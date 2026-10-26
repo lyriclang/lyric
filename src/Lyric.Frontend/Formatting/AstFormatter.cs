@@ -490,7 +490,7 @@ public sealed class AstFormatter
             decl.IsMut ? Doc.From("mut ") : Doc.Nil,
             Doc.Of(Doc.From($"{(decl.IsMacro ? "macro" : "fn")} "), NameDoc(decl.Name)),
             GenericsDoc(decl.Generics),
-            ParamListDoc(decl.Parameters),
+            ParamListDoc(decl.Parameters, decl.CVariadic is not null),
         };
 
         if (decl.ReturnType is { } ret) head.Add(Doc.Of(Doc.From(": "), ReturnDoc(ret, decl.Throws, decl.ReturnGrouped)));
@@ -529,15 +529,17 @@ public sealed class AstFormatter
         return Doc.Of(Doc.From("<"), Doc.Join(Doc.From(", "), parts.ToArray()), Doc.From(">"));
     }
 
-    private Doc ParamListDoc(Param[] parameters)
+    /// <param name="cVariadic">Whether C's variadic arguments follow, a bare <c>...</c>.</param>
+    private Doc ParamListDoc(Param[] parameters, bool cVariadic = false)
     {
-        if (parameters.Length == 0) return Doc.From("()");
+        if (parameters.Length == 0 && !cVariadic) return Doc.From("()");
 
         // No trailing comma: the parameter grammar does not allow one.
+        var items = parameters.Select(ParamDoc);
+        if (cVariadic) items = items.Append(Doc.From("..."));
         return Doc.GroupOf(Doc.From("("),
             Doc.IndentOf(Doc.LineOrNothing,
-                Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace),
-                    parameters.Select(ParamDoc).ToArray())),
+                Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace), items.ToArray())),
             Doc.LineOrNothing, Doc.From(")"));
     }
 

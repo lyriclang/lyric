@@ -148,6 +148,11 @@ public sealed record FunctionDecl(
     /// implementation the runtime binds outside the program. <c>null</c> for every ordinary
     /// function.</summary>
     public ExternSpec? Extern { get; init; }
+
+    /// <summary><c>extern "C" fn printf(fmt: CStr, ...)</c>: where the bare <c>...</c> after the
+    /// last parameter stands — C's variadic arguments, which no Lyric function has; <c>null</c>
+    /// where it does not.</summary>
+    public Span? CVariadic { get; init; }
 }
 
 /// <summary>

@@ -696,7 +696,8 @@ public sealed class CEmitter
         foreach (var import in foreign)
         {
             var parameters = import.ParamTypes.Length == 0 ? "void"
-                : string.Join(", ", import.ParamTypes.Select((t, i) => CAbiType(t, import.CParams?[i])));
+                : string.Join(", ", import.ParamTypes.Select((t, i) => CAbiType(t, import.CParams?[i])))
+                  + (import.CVariadic ? ", ..." : "");
             var symbol = import.Name[2..];
             _out.AppendLine($"extern {CAbiType(import.ReturnType, import.CReturn)} {ForeignName(symbol)}({parameters}) "
                 + $"__asm__(LYR_C_SYMBOL(\"{symbol}\"));");
@@ -2009,6 +2010,18 @@ public sealed class CEmitter
         _ => CType(type),
     };
 
+    /// <summary>A variadic argument as C's default promotions make it: a <c>float32</c> a
+    /// <c>double</c>, an integer narrower than <c>int</c> — <c>bool</c> and a small enum's among
+    /// them — an <c>int</c>. The prototype's <c>...</c> would do the same; the cast says it.</summary>
+    private static string Promoted(string crossing, IrType type, IrCForm form) => form.Kind switch
+    {
+        IrCKind.Enum when form.Integer is "int8_t" or "int16_t" or "uint8_t" or "uint16_t" => $"(int){crossing}",
+        IrCKind.Value when type is IrScalarType { Kind: IrScalar.F32 } => $"(double){crossing}",
+        IrCKind.Value when type is IrScalarType { Kind: IrScalar.I8 or IrScalar.I16 or IrScalar.U8 or IrScalar.U16 or IrScalar.Bool }
+            => $"(int){crossing}",
+        _ => crossing,
+    };
+
     /// <summary>
     /// A call of a C function: each argument in its C form — a pointer from the struct that holds
     /// its address, null for an absent optional, an enum's tag as its integer —, and the result
@@ -2019,18 +2032,23 @@ public sealed class CEmitter
     {
         var import = _module.Imports[call.Target.Value];
         var address = FieldName("address");
+        var fixedCount = import.ParamTypes.Length;
         var arguments = call.Args.Select((arg, i) =>
         {
             var value = Value(arg);
-            return import.CParams?[i].Kind switch
+            // past the parameters, C's variadic arguments: in their form, then as C promotes them
+            var variadic = i >= fixedCount;
+            var form = variadic ? call.Variadic![i - fixedCount] : import.CParams?[i];
+            var crossing = form?.Kind switch
             {
                 IrCKind.Pointer => $"(void *)(uintptr_t)({value}).{address}",
                 IrCKind.CString => $"(const char *)(uintptr_t)({value}).{address}",
                 IrCKind.OptionalPointer => $"(({value}).has ? (void *)(uintptr_t)({value}).value.{address} : NULL)",
                 IrCKind.OptionalCString => $"(({value}).has ? (const char *)(uintptr_t)({value}).value.{address} : NULL)",
-                IrCKind.Enum => $"({import.CParams[i].Integer})({value}).tag",
+                IrCKind.Enum => $"({form.Integer})({value}).tag",
                 _ => value,
             };
+            return variadic ? Promoted(crossing, TypeOf(arg), form!) : crossing;
         });
         var c = $"{ForeignName(import.Name[2..])}({string.Join(", ", arguments)})";
         if (call.Dest is not { } dest) return $"{c};";

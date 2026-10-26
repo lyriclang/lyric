@@ -8485,23 +8485,29 @@ internal sealed class FunctionLowerer
         // signature. Without a shape — runtime helpers, generated host functions — the two
         // coincide.
         var shape = _imports.ShapeOf(target);
-        if (arguments.Length + offset != (shape?.Params.Length ?? import.ParamTypes.Length))
+        var declared = shape?.Params.Length ?? import.ParamTypes.Length;
+        if (import.CVariadic ? arguments.Length + offset < declared : arguments.Length + offset != declared)
             throw NotSupported($"call to '{import.Name}' with default or variadic arguments", span);
 
         var args = new List<TempId>(import.ParamTypes.Length);
+        // C's variadic arguments, after the parameters: each as it crosses, in the form it crosses in
+        List<IrCForm>? variadic = import.CVariadic ? [] : null;
         if (receiver is { } self) args.Add(self);
         for (var i = 0; i < arguments.Length; i++)
         {
+            if (variadic is not null && args.Count >= import.ParamTypes.Length)
+            {
+                var passed = _types.IsCStrArgument(arguments[i])
+                    ? StringAsCStr(arguments[i], _typeTable.Lower(new NamedRef(FfiType("CStr", span)), span), span)
+                    : LowerExpr(arguments[i]);
+                variadic.Add(ModuleLowerer.CFormOf(_slots.TypeOfTemp(passed), _typeTable, _typeTable.Compilation!));
+                args.Add(passed);
+                continue;
+            }
             // a string handed to a C function's 'CStr': its bytes, for the call
             if (_types.IsCStrArgument(arguments[i]))
             {
-                if (_typeTable.Compilation?.FindModule(["std", "ffi"])?.Members.LookupLocal("stringAsCStr") is not FunctionSymbol asCStr
-                    || !TryResolveFunction(asCStr, out var asCStrTarget))
-                    throw Bug($"std.ffi's 'stringAsCStr' was not lowered, for {span}");
-                var text = LowerExpr(arguments[i]);
-                var cstr = _slots.NewTemp(import.ParamTypes[args.Count]);
-                _b.Emit(new Call(cstr, asCStrTarget, [text], span));
-                args.Add(cstr);
+                args.Add(StringAsCStr(arguments[i], import.ParamTypes[args.Count], span));
                 continue;
             }
             if (shape?.Params[i + offset] is not { Struct: { } structType } flat)
@@ -8548,14 +8554,31 @@ internal sealed class FunctionLowerer
 
         if (IsVoid(import.ReturnType))
         {
-            _b.Emit(new CallImport(null, target, [.. args], span));
+            _b.Emit(new CallImport(null, target, [.. args], span) { Variadic = variadic?.ToArray() });
             return null;
         }
 
         var dest = _slots.NewTemp(import.ReturnType);
-        _b.Emit(new CallImport(dest, target, [.. args], span));
+        _b.Emit(new CallImport(dest, target, [.. args], span) { Variadic = variadic?.ToArray() });
         return dest;
     }
+
+    /// <summary>A string handed to a C function as a <c>CStr</c>: its bytes, for the call.</summary>
+    private TempId StringAsCStr(Expr argument, IrType cstrType, Span span)
+    {
+        var asCStr = _typeTable.Compilation?.FindModule(["std", "ffi"])?.Members.LookupLocal("stringAsCStr") as FunctionSymbol;
+        if (asCStr is null || !TryResolveFunction(asCStr, out var asCStrTarget))
+            throw Bug($"std.ffi's 'stringAsCStr' was not lowered, for {span}");
+        var text = LowerExpr(argument);
+        var cstr = _slots.NewTemp(cstrType);
+        _b.Emit(new Call(cstr, asCStrTarget, [text], span));
+        return cstr;
+    }
+
+    /// <summary>A type of <c>std.ffi</c>, by its name.</summary>
+    private TypeSymbol FfiType(string name, Span span) =>
+        _typeTable.Compilation?.FindModule(["std", "ffi"])?.Members.LookupLocal(name) as TypeSymbol
+        ?? throw Bug($"std.ffi has no '{name}', for {span}");
 
     /// <summary>
     /// A direct call to a runtime helper through its fixed name.

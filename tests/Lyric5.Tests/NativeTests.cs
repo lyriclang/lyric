@@ -213,12 +213,61 @@ public class NativeTests
     [Theory]
     [InlineData("extern \"C\" { }", "LYR-PAR0032", "an extern block declares functions")]
     [InlineData("@Cold\nextern \"C\" { fn f(): int; }", "LYR-PAR0042", "an attribute stands before one function, and this is a block of them")]
+    [InlineData("fn f(a: int, ...): int {\n    return a;\n}", "LYR-PAR0026", "a bare '...' is a C function's variadic arguments")]
+    [InlineData("extern \"C\" fn f(...): int;", "LYR-SEM0099", "'f' takes C's variadic arguments, and they follow a parameter")]
     public void An_extern_block_is_checked(string declaration, string code, string why)
     {
         var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", declaration + "\n\nfn main(): void {\n}\n"));
         var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
         Assert.Equal(1, exit);
         Assert.Contains($"error[{code}]: {why}", error);
+    }
+
+    /// <summary>C's variadic arguments: any number after the parameters, each as it crosses — a
+    /// string as its bytes — and as C promotes it: a <c>float32</c> a <c>double</c>, an <c>int8</c>
+    /// and a <c>bool</c> an <c>int</c>. A Lyric variadic function beside it is what it was.</summary>
+    [Fact]
+    public void C_variadic_arguments_are_promoted()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", """
+            import std.ffi { Ptr, CStr };
+
+            extern "C" {
+                fn printf(format: CStr, ...): int32;
+                fn fflush(stream: ?Ptr<uint8>): int32;
+            }
+
+            fn sum(xs: int...): int {
+                var total = 0;
+                for (x in xs) {
+                    total += x;
+                }
+                return total;
+            }
+
+            fn main(): void {
+                let small: int8 = -3;
+                let half: float32 = 1.5;
+                let n = printf("%d %.2f %s %lld|", small, half, "text", sum(1, 2, 3));
+                printf("%d %d\n", n, true);
+                fflush(null);
+            }
+
+            """));
+        Assert.Equal("-3 1.50 text 6|15 1\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    [Theory]
+    [InlineData("printf(\"%d\", [1, 2])", "a 'int[]' does not cross into C among the variadic arguments of 'printf'")]
+    [InlineData("printf()", "call expects at least 1 argument(s), got 0")]
+    public void A_C_variadic_argument_is_checked(string call, string why)
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr",
+            "import std.ffi { CStr };\n\nextern \"C\" fn printf(format: CStr, ...): int32;\n\nfn main(): void {\n    let _ = "
+            + call + ";\n}\n"));
+        var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
+        Assert.Equal(1, exit);
+        Assert.Contains(why, error);
     }
 
     [Theory]

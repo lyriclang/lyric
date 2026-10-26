@@ -189,6 +189,7 @@ public static class ModuleLowerer
                                 {
                                     CParams = [.. cTypes.Select(t => CFormOf(t, typeTable, compilation))],
                                     CReturn = CFormOf(cReturn, typeTable, compilation),
+                                    CVariadic = function.CVariadic is not null,
                                 },
                                 new ImportShape([.. cTypes.Select(t => new ImportParam(t, null, []))], null));
                             continue;
@@ -865,7 +866,7 @@ public static class ModuleLowerer
     /// <summary>How a value of this type crosses into C: <c>std.ffi</c>'s pointers and C strings
     /// and their optionals as C's pointers, an enum with <c>@Layout</c> as its integer, the rest as
     /// it is.</summary>
-    private static IrCForm CFormOf(IrType type, TypeTable typeTable, Compilation compilation)
+    internal static IrCForm CFormOf(IrType type, TypeTable typeTable, Compilation compilation)
     {
         var ffi = compilation.FindModule(["std", "ffi"])?.Members;
         bool Is(IrType t, string name) => t is IrStructType s && ffi?.LookupLocal(name) is TypeSymbol wanted

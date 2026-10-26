@@ -1087,14 +1087,18 @@ public static class IrVerifier
 
         var import = _module.Imports[k.Target.Value];
 
-        if (k.Args.Length != import.ParamTypes.Length)
+        // a C function's variadic arguments come after its parameters, each with its form
+        var extra = k.Args.Length - import.ParamTypes.Length;
+        if (import.CVariadic ? extra < 0 || (k.Variadic?.Length ?? 0) != extra
+                : extra != 0 || k.Variadic is not null)
         {
-            Report(block, index, $"call to import '{import.Name}' passes {N(k.Args.Length)} arg(s), " +
-                                 $"expected {N(import.ParamTypes.Length)}");
+            Report(block, index, $"call to import '{import.Name}' passes {N(k.Args.Length)} arg(s) with " +
+                                 $"{N(k.Variadic?.Length ?? 0)} variadic form(s), expected {N(import.ParamTypes.Length)}" +
+                                 (import.CVariadic ? " and one form for each beyond them" : ""));
         }
         else
         {
-            for (var i = 0; i < k.Args.Length; i++)
+            for (var i = 0; i < import.ParamTypes.Length; i++)
             {
                 var actual = TypeOf(k.Args[i]);
                 if (!IrType.Equal(import.ParamTypes[i], actual))
