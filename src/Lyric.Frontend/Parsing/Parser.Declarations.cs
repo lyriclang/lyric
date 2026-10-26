@@ -558,8 +558,12 @@ public sealed partial class Parser
         var generics = _buffer.Check(TokenKind.Less) ? ParseGenericParams() : [];
 
         _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after function name");
-        var parameters = ParseParamList();
+        var parameters = ParseParamList(out var cVariadic);
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after parameters");
+        if (cVariadic is { } dots && spec is null)
+            _de.Report("LYR-PAR0026", Severity.Error, dots,
+                "a bare '...' is a C function's variadic arguments, in an extern \"C\" declaration — a Lyric "
+                + "function's are a parameter, 'xs: T...'");
 
         // allowThrows: false — a trailing 'throws' here is the FUNCTION's clause, as it has been
         // since 1.0. For a coroutine function the checker moves it into the returned type, which
@@ -610,7 +614,11 @@ public sealed partial class Parser
         }
 
         return new FunctionDecl(isPublic, isMut, isStatic, name.Name, generics, parameters, returnType, throws, body,
-            Span.Union(start, end)) { NameSpan = name.Span, Extern = spec, ReturnGrouped = returnGrouped, IsInline = isInline, IsMacro = isMacro };
+            Span.Union(start, end))
+        {
+            NameSpan = name.Span, Extern = spec, ReturnGrouped = returnGrouped, IsInline = isInline, IsMacro = isMacro,
+            CVariadic = cVariadic,
+        };
     }
 
     /// <summary>
@@ -657,13 +665,21 @@ public sealed partial class Parser
         return new ThrowsClause(listed.ToArray(), Span.Union(keyword, close.Span));
     }
 
-    private Param[] ParseParamList()
+    /// <param name="cVariadic">Where a bare <c>...</c> closes the list — C's variadic arguments;
+    /// whatever follows it is the closing parenthesis's to miss.</param>
+    private Param[] ParseParamList(out Span? cVariadic)
     {
+        cVariadic = null;
         var parameters = new List<Param>();
         if (_buffer.Check(TokenKind.RParen)) return parameters.ToArray();
         do
         {
             if (_buffer.Check(TokenKind.RParen)) break; // trailing comma
+            if (_buffer.Check(TokenKind.DotDotDot))
+            {
+                cVariadic = _buffer.Advance().Span;
+                break;
+            }
             var start = _buffer.Current.Span;
 
             // '@callerExpr(actual)': which attribute a parameter takes is

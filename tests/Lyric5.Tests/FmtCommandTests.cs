@@ -42,15 +42,16 @@ public class FmtCommandTests
     }
 
     /// <summary>An extern block stays a block: its head once, a function with a visibility of its
-    /// own keeps it.</summary>
+    /// own keeps it; C's variadic arguments stay after the last parameter.</summary>
     [Fact]
     public void Fmt_keeps_an_extern_block()
     {
-        const string loose = "pub extern \"C\" {fn abs(x: int32): int32;\n  private fn labs(x: int): int = \"labs\";}\n\nfn main(): void {\n}\n";
+        const string loose = "pub extern \"C\" {fn abs(x: int32): int32;\n  private fn labs(x: int): int = \"labs\";\nfn printf(f: CStr,...): int32;}\n\nfn main(): void {\n}\n";
         const string formed = """
             pub extern "C" {
                 fn abs(x: int32): int32;
                 private fn labs(x: int): int = "labs";
+                fn printf(f: CStr, ...): int32;
             }
 
             fn main(): void { }

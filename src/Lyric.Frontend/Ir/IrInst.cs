@@ -40,7 +40,12 @@ public sealed record Call(TempId? Dest, FunctionId Target, TempId[] Args, Span S
 // index space with Call: in the IR these are two different things — one has a body, the other does
 // not — and the verifier checks each against its own table. The index arithmetic belongs where the
 // convention lives: in the bytecode writer.
-public sealed record CallImport(TempId? Dest, ImportId Target, TempId[] Args, Span Span) : IrOp(Span);
+public sealed record CallImport(TempId? Dest, ImportId Target, TempId[] Args, Span Span) : IrOp(Span)
+{
+    /// <summary>For a C function's variadic arguments, the ones after its parameters: how each
+    /// crosses, in their order. <c>null</c> where the call hands none.</summary>
+    public IrCForm[]? Variadic { get; init; }
+}
 
 // Objects. Field access goes through the index rather than the name: Lyric is statically typed and
 // has no monkey patching, so the index is fixed at compile time. A name lookup with an inline cache,

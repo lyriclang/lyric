@@ -815,6 +815,10 @@ public sealed class TypeChecker
                 $"'{fn.Name}' is extern and cannot have type parameters — a C function is one signature");
         if (fn.Throws is not null)
             _de.Report("LYR-SEM0099", Severity.Error, fn.Throws.Span, $"'{fn.Name}' is a C function, and a C function throws nothing");
+        // C's variadic arguments follow a named one: the callee finds them from it
+        if (fn.CVariadic is { } dots && fn.Parameters.Length == 0)
+            _de.Report("LYR-SEM0099", Severity.Error, dots,
+                $"'{fn.Name}' takes C's variadic arguments, and they follow a parameter — declare the one before '...'");
         foreach (var p in fn.Parameters)
         {
             // A place (03 §2.3a) is an address of Lyric's, and C's addresses are 'Ptr's: no place
@@ -7822,6 +7826,8 @@ public sealed class TypeChecker
         var fixedCount = variadic ? ps!.Length - 1 : ps?.Length ?? fn.Parameters.Length;
         var minRequired = ps is null ? fn.Parameters.Length : ps.Take(fixedCount).Count(p => p.Default is null);
         var given = args.Count(a => a is not null);
+        // a C function's '...': any number more, each of a type that crosses
+        var cVariadic = decl is { CVariadic: not null, Extern.Abi: "C" };
 
         // What the call leaves out: by name when it names any argument — then a hole is a
         // parameter, and the parameter is what to say — by count otherwise, as a positional
@@ -7833,13 +7839,13 @@ public sealed class TypeChecker
                     _de.Report("LYR-SEM0014", Severity.Error, call.Span,
                         $"call gives no argument for '{ps[i].Name}', which has no default");
         }
-        else if (given < minRequired || (!variadic && given > fn.Parameters.Length))
+        else if (given < minRequired || (!variadic && !cVariadic && given > fn.Parameters.Length))
         {
             // the one of that count this module may not call, where the call names one
             var calleeName = call.Callee switch { MemberExpr m => m.Member, IdentifierExpr i => i.Name, _ => null };
             var hidden = calleeName is not null ? HiddenOverload(call, calleeName, given) : null;
             _de.Report("LYR-SEM0014", Severity.Error, call.Span,
-                $"call expects {(variadic ? $"at least {minRequired}" : minRequired == fn.Parameters.Length ? minRequired.ToString() : $"{minRequired}–{fn.Parameters.Length}")} argument(s), got {given}",
+                $"call expects {(variadic || cVariadic ? $"at least {minRequired}" :minRequired == fn.Parameters.Length ? minRequired.ToString() : $"{minRequired}–{fn.Parameters.Length}")} argument(s), got {given}",
                 hidden is { } note ? [note] : []);
         }
 
@@ -7916,6 +7922,23 @@ public sealed class TypeChecker
                     continue;
                 }
                 CheckAssignable(a, argTypes[i]!, elem.Element, a.Span);
+            }
+
+        // C's variadic arguments: what crosses as a parameter crosses here, a string as its bytes
+        // as into a 'CStr'; C promotes the small ones, the emitter with it.
+        if (cVariadic)
+            for (var i = fixedCount; i < args.Length; i++)
+            {
+                if (args[i] is not { } a || Spreads(call, a) || argTypes[i] is not { IsError: false } handed) continue;
+                if (handed is PrimitiveType { Kind: PrimitiveKind.String })
+                {
+                    _result.MarkCStrArgument(a);
+                    continue;
+                }
+                if (CFault(handed, CSite.Parameter) is { } fault)
+                    _de.Report("LYR-SEM0099", Severity.Error, a.Span,
+                        $"a '{TypeFacts.Display(handed)}' does not cross into C among the variadic arguments of "
+                        + $"{CalleeText(call, decl)} — {fault}");
             }
     }
 

@@ -102,6 +102,10 @@ public record struct IrImport(string Name, IrType[] ParamTypes, IrType ReturnTyp
 
     /// <summary>For a C function: how its result comes back.</summary>
     public IrCForm? CReturn { get; init; }
+
+    /// <summary>For a C function: whether C's variadic arguments follow its parameters — a call
+    /// may hand more arguments than <see cref="ParamTypes"/> has.</summary>
+    public bool CVariadic { get; init; }
 }
 
 /// <summary>What a value is at C's boundary.</summary>
