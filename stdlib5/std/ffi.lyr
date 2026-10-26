@@ -6,6 +6,11 @@
 //! [CStr] is C's text, `const char *`. A `string` handed to a `CStr` parameter crosses without a
 //! copy, its bytes as they lie, for the time of the call.
 //!
+//! Reading and writing through a pointer, moving it and changing what it points at, and C's own
+//! memory — [alloc] and [free] — stand in an `unsafe { … }` block: there the program says it
+//! holds to what the compiler cannot see, that the memory is there and of the type. Calling a C
+//! function is not unsafe, and neither is [Ptr] of an array or a slice's elements.
+//!
 //! # Examples
 //!
 //! ```lyric
@@ -27,10 +32,92 @@ import std.core { Utf8Error };
 /// A pointer to a `T` in memory C manages, never null: `T *` where a C function takes or returns
 /// one.
 ///
-/// A value of it comes from C and goes back to C; Lyric holds it and compares it, and does not
-/// read through it. A pointer C may return as null is a `?Ptr<T>`, `none` for null.
+/// A value of it comes from C, from [alloc] or from an array's `asPtr()`, and goes back to C. A
+/// pointer C may return as null is a `?Ptr<T>`, `none` for null. What it points at is read and
+/// written in an `unsafe` block, and only where `T` is what C holds — integers, floats, `bool`,
+/// `char`, a pointer, a `@Layout(C)` struct.
 pub struct Ptr<T> {
     address: uint,
+
+    /// Returns the `T` it points at. Unsafe: the memory is the program's word.
+    pub fn read(): T {
+        return load<T>(this.address);
+    }
+
+    /// Writes `value` where it points. Unsafe: the memory is the program's word.
+    pub fn write(value: T): void {
+        store<T>(this.address, value);
+    }
+
+    /// Returns the pointer `n` values of `T` further on, or back for a negative `n`. Unsafe:
+    /// nothing says the memory goes on.
+    pub fn offset(n: int): Ptr<T> {
+        return Ptr<T> { address = ((this.address as int) + n * (sizeOf<T>() as int)) as uint };
+    }
+
+    /// Returns the same address as a pointer to a `U`. Unsafe: nothing says a `U` lies there.
+    pub fn cast<U>(): Ptr<U> {
+        return Ptr<U> { address = this.address };
+    }
+}
+
+/// Returns `count` values of `T` from C's heap, each set to zero — what C's `calloc` gives, to
+/// be given back with [free]. Unsafe: nothing frees it but the program.
+///
+/// # Panics
+/// Where `count` is negative, and where C's heap has no memory left.
+pub fn alloc<T>(count: int): Ptr<T> {
+    return Ptr<T> { address = lyr_ffi_alloc(count, sizeOf<T>()) };
+}
+
+/// Gives the memory [alloc] gave back to C's heap. Unsafe: nothing reads it afterwards but the
+/// program's word says so.
+pub fn free<T>(p: Ptr<T>): void {
+    lyr_ffi_free(p.address);
+}
+
+extend<T> T[] {
+    /// Returns a pointer to the first element: the elements lie one after the other, as C's
+    /// array does. It holds the array no longer than the array is otherwise held, and it is no
+    /// pointer to anything where the array is empty.
+    pub fn asPtr(): Ptr<T> {
+        return Ptr<T> { address = dataAddress(this) };
+    }
+}
+
+extend<T> Slice<T> {
+    /// Returns a pointer to the slice's first element, in the memory of its array. It holds the
+    /// array no longer than the array is otherwise held, and it is no pointer to anything where
+    /// the slice is empty.
+    pub fn asPtr(): Ptr<T> {
+        return Ptr<T> { address = sliceAddress(this) };
+    }
+}
+
+// The compiler's own, beneath Ptr: their bodies never run, and say nothing of what they take.
+@Allow("unused")
+fn load<T>(address: uint): T {
+    unreachable("std.ffi's load is the compiler's");
+}
+
+@Allow("unused")
+fn store<T>(address: uint, value: T): void {
+    unreachable("std.ffi's store is the compiler's");
+}
+
+@Allow("unused")
+fn sizeOf<T>(): uint {
+    unreachable("std.ffi's sizeOf is the compiler's");
+}
+
+@Allow("unused")
+fn dataAddress<T>(xs: T[]): uint {
+    unreachable("std.ffi's dataAddress is the compiler's");
+}
+
+@Allow("unused")
+fn sliceAddress<T>(xs: Slice<T>): uint {
+    unreachable("std.ffi's sliceAddress is the compiler's");
 }
 
 /// A C string: the address of bytes a NUL ends, `const char *` at a C function's boundary.
@@ -71,3 +158,5 @@ extern "C" fn lyr_ffi_cstr_length(address: uint): int;
 extern "C" fn lyr_ffi_cstr_invalid(address: uint): int;
 extern "C" fn lyr_ffi_cstr_string(address: uint): string;
 extern "C" fn lyr_ffi_string_address(s: string): uint;
+extern "C" fn lyr_ffi_alloc(count: int, size: uint): uint;
+extern "C" fn lyr_ffi_free(address: uint): void;

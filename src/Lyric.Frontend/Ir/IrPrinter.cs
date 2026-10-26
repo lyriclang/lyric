@@ -218,6 +218,9 @@ public static class IrPrinter
         SuppressedErrors s => $"{s.Dest}: {TypeStr(s.Type)} = suppressed s{s.Stash}",
         ErrorTrace t => $"{t.Dest}: {TypeStr(t.Type)} = errtrace s{t.Stash}",
         BlackBox b => $"{b.Dest}: {TypeStr(b.Type)} = blackbox {b.Value}",
+        PlaceAt p => $"{p.Dest}: {TypeStr(new IrPlaceType(p.Type))} = placeat {p.Address}",
+        SizeOf s => $"{s.Dest}: u64 = sizeof {TypeStr(s.Type)}",
+        DataAddress d => $"{d.Dest}: u64 = dataaddress {d.Value}",
         _ => throw new InternalCompilationException($"ir-printer: unhandled op {op.GetType().Name}")
     };
 

@@ -215,6 +215,8 @@ public static class SubsetGate
                     break;
                 case BlackBox:
                     break;
+                case PlaceAt or SizeOf or DataAddress:
+                    break;
                 case LoadGlobal or StoreGlobal:
                     break;
                 // Places: a place parameter's.

@@ -10975,3 +10975,34 @@ fn main(): void {
     }
 }
 '''
+
+[LYR-SEM0233]
+title = "a memory operation outside an unsafe block"
+severity = "error"
+area = "13-abi"
+summary = "A pointer's `read`, `write`, `offset` or `cast`, or `std.ffi`'s `alloc` or `free`, is called outside an `unsafe { … }` block."
+explanation = '''
+These operations hold to what the compiler cannot see: that memory is there, that it holds a value of the type, that nothing else frees it. The `unsafe` block is where the program says it holds to that, and the one place a reader looks for it. Calling a C function is not unsafe, and neither is an array's `asPtr()`; what reads and writes through the pointer is.
+
+Put the call in an `unsafe { … }` block, as small as it can be.
+'''
+wrong = '''
+import std.ffi { alloc, free };
+
+fn main(): void {
+    let p = alloc<int>(1);
+    p.write(7);
+    free(p);
+}
+'''
+right = '''
+import std.ffi { alloc, free };
+
+fn main(): void {
+    unsafe {
+        let p = alloc<int>(1);
+        p.write(7);
+        free(p);
+    }
+}
+'''

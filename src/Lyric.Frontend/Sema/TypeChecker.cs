@@ -3154,9 +3154,53 @@ public sealed class TypeChecker
         var scope = new SymbolTable(parent);
         var savedNarrowed = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
         _walked.Add(new Dictionary<Symbol, Span>(ReferenceEqualityComparer.Instance));
-        foreach (var stmt in block.Statements) CheckStmt(stmt, scope);
+        if (block.Unsafe is not null) _unsafeDepth++;
+        try
+        {
+            foreach (var stmt in block.Statements) CheckStmt(stmt, scope);
+        }
+        finally
+        {
+            if (block.Unsafe is not null) _unsafeDepth--;
+        }
         _walked.RemoveAt(_walked.Count - 1); // a loop inside ran or did not: it speaks for no statement after the block
         EndScope(savedNarrowed); // narrowings established inside the block by an early exit end here
+    }
+
+    /// <summary>How many <c>unsafe { … }</c> blocks enclose what is checked: within one,
+    /// <c>std.ffi</c>'s memory operations may be called.</summary>
+    private int _unsafeDepth;
+
+    /// <summary>
+    /// <c>std.ffi</c>'s memory operations — a pointer's <c>read</c>, <c>write</c>,
+    /// <c>offset</c> and <c>cast</c>, <c>alloc</c> and <c>free</c> — the closed list of what holds
+    /// to what the compiler cannot see: within an <c>unsafe</c> block only. What is read or
+    /// written is what C holds, as a field of a <c>@Layout(C)</c> struct is.
+    /// </summary>
+    private void CheckUnsafeCall(CallExpr call, FnType fn, FunctionDecl? decl)
+    {
+        if (decl is null || _comp.FindModule(["std", "ffi"])?.Members is not { } ffi) return;
+        var ptr = ffi.LookupLocal("Ptr") as TypeSymbol;
+        string? operation = null;
+        foreach (var name in (string[])["read", "write", "offset", "cast"])
+            if (ReferenceEquals(ptr?.Members.LookupLocal(name)?.Declaration, decl)) operation = $"Ptr.{name}";
+        foreach (var name in (string[])["alloc", "free"])
+            if (ReferenceEquals(ffi.LookupLocal(name)?.Declaration, decl)) operation = name;
+        if (operation is null) return;
+        if (_unsafeDepth == 0)
+            _de.Report(Lyric5Code("LYR-SEM0233"), Severity.Error, call.Span,
+                $"'{operation}' holds to what the compiler cannot see — that the memory is there and of its type: "
+                + "call it in an 'unsafe { … }' block");
+        var moved = operation switch
+        {
+            "Ptr.read" => fn.Return,
+            "Ptr.write" => fn.Parameters.Length > 0 ? fn.Parameters[0] : null,
+            "alloc" => fn.Return is GenericInstance { Arguments: [var element] } ? element : null,
+            _ => null,
+        };
+        if (moved is { IsError: false } && !MentionsTypeParam(moved) && CFault(moved, CSite.Field) is { } fault)
+            _de.Report("LYR-SEM0099", Severity.Error, call.Span,
+                $"'{operation}' moves a '{TypeFacts.Display(moved)}', which C does not hold — {fault}");
     }
 
     /// <summary>The iterator bindings a loop walked, one frame per block being checked (07 §2
@@ -7742,6 +7786,7 @@ public sealed class TypeChecker
         }
 
         CheckCallArgs(call, substituted, args, argTypes, decl);
+        CheckUnsafeCall(call, substituted, decl);
 
         // What this call may throw, in its instance's terms: the exception analysis
         // asks whether it is marked and covered. 'task.await()' throws what the task's type says

@@ -507,6 +507,9 @@ public sealed class Interpreter
                 Set(b.Dest, Heap.Copy(T(b.Value)));
                 return null;
 
+            case PlaceAt or SizeOf or DataAddress:
+                throw ComptimeFailure.NotYet("memory at an address — std.ffi's — is C's, and C does not run at compile time");
+
             case MakeCoroutine or ResumePull or CoroutineDone or CoroutineResult or CoroutineClosing or CoroutineClose or YieldSuspend:
                 throw ComptimeFailure.NotYet("a coroutine — a generator, 'sequence { }', a task — does not run at compile time yet");
 

@@ -1363,11 +1363,12 @@ public sealed class CEmitter
             Visit(function.ReturnType);
         }
         // A test or a downcast names its target by id alone: a descriptor to declare — as does a
-        // close, the Cancelled it drops.
+        // close, the Cancelled it drops. A size names a type no temp may hold.
         foreach (var op in ops)
             if (op is TypeTest tt) Add(tt.Target.Value);
             else if (op is Downcast dc) Add(dc.Target.Value);
             else if (op is CoroutineClose cc) Add(cc.Cancelled.Value);
+            else if (op is SizeOf so) Visit(so.Type);
 
         if (program)
         {
@@ -1878,6 +1879,11 @@ public sealed class CEmitter
         // points at its storage: the value is stored there, and that is held.
         BlackBox b => Assign(b.Dest, Value(b.Value))
             + $" __asm__ volatile(\"\" : : \"r\"(&{(IsAggregate(TypeOf(b.Dest)) ? Storage(b.Dest) : Temp(b.Dest))}) : \"memory\");",
+        // std.ffi's memory: a place at an address C gave, the size C gives a type, where an
+        // array's or a slice's elements begin
+        PlaceAt p => $"{Temp(p.Dest)} = ({CType(p.Type)} *)(uintptr_t){Temp(p.Address)};",
+        SizeOf s => $"{Temp(s.Dest)} = (uint64_t)sizeof({CType(s.Type)});",
+        DataAddress d => $"{Temp(d.Dest)} = (uint64_t)(uintptr_t){Elements(d.Value, d.Element)};",
         // 'x is T': the descriptor the value's table begins with, or the conformance
         // list behind that descriptor for an interface.
         TypeTest t when _module.Types[t.Target.Value].IsInterface =>

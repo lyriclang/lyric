@@ -325,3 +325,16 @@ public sealed record ErrorTrace(TempId Dest, IrType Type, int Stash, Span Span) 
 /// <paramref name="Dest"/> through a point the C compiler cannot see through — what computed the
 /// value is not dropped, and the value that comes out is not known in advance.</summary>
 public sealed record BlackBox(TempId Dest, TempId Value, IrType Type, Span Span) : IrOp(Span);
+
+/// <summary><c>std.ffi</c>'s memory: the place of a <paramref name="Type"/> at
+/// <paramref name="Address"/>, a <c>uint</c> C gave — read and written through
+/// <see cref="LoadPlace"/> and <see cref="StorePlace"/> as any place.</summary>
+public sealed record PlaceAt(TempId Dest, TempId Address, IrType Type, Span Span) : IrOp(Span);
+
+/// <summary><c>std.ffi</c>'s size of <paramref name="Type"/> in memory, a <c>uint</c>: what C's
+/// <c>sizeof</c> says of it, and the step between two of them.</summary>
+public sealed record SizeOf(TempId Dest, IrType Type, Span Span) : IrOp(Span);
+
+/// <summary><c>std.ffi</c>'s address of the first element of an array or a slice, a
+/// <c>uint</c>.</summary>
+public sealed record DataAddress(TempId Dest, TempId Value, IrType Element, Span Span) : IrOp(Span);

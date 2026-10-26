@@ -88,6 +88,9 @@ public static class IrShape
         CurrentError or ClearError or StashError or RestoreError or SuppressError
             or SuppressedErrors or ErrorTrace => Array.Empty<TempId>(),
         BlackBox b => new[] { b.Value },
+        PlaceAt p => new[] { p.Address },
+        SizeOf => Array.Empty<TempId>(),
+        DataAddress d => new[] { d.Value },
 
         _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
     };
@@ -168,6 +171,9 @@ public static class IrShape
         SuppressedErrors s => s.Dest,
         ErrorTrace t => t.Dest,
         BlackBox b => b.Dest,
+        PlaceAt p => p.Dest,
+        SizeOf s => s.Dest,
+        DataAddress d => d.Dest,
         ClearError or StashError or RestoreError or SuppressError => null,
 
         _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
@@ -271,6 +277,9 @@ public static class IrShape
             SuppressedErrors s => s with { Dest = temp(s.Dest) },
             ErrorTrace t => t with { Dest = temp(t.Dest) },
             BlackBox b => b with { Dest = temp(b.Dest), Value = temp(b.Value) },
+            PlaceAt p => p with { Dest = temp(p.Dest), Address = temp(p.Address) },
+            SizeOf s => s with { Dest = temp(s.Dest) },
+            DataAddress d => d with { Dest = temp(d.Dest), Value = temp(d.Value) },
             ClearError or StashError or RestoreError or SuppressError => op,
 
             _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")

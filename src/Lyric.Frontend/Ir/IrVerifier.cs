@@ -814,6 +814,19 @@ public static class IrVerifier
                         Report(block, index, $"blackbox {b.Value} is {Show(TypeOf(b.Value))}, annotated {Show(b.Type)}");
                     RequireDestType(b.Dest, b.Type, "blackbox", block, index);
                     break;
+                case PlaceAt p:
+                    if (!IrType.Equal(TypeOf(p.Address), new IrScalarType(IrScalar.U64)))
+                        Report(block, index, $"placeat {p.Address} is {Show(TypeOf(p.Address))}, expected an address, u64");
+                    RequireDestType(p.Dest, new IrPlaceType(p.Type), "placeat", block, index);
+                    break;
+                case SizeOf s:
+                    RequireDestType(s.Dest, new IrScalarType(IrScalar.U64), "sizeof", block, index);
+                    break;
+                case DataAddress d:
+                    if (TypeOf(d.Value) is not (IrArrayType or IrSliceType))
+                        Report(block, index, $"dataaddress {d.Value} is {Show(TypeOf(d.Value))}, expected an array or a slice");
+                    RequireDestType(d.Dest, new IrScalarType(IrScalar.U64), "dataaddress", block, index);
+                    break;
                 default:
                     throw new InternalCompilationException(
                         $"ir-verifier: unhandled op {op.GetType().Name}");
