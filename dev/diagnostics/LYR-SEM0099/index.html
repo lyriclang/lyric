@@ -243,9 +243,9 @@
 <h1>LYR-SEM0099</h1>
 <p class="code-title">an extern declaration that cannot cross into C</p>
 <p class="meta">error · <a href="../../spec/13-abi/">spec 13-abi</a></p>
-<p>An <code>extern</code> function names an ABI other than &quot;C&quot;, a symbol that is no C name, type parameters, <code>throws</code>, a place parameter, or a parameter or return type that does not cross into C.</p>
+<p>An <code>extern</code> function names an ABI other than &quot;C&quot;, a symbol that is no C name, type parameters, <code>throws</code>, a place parameter, or a parameter or return type that does not cross into C; or <code>@Layout</code> stands where C cannot lay the type out, or in another form than <code>@Layout(C)</code> or an integer type.</p>
 <h2 id="explanation">Explanation</h2>
-<p>Lyric 5's one foreign boundary is C. In this stage integers, floats and <code>bool</code> cross it (and <code>void</code> as a return); strings, pointers and places, generics and thrown errors do not, so a declaration nobody could bind is refused where it stands, whether or not it is called.</p>
+<p>Lyric 5's one foreign boundary is C. Integers, floats, <code>bool</code> and <code>char</code> cross it (and <code>void</code> as a return); <code>std.ffi</code>'s <code>Ptr&lt;T&gt;</code> and <code>CStr</code> cross as C's pointers, <code>?Ptr&lt;T&gt;</code> and <code>?CStr</code> as pointers that may be null; a struct with <code>@Layout(C)</code> crosses as C's struct, by value, and an enum with <code>@Layout</code> as its integer. A <code>string</code> argument crosses into a <code>CStr</code> parameter as its bytes. Classes, arrays, other optionals, places, generics and thrown errors do not, so a declaration nobody could bind is refused where it stands, whether or not it is called.</p>
 <p>Declare the C function with types that cross, and convert at the Lyric side.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> shout(s: <span class="ty">string</span>): <span class="ty">int</span>;
@@ -254,10 +254,12 @@
     <span class="kw">let</span> _ = shout(<span class="str">"hi"</span>);
 }</code></pre>
 <h2 id="right">Right</h2>
-<pre><code class="language-lyric"><span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> abs(n: <span class="ty">int32</span>): <span class="ty">int32</span>;
+<pre><code class="language-lyric"><span class="kw">import</span> std.ffi { <span class="ty">CStr</span> };
+
+<span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> shout(s: <span class="ty">CStr</span>): <span class="ty">int</span>;
 
 <span class="kw">fn</span> main(): <span class="ty">void</span> {
-    <span class="kw">let</span> _ = abs(-<span class="num">3</span>);
+    <span class="kw">let</span> _ = shout(<span class="str">"hi"</span>);
 }</code></pre>
 </main>
 <aside class="on-this-page" aria-label="On this page">

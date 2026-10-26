@@ -85,7 +85,7 @@
 <h1>LYR-PAR0042</h1>
 <p class="code-title">an attribute with no declaration to carry it</p>
 <p class="meta">error · <a href="../../spec/11-metaprogramming/">spec 11-metaprogramming</a></p>
-<p>An attribute stands at the end of a file, before something that is no declaration, or before an <code>import</code>.</p>
+<p>An attribute stands at the end of a file, before something that is no declaration, before an <code>import</code>, or before an <code>extern</code> block, whose functions carry their own.</p>
 <h2 id="explanation">Explanation</h2>
 <p>An attribute belongs to the declaration that follows it: a function, a type, a member, a binding, an alias, the module header. Before an <code>import</code> or with nothing after it, it would be lost without a word.</p>
 <p>Put the attribute before the declaration it is for, or remove it.</p>

@@ -85,7 +85,7 @@
 <h1>LYR-PAR0032</h1>
 <p class="code-title">a function without 'fn', or its words out of order</p>
 <p class="meta">error · <a href="../../spec/03-types/">spec 03-types</a></p>
-<p>Where a function or method is declared, <code>fn</code> is missing after its other words, or <code>inline static</code> is written where the order is <code>static inline</code>.</p>
+<p>Where a function or method is declared, <code>fn</code> is missing after its other words, or <code>inline static</code> is written where the order is <code>static inline</code>; an <code>extern</code> block declares no function.</p>
 <h2 id="explanation">Explanation</h2>
 <p>The words of a function stand in one order: <code>[static] [inline] [mut] fn name(…)</code>. <code>inline static</code> is refused and read as what it says; a <code>mut</code> or <code>static</code> without <code>fn</code> declares nothing.</p>
 <p>Write <code>fn</code>, and the words in their order.</p>

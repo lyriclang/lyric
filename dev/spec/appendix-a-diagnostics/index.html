@@ -391,7 +391,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/03-types/">03-types</a></td>
 <td>a function without 'fn', or its words out of order</td>
-<td>Where a function or method is declared, <code>fn</code> is missing after its other words, or <code>inline static</code> is written where the order is <code>static inline</code>.</td>
+<td>Where a function or method is declared, <code>fn</code> is missing after its other words, or <code>inline static</code> is written where the order is <code>static inline</code>; an <code>extern</code> block declares no function.</td>
 </tr>
 <tr>
 <td>LYR-PAR0033</td>
@@ -440,7 +440,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
 <td>an attribute with no declaration to carry it</td>
-<td>An attribute stands at the end of a file, before something that is no declaration, or before an <code>import</code>.</td>
+<td>An attribute stands at the end of a file, before something that is no declaration, before an <code>import</code>, or before an <code>extern</code> block, whose functions carry their own.</td>
 </tr>
 <tr>
 <td>LYR-PAR0043</td>
@@ -1373,7 +1373,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/13-abi/">13-abi</a></td>
 <td>an extern declaration that cannot cross into C</td>
-<td>An <code>extern</code> function names an ABI other than &quot;C&quot;, a symbol that is no C name, type parameters, <code>throws</code>, a place parameter, or a parameter or return type that does not cross into C.</td>
+<td>An <code>extern</code> function names an ABI other than &quot;C&quot;, a symbol that is no C name, type parameters, <code>throws</code>, a place parameter, or a parameter or return type that does not cross into C; or <code>@Layout</code> stands where C cannot lay the type out, or in another form than <code>@Layout(C)</code> or an integer type.</td>
 </tr>
 <tr>
 <td>LYR-SEM0100</td>
@@ -2881,6 +2881,13 @@ code is no longer reported, and its number is not given again.</p>
 <td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
 <td>the runtime found its own invariant broken</td>
 <td>The runtime met a state its own rules exclude — a thread allocating that the collector does not know, an object whose descriptor gives no size, a pointer the collector's map of a type does not name, a young object stored without its barrier, a coroutine whose descriptor is no coroutine's. That is a bug in the runtime or in the compiler, never in the program.</td>
+</tr>
+<tr>
+<td>LYR-RT0021</td>
+<td>P</td>
+<td><a href="../../spec/13-abi/">13-abi</a></td>
+<td>an integer from C that no variant of the enum stands for</td>
+<td>A C function declared to return a <code>@Layout</code> enum returned an integer that is none of the enum's variants. A C enum may hold any integer of its type; a Lyric enum holds one of its variants, the first as 0, the next as 1, in the order they are written.</td>
 </tr>
 </tbody>
 </table>

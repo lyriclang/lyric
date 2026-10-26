@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>std.ffi — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a class="current" href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.ffi</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a class="current" href="../../std/ffi/">std.ffi</a></li>
+<li><a href="../../std/ffi/Ptr/">Ptr</a></li>
+<li><a href="../../std/ffi/CStr/">CStr</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>std.ffi</h1>
+<p>Provides the types that cross into a C function and back.</p>
+<p>A C function is declared with <code>extern &quot;C&quot;</code> and called as any other: its integers, floats and
+<code>bool</code> cross as they are, a <code>@Layout(C)</code> struct crosses by value, and the types here stand for
+what C holds by address. <a href="../../std/ffi/Ptr/">Ptr</a> is a pointer to memory C manages, <code>?Ptr</code> one that may be null;
+<a href="../../std/ffi/CStr/">CStr</a> is C's text, <code>const char *</code>. A <code>string</code> handed to a <code>CStr</code> parameter crosses without a
+copy, its bytes as they lie, for the time of the call.</p>
+<h4 id="examples">Examples</h4>
+<pre><code class="language-lyric"><span class="kw">import</span> std.ffi { <span class="ty">CStr</span> };
+<span class="kw">import</span> std.io { println };
+
+<span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> strlen(s: <span class="ty">CStr</span>): <span class="ty">uint</span>;
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(strlen(<span class="str">"hello"</span>));
+}</code></pre>
+<pre class="output"><code>5</code></pre>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/ffi/Ptr/">Ptr</a> <span class="kind">struct</span> <span class="summary">— A pointer to a <code>T</code> in memory C manages, never null: <code>T *</code> where a C function takes or returns one.</span></div>
+<div class="listed"><a href="../../std/ffi/CStr/">CStr</a> <span class="kind">struct</span> <span class="summary">— A C string: the address of bytes a NUL ends, <code>const char *</code> at a C function's boundary.</span></div>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#types">Types</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

@@ -42,7 +42,7 @@
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
 <h1>ABI and embedding</h1>
 <blockquote>
-<p><strong>Partly written.</strong> §1 was written with milestone <strong>M1</strong> of the Lyric 5 plan, §1.6 and §1.7 with <strong>M6</strong>, §2 with <strong>M7</strong>; the rest comes
+<p><strong>Partly written.</strong> §1 was written with milestone <strong>M1</strong> of the Lyric 5 plan, §1.6 and §1.7 with <strong>M6</strong>, §2 with <strong>M7</strong>, §3 with <strong>M14</strong>; the rest comes
 with <strong>M14</strong>, spec-first: each rule lands here with its conformance case before or with its
 implementation. Source of the decisions:
 <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 Runtime</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 Tooling and interop W4/W5</a>.</p>
@@ -250,6 +250,10 @@ with the line <code>panic while panicking [CODE]: message</code>, still with 101
 <td><code>LYR-RT0019</code></td>
 <td><code>lock</code>, <code>read</code>, <code>write</code> or <code>run</code> on a lock a task panicked while it held: <code>lock poisoned by a panic: &lt;code&gt;: &lt;message&gt;</code>, the first panic named (<a href="../../spec/10-concurrency/">10 §10</a> rule 6)</td>
 </tr>
+<tr>
+<td><code>LYR-RT0021</code></td>
+<td>a C function returned, for an enum with <code>@Layout</code>, an integer no variant stands for: <code>C returned &lt;n&gt;, which is no variant of &lt;enum&gt; (it has &lt;count&gt;)</code> (§3 rule 5)</td>
+</tr>
 </tbody>
 </table>
 </li>
@@ -353,8 +357,8 @@ panic (<code>LYR-RT0015</code>).</li>
 <h2 id="2-c-functions-stage-1">2. C functions, stage 1</h2>
 <p>A C function the program calls, declared in Lyric and found by the linker in a package's native
 part (<a href="../../spec/15-project/">15 §5</a>) or a library (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W4</a>). Stage 1 carries the
-scalars C has as they are; strings, pointers, structs, callbacks and exports are the type table
-of a later stage (M14).</p>
+scalars C has as they are; pointers, strings, structs and enums are the type table's second
+stage (§3); callbacks and exports come later (M14).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code>, package cases with a native part; the toolchain's
 own tests (<code>tests/Lyric5.Tests</code>, <code>NativeTests</code>).</p>
 <ol>
@@ -364,11 +368,50 @@ signature names its symbol instead, a C identifier (<code>LYR-SEM0099</code> for
 body, no type parameters and no <code>throws</code> — a C function throws nothing (<code>LYR-SEM0099</code>).</li>
 <li>What crosses: <code>int8</code> to <code>int64</code> and <code>uint8</code> to <code>uint64</code> as the C integer of their width,
 <code>int</code>/<code>uint</code> as the 64-bit ones; <code>float32</code> as <code>float</code>, <code>float</code> as <code>double</code>; <code>bool</code> as C's
-<code>bool</code>, 0 or 1; and <code>void</code> as a return. Each by value: a place parameter (<code>&amp;x: T</code>,
-<a href="../../spec/03-types/">03 §2.3a</a>) is an address and does not cross. Every other type is refused, as a parameter and as a
-result (<code>LYR-SEM0099</code>).</li>
+<code>bool</code>, 0 or 1; <code>char</code> as <code>uint32_t</code>, its scalar value; and <code>void</code> as a return. Each by value:
+a place parameter (<code>&amp;x: T</code>, <a href="../../spec/03-types/">03 §2.3a</a>) is an address and does not cross. What
+§3 adds crosses too; every other type is refused, as a parameter and as a result
+(<code>LYR-SEM0099</code>).</li>
 <li>A call is a direct call in the target platform's C ABI. A symbol nothing defines fails the link
-(exit 2, <a href="../../spec/14-cli/">14 §1.3</a>).</li>
+(exit 2, <a href="../../spec/14-cli/">14 §1.3</a>). The program's own declaration is the one it calls by: a header
+of the system's that declares the same function with other types does not meet it.</li>
+<li><code>extern &quot;C&quot; { fn …; fn …; }</code> declares the functions of one ABI together: each is the
+declaration it would be alone, with its symbol and its <code>;</code>. A visibility word before <code>extern</code>
+is that of each function inside without its own. An attribute stands on a function inside,
+not on the block (<code>LYR-PAR0042</code>); a block without a function is refused (<code>LYR-PAR0032</code>).</li>
+</ol>
+<h2 id="3-the-type-table-stage-2">3. The type table, stage 2</h2>
+<p>What crosses into C beside the scalars of §2: pointers, C's strings, structs by value and enums
+as integers (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 X2</a>).
+The pointer types are <code>std.ffi</code>'s; <code>@Layout</code> is a compiler instruction of the prelude
+(<a href="../../spec/11-metaprogramming/">11 §1</a> rule 16).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code>; the toolchain's own tests (<code>NativeTests</code>).</p>
+<ol>
+<li><strong><code>Ptr&lt;T&gt;</code></strong> is an address C gave, never null: C's <code>T *</code>. Lyric does not read or write through
+it here, and makes none of its own; <code>T</code> says what it points at, which C alone holds to.
+<strong><code>?Ptr&lt;T&gt;</code></strong> is a pointer that may be null: <code>null</code> crosses as C's null, and a null pointer C
+returns comes back as <code>null</code>.</li>
+<li><strong><code>CStr</code></strong> is C's <code>const char *</code>: bytes up to a NUL, which C owns. Its <code>length()</code> counts the
+bytes before the NUL; its <code>toString()</code> copies them into a <code>string</code>, and throws <code>Utf8Error</code>
+where they are no well-formed UTF-8. <strong><code>?CStr</code></strong> may be null, as <code>?Ptr&lt;T&gt;</code>.</li>
+<li>A <code>string</code> argument where a C function's parameter is <code>CStr</code> crosses as the string's bytes,
+with the NUL every string holds (§1.2), without a copy. They are C's for the call: C does not
+keep the address past its return.</li>
+<li>A struct with <strong><code>@Layout(C)</code></strong> is laid out as C lays out a struct of the same fields in the same
+order on the target platform, and crosses by value, as a parameter and as a result. Its fields
+are what C holds: the scalars of §2, <code>char</code>, <code>Ptr&lt;T&gt;</code>, <code>CStr</code>, another <code>@Layout(C)</code> struct, and an
+inline array <code>T[N]</code> of one of them. A field of another type — an optional, an enum, a string —
+is refused (<code>LYR-SEM0099</code>). A struct without <code>@Layout(C)</code> is the compiler's to lay out and does
+not cross (<code>LYR-SEM0099</code>).</li>
+<li>An enum with <strong><code>@Layout(C)</code></strong> is C's <code>enum</code>, an <code>int</code>; with <strong><code>@Layout(uint8)</code></strong> — or any other
+integer type of §2 — it is that integer. Its variants carry no payload (<code>LYR-SEM0099</code>). The
+first variant written is 0, the next 1, in the order they are written, and the count must fit
+the integer (<code>LYR-SEM0099</code>). It crosses as a parameter and as a result; an integer C returns that
+no variant stands for is a panic (<code>LYR-RT0021</code>), before any <code>match</code> meets it. An enum without
+<code>@Layout</code> does not cross (<code>LYR-SEM0099</code>).</li>
+<li><code>@Layout</code> takes <code>C</code> or an integer type, written as a name: <code>@Layout(C)</code>, <code>@Layout(uint8)</code>. It
+sits on a struct or an enum that is not generic; on a class, on a generic type, on a struct
+with an integer type, or in another form it is refused (<code>LYR-SEM0099</code>).</li>
 </ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
@@ -384,6 +427,7 @@ result (<code>LYR-SEM0099</code>).</li>
 <li class="level-3"><a href="#16-coroutines">1.6 Coroutines</a></li>
 <li class="level-3"><a href="#17-waiting">1.7 Waiting</a></li>
 <li class="level-2"><a href="#2-c-functions-stage-1">2. C functions, stage 1</a></li>
+<li class="level-2"><a href="#3-the-type-table-stage-2">3. The type table, stage 2</a></li>
 </ul>
 </aside>
 </div>
