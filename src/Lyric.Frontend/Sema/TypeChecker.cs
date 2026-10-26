@@ -612,7 +612,10 @@ public sealed class TypeChecker
                     module.Members, "a struct");
                 CheckValueTypeIsFinite(s, s.Name, "struct", module);
                 if (module.Members.LookupLocal(s.Name) is TypeSymbol sType)
+                {
                     CheckOverloadSets(sType.Members, $"'{s.Name}'", inInterface: false, sType);
+                    CheckLayout(sType);
+                }
                 CheckMethods(s.Name, s.Members, module);
                 CheckTypeConformance(s.Name, s.Interfaces, module, s.Delegates);
                 break;
@@ -620,7 +623,10 @@ public sealed class TypeChecker
                 CheckAttributes(c.Attributes, AttributeSite.Type, c.Generics.Length > 0,
                     module.Members, "a class");
                 if (module.Members.LookupLocal(c.Name) is TypeSymbol cType)
+                {
                     CheckOverloadSets(cType.Members, $"'{c.Name}'", inInterface: false, cType);
+                    CheckLayout(cType);
+                }
                 CheckMethods(c.Name, c.Members, module);
                 CheckTypeConformance(c.Name, c.Interfaces, module, c.Delegates);
                 break;
@@ -653,7 +659,10 @@ public sealed class TypeChecker
                 }
                 CheckValueTypeIsFinite(e, e.Name, "enum", module);
                 if (module.Members.LookupLocal(e.Name) is TypeSymbol eType)
+                {
                     CheckOverloadSets(eType.Members, $"'{e.Name}'", inInterface: false);
+                    CheckLayout(eType);
+                }
                 CheckEnumMethods(e, module);
                 CheckTypeConformance(e.Name, e.Interfaces, module);
                 break;
@@ -808,35 +817,176 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0099", Severity.Error, fn.Throws.Span, $"'{fn.Name}' is a C function, and a C function throws nothing");
         foreach (var p in fn.Parameters)
         {
-            // A place (03 §2.3a) is an address, and what a pointer is to C is the type table's:
-            // no place crosses. It was taken here, and the lowering — which
-            // has no wire for it — stopped the toolchain.
+            // A place (03 §2.3a) is an address of Lyric's, and C's addresses are 'Ptr's: no place
+            // crosses. It was taken here once, and the lowering — which has no wire for it —
+            // stopped the toolchain.
             if (p.IsPlace)
                 _de.Report("LYR-SEM0099", Severity.Error, p.Span,
-                    $"parameter '{p.Name}' of extern '{fn.Name}' takes a place ('&'), which does not cross into C in "
-                    + "this stage — integers, floats and bool do, by value");
+                    $"parameter '{p.Name}' of extern '{fn.Name}' takes a place ('&'), which does not cross into C — "
+                    + "what C takes by address is a 'Ptr'");
             var type = ResolveType(p.Type, module.Members);
-            if (!CrossesC(type, asReturn: false))
+            if (CFault(type, CSite.Parameter) is { } fault)
                 _de.Report("LYR-SEM0099", Severity.Error, p.Type.Span,
                     $"parameter '{p.Name}' of extern '{fn.Name}' has type '{TypeFacts.Display(type)}', which does not "
-                    + "cross into C in this stage — integers, floats and bool do");
+                    + $"cross into C — {fault}");
         }
         if (fn.ReturnType is { } ret)
         {
             var type = ResolveType(ret, module.Members);
-            if (!CrossesC(type, asReturn: true))
+            if (CFault(type, CSite.Return) is { } fault)
                 _de.Report("LYR-SEM0099", Severity.Error, ret.Span,
-                    $"extern '{fn.Name}' returns '{TypeFacts.Display(type)}', which does not come back from C in this "
-                    + "stage — integers, floats, bool and void do");
+                    $"extern '{fn.Name}' returns '{TypeFacts.Display(type)}', which does not come back from C — {fault}");
         }
     }
 
-    private static bool CrossesC(LyrType type, bool asReturn) =>
-        type is PrimitiveType { Kind: var kind }
-        && (kind is PrimitiveKind.Int or PrimitiveKind.Uint or PrimitiveKind.Float or PrimitiveKind.Int8
-                or PrimitiveKind.Int16 or PrimitiveKind.Int32 or PrimitiveKind.Uint8 or PrimitiveKind.Uint16
-                or PrimitiveKind.Uint32 or PrimitiveKind.Float32 or PrimitiveKind.Bool
-            || (kind == PrimitiveKind.Void && asReturn));
+    /// <summary>Where a type stands at C's boundary: a C function's parameter or result, or a
+    /// field of a <c>@Layout(C)</c> struct.</summary>
+    private enum CSite { Parameter, Return, Field }
+
+    /// <summary>
+    /// What may cross into C, and where — the one table the checker, the lowering and the
+    /// specification read: <c>null</c> where the type crosses, else why not. The integers and the
+    /// floats, <c>bool</c> and <c>char</c> as they are; <c>void</c> as a result; <c>std.ffi</c>'s
+    /// <c>Ptr&lt;T&gt;</c> and <c>CStr</c> as C's pointers, and their optionals as the null one
+    /// — not in a struct, where an optional is wider than a pointer; a <c>@Layout(C)</c> struct
+    /// by value; an enum with <c>@Layout</c> as its integer, beside a struct's fields; an inline
+    /// array as a field. A <c>string</c> crosses where a <c>CStr</c> parameter takes it, as its
+    /// bytes.
+    /// </summary>
+    private string? CFault(LyrType type, CSite site)
+    {
+        const string table = "integers, floats, bool, char, a 'Ptr', a 'CStr' and a '@Layout(C)' struct do";
+        switch (type)
+        {
+            case { IsError: true }:
+                return null;
+            case PrimitiveType { Kind: PrimitiveKind.Void }:
+                return site == CSite.Return ? null : "'void' is a result's, nothing else's";
+            case PrimitiveType { Kind: PrimitiveKind.String }:
+                return site == CSite.Parameter
+                    ? "declare the parameter 'CStr' (std.ffi): a 'string' argument crosses into it as its bytes"
+                    : "a string crosses into C as a 'CStr' (std.ffi), and C's text comes back as one";
+            case PrimitiveType:
+                return null;
+            case GenericInstance g when IsFfiType(g.Definition, "Ptr"):
+                return null;
+            case NamedRef r when IsFfiType(r.Symbol, "CStr"):
+                return null;
+            case Optional { Inner: var inner } when IsFfiPointer(inner):
+                return site == CSite.Field
+                    ? "an optional pointer is wider than a pointer in a struct; a field of C's that may be null is a 'Ptr' C never leaves null, or the struct holds an integer"
+                    : null;
+            case NamedRef { Symbol: { Kind: TypeSymbolKind.Struct } s }:
+                return LayoutOf(s) == "C" ? null
+                    : $"'{s.Name}' is laid out by the compiler; '@Layout(C)' lays it out as C does";
+            case GenericInstance { Definition: { Kind: TypeSymbolKind.Struct } d }:
+                return $"'{d.Name}' is generic, and '@Layout(C)' lays out one struct, not one per instance";
+            case NamedRef { Symbol: { Kind: TypeSymbolKind.Enum } e }:
+                if (LayoutOf(e) is null) return $"'{e.Name}' is laid out by the compiler; '@Layout(C)' or '@Layout(uint8)' makes it C's integer";
+                return site == CSite.Field ? "an enum crosses as a parameter or a result; a C struct's enum field is its integer" : null;
+            case InlineArrayOf ia when site == CSite.Field:
+                return CFault(ia.Element, CSite.Field);
+            default:
+                return table;
+        }
+    }
+
+    /// <summary>Is this <c>std.ffi</c>'s type of this name?</summary>
+    private bool IsFfiType(TypeSymbol symbol, string name) =>
+        _comp.FindModule(["std", "ffi"])?.Members.LookupLocal(name) is TypeSymbol ffi && ReferenceEquals(symbol, ffi);
+
+    /// <summary>A <c>Ptr&lt;T&gt;</c> or a <c>CStr</c>: what C holds by address.</summary>
+    private bool IsFfiPointer(LyrType type) =>
+        type is GenericInstance g && IsFfiType(g.Definition, "Ptr") || type is NamedRef r && IsFfiType(r.Symbol, "CStr");
+
+    /// <summary>The forms <c>@Layout</c> takes: C's own, or an enum's integer type.</summary>
+    private static readonly string[] LayoutForms =
+        ["C", "int8", "int16", "int32", "int64", "int", "uint8", "uint16", "uint32", "uint64", "uint"];
+
+    /// <summary>What <c>@Layout</c> says of a type — <c>"C"</c> or an integer type — or <c>null</c>
+    /// where it stands not, read off the declaration by its path: an unchecked declaration elsewhere
+    /// answers too.</summary>
+    private static string? LayoutOf(TypeSymbol type)
+    {
+        var attributes = type.Declaration switch
+        {
+            StructDecl s => s.Attributes,
+            EnumDecl e => e.Attributes,
+            ClassDecl c => c.Attributes,
+            _ => [],
+        };
+        return attributes.FirstOrDefault(a => a.Path is ["Layout"])?.Positional is IdentifierExpr { Name: var form }
+               && LayoutForms.Contains(form) ? form : null;
+    }
+
+    /// <summary><c>@Layout(C)</c> and <c>@Layout(uint8)</c>: the form the attribute takes, a name
+    /// as <c>@callerExpr</c>'s is.</summary>
+    private void CheckLayoutForm(AttributeNode attribute)
+    {
+        if (attribute.Positional is IdentifierExpr { Name: var form } && LayoutForms.Contains(form) && attribute.Fields.Length == 0)
+            return;
+        _de.Report("LYR-SEM0099", Severity.Error, attribute.Span,
+            "'@Layout' takes C's layout or an enum's integer type: '@Layout(C)', '@Layout(uint8)'");
+    }
+
+    /// <summary>
+    /// A type that says <c>@Layout</c>: a struct's fields each cross as a field, in the order
+    /// they are written; an enum has no payload, and its integer holds every variant. A class is
+    /// an object and never C's; a generic type is one per instance.
+    /// </summary>
+    private void CheckLayout(TypeSymbol type)
+    {
+        var attribute = type.Declaration switch
+        {
+            StructDecl s => s.Attributes,
+            EnumDecl e => e.Attributes,
+            ClassDecl c => c.Attributes,
+            _ => [],
+        };
+        var layout = attribute.FirstOrDefault(a => a.Path is ["Layout"]);
+        if (layout is null || LayoutOf(type) is not { } form) return;
+        if (type.Kind == TypeSymbolKind.Class)
+        {
+            _de.Report("LYR-SEM0099", Severity.Error, layout.Span,
+                $"'{type.Name}' is a class, an object behind its header — '@Layout' lays out a struct or an enum");
+            return;
+        }
+        if (type.Generics.Length > 0)
+        {
+            _de.Report("LYR-SEM0099", Severity.Error, layout.Span,
+                $"'{type.Name}' is generic — '@Layout' lays out one type, not one per instance");
+            return;
+        }
+        if (type.Kind == TypeSymbolKind.Struct)
+        {
+            if (form != "C")
+                _de.Report("LYR-SEM0099", Severity.Error, layout.Span,
+                    $"'@Layout({form})' makes an enum an integer — a struct is laid out as C's, '@Layout(C)'");
+            foreach (var field in (type.Declaration as StructDecl)!.Members.OfType<FieldDecl>())
+            {
+                if (type.Members.LookupLocal(field.Name) is not FieldSymbol fs) continue;
+                var fieldType = FieldType(fs);
+                if (CFault(fieldType, CSite.Field) is { } fault)
+                    _de.Report("LYR-SEM0099", Severity.Error, field.Type.Span,
+                        $"field '{field.Name}' of '@Layout(C)' struct '{type.Name}' has type '{TypeFacts.Display(fieldType)}', "
+                        + $"which C does not hold — {fault}");
+            }
+            return;
+        }
+        var declared = (EnumDecl)type.Declaration!;
+        foreach (var variant in declared.Variants)
+            if (variant.TupleFields is { Length: > 0 } || variant.StructFields is { Length: > 0 })
+                _de.Report("LYR-SEM0099", Severity.Error, variant.Span,
+                    $"variant '{variant.Name}' carries a payload — an enum with '@Layout' is C's integer, one per variant");
+        var max = form switch
+        {
+            "int8" => sbyte.MaxValue, "uint8" => byte.MaxValue, "int16" => short.MaxValue, "uint16" => ushort.MaxValue,
+            _ => (long)int.MaxValue,
+        };
+        if (declared.Variants.Length - 1 > max)
+            _de.Report("LYR-SEM0099", Severity.Error, layout.Span,
+                $"'{type.Name}' has {declared.Variants.Length} variants, and '{form}' holds 0 to {max}");
+    }
 
     private static readonly System.Text.RegularExpressions.Regex CIdentifier = new("^[A-Za-z_][A-Za-z0-9_]*$");
 
@@ -7716,7 +7866,18 @@ public sealed class TypeChecker
             if (args[i] is not { } a || Spreads(call, a)) continue;
             // A place parameter's argument is marked (03 §2.3a); a value parameter's mark was
             // refused where it was checked.
-            if (!fn.PlaceAt(i)) { CheckAssignable(a, argTypes[i]!, fn.Parameters[i], a.Span); continue; }
+            if (!fn.PlaceAt(i))
+            {
+                // a C function's 'CStr' takes a 'string' as its bytes, for the call
+                if (decl?.Extern is { Abi: "C" } && argTypes[i] is PrimitiveType { Kind: PrimitiveKind.String }
+                    && fn.Parameters[i] is NamedRef cstr && IsFfiType(cstr.Symbol, "CStr"))
+                {
+                    _result.MarkCStrArgument(a);
+                    continue;
+                }
+                CheckAssignable(a, argTypes[i]!, fn.Parameters[i], a.Span);
+                continue;
+            }
             if (a is not UnaryExpr { Operator: UnaryOp.Place })
             {
                 _de.Report("LYR-SEM0157", Severity.Error, a.Span,
@@ -10559,6 +10720,12 @@ public sealed class TypeChecker
         if (targetIsGeneric && !IsCompilerInstruction(ts))
             _de.Report("LYR-SEM0067", Severity.Error, attribute.PathSpan,
                 "an attribute cannot sit on a generic declaration — one value would stand for every instance");
+
+        if (ReferenceEquals(ts, _coreMembers?.LookupLocal("Layout")))
+        {
+            CheckLayoutForm(attribute);
+            return ts;
+        }
 
         var fields = attribute.Fields.ToList();
         if (attribute.Positional is { } positional)
@@ -15165,7 +15332,7 @@ public sealed class TypeChecker
     /// <summary>The compiler instructions of <c>std.core</c> beside <c>@Test</c>, <c>@Bench</c> and
     /// <c>@callerExpr</c> (the closed list of T2): what changes what the compiler does.</summary>
     private static readonly string[] CompilerInstructions =
-        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "Warn", "Deny", "When", "Shared", "SeesConformer"];
+        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "Warn", "Deny", "When", "Shared", "SeesConformer", "Layout"];
 
     /// <summary>Whether this is one of <see cref="CompilerInstructions"/>, by identity.</summary>
     private bool IsCompilerInstruction(TypeSymbol ts) =>

@@ -23,5 +23,6 @@
 #include "lyr/net.h"
 #include "lyr/process.h"
 #include "lyr/unicode.h"
+#include "lyr/ffi.h"
 
 #endif

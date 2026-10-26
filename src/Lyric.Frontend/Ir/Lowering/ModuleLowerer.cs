@@ -174,8 +174,27 @@ public static class ModuleLowerer
                     // a position rather than a compiler crash.
                     try
                     {
-                        var host = HostTypeResolver(module, compilation);
                         var aliases = LocalAliases(compilation, module);
+                        // A C function takes its parameters as C does: a struct whole, by value, and
+                        // each value in the form C holds it — never flattened, which is the
+                        // runtime's own natives' wire.
+                        if (function.Extern is { Abi: "C" } cSpec)
+                        {
+                            var cTypes = function.Parameters
+                                .Select(p => typeTable.Lower(ResolveLocalAliases(p.Type, aliases, binding)!)).ToArray();
+                            var cReturn = function.ReturnType is { } written
+                                ? typeTable.Lower(ResolveLocalAliases(written, aliases, binding)!)
+                                : new IrScalarType(IrScalar.Void);
+                            imports.Declare(symbol, new IrImport(NameMangling.ForExtern(cSpec, function.Name), cTypes, cReturn)
+                                {
+                                    CParams = [.. cTypes.Select(t => CFormOf(t, typeTable, compilation))],
+                                    CReturn = CFormOf(cReturn, typeTable, compilation),
+                                },
+                                new ImportShape([.. cTypes.Select(t => new ImportParam(t, null, []))], null));
+                            continue;
+                        }
+
+                        var host = HostTypeResolver(module, compilation);
                         var (flattened, parameters) = LowerNativeParameters(module, function,
                             host, typeTable, aliases, binding);
 
@@ -841,6 +860,36 @@ public static class ModuleLowerer
             default:
                 return node;
         }
+    }
+
+    /// <summary>How a value of this type crosses into C: <c>std.ffi</c>'s pointers and C strings
+    /// and their optionals as C's pointers, an enum with <c>@Layout</c> as its integer, the rest as
+    /// it is.</summary>
+    private static IrCForm CFormOf(IrType type, TypeTable typeTable, Compilation compilation)
+    {
+        var ffi = compilation.FindModule(["std", "ffi"])?.Members;
+        bool Is(IrType t, string name) => t is IrStructType s && ffi?.LookupLocal(name) is TypeSymbol wanted
+                                          && ReferenceEquals(typeTable.SymbolOfId(s.Type), wanted);
+        if (Is(type, "Ptr")) return new IrCForm(IrCKind.Pointer);
+        if (Is(type, "CStr")) return new IrCForm(IrCKind.CString);
+        if (type is IrOptionalType { Inner: var inner })
+        {
+            if (Is(inner, "Ptr")) return new IrCForm(IrCKind.OptionalPointer);
+            if (Is(inner, "CStr")) return new IrCForm(IrCKind.OptionalCString);
+        }
+        if (type is IrEnumType e && typeTable.SymbolOfId(e.Type) is { Declaration: EnumDecl declared } symbol
+            && declared.Attributes.FirstOrDefault(a => a.Path is ["Layout"])?.Positional is IdentifierExpr { Name: var form })
+        {
+            var integer = form switch
+            {
+                "C" => "int",
+                "int" => "int64_t",
+                "uint" => "uint64_t",
+                _ => form + "_t",
+            };
+            return new IrCForm(IrCKind.Enum, integer, declared.Variants.Length, typeTable.ModuleNameOf(symbol) + "." + symbol.Name);
+        }
+        return IrCForm.Value;
     }
 
     private static (IrType[] Flattened, ImportParam[] Shape) LowerNativeParameters(

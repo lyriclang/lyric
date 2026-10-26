@@ -1835,7 +1835,7 @@ fn main(): void {
 title = "a function without 'fn', or its words out of order"
 severity = "error"
 area = "03-types"
-summary = "Where a function or method is declared, `fn` is missing after its other words, or `inline static` is written where the order is `static inline`."
+summary = "Where a function or method is declared, `fn` is missing after its other words, or `inline static` is written where the order is `static inline`; an `extern` block declares no function."
 explanation = '''
 The words of a function stand in one order: `[static] [inline] [mut] fn name(…)`. `inline static` is refused and read as what it says; a `mut` or `static` without `fn` declares nothing.
 
@@ -2017,7 +2017,7 @@ retired = "In Lyric 5 an interface declares static members, which a constraint r
 title = "an attribute with no declaration to carry it"
 severity = "error"
 area = "11-metaprogramming"
-summary = "An attribute stands at the end of a file, before something that is no declaration, or before an `import`."
+summary = "An attribute stands at the end of a file, before something that is no declaration, before an `import`, or before an `extern` block, whose functions carry their own."
 explanation = '''
 An attribute belongs to the declaration that follows it: a function, a type, a member, a binding, an alias, the module header. Before an `import` or with nothing after it, it would be lost without a word.
 
@@ -4057,6 +4057,19 @@ Report the program with the message and the trace.
 example = '''
 $ ./out/debug/x86_64-linux-gnu/app
 panic[LYR-RT0020]: the map of app.Node does not name its word at offset 16, which points at an unmarked app.Leaf
+'''
+
+[LYR-RT0021]
+title = "an integer from C that no variant of the enum stands for"
+severity = "panic"
+area = "13-abi"
+summary = "A C function declared to return a `@Layout` enum returned an integer that is none of the enum's variants. A C enum may hold any integer of its type; a Lyric enum holds one of its variants, the first as 0, the next as 1, in the order they are written."
+explanation = '''
+A `@Layout(C)` or `@Layout(uint8)` enum crosses into C as the integer of its variant — the first variant written is 0, the next 1 — and comes back the same way. Where C returns an integer outside that range, the value is no variant of the enum, and the program stops before a `match` meets it. Declare the C function's result as the integer type and decide in Lyric what an unknown value means.
+'''
+example = '''
+$ ./out/debug/x86_64-linux-gnu/app
+panic [LYR-RT0021]: C returned 7, which is no variant of app.main.Color (it has 3)
 '''
 
 [LYR-SEM0001]
@@ -6627,9 +6640,9 @@ fn main(): void {
 title = "an extern declaration that cannot cross into C"
 severity = "error"
 area = "13-abi"
-summary = "An `extern` function names an ABI other than \"C\", a symbol that is no C name, type parameters, `throws`, a place parameter, or a parameter or return type that does not cross into C."
+summary = "An `extern` function names an ABI other than \"C\", a symbol that is no C name, type parameters, `throws`, a place parameter, or a parameter or return type that does not cross into C; or `@Layout` stands where C cannot lay the type out, or in another form than `@Layout(C)` or an integer type."
 explanation = '''
-Lyric 5's one foreign boundary is C. In this stage integers, floats and `bool` cross it (and `void` as a return); strings, pointers and places, generics and thrown errors do not, so a declaration nobody could bind is refused where it stands, whether or not it is called.
+Lyric 5's one foreign boundary is C. Integers, floats, `bool` and `char` cross it (and `void` as a return); `std.ffi`'s `Ptr<T>` and `CStr` cross as C's pointers, `?Ptr<T>` and `?CStr` as pointers that may be null; a struct with `@Layout(C)` crosses as C's struct, by value, and an enum with `@Layout` as its integer. A `string` argument crosses into a `CStr` parameter as its bytes. Classes, arrays, other optionals, places, generics and thrown errors do not, so a declaration nobody could bind is refused where it stands, whether or not it is called.
 
 Declare the C function with types that cross, and convert at the Lyric side.
 '''
@@ -6641,10 +6654,12 @@ fn main(): void {
 }
 '''
 right = '''
-extern "C" fn abs(n: int32): int32;
+import std.ffi { CStr };
+
+extern "C" fn shout(s: CStr): int;
 
 fn main(): void {
-    let _ = abs(-3);
+    let _ = shout("hi");
 }
 '''
 

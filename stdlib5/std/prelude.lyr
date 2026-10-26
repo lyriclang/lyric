@@ -66,6 +66,7 @@ pub import std.core {
     Cold,
     MustUse,
     NonExhaustive,
+    Layout,
     Allow,
     Warn,
     Deny,

@@ -495,6 +495,16 @@ pub struct Cold :: [OnCallable] { }
 /// stands as a statement and its value goes nowhere.
 pub struct MustUse :: [OnCallable, OnType] { }
 
+/// Lays the type out as C does, so it crosses into a C function as C's own.
+///
+/// `@Layout(C)` on a struct keeps its fields in the order they are written, each where the
+/// platform's C ABI puts it; its fields are what crosses into C — integers, floats, `bool`,
+/// `char`, a `Ptr`, a `CStr`, another `@Layout(C)` struct, an inline array of one of them. On an
+/// enum without payloads it makes the enum C's `enum`, an `int`; `@Layout(uint8)` and the other
+/// integer types make it that integer. The first variant written is 0, the next 1. Without the
+/// attribute a type is the compiler's to lay out, and does not cross.
+pub struct Layout :: [OnType] { }
+
 /// Marks an enum or a `sealed` interface that may grow.
 ///
 /// A `match` over it outside its package needs a `_` arm, so a new variant or conformer breaks

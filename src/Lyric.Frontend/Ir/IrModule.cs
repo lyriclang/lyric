@@ -94,7 +94,46 @@ public enum IrHints
 
 /// <summary>A natively backed function: the signature is declared in Lyric, the implementation lives
 /// in the host and is bound by <see cref="Name"/> at load time.</summary>
-public record struct IrImport(string Name, IrType[] ParamTypes, IrType ReturnType);
+public record struct IrImport(string Name, IrType[] ParamTypes, IrType ReturnType)
+{
+    /// <summary>For a C function: how each parameter crosses into C, in their order; <c>null</c>
+    /// for every other native.</summary>
+    public IrCForm[]? CParams { get; init; }
+
+    /// <summary>For a C function: how its result comes back.</summary>
+    public IrCForm? CReturn { get; init; }
+}
+
+/// <summary>What a value is at C's boundary.</summary>
+public enum IrCKind
+{
+    /// <summary>As it is: a scalar, a <c>@Layout(C)</c> struct by value.</summary>
+    Value,
+
+    /// <summary><c>std.ffi.Ptr&lt;T&gt;</c>: C's <c>void *</c>, the struct's address field.</summary>
+    Pointer,
+
+    /// <summary><c>std.ffi.CStr</c>: C's <c>const char *</c>.</summary>
+    CString,
+
+    /// <summary><c>?Ptr&lt;T&gt;</c>: a pointer, null for <c>none</c>.</summary>
+    OptionalPointer,
+
+    /// <summary><c>?CStr</c>: a C string, null for <c>none</c>.</summary>
+    OptionalCString,
+
+    /// <summary>An enum with <c>@Layout</c>: the integer of its variant.</summary>
+    Enum,
+}
+
+/// <summary>How one value crosses into C.</summary>
+/// <param name="Integer">For <see cref="IrCKind.Enum"/>: the C integer type, <c>int</c> for C's own.</param>
+/// <param name="Variants">For <see cref="IrCKind.Enum"/>: how many variants the enum has.</param>
+/// <param name="EnumName">For <see cref="IrCKind.Enum"/>: the enum as a panic names it.</param>
+public sealed record IrCForm(IrCKind Kind, string? Integer = null, int Variants = 0, string? EnumName = null)
+{
+    public static readonly IrCForm Value = new(IrCKind.Value);
+}
 
 /// <summary>
 /// The layout of a composite type. <see cref="FieldNames"/> is diagnostics only — only the types

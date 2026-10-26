@@ -79,6 +79,13 @@ public sealed class TypeResult
 
     public void BindCallerExpr(Param parameter, string target) => _callerExpr[parameter] = target;
 
+    private readonly HashSet<Expr> _cstrArguments = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>A <c>string</c> argument of a C function's <c>CStr</c> parameter: it crosses as
+    /// its bytes, without a copy.</summary>
+    public bool IsCStrArgument(Expr argument) => _cstrArguments.Contains(argument);
+    internal void MarkCStrArgument(Expr argument) => _cstrArguments.Add(argument);
+
     /// <summary>The parameter whose argument's text <paramref name="parameter"/> takes, or
     /// <c>null</c> where no <c>@callerExpr</c> sits on it.</summary>
     public string? CallerExprOf(Param parameter) => _callerExpr.GetValueOrDefault(parameter);

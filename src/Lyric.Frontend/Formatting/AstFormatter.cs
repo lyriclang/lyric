@@ -310,7 +310,16 @@ public sealed class AstFormatter
         var items = new List<Node>();
         items.AddRange(module.Attributes);
         if (module.Header is { } header) items.Add(header);
-        items.AddRange(module.Declarations);
+        // the functions of an extern block go back into the block they were written in
+        foreach (var decl in module.Declarations)
+        {
+            if (decl is FunctionDecl { Extern.Block: { } block })
+            {
+                if (items.Count == 0 || !ReferenceEquals(items[^1], block)) items.Add(block);
+                continue;
+            }
+            items.Add(decl);
+        }
 
         var content = SequenceDoc(items, ItemDoc, ModuleAir, _source.Length);
         return Doc.Of(content, Doc.NewLine); // the trailing newline of every formatted file
@@ -320,9 +329,33 @@ public sealed class AstFormatter
             AttributeNode a => AttributeDoc(a),
             ModulePath h => Doc.From($"module {string.Join(".", h.Segments)};"),
             Decl d => DeclDoc(d),
+            ExternBlock b => ExternBlockDoc(b),
             _ => throw new InternalCompilationException($"unreachable: {item.GetType().Name} at top level"),
         };
     }
+
+    /// <summary><c>extern "C" { … }</c>: the block's head once, its functions inside without it.</summary>
+    private Doc ExternBlockDoc(ExternBlock block)
+    {
+        var first = block.Members[0];
+        var head = Doc.Of(Pub(block.Visibility), Doc.From("extern "),
+            _synthesized ? Doc.From(Quote(first.Extern!.Abi)) : Src(first.Extern!.AbiSpan), Doc.From(" "));
+        _inExternBlock = true;
+        try
+        {
+            _blockVisibility = block.Visibility;
+            var body = SequenceDoc(block.Members, FunctionDoc, (_, _) => Air.User, block.Span.End);
+            return Doc.Of(head, Doc.From("{"), Doc.IndentOf(Doc.NewLine, body), Doc.NewLine, Doc.From("}"));
+        }
+        finally { _inExternBlock = false; }
+    }
+
+    /// <summary>Set while a block's functions are written: their head is the block's.</summary>
+    private bool _inExternBlock;
+
+    /// <summary>The visibility word of the block being written: a function says its own only
+    /// where it differs.</summary>
+    private VisibilityWord _blockVisibility;
 
     private static Air ModuleAir(Node previous, Node next) => (previous, next) switch
     {
@@ -449,8 +482,9 @@ public sealed class AstFormatter
         var head = new List<Doc>
         {
             Attributes(decl.Attributes),
-            Pub(decl.Visibility),
-            decl.Extern is { } abi ? Doc.Of(Doc.From("extern "), _synthesized ? Doc.From(Quote(abi.Abi)) : Src(abi.AbiSpan), Doc.Space) : Doc.Nil,
+            _inExternBlock && decl.Visibility == _blockVisibility ? Doc.Nil : Pub(decl.Visibility),
+            decl.Extern is { } abi && !_inExternBlock
+                ? Doc.Of(Doc.From("extern "), _synthesized ? Doc.From(Quote(abi.Abi)) : Src(abi.AbiSpan), Doc.Space) : Doc.Nil,
             decl.IsStatic ? Doc.From("static ") : Doc.Nil,
             decl.IsInline ? Doc.From("inline ") : Doc.Nil,
             decl.IsMut ? Doc.From("mut ") : Doc.Nil,

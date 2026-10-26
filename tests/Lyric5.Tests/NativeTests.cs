@@ -98,7 +98,17 @@ public class NativeTests
 
     [Theory]
     [InlineData("extern \"C\" fn f(s: string): int;", "parameter 's' of extern 'f' has type 'string', which does not cross into C")]
-    [InlineData("extern \"C\" fn f(c: char): int;", "parameter 'c' of extern 'f' has type 'char'")]
+    [InlineData("extern \"C\" fn f(x: ?int): int;", "parameter 'x' of extern 'f' has type '?int'")]
+    [InlineData("struct P { x: int }\nextern \"C\" fn f(p: P): int;", "parameter 'p' of extern 'f' has type 'P', which does not cross into C — 'P' is laid out by the compiler")]
+    [InlineData("enum E { A, B }\nextern \"C\" fn f(): E;", "extern 'f' returns 'E', which does not come back from C — 'E' is laid out by the compiler")]
+    [InlineData("@Layout(C)\nstruct P { s: string }", "field 's' of '@Layout(C)' struct 'P' has type 'string', which C does not hold")]
+    [InlineData("@Layout(C)\nenum E { A }\n@Layout(C)\nstruct P { e: E }", "field 'e' of '@Layout(C)' struct 'P' has type 'E', which C does not hold — an enum crosses as a parameter or a result")]
+    [InlineData("import std.ffi { CStr };\n@Layout(C)\nstruct P { s: ?CStr }", "field 's' of '@Layout(C)' struct 'P' has type '?CStr', which C does not hold — an optional pointer is wider")]
+    [InlineData("@Layout(uint8)\nstruct P { x: int }", "'@Layout(uint8)' makes an enum an integer")]
+    [InlineData("@Layout(C)\nenum E { A(int), B }", "variant 'A' carries a payload")]
+    [InlineData("@Layout(C)\nclass K { }", "'K' is a class")]
+    [InlineData("@Layout(C)\nstruct G<T> { x: int }", "'G' is generic")]
+    [InlineData("@Layout(packed)\nstruct P { x: int }", "'@Layout' takes C's layout or an enum's integer type")]
     [InlineData("extern \"C\" fn f(xs: int[]): int;", "parameter 'xs' of extern 'f'")]
     [InlineData("extern \"C\" fn f(): string;", "extern 'f' returns 'string', which does not come back from C")]
     // a place is an address: it was taken, and a call of it stopped the toolchain (LYR-ICE0001)
@@ -114,6 +124,101 @@ public class NativeTests
         var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
         Assert.Equal(1, exit);
         Assert.Contains("error[LYR-SEM0099]: " + why, error);
+    }
+
+    private const string BoundaryC = """
+        #include <stdint.h>
+        #include <stddef.h>
+        typedef struct { int32_t x; double y; uint8_t ok; } P;
+        P shift(P p, int32_t d) { p.x += d; p.y *= 2; p.ok = !p.ok; return p; }
+        static int cell = 41;
+        void *cell_at(void) { return &cell; }
+        int64_t read_cell(void *p) { return *(int *)p + 1; }
+        const char *greet(void) { return "hi there"; }
+        const char *nothing(void) { return NULL; }
+        int64_t length_or(const char *s) { return s == NULL ? -1 : (int64_t)strlen(s); }
+        uint8_t next_color(uint8_t c) { return (uint8_t)((c + 1) % 3); }
+        uint8_t bad_color(void) { return 7; }
+
+        """;
+
+    private const string BoundaryLyric = """
+        import std.io { println };
+        import std.ffi { Ptr, CStr };
+        import std.core { Utf8Error };
+
+        @Layout(C)
+        struct P { x: int32, y: float, ok: bool }
+
+        @Layout(uint8)
+        enum Color { Red, Green, Blue }
+
+        extern "C" {
+            fn strlen(s: CStr): uint;
+            fn shift(p: P, d: int32): P;
+            fn cell_at(): Ptr<int32>;
+            fn read_cell(p: Ptr<int32>): int;
+            fn greet(): CStr;
+            fn nothing(): ?CStr;
+            fn length_or(s: ?CStr): int;
+            fn next_color(c: Color): Color;
+            fn bad_color(): Color;
+        }
+
+        fn name(c: Color): string {
+            return match (c) { .Red => "red", .Green => "green", .Blue => "blue" };
+        }
+
+        """;
+
+    private static string Boundary(string body) => Package(
+        ("lyric.toml", AppManifest + "\n[native]\nsources = [\"native/*.c\"]\n"),
+        ("native/boundary.c", "#include <string.h>\n" + BoundaryC),
+        ("src/main.lyr", BoundaryLyric + "fn main(): void throws Utf8Error {\n" + body + "}\n"));
+
+    /// <summary>A string into a <c>CStr</c>, a <c>@Layout(C)</c> struct by value both ways, a
+    /// pointer out of C and back, a C string and a null one back, an enum as its integer.</summary>
+    [Fact]
+    public void Pointers_C_strings_structs_and_enums_cross()
+    {
+        var dir = Boundary("""
+                println(f"{strlen("hello")}");
+                let p = shift(P { x = 1, y = 1.5, ok = true }, 10);
+                println(f"{p.x} {p.y} {p.ok}");
+                println(f"{read_cell(cell_at())}");
+                let g = greet();
+                println(f"{g.length()} {try g.toString()}");
+                println(f"{nothing() == null} {length_or(null)} {length_or(greet())}");
+                println(name(next_color(Color.Blue)));
+                println(name(next_color(Color.Red)));
+
+            """);
+        Assert.Equal("5\n11 3.0 false\n42\n8 hi there\ntrue -1 8\nred\ngreen\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    /// <summary>An integer C returns for an enum that no variant stands for stops the program.</summary>
+    [Fact]
+    public void An_integer_no_variant_stands_for_panics()
+    {
+        var dir = Boundary("    println(name(bad_color()));\n");
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.True(exit == 0, error);
+        var host = Lyric5.Toolchain.Target.Host;
+        var ran = Lyric5.Toolchain.ProcessRunner.Run(Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix),
+            [], TimeSpan.FromMinutes(1));
+        Assert.Equal(101, ran.ExitCode);
+        Assert.Contains("panic [LYR-RT0021]: C returned 7, which is no variant of app.main.Color (it has 3)", ran.Stderr);
+    }
+
+    [Theory]
+    [InlineData("extern \"C\" { }", "LYR-PAR0032", "an extern block declares functions")]
+    [InlineData("@Cold\nextern \"C\" { fn f(): int; }", "LYR-PAR0042", "an attribute stands before one function, and this is a block of them")]
+    public void An_extern_block_is_checked(string declaration, string code, string why)
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", declaration + "\n\nfn main(): void {\n}\n"));
+        var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
+        Assert.Equal(1, exit);
+        Assert.Contains($"error[{code}]: {why}", error);
     }
 
     [Theory]

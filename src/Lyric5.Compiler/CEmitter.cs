@@ -684,17 +684,24 @@ public sealed class CEmitter
         _out.AppendLine("#include <math.h>");
         _out.AppendLine();
 
+        Structs();
+
         // The C functions the program declares (extern "C"): a prototype each, in the
-        // platform's C ABI; the linker finds the symbol in the native part or a library.
-        var foreign = _module.Imports.Where(i => Intrinsics.IsForeign(i.Name)).ToList();
+        // platform's C ABI, under a name of the program's own bound to the C symbol by an asm
+        // label — so it never meets the prototype a system header gives the same function; the
+        // linker finds the symbol in the native part or a library. They follow the types, which a
+        // struct by value names; an instance's unit declares the ones it calls.
+        var called = _main ? null : ScopeOps().OfType<CallImport>().Select(c => c.Target.Value).ToHashSet();
+        var foreign = _module.Imports.Where((i, n) => Intrinsics.IsForeign(i.Name) && (called is null || called.Contains(n))).ToList();
         foreach (var import in foreign)
         {
-            var parameters = import.ParamTypes.Length == 0 ? "void" : string.Join(", ", import.ParamTypes.Select(CType));
-            _out.AppendLine($"extern {CType(import.ReturnType)} {import.Name[2..]}({parameters});");
+            var parameters = import.ParamTypes.Length == 0 ? "void"
+                : string.Join(", ", import.ParamTypes.Select((t, i) => CAbiType(t, import.CParams?[i])));
+            var symbol = import.Name[2..];
+            _out.AppendLine($"extern {CAbiType(import.ReturnType, import.CReturn)} {ForeignName(symbol)}({parameters}) "
+                + $"__asm__(LYR_C_SYMBOL(\"{symbol}\"));");
         }
         if (foreign.Count > 0) _out.AppendLine();
-
-        Structs();
 
         // The module's globals: variables of the module's unit, filled by the initializer
         // before the entry runs; an instance's unit declares the ones it touches. They are roots of
@@ -1836,6 +1843,7 @@ public sealed class CEmitter
         StorePlace s => StoreThrough(s),
         Call call => Assign(call.Dest, $"{FunctionName(_module.Functions[call.Target.Value].Name)}({Arguments(_module.Functions[call.Target.Value], call.Args)}"
             + $"{SlotArgument(_module.Functions[call.Target.Value], call.Args.Length)})"),
+        CallImport call when Intrinsics.IsForeign(_module.Imports[call.Target.Value].Name) => ForeignCall(call),
         CallImport call => Assign(call.Dest, Intrinsics.Call(_module.Imports[call.Target.Value].Name, call.Args.Select(Value).ToArray())),
         NewObject { Result: IrRefType r } n => $"{Temp(n.Dest)} = ({CType(r)})lyr_alloc(&{DescriptorName(r.Type)});",
         NewObject n => $"{Storage(n.Dest)} = ({CType(n.Result)}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
@@ -1985,6 +1993,60 @@ public sealed class CEmitter
         var fields = string.Join(", ", v.Fields.Select((f, i) => $".{FieldName(variant.FieldNames[i + 1])} = {Value(f)}"));
         var payload = v.Fields.Length == 0 ? "" : $", .as.v{tag} = {{ {fields} }}";
         return $"{Storage(v.Dest)} = ({CType(TypeOf(v.Dest))}){{ .tag = {tag}{payload} }}; {Temp(v.Dest)} = &{Storage(v.Dest)};";
+    }
+
+    /// <summary>The name a C function goes by in the program's C, beside its own.</summary>
+    private static string ForeignName(string symbol) => "lyr_c_" + symbol;
+
+    /// <summary>The C type of a value in the form it crosses in: C's pointers for
+    /// <c>std.ffi</c>'s, an enum's integer, C's <c>bool</c>, the rest as Lyric holds it.</summary>
+    private string CAbiType(IrType type, IrCForm? form) => form?.Kind switch
+    {
+        IrCKind.Pointer or IrCKind.OptionalPointer => "void *",
+        IrCKind.CString or IrCKind.OptionalCString => "const char *",
+        IrCKind.Enum => form.Integer!,
+        _ when type is IrScalarType { Kind: IrScalar.Bool } => "bool",
+        _ => CType(type),
+    };
+
+    /// <summary>
+    /// A call of a C function: each argument in its C form — a pointer from the struct that holds
+    /// its address, null for an absent optional, an enum's tag as its integer —, and the result
+    /// back into Lyric's: a pointer into its struct, null into <c>none</c>, an integer into the
+    /// variant it stands for, or a panic where it stands for none.
+    /// </summary>
+    private string ForeignCall(CallImport call)
+    {
+        var import = _module.Imports[call.Target.Value];
+        var address = FieldName("address");
+        var arguments = call.Args.Select((arg, i) =>
+        {
+            var value = Value(arg);
+            return import.CParams?[i].Kind switch
+            {
+                IrCKind.Pointer => $"(void *)(uintptr_t)({value}).{address}",
+                IrCKind.CString => $"(const char *)(uintptr_t)({value}).{address}",
+                IrCKind.OptionalPointer => $"(({value}).has ? (void *)(uintptr_t)({value}).value.{address} : NULL)",
+                IrCKind.OptionalCString => $"(({value}).has ? (const char *)(uintptr_t)({value}).value.{address} : NULL)",
+                IrCKind.Enum => $"({import.CParams[i].Integer})({value}).tag",
+                _ => value,
+            };
+        });
+        var c = $"{ForeignName(import.Name[2..])}({string.Join(", ", arguments)})";
+        if (call.Dest is not { } dest) return $"{c};";
+        var type = CType(TypeOf(dest));
+        return import.CReturn?.Kind switch
+        {
+            IrCKind.Pointer or IrCKind.CString =>
+                $"{Storage(dest)} = ({type}){{ .{address} = (uint64_t)(uintptr_t){c} }}; {Temp(dest)} = &{Storage(dest)};",
+            IrCKind.OptionalPointer or IrCKind.OptionalCString =>
+                $"{{ const void *lyr_r = {c}; {Storage(dest)} = ({type}){{ .value = {{ .{address} = (uint64_t)(uintptr_t)lyr_r }}, "
+                + $".has = lyr_r != NULL }}; }} {Temp(dest)} = &{Storage(dest)};",
+            IrCKind.Enum =>
+                $"{Storage(dest)} = ({type}){{ .tag = lyr_ffi_enum_tag((int64_t){c}, {import.CReturn.Variants}, "
+                + $"\"{import.CReturn.EnumName}\") }}; {Temp(dest)} = &{Storage(dest)};",
+            _ => Assign(dest, c),
+        };
     }
 
     private string Arguments(IrFunction callee, TempId[] args) =>

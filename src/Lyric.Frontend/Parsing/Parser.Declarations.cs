@@ -59,6 +59,7 @@ public sealed partial class Parser
         {
             var before = _buffer.Position;
             decls.Add(ParseTopLevelDecl(pending));
+            TakeBlockMembers(decls);
             pending = [];
             if (_buffer.Position == before) _buffer.Advance(); // force progress
         }
@@ -298,7 +299,9 @@ public sealed partial class Parser
                 // 'type': the word stays an identifier everywhere else, so no program that names
                 // something 'extern' loses that name.
                 if (AtContextual("extern") && _buffer.Peek(1).TokenKind == TokenKind.StringLiteral)
-                    return Attach(ParseExternDecl(isPublic, start), attributes, "an extern declaration");
+                    return _buffer.Peek(2).TokenKind == TokenKind.LBrace
+                        ? ParseExternBlock(isPublic, start, attributes)
+                        : Attach(ParseExternDecl(isPublic, start), attributes, "an extern declaration");
                 // 'opaque type X = int;' — contextual like 'type' itself: neither word is a
                 // keyword, so neither is taken from anyone's identifiers.
                 if (AtContextual("opaque") && PeekContextual(1, "type"))
@@ -477,6 +480,60 @@ public sealed partial class Parser
         var abi = LiteralDecoder.DecodeString(_sm.Slice(abiTok.Span), abiTok.Span, _de);
         var spec = new ExternSpec(abi, null, Span.Union(kw.Span, abiTok.Span)) { AbiSpan = abiTok.Span };
         return ParseFunctionDecl(isPublic, start, spec: spec);
+    }
+
+    /// <summary>The functions of an <c>extern</c> block after its first, which
+    /// <see cref="ParseTopLevelDecl"/> returned; taken by the list it is read into.</summary>
+    private readonly Queue<FunctionDecl> _blockMembers = new();
+
+    /// <summary>Adds the functions an <c>extern</c> block declared after its first.</summary>
+    private void TakeBlockMembers(List<Decl> decls)
+    {
+        while (_blockMembers.Count > 0) decls.Add(_blockMembers.Dequeue());
+    }
+
+    /// <summary>
+    /// <c>extern "C" { fn strlen(s: CStr): uint; fn abs(x: int32): int32; }</c>: the functions of
+    /// one ABI declared together, each as it would be alone — its symbol after <c>=</c>, its
+    /// <c>;</c>. A visibility word before <c>extern</c> is each function's that has none of its
+    /// own. The first is returned, the rest wait in <see cref="_blockMembers"/>; an empty block
+    /// declares nothing and is said once.
+    /// </summary>
+    private Decl ParseExternBlock(VisibilityWord isPublic, Span start, AttributeNode[] attributes)
+    {
+        if (attributes.Length > 0)
+            _de.Report("LYR-PAR0042", Severity.Error, attributes[0].Span,
+                "an attribute stands before one function, and this is a block of them — write it on the function inside");
+        var kw = _buffer.Advance(); // 'extern'
+        var abiTok = _buffer.Advance();
+        var abi = LiteralDecoder.DecodeString(_sm.Slice(abiTok.Span), abiTok.Span, _de);
+        _buffer.Advance(); // '{'
+        var members = new List<FunctionDecl>();
+        while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
+        {
+            var before = _buffer.Position;
+            var memberStart = _buffer.Current.Span;
+            var memberAttributes = AtAttributeStart ? ParseAttributeList() : [];
+            var own = ParseVisibility();
+            var spec = new ExternSpec(abi, null, Span.Union(kw.Span, abiTok.Span)) { AbiSpan = abiTok.Span };
+            var fn = ParseFunctionDecl(own == VisibilityWord.None ? isPublic : own, memberStart, spec: spec)
+                with { Attributes = memberAttributes };
+            members.Add(fn);
+            if (_buffer.Position == before) _buffer.Advance(); // force progress
+        }
+        var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close the extern block");
+        // the block once it is closed, its span over its functions, and they pointing at it
+        var block = new ExternBlock(isPublic, Span.Union(start, close.Span));
+        for (var i = 0; i < members.Count; i++)
+            members[i] = members[i] with { Extern = members[i].Extern! with { Block = block } };
+        block.Members.AddRange(members);
+        if (members.Count == 0)
+        {
+            _de.Report("LYR-PAR0032", Severity.Error, close.Span, "an extern block declares functions: expected 'fn'");
+            return new ErrorDecl(Span.Union(start, close.Span));
+        }
+        foreach (var member in members.Skip(1)) _blockMembers.Enqueue(member);
+        return members[0];
     }
 
     private FunctionDecl ParseFunctionDecl(VisibilityWord isPublic, Span start, bool isStatic = false,

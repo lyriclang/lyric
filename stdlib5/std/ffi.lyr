@@ -1,0 +1,73 @@
+//! Provides the types that cross into a C function and back.
+//!
+//! A C function is declared with `extern "C"` and called as any other: its integers, floats and
+//! `bool` cross as they are, a `@Layout(C)` struct crosses by value, and the types here stand for
+//! what C holds by address. [Ptr] is a pointer to memory C manages, `?Ptr` one that may be null;
+//! [CStr] is C's text, `const char *`. A `string` handed to a `CStr` parameter crosses without a
+//! copy, its bytes as they lie, for the time of the call.
+//!
+//! # Examples
+//!
+//! ```lyric
+//! import std.ffi { CStr };
+//! import std.io { println };
+//!
+//! extern "C" fn strlen(s: CStr): uint;
+//!
+//! fn main(): void {
+//!     println(strlen("hello"));
+//! }
+//! ```
+//!
+//! ```output
+//! 5
+//! ```
+import std.core { Utf8Error };
+
+/// A pointer to a `T` in memory C manages, never null: `T *` where a C function takes or returns
+/// one.
+///
+/// A value of it comes from C and goes back to C; Lyric holds it and compares it, and does not
+/// read through it. A pointer C may return as null is a `?Ptr<T>`, `none` for null.
+pub struct Ptr<T> {
+    address: uint,
+}
+
+/// A C string: the address of bytes a NUL ends, `const char *` at a C function's boundary.
+///
+/// It is borrowed: the bytes are C's, and they are valid as long as C says. [CStr.toString]
+/// copies them into a `string`. A C function that may return null returns a `?CStr`.
+pub struct CStr {
+    address: uint,
+
+    /// Returns the number of bytes before the NUL.
+    pub fn length(): int {
+        return lyr_ffi_cstr_length(this.address);
+    }
+
+    /// Returns a copy of the bytes as a `string`.
+    ///
+    /// # Errors
+    /// A [Utf8Error] where the bytes are no well-formed UTF-8, with the offset of the first that
+    /// is none.
+    pub fn toString(): string throws Utf8Error {
+        let bad = lyr_ffi_cstr_invalid(this.address);
+        if (bad >= 0) {
+            throw Utf8Error { offset = bad };
+        }
+        return lyr_ffi_cstr_string(this.address);
+    }
+}
+
+/// The `CStr` a `string` stands for at a C function's boundary: its bytes, which a NUL ends.
+/// Nothing but such a call holds one: the string's bytes are the string's, and the call is the
+/// time they are known to be alive.
+@Allow("unused")
+fn stringAsCStr(s: string): CStr {
+    return CStr { address = lyr_ffi_string_address(s) };
+}
+
+extern "C" fn lyr_ffi_cstr_length(address: uint): int;
+extern "C" fn lyr_ffi_cstr_invalid(address: uint): int;
+extern "C" fn lyr_ffi_cstr_string(address: uint): string;
+extern "C" fn lyr_ffi_string_address(s: string): uint;

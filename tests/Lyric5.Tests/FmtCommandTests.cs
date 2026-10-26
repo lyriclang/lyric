@@ -41,6 +41,26 @@ public class FmtCommandTests
         Assert.Equal(written, File.GetLastWriteTimeUtc(Path.Combine(root, "src/main.lyr")));
     }
 
+    /// <summary>An extern block stays a block: its head once, a function with a visibility of its
+    /// own keeps it.</summary>
+    [Fact]
+    public void Fmt_keeps_an_extern_block()
+    {
+        const string loose = "pub extern \"C\" {fn abs(x: int32): int32;\n  private fn labs(x: int): int = \"labs\";}\n\nfn main(): void {\n}\n";
+        const string formed = """
+            pub extern "C" {
+                fn abs(x: int32): int32;
+                private fn labs(x: int): int = "labs";
+            }
+
+            fn main(): void { }
+
+            """;
+        var root = Package(("lyric.toml", AppManifest), ("src/main.lyr", loose));
+        Assert.Equal(0, RunRaw("fmt", "-C", root).Exit);
+        Assert.Equal(formed, File.ReadAllText(Path.Combine(root, "src/main.lyr")));
+    }
+
     [Fact]
     public void Check_names_what_would_change_writes_nothing_and_fails_until_it_is_formed()
     {
