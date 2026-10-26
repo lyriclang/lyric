@@ -182,7 +182,15 @@ jobs:
         shell: bash
         run: bash tooling/c-smoke/run.sh
 
+      # The runner's own .NET 10 where it has one; the download only where it has none —
+      # on 2026-10-25 the install script's links answered 409 for hours.
+      - name: The preinstalled .NET, if it is 10
+        id: dotnet
+        shell: bash
+        run: dotnet --list-sdks 2>/dev/null | grep -q '^10\.' && echo "have=1" >> "$GITHUB_OUTPUT" || true
+
       - name: Set up .NET from global.json
+        if: steps.dotnet.outputs.have != '1'
         uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
@@ -256,7 +264,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # The runner's own .NET 10 where it has one; the download only where it has none —
+      # on 2026-10-25 the install script's links answered 409 for hours.
+      - name: The preinstalled .NET, if it is 10
+        id: dotnet
+        shell: bash
+        run: dotnet --list-sdks 2>/dev/null | grep -q '^10\.' && echo "have=1" >> "$GITHUB_OUTPUT" || true
+
       - name: Set up .NET from global.json
+        if: steps.dotnet.outputs.have != '1'
         uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
