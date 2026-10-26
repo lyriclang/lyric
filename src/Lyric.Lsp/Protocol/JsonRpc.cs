@@ -70,6 +70,11 @@ public sealed record JsonRpcError
 {
     [JsonPropertyName("code")] public required int Code { get; init; }
     [JsonPropertyName("message")] public required string Message { get; init; }
+
+    /// <summary>What the method defines beside the code, where it defines something.</summary>
+    [JsonPropertyName("data")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? Data { get; init; }
 }
 
 /// <summary>
@@ -120,4 +125,9 @@ public static class JsonRpcErrorCodes
     /// is the standard library, for instance. The message is shown to the user, which is the whole
     /// point of refusing with this code rather than with an empty result.</summary>
     public const int RequestFailed = -32803;
+
+    /// <summary>The server gave up on a request it had begun, and the client may ask again; for
+    /// <c>textDocument/diagnostic</c> the error's data says whether it should
+    /// (<c>retriggerRequest</c>).</summary>
+    public const int ServerCancelled = -32802;
 }
