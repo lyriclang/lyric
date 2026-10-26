@@ -380,6 +380,17 @@ the one form, with no options to change it; comments and the parentheses a progr
 a file that does not parse is left as it is. <code>--check</code> writes nothing and fails where a file would
 change; <code>--diff</code> shows how. The standard library is in the form.</p>
 </li>
+<li><p><strong>The editor and the debugger (M13b</strong> — <code>design/v5/spec/11</code> E1–E4, E8; spec chapter 14 §11, §12**):**
+<code>lyric lsp</code> is the language server of a package — diagnostics as you type, quick fixes from the compiler's
+suggestions and an <code>@Allow</code> for a lint, a finding's link to its page, formatting, hover with a declaration's head as
+written, definition, references and rename across the packages open, completion, test lenses (<code>lyric/tests</code>) and
+<code>lyric.expand</code>. <code>lyric dap</code> debugs over lldb-dap: a launch builds the package, a file or (<code>test</code>) the package's
+tests in the debug profile; a panic stops the program (<code>lyric-panic</code>); frames, locals and values are shown by
+their Lyric names, strings as text, arrays, optionals and enums by what they hold. <code>lyric test --no-run</code> builds
+the tests and prints the binary's path. The grammar for editors is
+<a href="https://github.com/lyriclang/tree-sitter-lyric">tree-sitter-lyric</a>; vscode-lyric and jetbrains-lyric 2.0.0
+speak to Lyric 5.</p>
+</li>
 <li><p><strong>Formatting, documentation and the API (M13a</strong> — <code>design/v5/spec/11</code> E5, E7, 07 B3; spec chapter 14 §3, §8–§10**):**
 <code>lyric fmt</code> writes the one form there is — comments and written parentheses kept, a file that does not parse left
 as it is; <code>--check</code> names a file that would change. <code>lyric doc</code> writes a package's reference: a page per module and
