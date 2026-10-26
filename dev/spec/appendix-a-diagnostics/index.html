@@ -2257,6 +2257,13 @@ code is no longer reported, and its number is not given again.</p>
 <td>a loop over a string</td>
 <td>A <code>for</code> loop walks a <code>string</code>, which is no <code>Iterable</code>: <code>s.chars()</code> gives its characters, <code>s.lines()</code> its lines.</td>
 </tr>
+<tr>
+<td>LYR-SEM0233</td>
+<td>E</td>
+<td><a href="../../spec/13-abi/">13-abi</a></td>
+<td>a memory operation outside an unsafe block</td>
+<td>A pointer's <code>read</code>, <code>write</code>, <code>offset</code> or <code>cast</code>, or <code>std.ffi</code>'s <code>alloc</code> or <code>free</code>, is called outside an <code>unsafe { … }</code> block.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a5-mac--macros">A.5 MAC — Macros</h2>

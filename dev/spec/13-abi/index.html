@@ -423,6 +423,27 @@ argument promotions make them: a <code>float32</code> as <code>double</code>, an
 <code>bool</code> and an enum of such an integer among them — as <code>int</code>; every other as itself. <em>(Informative:
 what the callee reads is its format's to say; an <code>int</code> is C's <code>int64_t</code>, which <code>%lld</code> reads,
 not <code>%d</code>.)</em></li>
+<li><strong>Memory and <code>unsafe</code></strong>: <code>unsafe { … }</code> — the word contextual, a statement — is a block
+within which <code>std.ffi</code>'s memory operations may be called: a pointer's <code>read()</code>, <code>write(v)</code>,
+<code>offset(n)</code> and <code>cast&lt;U&gt;()</code>, <code>alloc&lt;T&gt;(n)</code> and <code>free(p)</code>. Called outside one, each is refused
+(<code>LYR-SEM0233</code>); the block is lexical, a lambda written within it is within it. Nothing else
+about the block differs, and calling a C function is not unsafe.
+<ul>
+<li><code>read()</code> is the <code>T</code> at the pointer's address, <code>write(v)</code> puts one there; <code>T</code> is what a field
+of a <code>@Layout(C)</code> struct may be (rule 4, <code>LYR-SEM0099</code>), and the memory's layout is C's.</li>
+<li><code>offset(n)</code> is the address <code>n</code> values of <code>T</code> further — before it for a negative <code>n</code>;
+<code>cast&lt;U&gt;()</code> the same address as a <code>Ptr&lt;U&gt;</code>.</li>
+<li><code>alloc&lt;T&gt;(n)</code> is <code>n</code> values of <code>T</code> from C's heap, set to zero, never null: a negative <code>n</code>
+panics (<code>LYR-RT0007</code>), and so does a heap with no memory left (<code>LYR-RT0005</code>); <code>T</code> is as for
+<code>read</code>. <code>free(p)</code> gives it back.</li>
+<li>What the program holds to in the block — that the memory is there, holds a <code>T</code> and is not
+freed twice — is the program's word; the implementation does not check it, and breaking it
+is undefined.</li>
+<li><code>xs.asPtr()</code> of an array or a slice — safe — is the address of its first element, the
+elements one after another as in a C array. The pointer does not keep the array alive, and
+points at nothing where it is empty.</li>
+</ul>
+</li>
 </ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">

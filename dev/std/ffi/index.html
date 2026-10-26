@@ -22,6 +22,8 @@
 <li><a class="current" href="../../std/ffi/">std.ffi</a></li>
 <li><a href="../../std/ffi/Ptr/">Ptr</a></li>
 <li><a href="../../std/ffi/CStr/">CStr</a></li>
+<li><a href="../../std/ffi/#fn.alloc">alloc()</a></li>
+<li><a href="../../std/ffi/#fn.free">free()</a></li>
 </ul>
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
@@ -32,6 +34,10 @@
 what C holds by address. <a href="../../std/ffi/Ptr/">Ptr</a> is a pointer to memory C manages, <code>?Ptr</code> one that may be null;
 <a href="../../std/ffi/CStr/">CStr</a> is C's text, <code>const char *</code>. A <code>string</code> handed to a <code>CStr</code> parameter crosses without a
 copy, its bytes as they lie, for the time of the call.</p>
+<p>Reading and writing through a pointer, moving it and changing what it points at, and C's own
+memory — <a href="../../std/ffi/#fn.alloc">alloc</a> and <a href="../../std/ffi/#fn.free">free</a> — stand in an <code>unsafe { … }</code> block: there the program says it
+holds to what the compiler cannot see, that the memory is there and of the type. Calling a C
+function is not unsafe, and neither is <a href="../../std/ffi/Ptr/">Ptr</a> of an array or a slice's elements.</p>
 <h4 id="examples">Examples</h4>
 <pre><code class="language-lyric"><span class="kw">import</span> std.ffi { <span class="ty">CStr</span> };
 <span class="kw">import</span> std.io { println };
@@ -45,11 +51,49 @@ copy, its bytes as they lie, for the time of the call.</p>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/ffi/Ptr/">Ptr</a> <span class="kind">struct</span> <span class="summary">— A pointer to a <code>T</code> in memory C manages, never null: <code>T *</code> where a C function takes or returns one.</span></div>
 <div class="listed"><a href="../../std/ffi/CStr/">CStr</a> <span class="kind">struct</span> <span class="summary">— A C string: the address of bytes a NUL ends, <code>const char *</code> at a C function's boundary.</span></div>
+<h2 id="functions">Functions</h2>
+<section class="member" id="fn.alloc">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> alloc&lt;<span class="ty">T</span>&gt;(count: <span class="ty">int</span>): <span class="ty">Ptr</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Returns <code>count</code> values of <code>T</code> from C's heap, each set to zero — what C's <code>calloc</code> gives, to
+be given back with <a href="../../std/ffi/#fn.free">free</a>. Unsafe: nothing frees it but the program.</p>
+<h4 id="panics">Panics</h4>
+<p>Where <code>count</code> is negative, and where C's heap has no memory left.</p>
+</section>
+<section class="member" id="fn.free">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> free&lt;<span class="ty">T</span>&gt;(p: <span class="ty">Ptr</span>&lt;<span class="ty">T</span>&gt;): <span class="ty">void</span></code></pre>
+<p>Gives the memory <a href="../../std/ffi/#fn.alloc">alloc</a> gave back to C's heap. Unsafe: nothing reads it afterwards but the
+program's word says so.</p>
+</section>
+<h2 id="extensions">Extensions</h2>
+<section class="member" id="ext.T">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span>&gt; <span class="ty">T</span>[]</code></pre>
+</section>
+<section class="member" id="ext.T.method.asPtr">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asPtr(): <span class="ty">Ptr</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Returns a pointer to the first element: the elements lie one after the other, as C's
+array does. It holds the array no longer than the array is otherwise held, and it is no
+pointer to anything where the array is empty.</p>
+</section>
+<section class="member" id="ext.SliceT">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span>&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+</section>
+<section class="member" id="ext.SliceT.method.asPtr">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asPtr(): <span class="ty">Ptr</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Returns a pointer to the slice's first element, in the memory of its array. It holds the
+array no longer than the array is otherwise held, and it is no pointer to anything where
+the slice is empty.</p>
+</section>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
 <ul>
 <li class="level-2"><a href="#types">Types</a></li>
+<li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.alloc">alloc</a></li>
+<li class="level-3"><a href="#fn.free">free</a></li>
+<li class="level-2"><a href="#extensions">Extensions</a></li>
+<li class="level-3"><a href="#ext.T">T[]</a></li>
+<li class="level-3"><a href="#ext.SliceT">Slice&lt;T&gt;</a></li>
 </ul>
 </aside>
 </div>

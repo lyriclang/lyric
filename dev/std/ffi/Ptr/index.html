@@ -22,6 +22,8 @@
 <li><a href="../../../std/ffi/">std.ffi</a></li>
 <li><a class="current" href="../../../std/ffi/Ptr/">Ptr</a></li>
 <li><a href="../../../std/ffi/CStr/">CStr</a></li>
+<li><a href="../../../std/ffi/#fn.alloc">alloc()</a></li>
+<li><a href="../../../std/ffi/#fn.free">free()</a></li>
 </ul>
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
@@ -29,12 +31,37 @@
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Ptr</span>&lt;<span class="ty">T</span>&gt;</code></pre>
 <p>A pointer to a <code>T</code> in memory C manages, never null: <code>T *</code> where a C function takes or returns
 one.</p>
-<p>A value of it comes from C and goes back to C; Lyric holds it and compares it, and does not
-read through it. A pointer C may return as null is a <code>?Ptr&lt;T&gt;</code>, <code>none</code> for null.</p>
+<p>A value of it comes from C, from <a href="../../../std/ffi/#fn.alloc">alloc</a> or from an array's <code>asPtr()</code>, and goes back to C. A
+pointer C may return as null is a <code>?Ptr&lt;T&gt;</code>, <code>none</code> for null. What it points at is read and
+written in an <code>unsafe</code> block, and only where <code>T</code> is what C holds — integers, floats, <code>bool</code>,
+<code>char</code>, a pointer, a <code>@Layout(C)</code> struct.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.read">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> read(): <span class="ty">T</span></code></pre>
+<p>Returns the <code>T</code> it points at. Unsafe: the memory is the program's word.</p>
+</section>
+<section class="member" id="method.write">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> write(value: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
+<p>Writes <code>value</code> where it points. Unsafe: the memory is the program's word.</p>
+</section>
+<section class="member" id="method.offset">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> offset(n: <span class="ty">int</span>): <span class="ty">Ptr</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Returns the pointer <code>n</code> values of <code>T</code> further on, or back for a negative <code>n</code>. Unsafe:
+nothing says the memory goes on.</p>
+</section>
+<section class="member" id="method.cast">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cast&lt;<span class="ty">U</span>&gt;(): <span class="ty">Ptr</span>&lt;<span class="ty">U</span>&gt;</code></pre>
+<p>Returns the same address as a pointer to a <code>U</code>. Unsafe: nothing says a <code>U</code> lies there.</p>
+</section>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
 <ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.read">read</a></li>
+<li class="level-3"><a href="#method.write">write</a></li>
+<li class="level-3"><a href="#method.offset">offset</a></li>
+<li class="level-3"><a href="#method.cast">cast</a></li>
 </ul>
 </aside>
 </div>
