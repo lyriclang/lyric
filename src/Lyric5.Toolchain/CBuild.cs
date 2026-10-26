@@ -16,6 +16,13 @@ public sealed record CUnit(
 
 public sealed class CBuildException(string message) : Exception(message);
 
+/// <summary>Where a link finds libraries beyond the linker's own directories, and whether the
+/// binary searches its own directory for shared libraries first — where files lie beside it.</summary>
+public sealed record LinkPaths(IReadOnlyList<string> SearchDirs, bool OwnDirFirst)
+{
+    public static readonly LinkPaths None = new([], false);
+}
+
 /// <summary>
 /// Turns C units into objects, objects into an archive, and archives into an executable, for one
 /// compiler, target and profile. Objects are cached by content: the key covers the compiler
@@ -215,22 +222,26 @@ public sealed class CBuild
     /// it, which is where libbacktrace reads line tables from (<see cref="Reproducible"/>).
     /// </summary>
     /// <param name="libraries">Libraries by name (<c>-l</c>), after every input that needs them.</param>
-    public string LinkExecutable(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries = null)
+    /// <param name="paths">Where the libraries are searched, and whether the binary looks for shared
+    /// libraries in its own directory first.</param>
+    public string LinkExecutable(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries = null,
+        LinkPaths? paths = null)
     {
+        paths ??= LinkPaths.None;
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
-        Link(inputs, output, libraries, debugMap: false);
+        Link(inputs, output, libraries, paths, debugMap: false);
         if (Target.Os == TargetOs.Windows)
         {
             try { Reproducible.NormalizePe(output, Path.ChangeExtension(output, ".pdb")); }
             catch (InvalidDataException failure) { throw new CBuildException($"{output}: {failure.Message}"); }
         }
-        if (Target.Os == TargetOs.MacOs && OperatingSystem.IsMacOS()) GatherDebugInfo(inputs, output, libraries);
+        if (Target.Os == TargetOs.MacOs && OperatingSystem.IsMacOS()) GatherDebugInfo(inputs, output, libraries, paths);
         return output;
     }
 
     /// <summary>One link. A Mach-O image keeps its debug map only when asked: <c>-S</c> leaves out
     /// what would name every object by its path and time.</summary>
-    private void Link(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries, bool debugMap)
+    private void Link(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries, LinkPaths paths, bool debugMap)
     {
         var arguments = Driver();
         // No LTO flag at the link: lld runs LTO over bitcode inputs by itself, and with the flag
@@ -239,7 +250,12 @@ public sealed class CBuild
         arguments.AddRange(Profile.Codegen.Where(f => !IsLto(f)));
         arguments.AddRange(Profile.Instrumentation);
         arguments.AddRange(inputs);
-        foreach (var library in libraries ?? []) arguments.Add("-l" + library);
+        // the directories named before the libraries searched in them, in their order
+        foreach (var dir in paths.SearchDirs) arguments.Add("-L" + dir);
+        foreach (var library in libraries ?? []) arguments.Add(ImportLibrary(library, paths.SearchDirs) ?? "-l" + library);
+        // Windows' loader looks beside the image first by itself; ELF and Mach-O are told to
+        if (paths.OwnDirFirst && Target.Os == TargetOs.Linux) arguments.Add("-Wl,-rpath,$ORIGIN");
+        if (paths.OwnDirFirst && Target.Os == TargetOs.MacOs) arguments.Add("-Wl,-rpath,@executable_path");
         arguments.AddRange(["-o", output]);
         arguments.AddRange(Target.Os switch
         {
@@ -261,6 +277,27 @@ public sealed class CBuild
         {
             throw new CBuildException($"linking {output} for {Target} ({Profile.Name}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
         }
+    }
+
+    /// <summary>
+    /// A MinGW import library for <c>-l<paramref name="library"/></c>, by its path, where zig would
+    /// not find it: for a Windows target zig's linker looks for <c>X.dll</c>, <c>X.lib</c> and
+    /// <c>libX.a</c>, and an SDK built with MinGW — SDL's among them — ships <c>libX.dll.a</c>, which
+    /// GNU ld and clang find by the name. The first directory that holds a form zig knows wins, as
+    /// it would; <c>null</c> where the name does.
+    /// </summary>
+    private string? ImportLibrary(string library, IReadOnlyList<string> searchDirs)
+    {
+        if (Target.Os != TargetOs.Windows || Compiler.Kind != CCompilerKind.Zig) return null;
+        foreach (var dir in searchDirs)
+        {
+            if (new[] { $"{library}.dll", $"{library}.lib", $"lib{library}.a" }.Any(n => File.Exists(Path.Combine(dir, n))))
+                return null;
+            foreach (var name in new[] { $"lib{library}.dll.a", $"{library}.dll.a" })
+                if (Path.Combine(dir, name) is var found && File.Exists(found))
+                    return found;
+        }
+        return null;
     }
 
     /// <summary>The main task's stack, in bytes (<c>LYR_MAIN_TASK_STACK</c>), asked of the linker for
@@ -306,7 +343,7 @@ public sealed class CBuild
     /// the image when the two hold the same bytes at the same addresses. It then takes the image's
     /// UUID, by which libbacktrace pairs the two.
     /// </summary>
-    private void GatherDebugInfo(IReadOnlyList<string> inputs, string executable, IReadOnlyList<string>? libraries)
+    private void GatherDebugInfo(IReadOnlyList<string> inputs, string executable, IReadOnlyList<string>? libraries, LinkPaths paths)
     {
         var dsymutil = CCompiler.FindOnPath("dsymutil");
         if (dsymutil is null) return;
@@ -317,7 +354,7 @@ public sealed class CBuild
         try
         {
             Directory.CreateDirectory(scratch);
-            Link(inputs, mapped, libraries, debugMap: true);
+            Link(inputs, mapped, libraries, paths, debugMap: true);
             if (!Reproducible.SameSegments(mapped, executable)) return;
             ProcessRunner.Run(dsymutil, [mapped, "-o", dsym], TimeSpan.FromMinutes(2));
             var dwarf = Path.Combine(dsym, "Contents", "Resources", "DWARF", Path.GetFileName(executable));

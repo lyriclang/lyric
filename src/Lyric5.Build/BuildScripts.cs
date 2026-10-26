@@ -5,10 +5,12 @@ using Lyric5.Toolchain;
 namespace Lyric5.Build;
 
 /// <summary>What the program's build scripts asked of its build: C to
-/// compile with the program, each with its flags, and libraries to link.</summary>
-public sealed record ScriptDirectives(IReadOnlyList<CUnit> Sources, IReadOnlyList<string> Libraries)
+/// compile with the program, each with its flags, libraries to link, the directories the link
+/// searches them in, and the files that go beside each binary — full paths, each once.</summary>
+public sealed record ScriptDirectives(IReadOnlyList<CUnit> Sources, IReadOnlyList<string> Libraries,
+    IReadOnlyList<string> SearchDirs, IReadOnlyList<string> Beside)
 {
-    public static readonly ScriptDirectives None = new([], []);
+    public static readonly ScriptDirectives None = new([], [], [], []);
 }
 
 /// <summary>
@@ -27,8 +29,8 @@ public sealed record ScriptDirectives(IReadOnlyList<CUnit> Sources, IReadOnlyLis
 ///
 /// <para>When: before the compile, where the script — <c>build.lyr</c>, <c>build/</c>, std, the
 /// toolchain, the target, the profile — changed, where a file it named with
-/// <c>rerunIfChanged</c> changed, or where <c>gen/</c> is not as it left it; else what its last run
-/// asked stands. Which: the root package's script always; a dependency's only where the root
+/// <c>rerunIfChanged</c> changed, where a variable it named with <c>rerunIfEnvChanged</c> has another
+/// value, or where <c>gen/</c> is not as it left it; else what its last run asked stands. Which: the root package's script always; a dependency's only where the root
 /// manifest's <c>[trust] build-scripts</c> names it (pnpm 10), else the build stops before it.</para>
 /// </summary>
 public static class BuildScripts
@@ -42,6 +44,8 @@ public static class BuildScripts
         var root = graph.Root;
         var sources = new List<CUnit>();
         var libraries = new List<string>();
+        var searchDirs = new List<string>();
+        var beside = new List<(string Path, string Package)>();
         var order = graph.Packages.Values.Where(m => m.Name != root.Name).OrderBy(m => m.Name, StringComparer.Ordinal).Append(root);
         // a script's 'warn' is the lint 'build-script-warning', at its package's level (spec 16 §5);
         // a dependency's script warns with --warn-deps alone, and never as an error
@@ -73,6 +77,14 @@ public static class BuildScripts
                     case "link-lib":
                         if (!libraries.Contains(text)) libraries.Add(text);
                         break;
+                    case "link-search":
+                        var dir = Path.GetFullPath(text, manifest.Root);
+                        if (!searchDirs.Contains(dir)) searchDirs.Add(dir);
+                        break;
+                    case "beside-binary":
+                        var file = Path.GetFullPath(text, manifest.Root);
+                        if (!beside.Any(b => b.Path == file)) beside.Add((file, manifest.Name));
+                        break;
                     case "warn":
                         var foreign = manifest.Name != root.Name;
                         if (foreign && !project.LintArgs.WarnDeps) break;
@@ -91,8 +103,26 @@ public static class BuildScripts
                 }
             }
         }
-        return (0, new ScriptDirectives(sources, libraries));
+        // what goes beside the binary is there, and no two files take one name there
+        foreach (var (file, package) in beside)
+            if (!File.Exists(file))
+            {
+                Say.Error(error, "LYR-BLD0004", $"{package}'s build.lyr puts '{file}' beside the binary, and there is no such file");
+                return (1, null);
+            }
+        foreach (var clash in beside.GroupBy(b => Path.GetFileName(b.Path), FileNames).Where(g => g.Count() > 1))
+        {
+            Say.Error(error, "LYR-BLD0004",
+                $"two files named '{clash.Key}' would lie beside the binary: {string.Join(" and ", clash.Select(b => $"'{b.Path}' ({b.Package})"))}");
+            return (1, null);
+        }
+        return (0, new ScriptDirectives(sources, libraries, searchDirs, [.. beside.Select(b => b.Path)]));
     }
+
+    /// <summary>File names as the systems compare them: Windows and macOS's default volumes
+    /// do not tell 'SDL3.dll' from 'sdl3.dll'.</summary>
+    private static readonly StringComparer FileNames =
+        OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
 
     /// <summary>Where the graph's manifests declare the package — the root's first, for the line a
     /// refusal points at.</summary>
@@ -199,6 +229,13 @@ public static class BuildScripts
     private static string Content(string path) =>
         File.Exists(path) ? Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))) : "-";
 
+    /// <summary>An environment variable's value as a key, <c>-</c> where it is not set: a hash, so
+    /// that what the variable holds — a token, perhaps — is not written under <c>out/</c>.</summary>
+    private static string EnvValue(string name) =>
+        Environment.GetEnvironmentVariable(name) is { } value
+            ? Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)))
+            : "-";
+
     /// <summary>A directory's tree as a key — what the script left in <c>gen/</c>.</summary>
     private static string Tree(string directory)
     {
@@ -209,15 +246,18 @@ public static class BuildScripts
     }
 
     /// <summary>What the last run left: the script's key, the inputs it named with the content they
-    /// had, the tree of <c>gen/</c>, and its directives — a line each.</summary>
+    /// had, the environment variables it named with the values they had, the tree of <c>gen/</c>,
+    /// and its directives — a line each.</summary>
     private sealed record State(string Key, List<(string Word, string Text)> Directives)
     {
         public Dictionary<string, string> Inputs { get; init; } = new(StringComparer.Ordinal);
+        public Dictionary<string, string> Env { get; init; } = new(StringComparer.Ordinal);
         public string Gen { get; init; } = "-";
 
         public bool Fresh(Manifest manifest) =>
             Gen == Tree(manifest.GenRoot)
-            && Inputs.All(input => Content(Path.GetFullPath(input.Key, manifest.Root)) == input.Value);
+            && Inputs.All(input => Content(Path.GetFullPath(input.Key, manifest.Root)) == input.Value)
+            && Env.All(variable => EnvValue(variable.Key) == variable.Value);
 
         public void Write(string file, Manifest manifest)
         {
@@ -226,6 +266,8 @@ public static class BuildScripts
             text.Append("gen\t").Append(Tree(manifest.GenRoot)).Append('\n');
             foreach (var (word, path) in Directives.Where(d => d.Word == "rerun-if-changed").Distinct())
                 text.Append("input\t").Append(Content(Path.GetFullPath(path, manifest.Root))).Append('\t').Append(path).Append('\n');
+            foreach (var (word, name) in Directives.Where(d => d.Word == "rerun-if-env-changed").Distinct())
+                text.Append("env\t").Append(EnvValue(name)).Append('\t').Append(name).Append('\n');
             foreach (var (word, value) in Directives) text.Append("directive\t").Append(word).Append('\t').Append(value).Append('\n');
             File.WriteAllText(file, text.ToString());
         }
@@ -235,6 +277,7 @@ public static class BuildScripts
             if (!File.Exists(file)) return null;
             string? key = null, gen = null;
             var inputs = new Dictionary<string, string>(StringComparer.Ordinal);
+            var env = new Dictionary<string, string>(StringComparer.Ordinal);
             var directives = new List<(string, string)>();
             foreach (var line in File.ReadAllLines(file))
             {
@@ -244,10 +287,11 @@ public static class BuildScripts
                     case ["key", var k]: key = k; break;
                     case ["gen", var g]: gen = g; break;
                     case ["input", var content, var path]: inputs[path] = content; break;
+                    case ["env", var value, var name]: env[name] = value; break;
                     case ["directive", var word, var text]: directives.Add((word, text)); break;
                 }
             }
-            return key is null ? null : new State(key, directives) { Inputs = inputs, Gen = gen ?? "-" };
+            return key is null ? null : new State(key, directives) { Inputs = inputs, Env = env, Gen = gen ?? "-" };
         }
     }
 }

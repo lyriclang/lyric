@@ -94,6 +94,41 @@ fn main(): void {
 }
 '''
 
+[LYR-BLD0004]
+title = "a file a build script puts beside the binary is not there, or shares its name"
+severity = "error"
+area = "15-project"
+summary = "Reported when a package's `build.lyr` names a file with `std.build.besideBinary` that is not there when the script has ended, or two such files that have one name. Nothing is built."
+explanation = '''
+`build.besideBinary(path)` asks the build to copy a file into the directory of every binary it makes of the program — a shared library the program loads when it starts, most of all, such as `SDL3.dll` beside `app.exe`. The copy goes under the file's own name, so the file must be there when the script ends, and two files with one name — from two packages, or from two directories — would overwrite each other.
+
+A path relative to the package's root is read from there; one from the environment (`SDL3_DIR`) is likely wrong where it is missing. Name the variable with `build.rerunIfEnvChanged`, so the script runs again when it is set right, and check that the file is there before naming it: `build.warn` can say what to set.
+'''
+wrong = '''
+//- build.lyr
+import std.build;
+
+fn main(): void {
+    build.besideBinary("lib/missing.dll");
+}
+//- src/main.lyr
+fn main(): void {
+}
+'''
+right = '''
+//- build.lyr
+import std.build;
+
+fn main(): void {
+    build.besideBinary("data/notes.txt");
+}
+//- data/notes.txt
+beside the binary
+//- src/main.lyr
+fn main(): void {
+}
+'''
+
 [LYR-CG0001]
 title = "a construct the C backend does not translate"
 severity = "error"
