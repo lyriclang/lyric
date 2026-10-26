@@ -1306,3 +1306,78 @@ geöffneten abhängigen Paket findet niemand, wie bei gopls ohne geladenes Paket
 - **Windows gemessen**: `lldb-dap.exe` von LLVM startet auf dem Runner nicht (offener Punkt 286, Uhr M15).
 - **Zu bestätigen**: 273 (E1 B teilt die Parse, nicht die Prüfung — die geprüfte std eine Tür nach 5.0) und 281.
   **Nächster Schritt: M14, sein Plan hier zuerst.**
+
+## Nachtrag 2026-10-26 — der Plan für M14
+
+M14 nach seiner Zeile oben, 11 W4 (X1–X10) und W5 A (H1–H8), 01 K4, 06 G1/S5/S6, 07 B5/B6: **FFI und
+Einbettung** — C-Bibliotheken aus Lyric binden, Lyric als C-Bibliothek in einen Host einbetten. Das Artefakt:
+**`examples/ffi` bindet eine C-Bibliothek; `examples/embedded-host` ist ein C-Programm gegen `lib<app>.a`; Spec
+13 (ABI) vollständig**. Grundlage ist der Stand nach M13b (#577), gemessen vor dem Plan:
+
+- **Stufe 1 steht**: `extern "C" fn f(…): T [= "sym"];` mit Skalaren (`CrossesC`, `LYR-SEM0099`), als `IrImport`
+  `C:<sym>` gesenkt und direkt in C gerufen; `[native]` mit `sources`, `include`, `libs` je OS im Manifest
+  (`NativePart`); Spec 13 §1–§2, sieben Fälle.
+- **Die Laufzeit hat den Kern**: `lyr_init(const LyrConfig*)` mit Ausgabe-Haken, Heap-Grenze und Signalen,
+  `lyr_shutdown`; Wurzeln `lyr_root_new/get/set/free` (das Netz für `GcHandle`); `lyr_thread_attach/detach`; der
+  Fremdrahmen-Zähler `lyr_coro_enter_foreign/leave_foreign` (01 K4, „noch fragt ihn niemand“); `lyr_gc_collect`,
+  `lyr_gc_stats` („intern bis M14“); ein Panik-Haken. Öffentlich ist nur der Sammel-Header `lyr/lyr.h` aller internen.
+- **Es fehlt** alles auf der Sprachseite: `Ptr`, `CStr`, `@Layout`, Funktionszeiger-Typen, die Blockform, C-Variadik,
+  `unsafe`, `std.ffi`, Callbacks, `GcHandle`, `@Export`, `lyric build --lib`, Header, `LyrStatus`, `lyr_take_error`,
+  `lyr_step`/`lyr_run`, `ffi.Library`. Die Intrinsics-Tabelle der std (`Intrinsics.Runtime`, ~156 Einträge) steht
+  noch neben `extern "C"` — und die `extern`-Deklarationen der std **prüft niemand** (`RequireBody` kehrt bei
+  `IsNative` früh zurück; `hash.lyr` gibt `uint64` zurück, was `CrossesC` außerhalb der std ablehnt).
+
+| # | Entscheidung | Vergleich / Verworfen |
+|---|---|---|
+| P1 | **Die Typtabelle vollständig** (X2, X3): `Ptr<T>` (nie null) und `?Ptr<T>` (die Nische, V5) als Typen der Sprache in `std.ffi`, `CStr` ebenda; `string` als Argument koerziert zu `CStr` **ohne Kopie** (das Layout ist NUL-terminiert, Spec 13 §1.2), `CStr` aus C ist geliehen (`toString() throws Utf8Error`, `length()`); `@Layout(C) struct` als Wert und hinter `Ptr`, Felder C-fähig sonst `LYR-SEM0099`, `T[N]` darin inline; `@Layout(C)`/`@Layout(uint8)` an Enums ohne Nutzlast; `char` ↔ `uint32_t`. Die Prüfung ist **eine** Funktion (`CrossesC` wächst), die der Checker, die Spec-Tabelle und die Fälle teilen | Rust `#[repr(C)]`, Zig `extern struct`; verworfen: alle Structs im C-Layout (nimmt dem Compiler die Nischen, X2) |
+| P2 | **Die Formen** (X1): `extern "C" { fn …; fn …; }` gebündelt; C-Variadik als nacktes `...` ohne Namen (`fn printf(fmt: CStr, ...): int`), **getrennt** von Lyrics `xs: T...` — Argumente dahinter nach C-Promotion (`float32` → `double`, kleine Ganzzahlen → `int`), nur Typen der Tabelle; `extern "C" fn(int) -> int` als Typ eines Funktionszeigers | C, Rust; verworfen: `@Link` (X1: `[native] libs` gibt es) |
+| P3 | **`unsafe` und Speicher** (X4): `unsafe { … }` als kontextuelles Wort vor einem Block; darin `Ptr<T>.read()/write(v)/offset(n)/cast<U>()`, `ffi.alloc<T>(n)`/`ffi.free(p)`; `T[].asPtr()`/`Slice<T>.asPtr()` sicher, ihre Nutzung unsafe; der **Aufruf** eines `extern` ist nicht unsafe (Zig); `LYR-SEM` für eine Operation außerhalb; keine Arena | Rust `unsafe`, Zig; verworfen: Java-FFM-Arena, Handle-Tabelle |
+| P4 | **Callbacks** (X5, 01 K4): eine nicht-fangende Funktion oder ein nicht-fangendes Lambda koerziert zu `extern "C" fn(…)` — der Emitter schreibt je Signatur ein Trampolin, das den Fremdrahmen-Zähler setzt; `ffi.Callback.new(closure)` → `(fnptr, userdata: Ptr<void>)`, der Zustand über eine Wurzel gehalten bis `release()`; der Callback-Typ wirft nicht, die Brücke ist `ffi.stash(e)`/`ffi.takeStashed()` (Task-lokal); **Panik im Callback = Abbruch**; ein Callback darf parken (L4). K4: kein Abbruch und keine Thread-Migration einer Koroutine mit Fremdrahmen — die Laufzeit prüft und meldet | Rust, Go cgo |
+| P5 | **Lebensdauer und fremde Threads** (X6, X7, H5): `ffi.GcHandle.pin(obj)`, `release()`, `asPtr()`, `GcHandle.from(ptr)` über die Wurzeln; ein Callback auf einem Thread ohne Lyric-Scheduler geht in die **Queue des besitzenden Threads** (06), nur `void`; mit Rückgabe von fremdem Thread = Abbruch mit Meldung; `Callback.new(closure, thread: …)` wählt den Besitzer; `lyr_gc_stats`/`lyr_gc_collect` werden Host-API mit Header-Zusage | .NET `GCHandle`, Go `cgo.Handle`, Kotlin-Dispatcher |
+| P6 | **Die Intrinsics-Tabelle wird `extern "C"`** (M8b P1, die Uhr aus der Zeile 2026-10-07): jeder rumpflose std-Native wird eine `extern "C"`-Deklaration auf seine Laufzeitfunktion; was die Tabelle nicht trägt, weil es Objekte der Laufzeit kreuzt (`string`, Arrays, Klassen als `LyrStr*`/`LyrArr*`/Objektzeiger), kreuzt **nur in der std** — ein Vorrecht nach Herkunft, wie `IsNative` heute, aber **geprüft**: die std-Deklarationen gehen durch dieselbe Prüfung mit einer std-Zeile mehr in der Tabelle. Danach gibt es einen Mechanismus statt zwei; `Intrinsics.Runtime` fällt bis auf die Makros, die keine Funktionen sind (`LYR_CONSOLE_PUT` u. a. werden `static inline`-Funktionen der Laufzeit) | Go `//go:linkname` nur im Runtime-Paket; verworfen: die Tabelle behalten (zwei Wege zu einer C-Funktion, die Regel „ein Mechanismus“) |
+| P7 | **Export und Bibliotheken** (X8, B6): `@Export("c_name") pub fn` nur mit Typen der Tabelle, Reachability-Wurzel; **`lyric build --lib`** baut `lib<name>.a` und auf Wunsch `.so`/`.dylib`/`.dll` (`--lib=static\|shared`, Standard `static`), dazu **`<name>.h`** mit den Exporten, den `@Layout(C)`-Typen, die sie nennen, und dem Einbettungs-API; ein werfender Export bekommt `LyrStatus name(args…, R* out)` (H3) | Rust `cbindgen`, Go `//export`, Swift `@_cdecl` |
+| P8 | **Einbettung** (H1–H6): `lyr_init`/`lyr_shutdown` bekommen `LyrStatus`; **ein Export läuft als Task** auf dem Scheduler des rufenden Threads und pumpt bis zu seinem Ende (synchron für den Host, parken erlaubt); `lyr_step(): bool`/`lyr_run()` für Tasks, die ein Export mit `spawnDetached` begann; `LYR_OK`/`LYR_ERROR`/`LYR_PANIC`, **eine Panik im Export ist `LYR_PANIC` und die Laufzeit bleibt nutzbar** (die Task-Grenze, T4); `lyr_take_error(LyrError*)` mit Typname, Meldung, Ursachenkette; der erste Aufruf auf einem Host-Thread attacht ihn (H4), `lyr_detach_thread()` gibt ihn frei; Reentranz ohne Zähler (H6). **Ein kuratierter öffentlicher Header** `lyric.h` — der Sammel-Header bleibt intern | Python `Py_Initialize`, Swift; gegen Rust (Panik über FFI = abort) |
+| P9 | **Dynamisches Laden** (H7): `ffi.Library.open(path): Library throws IoError`, `lib.symbol<extern "C" fn(int) -> int>("name"): ?…`, `Closeable`; dlopen/LoadLibrary in einer Hülle je OS. Lyric-Plugins (eine Lyric-`.so` im Lyric-Programm) bleiben die Tür, die H7 nennt | Rust `libloading`, C# `NativeLibrary` |
+| P10 | **Beispiele, die laufen** (die Zeile oben): `examples/ffi` bindet eine kleine C-Bibliothek, die als `[native]`-Quelle im Beispiel liegt (kein Download, keine Systembibliothek außer libc) — Structs, Strings, ein Callback, ein Handle; `examples/embedded-host` ist ein C-Programm, das `lib<app>.a` linkt, Exporte ruft, einen Fehler und eine Panik als Status sieht und Ausgabe über die Haken umleitet. Beide baut und fährt die CI auf Linux, macOS und Windows | — |
+| P11 | **Spec 13 spec-first** (H, X10): die Typtabelle je Zieltripel, `@Layout`-Regeln, Callbacks, Export, das Einbettungs-API und seine Status als Normtext, je Slice die Regeln und Fälle vor oder mit dem Code; ein Fall, der C braucht, bringt seinen `[native]`-Teil mit | wie M11 P14 |
+
+| Slice | Inhalt | Artefakt |
+|---|---|---|
+| **S1** Zeiger, Strings, Structs an der Grenze | P1, P2 (Blockform, Funktionszeiger-Typ) | `strlen(s)` mit einem `string`; ein `@Layout(C)`-Struct als Wert und hinter `Ptr` in beide Richtungen; ein `@Layout(uint8)`-Enum; was nicht kreuzt, je ein Fall mit `LYR-SEM0099` |
+| **S2** C-Variadik | P2 (Variadik) | `printf` mit `int`, `float32` (befördert), `CStr`; ein Lyric-Variadik daneben unverändert |
+| **S3** `unsafe` und Speicher | P3 | `ffi.alloc`/`free`, `read`/`write`/`offset`/`cast` in `unsafe`; dieselbe Operation außerhalb abgelehnt; `asPtr()` |
+| **S4** Callbacks | P4 | `qsort` mit einer Lyric-Funktion; `Callback.new` über eine Closure mit `userdata`; ein Fehler über `stash`/`takeStashed`; eine Panik im Callback endet das Programm; ein Callback, der parkt; K4 gemeldet |
+| **S5** Handles und fremde Threads | P5 | `GcHandle` hält ein Objekt über eine Sammlung; ein C-Thread ruft einen `void`-Callback, der auf dem Besitzer läuft; einer mit Rückgabe bricht mit Meldung ab |
+| **S6** die Tabelle wird `extern "C"` | P6 | `Intrinsics.Runtime` fällt (bis auf Dokumentiertes); jede std-Deklaration geprüft; Codegröße und Messpunkte unverändert |
+| **S7** Export und `--lib` | P7 | `lyric build --lib` → `.a`/`.so`/`.dll` + Header; ein C-Programm ruft einen Export; ein werfender Export liefert `LyrStatus` |
+| **S8** Einbettung | P8, P10 (`embedded-host`) | `examples/embedded-host` auf drei Systemen: Exporte als Tasks, `lyr_step`, Panik als `LYR_PANIC` mit nutzbarer Laufzeit danach, `lyr_take_error`, Ausgabe umgeleitet, zweiter Host-Thread |
+| **S9** dynamisches Laden und `examples/ffi` | P9, P10 (`ffi`) | `ffi.Library` lädt die Beispiel-Bibliothek als `.so`/`.dylib`/`.dll`; `examples/ffi` läuft auf drei Systemen |
+| **S10** Abschluss | STATUS, CHANGELOG, Bericht, der Plan für M15 als nächster Schritt | die Zeile oben |
+
+Nach Aufwand: groß S1, S4, S8; mittel S3, S5, S6, S7; klein S2, S9, S10. Zusammen **L**, wie die Zeile sagt. Die
+Reihenfolge folgt den Abhängigkeiten: die Typen zuerst, weil jede weitere Grenze sie nennt (S1); Variadik und
+`unsafe` danach als kleine Nachbarn (S2, S3); die Callbacks (S4) vor den Handles und Threads (S5), die sie
+brauchen; die Tabelle (S6) erst, wenn die Typen ihre Natives tragen; Export (S7) vor der Einbettung (S8), weil
+ein Export die API der Einbettung ist; das dynamische Laden zuletzt, weil es die Funktionszeiger-Typen nur
+benutzt. S6 hängt nur an S1 und darf gezogen werden, wo ein PR in CI wartet.
+
+**Plattformen**: jeder Slice mit nativem Code fährt den vollen Plattformlauf vor dem Merge (die Regel seit M11
+S4); `.so`/`.dylib`/`.dll` und Callbacks sind die Stellen, an denen Windows und macOS anders sind — die Aufrufkonvention
+der Variadik unter Windows x64, der Export einer DLL (`__declspec(dllexport)` über zig cc), die Install-Namen
+unter macOS.
+
+**Reflexion**: Die Entscheidungen stehen (11 W4/W5, 2026-09-29); die Gefahr ist nicht das Entscheiden, sondern dass
+die Grenze an einem Ende anders aussieht als am anderen. Darum hält **eine** Funktion fest, was kreuzt (P1), und
+die Spec-Tabelle, der Header (P7) und die Fälle lesen dieselbe Liste — Rust brauchte für `repr(C)` und
+`improper_ctypes` zwei Mechanismen, die auseinanderliefen. Der zweite Punkt mit Risiko ist P6: die Intrinsics-Tabelle
+ist bequem, und die ungeprüften std-Deklarationen zeigen, was Bequemlichkeit kostet; ein Vorrecht nach Herkunft,
+das geprüft wird, ist das, was Go mit `linkname` im Runtime-Paket tut, und der eine Weg, auf dem eine C-Funktion
+gerufen wird. Bei der Einbettung ist die Wahl H3 gegen Rusts „Panik über FFI = abort“ schon getroffen; sie kostet
+die Task-Grenze um jeden Export, die die Laufzeit seit M6 hat — ein Export ist ein Task, der zufällig von C
+gestartet wird, nicht ein neuer Weg in die Laufzeit. Callbacks, die parken dürfen (L4), sind das Teuerste: der
+Fremdrahmen-Zähler (K4) liegt seit M6 bereit und bekommt hier seine Prüfer; ein Callback auf fremdem Thread wird
+in eine Queue gelegt statt ausgeführt, weil eine Koroutine ihren Thread nicht wechselt (G1).
+
+**Nicht in M14**: `lyric bindgen` (X9, Tür); `@Pure` an `extern` (X10, Tür); Unions und Bitfelder (X2, Tür);
+Lyric-Plugins in Lyric (H7, Tür); ein Compiler im Host (H8); Lyric-Script in Lyric 5 (H9, neu zu planen, wenn die
+native Script-VM steht); `lyr_gc_stats` für Stellschrauben (Tür, 01).
