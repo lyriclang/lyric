@@ -247,6 +247,8 @@ of <code>main</code>, or its declarations beside an empty one —, and imports t
 type for a member, where that is <code>pub</code> and the block imports nothing of the module itself. A
 comment whose block the form refuses fails a test named after its module. Built for another
 machine, no doc-test is built.</li>
+<li><strong><code>--no-run</code></strong> builds the program and runs none of it: its path is the last line printed, and no
+doc-test is built — each is a program of its own. It is what a debugger launches (§12).</li>
 </ol>
 <h2 id="4-bench">4. <code>bench</code></h2>
 <p>The package's benchmarks (<a href="../../spec/12-stdlib/">12 §Benchmarks</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 X4</a>) — the package of the nearest
@@ -327,7 +329,7 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <tr>
 <td><code>test</code></td>
 <td>—</td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--filter, -f &lt;text&gt;</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--filter, -f &lt;text&gt;</code>, <code>--no-run</code></td>
 <td>yes</td>
 <td>yes</td>
 </tr>
@@ -639,6 +641,20 @@ program stops where it panics, before the panic leaves its task. It is the only 
 <li>A frame is shown by its <strong>Lyric name</strong> (<code>app.main.deep</code>) at its Lyric line. A build writes the
 names beside the binary — <code>&lt;binary&gt;.lyric-names</code>, a line per function: its C name, a tab, its
 Lyric name —; a frame of the runtime keeps its name and is marked as set back (<code>subtle</code>).</li>
+<li>A <strong>value</strong> is shown as Lyric writes it: a local by its Lyric name, a string as its text, an
+array as its length with its elements, an optional as its value or <code>none</code>, an enum as its
+variant with its payload, a struct's and a class's fields by their names; what the compiler made
+— its temporaries, its locals of its own — is not shown, nor what the runtime keeps beside the
+program. The names file says which C type is which Lyric type (<code>type</code>, <code>variant</code>, <code>global</code>
+lines beside the functions'); the toolchain's <code>lldb/lyric_lldb.py</code> reads it, and lldb loads it
+with <code>command script import</code>.</li>
+<li>A <strong>line breakpoint</strong> stops at the line's code: the function's own setting up stands at the
+function's line, never at a line after it. The sources are found where they lie, by the names
+the binary writes for them (§1.2).</li>
+<li>On <strong>Windows</strong> the adapter is measured, not promised: the binary carries PDB, and whether
+lldb-dap reads it is reported, not gated.</li>
+<li>A <code>launch</code> with a <strong><code>test</code></strong> debugs the package's tests whose names hold it: the program
+<code>lyric test --no-run -f &lt;test&gt;</code> builds (§3), run in the package's directory as <code>test</code> runs it.</li>
 </ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
