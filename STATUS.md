@@ -13,7 +13,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
   Lyric 5 migration warnings), on its own roadmap toward `lyric-script 1.0.0`.
 - **`main` is Lyric 5 in development**, no promise of any kind. Of the 4.x toolchain the tree
   keeps the front end (lexer, parser, resolver, sema, IR) the Lyric 5 compiler grows out of
-  (13, M2), the language server (M13b decides), the standard library source (until M8a) and the
+  (13, M2), the language server (`Lyric.Lsp`, Lyric 5's since M13b: `lyric lsp`, `lyric dap`), the standard library source (until M8a) and the
   examples (the input of M16); the VM, the tools, the bytecode format and their tests went with
   M2 S0 and live on in `lyric-script`. The 4.x code says **4.6.0**. Beside it grows **`lyric5`**
   (`src/Lyric5`), the Lyric 5 command line as one NativeAOT binary, at **5.0.0** (`dev` builds:
@@ -56,7 +56,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M12b | Inference and abstraction (the review clocks) | M | **done** 2026-10-22 |
 | M12c | Docs foundation and website (comments in the W8 form, `Lyric5.Doc`, Book scaffold, `/dev/` live) | L | **done** 2026-10-24 |
 | M13a | fmt, doc, api | M | **done** 2026-10-25 |
-| M13b | LSP, DAP, clients | XL | — |
+| M13b | LSP, DAP, clients | XL | **done** 2026-10-26 |
 | M14 | FFI and embedding | L | — |
 | M15 | Distribution | M | — |
 | M16 | Migration (`lyric fix --from-4`) | L | — |
@@ -1378,6 +1378,51 @@ released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "
   conformance defaults (188, a compiler bug for the sweep; S11 worked around it); main's macOS
   job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
   step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
+
+### M13b — done (2026-10-26)
+
+The plan is design 13's addendum "der Plan für M13b" (P1–P11, S1–S10), #567. The mode of M12: no halt until the
+close, merged on green CI with the platform matrix dispatched, open points collected. Its artefacts beside this
+repository: [tree-sitter-lyric](https://github.com/lyriclang/tree-sitter-lyric), vscode-lyric and
+jetbrains-lyric 2.0.0.
+
+- **S1** the server on Lyric 5 (#568 + spec#354): `lyric lsp` in the one binary, the unit from `lyric.toml`
+  through `Pipeline` (a file outside every manifest is a script), the provider tests on Lyric 5; measured first:
+  every keystroke checked the std again (~812 ms for hello).
+- **S2** a keystroke (#570 + spec#355): the std's parse shared (`StdlibSeed`, ~550 → ~420 ms), no lowering in the
+  editor, cancellation between the phases, pull diagnostics; the framing reader cancelled a message it had begun.
+  Design 11 E1 B (a module not checked twice) shares the parse only — the std's check is a door after 5.0 (open
+  point 273, to confirm).
+- **S3** the providers over the corpus (#571 + spec#356): every provider at every name of the std's tests and the
+  examples; five wrong definitions fixed; hover writes a declaration's head as written; references and rename
+  across the packages the editor analysed; the editor's evaluation budget a tenth.
+- **S4** code actions, formatting, `lyric.expand` (#572 + spec#357): a finding's suggestions as quick fixes, `@Allow`
+  for a lint, the catalog link as `codeDescription`, formatting sent as the lines that change (Myers beyond 4M
+  cells). Found: a file of its own had no module name, and the lints dropped all its warnings.
+- **S5** tests in the editor (#573 + spec#358): a lens over each `@Test` and doc-test, `lyric/tests`.
+- **S6** `lyric dap` over lldb-dap (#574 + spec#359): a launch builds, a panic stops (the filter `lyric-panic`),
+  frames by their Lyric names from `<binary>.lyric-names`. CI's lldb-dap 21 refused an `initialize` without
+  `pathFormat` and answered a launch before its `initialized` event — the adapter writes the protocol's defaults
+  out, the tests read lldb-dap's own log where a wait fails.
+- **S7** values, lines, a test under the debugger (#575 + spec#360): `lyric_lldb.py` shows strings, arrays,
+  optionals, enums and fields as Lyric writes them, locals by their names; the `#line` before a function covered its
+  prologue, so a line breakpoint stopped before any local had a value — every C golden gained the directives and
+  nothing else; the binary's sources are found through `target.source-map`; `lyric test --no-run` builds what a
+  `launch` with `test` debugs.
+- **S8** [tree-sitter-lyric](https://github.com/lyriclang/tree-sitter-lyric): the grammar of Lyric 5 with
+  highlights, locals and injections; all 1846 files of the corpus (std, its tests, the examples, the Book, the
+  conformance cases at the pin) parse without an `ERROR`; the TextMate grammar is made from it.
+- **S9** the clients 2.0.0 (vscode-lyric#2, jetbrains-lyric#3): `lyric lsp` and `lyric dap`, the lenses' commands,
+  the generated grammar, VS Code's snippets checked against `lyric check`. The JetBrains checklist is the
+  maintainer's to run.
+- Beside the slices: from 2026-10-25 evening the .NET install links answered 409; every job that downloaded .NET
+  failed for a night, main among them. The jobs take the runner's own .NET 10 since #576.
+- **S10** the close (this).
+- The exit criterion — in the editor hover, completion, rename and a fix over a Lyric 5 source, tests by code lens;
+  the debugger stops at a panic and shows Lyric's values; the risk of lldb on Windows measured — holds: the
+  providers' and the actions' tests, `DapCommandTests` on Linux and macOS. **Measured on Windows**: LLVM's
+  `lldb-dap.exe` does not start on the runner (open point 286). Open points 273–286; 273 and 281 (the "Tasks" scope,
+  a door after 5.0) wait for the maintainer. **Next: M14, its plan in design 13 first.**
 
 ### M13a — done (2026-10-25)
 
