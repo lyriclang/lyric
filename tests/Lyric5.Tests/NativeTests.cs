@@ -331,6 +331,165 @@ public class NativeTests
         Assert.Contains($"error[{code}]: {why}", error);
     }
 
+    private const string CallbackC = """
+        #include <stdint.h>
+        #include <stdlib.h>
+        #ifdef _WIN32
+        #include <windows.h>
+        #else
+        #include <pthread.h>
+        #endif
+
+        int64_t apply(int64_t (*f)(int64_t), int64_t x) { return f(f(x)); }
+        void each(void (*f)(int64_t), int64_t n) { for (int64_t i = 0; i < n; i++) f(i); }
+        static int64_t triple(int64_t x) { return 3 * x; }
+        int64_t (*c_triple(void))(int64_t) { return triple; }
+
+        static void (*away)(int64_t);
+        #ifdef _WIN32
+        static DWORD WINAPI run_away(LPVOID unused) { (void)unused; away(7); return 0; }
+        void elsewhere(void (*f)(int64_t)) {
+            away = f;
+            HANDLE t = CreateThread(NULL, 0, run_away, NULL, 0, NULL);
+            WaitForSingleObject(t, INFINITE);
+        }
+        #else
+        static void *run_away(void *unused) { (void)unused; away(7); return NULL; }
+        void elsewhere(void (*f)(int64_t)) {
+            away = f;
+            pthread_t t;
+            pthread_create(&t, NULL, run_away, NULL);
+            pthread_join(t, NULL);
+        }
+        #endif
+
+        """;
+
+    private const string CallbackDeclarations = """
+        import std.io { println };
+        import std.ffi { Ptr };
+        import std.task { spawn, yieldNow };
+
+        extern "C" {
+            fn qsort(base: Ptr<int>, count: uint, size: uint, compare: extern "C" fn(Ptr<int>, Ptr<int>) -> int32): void;
+            fn apply(f: extern "C" fn(int) -> int, x: int): int;
+            fn each(f: extern "C" fn(int) -> void, n: int): void;
+            fn c_triple(): extern "C" fn(int) -> int;
+            fn elsewhere(f: extern "C" fn(int) -> void): void;
+        }
+
+        """;
+
+    private static string Callbacks(string rest) => Package(
+        ("lyric.toml", AppManifest + "\n[native]\nsources = [\"native/*.c\"]\n\n[native.linux]\nlibs = [\"pthread\"]\n"),
+        ("native/callback.c", CallbackC),
+        ("src/main.lyr", CallbackDeclarations + rest));
+
+    /// <summary>C calls Lyric: a named function through qsort and through C's own call, a lambda
+    /// that captures nothing; and Lyric calls a C function's pointer C returned.</summary>
+    [Fact]
+    public void C_calls_a_Lyric_function_through_its_pointer()
+    {
+        var dir = Callbacks("""
+            fn ascending(a: Ptr<int>, b: Ptr<int>): int32 {
+                var order: int32 = 0;
+                unsafe {
+                    let x = a.read();
+                    let y = b.read();
+                    order = if (x < y) -1 else if (x > y) 1 else 0;
+                }
+                return order;
+            }
+
+            fn plusTen(x: int): int {
+                return x + 10;
+            }
+
+            fn main(): void {
+                let xs = [5, 3, 8, 1, 2];
+                qsort(xs.asPtr(), 5, 8, ascending);
+                println(f"{xs[0]} {xs[1]} {xs[2]} {xs[3]} {xs[4]}");
+                println(f"{apply(plusTen, 1)} {apply((x) => x * 2 + 1, 2)}");
+                let triple = c_triple();
+                println(f"{triple(4)}");
+            }
+
+            """);
+        Assert.Equal("1 2 3 5 8\n21 11\n12\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    /// <summary>A callback may park: C's frames lie on the task's stack while another task runs.</summary>
+    [Fact]
+    public void A_callback_parks_with_C_frames_below_it()
+    {
+        var dir = Callbacks("""
+            fn step(i: int): void {
+                println(f"callback {i}");
+                try! yieldNow();
+            }
+
+            fn main(): void throws Error {
+                let other = spawn(() => {
+                    for (i in 0..2) {
+                        println(f"other {i}");
+                        try yieldNow();
+                    }
+                });
+                each(step, 2);
+                try other.await();
+            }
+
+            """);
+        Assert.Equal("callback 0\nother 0\ncallback 1\nother 1\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    /// <summary>A panic in a callback ends the program: C's frames below it cannot be unwound. A
+    /// callback on a thread Lyric does not run ends it with LYR-RT0022.</summary>
+    [Theory]
+    [InlineData("fn boom(i: int): void {\n    panic(\"in the callback\");\n}\n\nfn main(): void {\n    each(boom, 1);\n    println(\"never\");\n}\n",
+        "panic [LYR-RT0008]: in the callback")]
+    [InlineData("fn there(i: int): void {\n    println(f\"{i}\");\n}\n\nfn main(): void {\n    elsewhere(there);\n    println(\"never\");\n}\n",
+        "panic [LYR-RT0022]: C called a Lyric function on a thread Lyric does not run")]
+    public void A_callback_that_cannot_go_on_ends_the_program(string rest, string report)
+    {
+        var dir = Callbacks(rest);
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.True(exit == 0, error);
+        var host = Lyric5.Toolchain.Target.Host;
+        var ran = Lyric5.Toolchain.ProcessRunner.Run(Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix),
+            [], TimeSpan.FromMinutes(1));
+        Assert.Equal(101, ran.ExitCode);
+        Assert.Contains(report, ran.Stderr);
+        Assert.DoesNotContain("never", ran.Stdout);
+    }
+
+    [Theory]
+    [InlineData("let n = 1;\n    let _ = apply((x) => x + n, 1);", "LYR-SEM0001")]
+    [InlineData("let _ = apply(thrower, 1);", "LYR-SEM0001")]
+    [InlineData("let f: fn(int) -> int = (x) => x;\n    let _ = apply(f, 1);", "LYR-SEM0001")]
+    public void What_C_cannot_call_is_refused(string body, string code)
+    {
+        var dir = Callbacks("fn thrower(x: int): int throws Error {\n    return x;\n}\n\nfn main(): void {\n    " + body + "\n}\n");
+        var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
+        Assert.Equal(1, exit);
+        Assert.Contains($"error[{code}]", error);
+        Assert.Contains("C calls a function by its address alone", error);
+    }
+
+    [Theory]
+    [InlineData("extern \"C\" fn f(g: extern \"C\" fn(string) -> int): void;", "a C function's parameter of type 'string' does not cross into C")]
+    [InlineData("extern \"C\" fn f(g: extern \"C\" fn(int) -> int throws Error): void;", "a C function throws nothing")]
+    [InlineData("extern \"C\" fn f(g: extern \"rust\" fn(int) -> int): void;", "unknown ABI \"rust\"")]
+    [InlineData("extern \"C\" fn f(g: fn(int) -> int): void;", "a Lyric function value holds its environment")]
+    public void A_C_function_type_is_checked(string declaration, string why)
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", declaration + "\n\nfn main(): void {\n}\n"));
+        var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
+        Assert.Equal(1, exit);
+        Assert.Contains($"error[LYR-SEM0099]", error);
+        Assert.Contains(why, error);
+    }
+
     [Theory]
     [InlineData("[native]\nsources = \"native/a.c\"\n", "LYR-PKG0002", "'sources' of [native] is an array of patterns")]
     [InlineData("[native]\ninclude = [\"native/*\"]\n", "LYR-PKG0002", "'native/*' in 'include' of [native] is no directory of the package")]

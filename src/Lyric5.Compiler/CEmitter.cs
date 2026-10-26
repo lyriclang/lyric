@@ -749,6 +749,7 @@ public sealed class CEmitter
                 Call c => c.Target.Value,
                 MakeClosure m => m.Target.Value,
                 MakeCoroutine mc => mc.Body.Value,
+                CCallback cb => cb.Function.Value,
                 _ => -1,
             }).Where(i => i >= 0)).Distinct().Order();
         var prototypes = new StringBuilder();
@@ -776,6 +777,15 @@ public sealed class CEmitter
                     + (target.Throws ? "" : "(void)lyr_err; ")
                     + (IsVoid(target.ReturnType) ? $"{call}; }}" : $"return {call}; }}"));
             }
+        }
+
+        // A function C calls gets a trampoline, static in every unit that takes its address.
+        var callbacks = ScopeOps().OfType<CCallback>().DistinctBy(c => c.Function.Value).OrderBy(c => c.Function.Value).ToList();
+        if (callbacks.Count > 0)
+        {
+            prototypes.AppendLine();
+            prototypes.AppendLine("/* trampolines: a Lyric function as C calls it */");
+            foreach (var callback in callbacks) prototypes.AppendLine(Trampoline(callback));
         }
 
         // A coroutine starts from an environment — the arguments it was called with and the
@@ -1846,6 +1856,8 @@ public sealed class CEmitter
         Call call => Assign(call.Dest, $"{FunctionName(_module.Functions[call.Target.Value].Name)}({Arguments(_module.Functions[call.Target.Value], call.Args)}"
             + $"{SlotArgument(_module.Functions[call.Target.Value], call.Args.Length)})"),
         CallImport call when Intrinsics.IsForeign(_module.Imports[call.Target.Value].Name) => ForeignCall(call),
+        CCallback cb => $"{Temp(cb.Dest)} = (uint64_t)(uintptr_t)&{TrampolineName(_module.Functions[cb.Function.Value])};",
+        CallCPointer cp => CPointerCall(cp),
         CallImport call => Assign(call.Dest, Intrinsics.Call(_module.Imports[call.Target.Value].Name, call.Args.Select(Value).ToArray())),
         NewObject { Result: IrRefType r } n => $"{Temp(n.Dest)} = ({CType(r)})lyr_alloc(&{DescriptorName(r.Type)});",
         NewObject n => $"{Storage(n.Dest)} = ({CType(n.Result)}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
@@ -2037,41 +2049,101 @@ public sealed class CEmitter
     private string ForeignCall(CallImport call)
     {
         var import = _module.Imports[call.Target.Value];
-        var address = FieldName("address");
         var fixedCount = import.ParamTypes.Length;
         var arguments = call.Args.Select((arg, i) =>
         {
-            var value = Value(arg);
             // past the parameters, C's variadic arguments: in their form, then as C promotes them
             var variadic = i >= fixedCount;
             var form = variadic ? call.Variadic![i - fixedCount] : import.CParams?[i];
-            var crossing = form?.Kind switch
-            {
-                IrCKind.Pointer => $"(void *)(uintptr_t)({value}).{address}",
-                IrCKind.CString => $"(const char *)(uintptr_t)({value}).{address}",
-                IrCKind.OptionalPointer => $"(({value}).has ? (void *)(uintptr_t)({value}).value.{address} : NULL)",
-                IrCKind.OptionalCString => $"(({value}).has ? (const char *)(uintptr_t)({value}).value.{address} : NULL)",
-                IrCKind.Enum => $"({form.Integer})({value}).tag",
-                _ => value,
-            };
+            var crossing = CrossingOut(Value(arg), form);
             return variadic ? Promoted(crossing, TypeOf(arg), form!) : crossing;
         });
-        var c = $"{ForeignName(import.Name[2..])}({string.Join(", ", arguments)})";
-        if (call.Dest is not { } dest) return $"{c};";
+        return ComingBack($"{ForeignName(import.Name[2..])}({string.Join(", ", arguments)})", call.Dest, import.CReturn);
+    }
+
+    /// <summary>A Lyric value as C takes it, in its form: a pointer out of the struct that holds
+    /// its address, null for an absent optional, an enum's tag as its integer.</summary>
+    private string CrossingOut(string value, IrCForm? form)
+    {
+        var address = FieldName("address");
+        return form?.Kind switch
+        {
+            IrCKind.Pointer => $"(void *)(uintptr_t)({value}).{address}",
+            IrCKind.CString => $"(const char *)(uintptr_t)({value}).{address}",
+            IrCKind.OptionalPointer => $"(({value}).has ? (void *)(uintptr_t)({value}).value.{address} : NULL)",
+            IrCKind.OptionalCString => $"(({value}).has ? (const char *)(uintptr_t)({value}).value.{address} : NULL)",
+            IrCKind.Enum => $"({form.Integer})({value}).tag",
+            _ => value,
+        };
+    }
+
+    /// <summary>A C value as Lyric holds it, a C expression of <paramref name="type"/>: a pointer
+    /// into its struct, null into <c>none</c>, an integer into its variant. <paramref name="c"/> is
+    /// read twice for an optional: a name, never a call.</summary>
+    private string ComingIn(string c, IrType type, IrCForm? form)
+    {
+        var address = FieldName("address");
+        return form?.Kind switch
+        {
+            IrCKind.Pointer or IrCKind.CString => $"({CType(type)}){{ .{address} = (uint64_t)(uintptr_t){c} }}",
+            IrCKind.OptionalPointer or IrCKind.OptionalCString =>
+                $"({CType(type)}){{ .value = {{ .{address} = (uint64_t)(uintptr_t){c} }}, .has = {c} != NULL }}",
+            IrCKind.Enum => $"({CType(type)}){{ .tag = lyr_ffi_enum_tag((int64_t){c}, {form.Variants}, \"{form.EnumName}\") }}",
+            _ => c,
+        };
+    }
+
+    /// <summary>The call <paramref name="c"/> of a C function, its result into
+    /// <paramref name="dest"/> as Lyric holds it.</summary>
+    private string ComingBack(string c, TempId? result, IrCForm? form)
+    {
+        var address = FieldName("address");
+        if (result is not { } dest) return $"{c};";
         var type = CType(TypeOf(dest));
-        return import.CReturn?.Kind switch
+        return form?.Kind switch
         {
             IrCKind.Pointer or IrCKind.CString =>
                 $"{Storage(dest)} = ({type}){{ .{address} = (uint64_t)(uintptr_t){c} }}; {Temp(dest)} = &{Storage(dest)};",
             IrCKind.OptionalPointer or IrCKind.OptionalCString =>
                 $"{{ const void *lyr_r = {c}; {Storage(dest)} = ({type}){{ .value = {{ .{address} = (uint64_t)(uintptr_t)lyr_r }}, "
                 + $".has = lyr_r != NULL }}; }} {Temp(dest)} = &{Storage(dest)};",
-            IrCKind.Enum =>
-                $"{Storage(dest)} = ({type}){{ .tag = lyr_ffi_enum_tag((int64_t){c}, {import.CReturn.Variants}, "
-                + $"\"{import.CReturn.EnumName}\") }}; {Temp(dest)} = &{Storage(dest)};",
+            IrCKind.Enum => $"{Storage(dest)} = {ComingIn(c, TypeOf(dest), form)}; {Temp(dest)} = &{Storage(dest)};",
             _ => Assign(dest, c),
         };
     }
+
+    /// <summary>A call through a C function's pointer: the address cast to the function's C type,
+    /// then as a call of an <c>extern "C"</c> function.</summary>
+    private string CPointerCall(CallCPointer call)
+    {
+        var parameters = call.ParamTypes.Length == 0 ? "void"
+            : string.Join(", ", call.ParamTypes.Select((t, i) => CAbiType(t, call.Params[i])));
+        var callee = $"(({CAbiType(call.ReturnType, call.Return)} (*)({parameters}))(uintptr_t){Temp(call.Callee)})";
+        var arguments = call.Args.Select((arg, i) => CrossingOut(Value(arg), call.Params[i]));
+        return ComingBack($"{callee}({string.Join(", ", arguments)})", call.Dest, call.Return);
+    }
+
+    /// <summary>The trampoline C calls for a Lyric function: C's values into Lyric's, the call, the
+    /// result back — between the runtime's two marks that C's frames lie below.</summary>
+    private string Trampoline(CCallback callback)
+    {
+        var target = _module.Functions[callback.Function.Value];
+        var environment = TakesEnvironment(target) ? 1 : 0;
+        var parameters = target.Locals.Skip(environment).Take(target.ParamCount - environment).ToList();
+        var signature = parameters.Count == 0 ? "void"
+            : string.Join(", ", parameters.Select((p, i) => $"{CAbiType(p.Type, callback.Params[i])} lyr_a{i}"));
+        var arguments = (environment == 1 ? ["NULL"] : Array.Empty<string>())
+            .Concat(parameters.Select((p, i) => ComingIn($"lyr_a{i}", p.Type, callback.Params[i])));
+        var call = $"{FunctionName(target.Name)}({string.Join(", ", arguments)})";
+        var returned = CAbiType(target.ReturnType, callback.Return);
+        var body = IsVoid(target.ReturnType)
+            ? $"lyr_ffi_callback_enter(); {call}; lyr_ffi_callback_leave();"
+            : $"lyr_ffi_callback_enter(); {CType(target.ReturnType)} lyr_r = {call}; lyr_ffi_callback_leave(); "
+              + $"return {CrossingOut("lyr_r", callback.Return)};";
+        return $"static {returned} {TrampolineName(target)}({signature}) {{ {body} }}";
+    }
+
+    private string TrampolineName(IrFunction target) => "lyr_cb_" + FunctionName(target.Name)[4..];
 
     private string Arguments(IrFunction callee, TempId[] args) =>
         string.Join(", ", args.Select((arg, i) => callee.ReceiverByRef && i == 0 ? Temp(arg) : Value(arg)));

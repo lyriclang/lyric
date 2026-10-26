@@ -1925,6 +1925,16 @@ public sealed partial class Parser
             }
             case TokenKind.Fn:
                 return ParseFunctionType(returned);
+            // 'extern "C" fn(int) -> int': a pointer to a C function; the ABI is the checker's to know
+            case TokenKind.Identifier when AtContextual("extern") && _buffer.Peek(1).TokenKind == TokenKind.StringLiteral
+                                           && _buffer.Peek(2).TokenKind == TokenKind.Fn:
+            {
+                var word = _buffer.Advance().Span;
+                var abiTok = _buffer.Advance();
+                var abi = LiteralDecoder.DecodeString(_sm.Slice(abiTok.Span), abiTok.Span, _de);
+                var fn = ParseFunctionType(returned);
+                return fn with { Abi = abi, AbiSpan = abiTok.Span, Span = Span.Union(word, fn.Span) };
+            }
             case TokenKind.LParen:
                 return ParseParenthesizedType();
             case TokenKind.Identifier:

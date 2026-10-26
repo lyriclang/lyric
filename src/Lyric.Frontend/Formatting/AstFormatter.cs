@@ -1482,7 +1482,9 @@ public sealed class AstFormatter
         TupleType t => Doc.Of(Doc.From("("),
             Doc.Join(Doc.From(", "), t.Elements.Select((e, i) => t.Labels?[i] is { } label
                 ? Doc.Of(Doc.From(label + ": "), TypeDoc(e)) : TypeDoc(e)).ToArray()), Doc.From(")")),
-        FunctionType f => Doc.Of(Doc.From("fn("),
+        FunctionType f => Doc.Of(f.Abi is { } abi
+                ? Doc.Of(Doc.From("extern "), _synthesized ? Doc.From(Quote(abi)) : Src(f.AbiSpan), Doc.Space) : Doc.Nil,
+            Doc.From("fn("),
             Doc.Join(Doc.From(", "), f.Parameters.Select((p, i) => i < f.Places.Length && f.Places[i]
                 ? Doc.Of(Doc.From("&"), TypeDoc(p)) : TypeDoc(p)).ToArray()),
             Doc.From(") -> "), ReturnDoc(f.ReturnType, f.Throws, f.ReturnGrouped), f.Throws is { } thrown ? ThrowsDoc(thrown) : Doc.Nil),

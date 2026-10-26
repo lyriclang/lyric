@@ -337,7 +337,8 @@ public static class TypeFacts
                 // as the source writes them: around one that ends in a set of its
                 // own, 'fn() -> (Task<int> throws E)', and around one that could have taken the
                 // set behind it, 'fn() -> (Task<int>) throws E'. Without them the two were one text.
-                return "fn(" + string.Join(", ", f.Parameters.Select((p, i) => (f.PlaceAt(i) ? "&" : "") + Render(p, name))) + ") -> "
+                return (f.IsC ? "extern \"C\" " : "")
+                       + "fn(" + string.Join(", ", f.Parameters.Select((p, i) => (f.PlaceAt(i) ? "&" : "") + Render(p, name))) + ") -> "
                        + (EndsInASet(f.Return) || (f.Throws.Length > 0 && CouldTakeASet(f.Return))
                            ? $"({Render(f.Return, name)})" : Render(f.Return, name))
                        + ThrownText(f.Throws, name);

@@ -890,9 +890,42 @@ public sealed class TypeChecker
                 return site == CSite.Field ? "an enum crosses as a parameter or a result; a C struct's enum field is its integer" : null;
             case InlineArrayOf ia when site == CSite.Field:
                 return CFault(ia.Element, CSite.Field);
+            // a C function's pointer is one word, wherever C holds it
+            case FnType { IsC: true }:
+                return null;
+            case FnType:
+                return "a Lyric function value holds its environment; C's function pointer is an 'extern \"C\" fn(…) -> T', "
+                       + "which a function or a lambda that captures nothing becomes";
             default:
                 return table;
         }
+    }
+
+    /// <summary>
+    /// <c>extern "C" fn(int) -&gt; int</c>: a pointer to a C function, which C calls and which Lyric
+    /// calls as C's. Its parameters and its result cross as a C function's do; it throws nothing
+    /// and takes no place. The ABI is C's, the one boundary.
+    /// </summary>
+    private LyrType ResolveCFunctionType(FunctionType f, string abi, LyrType[] parameters, LyrType result)
+    {
+        if (abi != "C")
+        {
+            _de.Report("LYR-SEM0099", Severity.Error, f.AbiSpan, $"unknown ABI \"{abi}\" — this compiler binds \"C\"");
+            return LyrType.Error;
+        }
+        if (f.Throws is { } thrown)
+            _de.Report("LYR-SEM0099", Severity.Error, thrown.Span, "a C function throws nothing — its type has no 'throws'");
+        if (f.Places.Contains(true))
+            _de.Report("LYR-SEM0099", Severity.Error, f.Span,
+                "a place does not cross into C — what C takes by address is a 'Ptr'");
+        for (var i = 0; i < parameters.Length; i++)
+            if (CFault(parameters[i], CSite.Parameter) is { } fault)
+                _de.Report("LYR-SEM0099", Severity.Error, f.Parameters[i].Span,
+                    $"a C function's parameter of type '{TypeFacts.Display(parameters[i])}' does not cross into C — {fault}");
+        if (CFault(result, CSite.Return) is { } returned)
+            _de.Report("LYR-SEM0099", Severity.Error, f.ReturnType.Span,
+                $"a C function's result of type '{TypeFacts.Display(result)}' does not come back from C — {returned}");
+        return new FnType(parameters, result) { IsC = true };
     }
 
     /// <summary>Is this <c>std.ffi</c>'s type of this name?</summary>
@@ -8566,7 +8599,7 @@ public sealed class TypeChecker
             SliceOf s => new SliceOf(Fix(s.Element)),
             InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
             TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
-            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = ThrownAfter(f.Throws.Select(Fix)), Places = f.Places },
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = ThrownAfter(f.Throws.Select(Fix)), Places = f.Places, IsC = f.IsC },
             GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations, Throws = g.Throws },
             RangeOf r => new RangeOf(Fix(r.Element)),
             CoroutineOf c => c with { Yield = Fix(c.Yield), Result = Fix(c.Result) },
@@ -8639,7 +8672,7 @@ public sealed class TypeChecker
             InlineArrayOf ia => new InlineArrayOf(Substitute(ia.Element, map), ia.Length),
             TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()) { Labels = t.Labels },
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map))
-                { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map))), Places = f.Places },
+                { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map))), Places = f.Places, IsC = f.IsC },
             // A join reduces once both its parts are known.
             GenericInstance gi => ReduceJoin(new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray())
             {
@@ -8788,7 +8821,7 @@ public sealed class TypeChecker
             SliceOf s => new SliceOf(Fix(s.Element)),
             InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
             TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
-            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws, Places = f.Places },
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws, Places = f.Places, IsC = f.IsC },
             GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations, Throws = g.Throws },
             _ => t,
         };
@@ -8818,7 +8851,7 @@ public sealed class TypeChecker
             SliceOf s => new SliceOf(Fix(s.Element)),
             InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
             TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
-            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = ThrownAfter(f.Throws.Select(Fix)), Places = f.Places },
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = ThrownAfter(f.Throws.Select(Fix)), Places = f.Places, IsC = f.IsC },
             GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations, Throws = g.Throws },
             RangeOf r => new RangeOf(Fix(r.Element)),
             CoroutineOf c => c with { Yield = Fix(c.Yield), Result = Fix(c.Result) },
@@ -14432,6 +14465,9 @@ public sealed class TypeChecker
                   + "generic call instantiating itself at a larger type, which cannot be "
                   + "monomorphized)"
                 : FixationMismatch(from, to) is { } differs ? $" — {differs}"
+                : to is FnType { IsC: true } && from is FnType { IsC: false }
+                    ? " — C calls a function by its address alone: a function by its name, or a lambda that captures "
+                      + "nothing and throws nothing, of the same signature"
                 : "";
             if (_expectedAt is { } at)
                 _de.Report(new Diagnostic("LYR-SEM0001", Severity.Error, span, $"cannot assign '{fromText}' to '{toText}'{hint}")
@@ -14587,6 +14623,15 @@ public sealed class TypeChecker
         // parameters and return — no variance — and its set covered by the target's. Free
         // at run time, since every function value takes the error slot; never the way back, which
         // is how the demand to mark a call would vanish.
+        // A Lyric function as a C function's pointer: of the same signature, and one C can call —
+        // named, or a lambda that captures nothing —, through a trampoline the emitter writes.
+        if (to is FnType { IsC: true } cWanted && from is FnType { IsC: false } lyricFn)
+        {
+            if (!coercionSite || !FitsFunctionType(lyricFn, cWanted with { IsC = false }) || !IsCCallbackSource(expr))
+                return false;
+            _result.MarkCCallback(expr);
+            return true;
+        }
         if (to is FnType wantedFn && from is FnType givenFn && FitsFunctionType(givenFn, wantedFn)) return true;
 
         if (coercionSite && to is SliceOf view && from is ArrayOf whole && LyrType.Equal(whole.Element, view.Element))
@@ -14627,7 +14672,21 @@ public sealed class TypeChecker
         && given.Parameters.Zip(wanted.Parameters).All(p => LyrType.Equal(p.First, p.Second))
         && LyrType.Equal(given.Return, wanted.Return)
         && FnType.SamePlaces(given, wanted)
+        && given.IsC == wanted.IsC
         && given.Throws.All(t => wanted.Throws.Any(w => ThrownCoveredBy(t, w, _currentModule)));
+
+    /// <summary>What C can call through a trampoline: a function by its name — free or static, with
+    /// a body and no type parameters — or a lambda that captures nothing. A closure's state has
+    /// nowhere to go in a C function's pointer.</summary>
+    private bool IsCCallbackSource(Expr expr) => expr switch
+    {
+        LambdaExpr lambda => !_result.IsInlineLambda(lambda) && _result.CapturesOf(lambda) is { Symbols.Count: 0, CapturesThis: false },
+        IdentifierExpr or MemberExpr => _result.RefOf(expr) is FunctionSymbol
+        {
+            Generics.Length: 0, Declaration: FunctionDecl { Body: not null, Extern: null, IsMacro: false },
+        } named && (named.IsStatic || ReferenceEquals(named.Home?.Members.LookupLocal(named.Name), named)),
+        _ => false,
+    };
 
     /// <summary>
     /// Nominal subtyping: a value may stand wherever one of its declared interfaces is expected.
@@ -15085,6 +15144,7 @@ public sealed class TypeChecker
                 var result = ResolveType(f.ReturnType, scope);
                 // 'fn() -> Task<int> throws E': the call's set, or the task's? As on a declaration.
                 if (f.Throws is { } whose && LeavesOpenWhoseThrows(result, f.ReturnGrouped, whose)) return LyrType.Error;
+                if (f.Abi is { } abi) return ResolveCFunctionType(f, abi, parameters, result);
                 return new FnType(parameters, result)
                     { Throws = f.Throws is { } thrown ? ResolveThrownSet(thrown, scope) : [], Places = f.Places };
             }

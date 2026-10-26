@@ -276,6 +276,8 @@ int lyr_thread_attach(void) {
     return 0;
 }
 
+int lyr_thread_attached(void) { return GC_thread_is_registered() ? 1 : 0; }
+
 void lyr_thread_detach(void) {
     TSAN_PUBLISH();  /* the thread's last writes, for the collection that recycles them */
     lyr_coro_thread_end();

@@ -1,5 +1,7 @@
 /* The conversions std.ffi's types make at a C function's boundary. */
 #include "lyr/ffi.h"
+#include "lyr/coro.h"
+#include "lyr/gc.h"
 #include "lyr/panic.h"
 #include "lyr/string.h"
 
@@ -33,6 +35,14 @@ uint64_t lyr_ffi_alloc(int64_t count, uint64_t size) {
 }
 
 void lyr_ffi_free(uint64_t address) { free((void *)(uintptr_t)address); }
+
+void lyr_ffi_callback_enter(void) {
+    if (!lyr_thread_attached())
+        lyr_panic(LYR_RT_FOREIGN_THREAD, "C called a Lyric function on a thread Lyric does not run");
+    lyr_coro_enter_foreign();
+}
+
+void lyr_ffi_callback_leave(void) { lyr_coro_leave_foreign(); }
 
 int64_t lyr_ffi_enum_tag(int64_t value, int64_t variants, const char *enum_name) {
     if (value < 0 || value >= variants)
