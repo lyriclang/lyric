@@ -250,9 +250,13 @@ public sealed class CBuild
         arguments.AddRange(Profile.Codegen.Where(f => !IsLto(f)));
         arguments.AddRange(Profile.Instrumentation);
         arguments.AddRange(inputs);
-        // the directories named before the libraries searched in them, in their order
-        foreach (var dir in paths.SearchDirs) arguments.Add("-L" + dir);
-        foreach (var library in libraries ?? []) arguments.Add(ImportLibrary(library, paths.SearchDirs) ?? "-l" + library);
+        // The directories named are searched before the linker's own, in their order. zig writes
+        // each -L that gave it a shared library into an ELF or Mach-O binary as a run path — the
+        // build's own directories, in every binary — so for zig the toolchain finds the library
+        // itself and hands it over by its path, which zig keeps out of the binary.
+        if (Compiler.Kind != CCompilerKind.Zig || Target.Os == TargetOs.Windows)
+            foreach (var dir in paths.SearchDirs) arguments.Add("-L" + dir);
+        foreach (var library in libraries ?? []) arguments.Add(Found(library, paths.SearchDirs) ?? "-l" + library);
         // Windows' loader looks beside the image first by itself; ELF and Mach-O are told to
         if (paths.OwnDirFirst && Target.Os == TargetOs.Linux) arguments.Add("-Wl,-rpath,$ORIGIN");
         if (paths.OwnDirFirst && Target.Os == TargetOs.MacOs) arguments.Add("-Wl,-rpath,@executable_path");
@@ -280,22 +284,33 @@ public sealed class CBuild
     }
 
     /// <summary>
-    /// A MinGW import library for <c>-l<paramref name="library"/></c>, by its path, where zig would
-    /// not find it: for a Windows target zig's linker looks for <c>X.dll</c>, <c>X.lib</c> and
-    /// <c>libX.a</c>, and an SDK built with MinGW — SDL's among them — ships <c>libX.dll.a</c>, which
-    /// GNU ld and clang find by the name. The first directory that holds a form zig knows wins, as
-    /// it would; <c>null</c> where the name does.
+    /// <c>-l<paramref name="library"/></c> found in the named directories by zig's link, by its path;
+    /// <c>null</c> where the linker is to look itself — clang and gcc, or no directory holds it.
+    /// <list type="bullet">
+    /// <item>ELF and Mach-O: the first directory with <c>libX.so</c>, <c>libX.dylib</c>,
+    /// <c>libX.tbd</c> or <c>libX.a</c>, as the linker would search — by its path, no run path is
+    /// written.</item>
+    /// <item>Windows: zig's linker looks for <c>X.dll</c>, <c>X.lib</c> and <c>libX.a</c> itself
+    /// (under <c>-L</c>), and an SDK built with MinGW — SDL's among them — ships the import library
+    /// <c>libX.dll.a</c>, which GNU ld and clang find by the name and zig does not.</item>
+    /// </list>
     /// </summary>
-    private string? ImportLibrary(string library, IReadOnlyList<string> searchDirs)
+    private string? Found(string library, IReadOnlyList<string> searchDirs)
     {
-        if (Target.Os != TargetOs.Windows || Compiler.Kind != CCompilerKind.Zig) return null;
+        if (Compiler.Kind != CCompilerKind.Zig) return null;
+        string[] own = Target.Os switch
+        {
+            TargetOs.Windows => [$"{library}.dll", $"{library}.lib", $"lib{library}.a"],
+            TargetOs.MacOs => [$"lib{library}.dylib", $"lib{library}.tbd", $"lib{library}.a"],
+            _ => [$"lib{library}.so", $"lib{library}.a"],
+        };
         foreach (var dir in searchDirs)
         {
-            if (new[] { $"{library}.dll", $"{library}.lib", $"lib{library}.a" }.Any(n => File.Exists(Path.Combine(dir, n))))
-                return null;
-            foreach (var name in new[] { $"lib{library}.dll.a", $"{library}.dll.a" })
-                if (Path.Combine(dir, name) is var found && File.Exists(found))
-                    return found;
+            if (own.Select(n => Path.Combine(dir, n)).FirstOrDefault(File.Exists) is { } file)
+                return Target.Os == TargetOs.Windows ? null : file;
+            if (Target.Os == TargetOs.Windows
+                && new[] { $"lib{library}.dll.a", $"{library}.dll.a" }.Select(n => Path.Combine(dir, n)).FirstOrDefault(File.Exists) is { } import)
+                return import;
         }
         return null;
     }

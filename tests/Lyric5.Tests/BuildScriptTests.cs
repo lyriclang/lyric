@@ -263,7 +263,7 @@ public class BuildScriptTests
         });
         List<string> arguments = compiler.Kind == Lyric5.Toolchain.CCompilerKind.Zig ? ["cc"] : [];
         arguments.AddRange(["-shared", "-o", shared, Path.Combine(dir, "greet.c")]);
-        if (os == Lyric5.Toolchain.TargetOs.Linux) arguments.Add("-fPIC");
+        if (os == Lyric5.Toolchain.TargetOs.Linux) arguments.AddRange(["-fPIC", "-Wl,-soname,libgreet.so"]);
         if (os == Lyric5.Toolchain.TargetOs.MacOs) arguments.Add("-Wl,-install_name,@rpath/libgreet.dylib");
         var built = Lyric5.Toolchain.ProcessRunner.Run(compiler.Path, arguments, TimeSpan.FromMinutes(2), dir);
         Assert.True(built.ExitCode == 0, built.Stderr + built.Stdout);
@@ -322,6 +322,9 @@ public class BuildScriptTests
         var exe = Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix);
         var alone = Lyric5.Toolchain.ProcessRunner.Run(exe, [], TimeSpan.FromMinutes(1));
         Assert.True(alone.ExitCode != 0, $"started without the library beside it: {alone.Stdout}");
+        // the directory the link searched is the build's, and no part of the binary
+        var bytes = File.ReadAllBytes(exe);
+        Assert.True(bytes.AsSpan().IndexOf(System.Text.Encoding.UTF8.GetBytes(lib)) < 0, $"the binary holds '{lib}'");
 
         File.WriteAllText(Path.Combine(dir, "build.lyr"), GreetScript(lib, shared));
         Assert.Equal("42\n", BuildAndRun(dir, "app", "build", "-C", dir));
