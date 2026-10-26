@@ -1373,7 +1373,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/13-abi/">13-abi</a></td>
 <td>an extern declaration that cannot cross into C</td>
-<td>An <code>extern</code> function names an ABI other than &quot;C&quot;, a symbol that is no C name, type parameters, <code>throws</code>, a place parameter, or a parameter or return type that does not cross into C; a bare <code>...</code> with no parameter before it, or a variadic argument of a type that does not cross; or <code>@Layout</code> stands where C cannot lay the type out, or in another form than <code>@Layout(C)</code> or an integer type.</td>
+<td>An <code>extern</code> function names an ABI other than &quot;C&quot;, a symbol that is no C name, type parameters, <code>throws</code>, a place parameter, or a parameter or return type that does not cross into C; a bare <code>...</code> with no parameter before it, or a variadic argument of a type that does not cross; a C function type, <code>extern &quot;C&quot; fn(…)</code>, whose parameters or result do not cross, that throws, or that names another ABI; or <code>@Layout</code> stands where C cannot lay the type out, or in another form than <code>@Layout(C)</code> or an integer type.</td>
 </tr>
 <tr>
 <td>LYR-SEM0100</td>
@@ -2895,6 +2895,13 @@ code is no longer reported, and its number is not given again.</p>
 <td><a href="../../spec/13-abi/">13-abi</a></td>
 <td>an integer from C that no variant of the enum stands for</td>
 <td>A C function declared to return a <code>@Layout</code> enum returned an integer that is none of the enum's variants. A C enum may hold any integer of its type; a Lyric enum holds one of its variants, the first as 0, the next as 1, in the order they are written.</td>
+</tr>
+<tr>
+<td>LYR-RT0022</td>
+<td>P</td>
+<td><a href="../../spec/13-abi/">13-abi</a></td>
+<td>a Lyric function called from a thread Lyric does not run</td>
+<td>C called a Lyric function through its pointer on a thread the runtime does not know: one C started itself, which no collector attached. There is no Lyric to run it on, and the process ends.</td>
 </tr>
 </tbody>
 </table>

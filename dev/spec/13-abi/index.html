@@ -254,6 +254,10 @@ with the line <code>panic while panicking [CODE]: message</code>, still with 101
 <td><code>LYR-RT0021</code></td>
 <td>a C function returned, for an enum with <code>@Layout</code>, an integer no variant stands for: <code>C returned &lt;n&gt;, which is no variant of &lt;enum&gt; (it has &lt;count&gt;)</code> (§3 rule 5)</td>
 </tr>
+<tr>
+<td><code>LYR-RT0022</code></td>
+<td>C called a Lyric function through its pointer on a thread Lyric does not run: <code>C called a Lyric function on a thread Lyric does not run</code> (§3 rule 9)</td>
+</tr>
 </tbody>
 </table>
 </li>
@@ -442,6 +446,25 @@ is undefined.</li>
 <li><code>xs.asPtr()</code> of an array or a slice — safe — is the address of its first element, the
 elements one after another as in a C array. The pointer does not keep the array alive, and
 points at nothing where it is empty.</li>
+</ul>
+</li>
+<li><strong>C function pointers</strong>: <code>extern &quot;C&quot; fn(int) -&gt; int</code> is the type of a pointer to a C function,
+crossing as C's function pointer wherever C holds one — a parameter, a result, a field. Its
+parameters and result are what a C function's are (rules 1–5, <code>LYR-SEM0099</code>); it throws
+nothing and takes no place (<code>LYR-SEM0099</code>); its ABI is <code>&quot;C&quot;</code> (<code>LYR-SEM0099</code>). A Lyric function
+type, <code>fn(int) -&gt; int</code>, is a closure and does not cross (<code>LYR-SEM0099</code>).
+<ul>
+<li>Where such a type is expected, a function given by its name — free or static, with a body,
+without type parameters — or a lambda that captures nothing becomes the pointer, when its
+parameters and result are the type's and it throws nothing. Any other function value is
+refused (<code>LYR-SEM0001</code>): a closure's state has no place in C's pointer.</li>
+<li>C calls such a function on the thread it runs on, through a trampoline that takes C's values
+as Lyric's (rules 1–5) and gives the result back as C's. The coroutine it runs in counts the
+C frames below it (§1.6 rule 6): the function may park and yield, and a panic in it ends the
+process with its report (§1.6 rule 10) — C's frames cannot be unwound. On a thread Lyric
+does not run — one C started itself — the call ends the process with <code>LYR-RT0022</code>.</li>
+<li>A value of the type is called as a function is: a call of the C function it points at, each
+value crossing as for an <code>extern &quot;C&quot;</code> declaration.</li>
 </ul>
 </li>
 </ol>
