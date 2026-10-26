@@ -61,8 +61,11 @@ public static class AstChildren
                 foreach (var thrown in t.Types) yield return thrown;
                 break;
 
-            // The ABI and the symbol are strings, not nodes: a leaf.
+            // The ABI and the symbol are strings, not nodes: a leaf. The block a function was
+            // written in is the formatter's; its functions are the module's declarations, walked
+            // there — a walk into the block would reach each of them twice.
             case ExternSpec:
+            case ExternBlock:
                 break;
 
             case FunctionDecl f:

@@ -1605,6 +1605,7 @@ public sealed partial class Parser
                 {
                     var before = _buffer.Position;
                     decls.Add(ParseTopLevelDecl([]));
+                    TakeBlockMembers(decls);
                     if (_buffer.Position == before && !_buffer.AtEnd) _buffer.Advance();
                 }
                 end = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close 'quote'").Span;

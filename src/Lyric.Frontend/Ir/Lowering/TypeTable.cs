@@ -526,6 +526,10 @@ internal sealed class TypeTable
 
     public bool IsInterface(TypeId id) => _defs[id.Value].IsInterface;
 
+    /// <summary>The symbol a type was interned for — a generic one's definition —, or <c>null</c>.</summary>
+    public TypeSymbol? SymbolOfId(TypeId id) =>
+        Interned.FirstOrDefault(entry => entry.Id.Value == id.Value).Symbol;
+
     /// <summary>
     /// The Types index of a variant. A variant is a layout entry of its own, and its slot 0 is the tag.
     ///
@@ -650,7 +654,7 @@ internal sealed class TypeTable
 
     /// <summary>The module a type is declared in, by identity: the one whose members hold this
     /// very symbol. Empty when no module does (a bare snippet, a synthesized type).</summary>
-    private string ModuleNameOf(TypeSymbol symbol)
+    public string ModuleNameOf(TypeSymbol symbol)
     {
         if (Compilation is not { } comp) return "";
         foreach (var module in comp.Modules)

@@ -163,6 +163,21 @@ public sealed record ExternSpec(string Abi, string? Symbol, Span Span) : Node(Sp
 
     /// <summary>The symbol string literal as written, or <c>null</c> when none was.</summary>
     public Span? SymbolSpan { get; init; }
+
+    /// <summary>The block the declaration was written in, <c>extern "C" { fn …; }</c>, shared by
+    /// its functions; <c>null</c> for one declared alone. The formatter writes the block again.</summary>
+    public ExternBlock? Block { get; init; }
+}
+
+/// <summary>
+/// <c>extern "C" { fn …; fn …; }</c>: functions of one ABI declared together. The parser hands each
+/// on as a declaration of its own; this node is what they share, for the formatter, which writes
+/// the block as it was written. No walk descends into it.
+/// </summary>
+public sealed record ExternBlock(VisibilityWord Visibility, Span Span) : Node(Span)
+{
+    /// <summary>The block's functions in their order.</summary>
+    public List<FunctionDecl> Members { get; } = [];
 }
 
 /// <summary>A <c>static let</c> constant in the body of a struct or class, reachable as

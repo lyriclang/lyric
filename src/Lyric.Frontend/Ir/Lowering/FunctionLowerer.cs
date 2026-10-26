@@ -8492,6 +8492,18 @@ internal sealed class FunctionLowerer
         if (receiver is { } self) args.Add(self);
         for (var i = 0; i < arguments.Length; i++)
         {
+            // a string handed to a C function's 'CStr': its bytes, for the call
+            if (_types.IsCStrArgument(arguments[i]))
+            {
+                if (_typeTable.Compilation?.FindModule(["std", "ffi"])?.Members.LookupLocal("stringAsCStr") is not FunctionSymbol asCStr
+                    || !TryResolveFunction(asCStr, out var asCStrTarget))
+                    throw Bug($"std.ffi's 'stringAsCStr' was not lowered, for {span}");
+                var text = LowerExpr(arguments[i]);
+                var cstr = _slots.NewTemp(import.ParamTypes[args.Count]);
+                _b.Emit(new Call(cstr, asCStrTarget, [text], span));
+                args.Add(cstr);
+                continue;
+            }
             if (shape?.Params[i + offset] is not { Struct: { } structType } flat)
             {
                 // A scalar argument is coerced to the wire type it lands in, as an argument to
