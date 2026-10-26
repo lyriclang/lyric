@@ -1275,3 +1275,34 @@ und ohne Meldung (Regel 6) — die std behält ihres.
 Nicht gebaut: Completion im Korpus (jede Anfrage kompiliert neu; ihre Tests decken die Formen); ein
 Workspace-weites Suchen nach Paketen, die der Editor nicht offen hat — die Verwendungen in einem nie
 geöffneten abhängigen Paket findet niemand, wie bei gopls ohne geladenes Paket.
+
+### Nachtrag 2026-10-26 — S4–S9 und der Abschluss von M13b
+
+- **S4** (#572): die Vorschläge eines Befunds sind Quick Fixes (die sicheren bevorzugt), ein Lint bekommt `@Allow`
+  über der Deklaration, der Katalog-Link steht als `codeDescription`, Formatieren sendet die Zeilen, die sich ändern
+  — über 4M Zellen nach Myers. Gefunden: eine Datei ohne Paket hatte keinen Modulnamen, und die Lints verwarfen
+  dadurch alle ihre Warnungen.
+- **S5** (#573): eine Linse über jedem Test und Doc-Test; die Befehle `lyric.runTest`/`lyric.debugTest` gehören dem
+  Client.
+- **S6** (#574): `lyric dap` über lldb-dap, der Panik-Filter als Breakpoint auf `lyr_panic`, Frames über die Namen,
+  die der Bau neben das Binary schreibt. Die CI fand zwei Unterschiede zwischen lldb-dap 21 und 23 (`pathFormat`
+  verlangt; die Antwort auf `launch` vor `initialized`) — der Adapter schreibt die Vorgaben des Protokolls aus.
+- **S7** (#575): die Werte über `lldb/lyric_lldb.py` aus den Typen, Varianten und Globalen der Namensdatei — nicht
+  aus `RuntimeLayout`, wie der Plan sagte: das kennt die Quellen der Laufzeit, nicht ihre Objekte. Gefunden: das
+  `#line` vor einer Funktion deckte ihren Prolog, ein Zeilen-Breakpoint hielt vor jedem Wert; die Quellen eines
+  Binarys tragen die Namen ihrer Pakete und brauchen `target.source-map`. Die Linse „Debug test“ hatte nichts
+  hinter sich: `lyric test --no-run` und `test` im `launch`. **Nicht gebaut, mit Uhr: der Scope „Tasks“** (offener
+  Punkt 281) — die Laufzeit führt keine Liste der wartenden Koroutinen, der Scheduler von `std.task` führt sie in
+  Lyric-Daten; ein Scope braucht ein lldb-OS-Plugin. Eine Tür nach 5.0, zu bestätigen.
+- **S8** (lyriclang/tree-sitter-lyric): die Grammatik aus dem Parser der Toolchain geschrieben — wo er
+  vorausschaut, spaltet sie (GLR) und behält, was parst; ein externer Scanner für verschachtelte Kommentare, rohe
+  Strings und den Text in Strings. Der Korpus (1846 Dateien) parst ohne `ERROR`; die Auswahl gegen den Parser der
+  Toolchain geprüft (jede ausgewählte nimmt er an, 37 der 39 ausgeschlossenen lehnt er ab, die zwei übrigen sind
+  benannt). Die TextMate-Grammatik der Clients wird aus `grammar.json` und `highlights.scm` erzeugt.
+- **S9** (vscode-lyric#2, jetbrains-lyric#3): beide 2.0.0 sprechen mit `lyric lsp` und `lyric dap`; die
+  Snippets von VS Code prüft die CI mit `lyric check` des Dev-Kanals (das alte `for`-Snippet scheiterte dort mit
+  LYR-PAR0019). Die Checkliste von JetBrains bleibt dem Maintainer; ihr Punkt 17 fragt, was hier nicht messbar war
+  (offener Punkt 283).
+- **Windows gemessen**: `lldb-dap.exe` von LLVM startet auf dem Runner nicht (offener Punkt 286, Uhr M15).
+- **Zu bestätigen**: 273 (E1 B teilt die Parse, nicht die Prüfung — die geprüfte std eine Tür nach 5.0) und 281.
+  **Nächster Schritt: M14, sein Plan hier zuerst.**
