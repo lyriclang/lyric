@@ -779,7 +779,8 @@ public sealed class AstFormatter
     private Doc BlockDoc(Block block)
     {
         var closing = block.Span.End - 1;
-        return BracedDoc(Doc.Nil, block.Statements.Length == 0 && !AnyCommentBefore(closing),
+        return BracedDoc(block.Unsafe is null ? Doc.Nil : Doc.From("unsafe "),
+            block.Statements.Length == 0 && !AnyCommentBefore(closing),
             () => SequenceDoc(block.Statements, StmtDoc, (_, _) => Air.User, closing));
     }
 

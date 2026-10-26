@@ -13,6 +13,10 @@ public sealed record Block(Stmt[] Statements, Span Span) : Stmt(Span)
     /// whose value the block delivers (§6.9). Only a block in value position (a match arm, a block
     /// lambda's body) may carry one; the parser produces it nowhere else.</summary>
     public TailExprStmt? Tail => Statements.Length > 0 ? Statements[^1] as TailExprStmt : null;
+
+    /// <summary><c>unsafe { … }</c>: where the word stands before the block, within which
+    /// <c>std.ffi</c>'s memory operations may be called; <c>null</c> for every other block.</summary>
+    public Span? Unsafe { get; init; }
 }
 
 /// <summary>The tail of a value block: an expression standing last, with no ';'. Never anywhere

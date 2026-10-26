@@ -46,7 +46,8 @@ public class FmtCommandTests
     [Fact]
     public void Fmt_keeps_an_extern_block()
     {
-        const string loose = "pub extern \"C\" {fn abs(x: int32): int32;\n  private fn labs(x: int): int = \"labs\";\nfn printf(f: CStr,...): int32;}\n\nfn main(): void {\n}\n";
+        const string loose = "pub extern \"C\" {fn abs(x: int32): int32;\n  private fn labs(x: int): int = \"labs\";\nfn printf(f: CStr,...): int32;}\n\n"
+                             + "fn main(): void {\nunsafe { let x = 1; }\n}\n";
         const string formed = """
             pub extern "C" {
                 fn abs(x: int32): int32;
@@ -54,7 +55,11 @@ public class FmtCommandTests
                 fn printf(f: CStr, ...): int32;
             }
 
-            fn main(): void { }
+            fn main(): void {
+                unsafe {
+                    let x = 1;
+                }
+            }
 
             """;
         var root = Package(("lyric.toml", AppManifest), ("src/main.lyr", loose));

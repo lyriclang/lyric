@@ -270,6 +270,67 @@ public class NativeTests
         Assert.Contains(why, error);
     }
 
+    /// <summary>Memory C manages, in an <c>unsafe</c> block: values written and read through a
+    /// pointer and its offsets, back and forth, as another type, a <c>@Layout(C)</c> struct behind
+    /// one; an array's and a slice's elements handed to C, which is safe.</summary>
+    [Fact]
+    public void Memory_is_read_and_written_in_an_unsafe_block()
+    {
+        var dir = Package(
+            ("lyric.toml", AppManifest + "\n[native]\nsources = [\"native/*.c\"]\n"),
+            ("native/sum.c", "#include <stdint.h>\n\nint64_t sum(const int64_t *xs, int64_t n) {\n"
+                             + "    int64_t s = 0;\n    for (int64_t i = 0; i < n; i++) s += xs[i];\n    return s;\n}\n"),
+            ("src/main.lyr", """
+                import std.io { println };
+                import std.ffi { Ptr, alloc, free };
+
+                @Layout(C)
+                struct Pair { a: int32, b: float }
+
+                extern "C" fn sum(xs: Ptr<int>, n: int): int;
+
+                fn main(): void {
+                    unsafe {
+                        let p = alloc<int>(3);
+                        p.write(10);
+                        p.offset(1).write(20);
+                        p.offset(2).write(12);
+                        println(f"{p.read() + p.offset(1).read() + p.offset(2).read()} {sum(p, 3)}");
+                        println(f"{p.cast<uint8>().offset(8).read()} {p.offset(2).offset(-1).read()}");
+                        free(p);
+                        let q = alloc<Pair>(2);
+                        q.offset(1).write(Pair { a = 7, b = 2.5 });
+                        let second = q.offset(1).read();
+                        println(f"{second.a} {second.b} {q.read().a}");
+                        free(q);
+                    }
+                    let xs = [1, 2, 3, 4];
+                    println(f"{sum(xs.asPtr(), 4)} {sum(xs[1..3].asPtr(), 2)}");
+                }
+
+                """));
+        Assert.Equal("42 42\n20 20\n7 2.5 0\n10 5\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    [Theory]
+    [InlineData("let p = alloc<int>(1);", "LYR-SEM0233", "'alloc' holds to what the compiler cannot see")]
+    [InlineData("unsafe {\n        let p = alloc<int>(1);\n    }\n    let q = [1].asPtr();\n    q.write(2);",
+        "LYR-SEM0233", "'Ptr.write' holds to what the compiler cannot see")]
+    [InlineData("let x = [1].asPtr().read();", "LYR-SEM0233", "'Ptr.read' holds")]
+    [InlineData("let q = [1].asPtr().offset(1);", "LYR-SEM0233", "'Ptr.offset' holds")]
+    [InlineData("let q = [1].asPtr().cast<uint8>();", "LYR-SEM0233", "'Ptr.cast' holds")]
+    [InlineData("free([1].asPtr());", "LYR-SEM0233", "'free' holds")]
+    [InlineData("unsafe {\n        let p = alloc<string>(1);\n    }", "LYR-SEM0099", "'alloc' moves a 'string', which C does not hold")]
+    [InlineData("unsafe {\n        let s = [\"a\"].asPtr().read();\n    }", "LYR-SEM0099", "'Ptr.read' moves a 'string'")]
+    public void A_memory_operation_is_checked(string body, string code, string why)
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr",
+            "import std.ffi { Ptr, alloc, free };\n\nfn main(): void {\n    " + body + "\n}\n"));
+        var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
+        Assert.Equal(1, exit);
+        Assert.Contains($"error[{code}]: {why}", error);
+    }
+
     [Theory]
     [InlineData("[native]\nsources = \"native/a.c\"\n", "LYR-PKG0002", "'sources' of [native] is an array of patterns")]
     [InlineData("[native]\ninclude = [\"native/*\"]\n", "LYR-PKG0002", "'native/*' in 'include' of [native] is no directory of the package")]

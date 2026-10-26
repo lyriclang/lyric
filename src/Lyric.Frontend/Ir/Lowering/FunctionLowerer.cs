@@ -7906,6 +7906,9 @@ internal sealed class FunctionLowerer
             _b.Emit(new BlackBox(held, value, type, expr.Span));
             return held;
         }
+        // std.ffi's memory, beneath its Ptr: a value at an address, the size C gives a type,
+        // where an array's or a slice's elements begin
+        if (TryFfiMemory(symbol, expr, out var memory)) return memory;
 
         // Natively backed, by the stdlib or the host: its own instruction type and its own index space.
         //
@@ -8561,6 +8564,70 @@ internal sealed class FunctionLowerer
         var dest = _slots.NewTemp(import.ReturnType);
         _b.Emit(new CallImport(dest, target, [.. args], span) { Variadic = variadic?.ToArray() });
         return dest;
+    }
+
+    /// <summary>
+    /// <c>std.ffi</c>'s four functions under its memory operations, which no Lyric body can say:
+    /// <c>load&lt;T&gt;(address)</c> reads the <c>T</c> at an address, <c>store&lt;T&gt;(address,
+    /// value)</c> writes one there, <c>sizeOf&lt;T&gt;()</c> is C's <c>sizeof</c>, and
+    /// <c>dataAddress(xs)</c> and <c>sliceAddress(xs)</c> are where an array's or a slice's
+    /// elements begin. <c>false</c> for
+    /// every other call.
+    /// </summary>
+    private bool TryFfiMemory(FunctionSymbol symbol, CallExpr expr, out TempId? result)
+    {
+        result = null;
+        var ffi = _typeTable.Compilation?.FindModule(["std", "ffi"])?.Members;
+        if (ffi is null || symbol.Name is not ("load" or "store" or "sizeOf" or "dataAddress" or "sliceAddress")
+            || !ReferenceEquals(ffi.LookupLocal(symbol.Name), symbol))
+            return false;
+        result = FfiMemory(symbol.Name, expr);
+        return true;
+    }
+
+    private TempId? FfiMemory(string name, CallExpr expr)
+    {
+        var span = expr.Span;
+        var u64 = new IrScalarType(IrScalar.U64);
+        switch (name)
+        {
+            case "load":
+            {
+                var type = TypeOfExpr(expr);
+                var place = _slots.NewTemp(new IrPlaceType(type));
+                _b.Emit(new PlaceAt(place, LowerExprAs(expr.Arguments[0], u64), type, span));
+                var value = _slots.NewTemp(type);
+                _b.Emit(new LoadPlace(value, place, type, span));
+                return value;
+            }
+            case "store":
+            {
+                var type = TypeOfExpr(expr.Arguments[1]);
+                var place = _slots.NewTemp(new IrPlaceType(type));
+                _b.Emit(new PlaceAt(place, LowerExprAs(expr.Arguments[0], u64), type, span));
+                _b.Emit(new StorePlace(place, LowerExprAs(expr.Arguments[1], type), span));
+                return null;
+            }
+            case "sizeOf":
+            {
+                var size = _slots.NewTemp(u64);
+                _b.Emit(new SizeOf(size, LowerType(SubstituteType(_types.TypeArgumentsOf(expr)[0]), span), span));
+                return size;
+            }
+            default:
+            {
+                var elements = LowerExpr(expr.Arguments[0]);
+                var element = _slots.TypeOfTemp(elements) switch
+                {
+                    IrArrayType a => a.Element,
+                    IrSliceType s => s.Element,
+                    var other => throw Bug($"dataAddress of a {other}, for {span}"),
+                };
+                var address = _slots.NewTemp(u64);
+                _b.Emit(new DataAddress(address, elements, element, span));
+                return address;
+            }
+        }
     }
 
     /// <summary>A string handed to a C function as a <c>CStr</c>: its bytes, for the call.</summary>

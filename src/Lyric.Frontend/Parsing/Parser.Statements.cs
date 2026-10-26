@@ -56,6 +56,9 @@ public sealed partial class Parser
         // 'loop { … }': contextual, as 'loop' before a brace starts nothing else. A
         // statement here — no ';' after its block — and an expression anywhere else.
         TokenKind.Identifier when IsLoopAhead(0) => LoopStatement(ParseLoop(null, default)),
+        // 'unsafe { … }': contextual as 'loop' is; a statement, and the block it stands before
+        TokenKind.Identifier when AtContextual("unsafe") && _buffer.Peek(1).TokenKind == TokenKind.LBrace
+            && _sm.Lyric5 => ParseUnsafe(),
         TokenKind.LBrace => ParseBlock(),
         TokenKind.Let or TokenKind.Var => ParseBinding(),
         // a local 'fn': Lyric 5's; the 4.x grammar has none
@@ -263,6 +266,15 @@ public sealed partial class Parser
         _allowTail = savedTail;
         _allowStructInit = savedStructInit;
         return new Block(stmts.ToArray(), Span.Union(open.Span, close.Span));
+    }
+
+    /// <summary><c>unsafe { … }</c>: a block whose word lets <c>std.ffi</c>'s memory operations be
+    /// called within it; nothing else about it differs.</summary>
+    private Stmt ParseUnsafe()
+    {
+        var word = _buffer.Advance().Span;
+        var block = ParseBlock();
+        return block with { Unsafe = word, Span = Span.Union(word, block.Span) };
     }
 
     /// <summary>
