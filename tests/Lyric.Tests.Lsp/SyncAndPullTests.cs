@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Lyric.Lsp;
 using Lyric.Lsp.Documents;
 using Lyric.Lsp.Protocol;
 
@@ -106,6 +107,39 @@ public sealed class SyncAndPullTests : IDisposable
         Assert.Equal("full", report.GetProperty("kind").GetString());
         var finding = Assert.Single(report.GetProperty("items").EnumerateArray());
         Assert.Equal(3, finding.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+    }
+
+    [Fact]
+    public async Task A_pull_withdrawn_by_the_open_files_own_analysis_is_asked_again_and_the_server_stays()
+    {
+        // What an editor sends on opening a file: the open and, at once, the ask. The ask compiles
+        // the package; the open's own run starts after the debounce and withdraws it. The answer is
+        // then a cancellation the client asks again on — or the report, where the ask finished first.
+        var uri = DocumentUri.FromFilePath(Path.Combine(_dir, "src", "main.lyr"));
+        await using var harness = new ServerHarness(new LspServerOptions { Debounce = TimeSpan.FromMilliseconds(20) });
+        await harness.InitializeAsync("""{"textDocument":{"diagnostic":{}}}""");
+        await harness.NotifyAsync(LspMethods.DidOpen, DidOpen(uri, "fn main(): int {\n    return \"no\";\n}\n"));
+        var asked = await harness.RequestAsync(LspMethods.Diagnostic,
+            JsonSerializer.Serialize(new { textDocument = new { uri } }));
+
+        var first = await harness.ReceiveResponseAsync(asked);
+        if (first.TryGetProperty("error", out var error))
+        {
+            Assert.Equal(JsonRpcErrorCodes.ServerCancelled, error.GetProperty("code").GetInt32());
+            Assert.True(error.GetProperty("data").GetProperty("retriggerRequest").GetBoolean());
+        }
+
+        // asked again, as the client does: the server is still there and says what the file holds
+        var again = await harness.RequestAsync(LspMethods.Diagnostic,
+            JsonSerializer.Serialize(new { textDocument = new { uri } }));
+        var report = (await harness.ReceiveResponseAsync(again)).GetProperty("result");
+        var finding = Assert.Single(report.GetProperty("items").EnumerateArray());
+        Assert.Equal("LYR-SEM0001", finding.GetProperty("code").GetString());
+
+        var shutdown = await harness.RequestAsync(LspMethods.Shutdown);
+        await harness.ReceiveResponseAsync(shutdown);
+        await harness.NotifyAsync(LspMethods.Exit);
+        Assert.Equal(0, await harness.ExitCodeAsync());
     }
 
     [Fact]

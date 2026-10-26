@@ -176,6 +176,13 @@ public sealed record DocumentDiagnosticParams
     public required TextDocumentIdentifier TextDocument { get; init; }
 }
 
+/// <summary>The data of a <c>textDocument/diagnostic</c> the server gave up on: whether the client
+/// should ask again.</summary>
+public sealed record DiagnosticServerCancellationData
+{
+    public required bool RetriggerRequest { get; init; }
+}
+
 /// <summary>The full report of a document: the protocol's <c>RelatedFullDocumentDiagnosticReport</c>
 /// without the related documents, which arrive pushed.</summary>
 public sealed record FullDocumentDiagnosticReport

@@ -58,6 +58,7 @@ namespace Lyric.Lsp.Protocol;
 [JsonSerializable(typeof(DocumentFormattingParams))]
 [JsonSerializable(typeof(IReadOnlyList<TextEdit>))]
 [JsonSerializable(typeof(DocumentDiagnosticParams))]
+[JsonSerializable(typeof(DiagnosticServerCancellationData))]
 [JsonSerializable(typeof(CodeActionParams))]
 [JsonSerializable(typeof(ExecuteCommandParams))]
 [JsonSerializable(typeof(CodeLensParams))]

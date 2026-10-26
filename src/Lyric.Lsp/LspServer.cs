@@ -121,9 +121,10 @@ public sealed class LspServer : IDisposable
                 await HandlePayloadAsync(payload, cancellationToken).ConfigureAwait(false);
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // The host is shutting us down. Not a protocol fault.
+            // The host is shutting us down. Not a protocol fault. A cancellation from anywhere else
+            // is a fault of the server and leaves as one, rather than as a client that went away.
         }
         catch (LspProtocolException exception)
         {
@@ -1231,7 +1232,31 @@ public sealed class LspServer : IDisposable
         var uri = parameters.TextDocument.Uri;
         if (_documents.ByUri(uri) is { } document
             && !(_lastDiagnostics.TryGetValue(uri, out var said) && said.Version == document.Version))
-            await _analysis.AnalyzeAsync(document, cancellationToken).ConfigureAwait(false);
+        {
+            try
+            {
+                await _analysis.AnalyzeAsync(document, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // A newer run of the same package withdrew this one — the open's own, after its
+                // debounce, is the usual one. What it finds is not known yet; the client asks again.
+                await SendAsync(
+                    new JsonRpcFailure
+                    {
+                        Id = id,
+                        Error = new JsonRpcError
+                        {
+                            Code = JsonRpcErrorCodes.ServerCancelled,
+                            Message = "a newer analysis of the package replaced this one",
+                            Data = LspJson.ToElement(new DiagnosticServerCancellationData { RetriggerRequest = true },
+                                LspJson.Default.DiagnosticServerCancellationData),
+                        },
+                    },
+                    LspJson.Default.JsonRpcFailure, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+        }
 
         var items = _lastDiagnostics.TryGetValue(uri, out var known) ? known.Diagnostics : [];
         await SendResultAsync(id, new FullDocumentDiagnosticReport { Items = items },
