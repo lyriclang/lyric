@@ -145,6 +145,90 @@ public class DapCommandTests
         return true;
     }
 
+    private const string Values = "struct Point {\n    x: int,\n    y: int,\n}\n\nclass Box {\n    var count: int = 0,\n}\n\n"
+        + "enum Shape {\n    Circle(int),\n    Rect { w: int, h: int },\n    Empty,\n}\n\n"
+        + "fn main(): int {\n    let p = Point { x = 1, y = 2 };\n    let b = Box { count = 3 };\n    let s = Shape.Rect { w = 4, h = 5 };\n"
+        + "    let o: ?int = 7;\n    let xs = [p, p];\n    let t = \"hello\";\n"
+        + "    let total = p.x + b.count + xs.length() + t.length() + (o ?? 0) + (match (s) { .Empty => 1, _ => 0 });\n"
+        + "    return total;\n}\n";
+
+    [Fact]
+    public void A_line_breakpoint_shows_the_locals_by_their_Lyric_names_and_values()
+    {
+        if (Unavailable()) return;
+        var root = Package(("lyric.toml", AppManifest), ("src/main.lyr", Values));
+        using var dap = new Session();
+
+        dap.Response(dap.Send("initialize", new JsonObject { ["adapterID"] = "lyric", ["linesStartAt1"] = true }));
+        dap.Send("launch", new JsonObject { ["program"] = root });
+        dap.Event("initialized");
+        // 'return total;', the line after every value is made: the prologue does not answer for it
+        dap.Response(dap.Send("setBreakpoints", new JsonObject
+        {
+            ["source"] = new JsonObject { ["path"] = Path.Combine(root, "src", "main.lyr") },
+            ["breakpoints"] = new JsonArray(new JsonObject { ["line"] = 24 }),
+        }));
+        dap.Response(dap.Send("setExceptionBreakpoints", new JsonObject { ["filters"] = new JsonArray() }));
+        dap.Send("configurationDone");
+
+        var stopped = dap.Event("stopped");
+        var frame = dap.Response(dap.Send("stackTrace", new JsonObject { ["threadId"] = (int)stopped["body"]!["threadId"]!, ["levels"] = 1 }))
+            ["body"]!["stackFrames"]![0]!;
+        Assert.Equal(24, (int?)frame["line"]);
+        var scopes = dap.Response(dap.Send("scopes", new JsonObject { ["frameId"] = (int)frame["id"]! }))["body"]!["scopes"]!.AsArray();
+        var locals = scopes.First(s => (string?)s!["name"] == "Locals")!;
+
+        JsonObject[] Variables(int reference) =>
+            [.. dap.Response(dap.Send("variables", new JsonObject { ["variablesReference"] = reference }))["body"]!["variables"]!
+                .AsArray().Select(v => v!.AsObject())];
+        string Shown(JsonObject[] variables) =>
+            string.Join(", ", variables.Select(v => $"{(string?)v["name"]} = {(string?)v["value"]}"));
+
+        var variables = Variables((int)locals["variablesReference"]!);
+        Assert.Equal(["p", "b", "s", "o", "xs", "t", "total"], variables.Select(v => (string?)v["name"]));
+        var byName = variables.ToDictionary(v => (string)v["name"]!);
+        Assert.Equal("\"hello\"", (string?)byName["t"]["value"]);
+        Assert.Equal("7", (string?)byName["o"]["value"]);
+        Assert.Equal("18", (string?)byName["total"]["value"]);
+        Assert.Equal("Rect", (string?)byName["s"]["value"]);
+        Assert.Equal("[2]", (string?)byName["xs"]["value"]);
+        Assert.Equal("x = 1, y = 2", Shown(Variables((int)byName["p"]["variablesReference"]!)));
+        Assert.Equal("count = 3", Shown(Variables((int)byName["b"]["variablesReference"]!)));
+        Assert.Equal("w = 4, h = 5", Shown(Variables((int)byName["s"]["variablesReference"]!)));
+        Assert.Equal(2, Variables((int)byName["xs"]["variablesReference"]!).Length);
+
+        dap.Response(dap.Send("disconnect", new JsonObject { ["terminateDebuggee"] = true }));
+    }
+
+    [Fact]
+    public void A_launch_with_a_test_debugs_that_test()
+    {
+        if (Unavailable()) return;
+        var tests = "import std.test { assertEq };\n\n@Test\nfn adds(): void {\n    let sum = 2 + 3;\n    assertEq(sum, 5);\n}\n\n"
+            + "@Test\nfn other(): void {\n    assertEq(1, 1);\n}\n";
+        var root = Package(("lyric.toml", AppManifest), ("src/lib.lyr", "pub fn one(): int {\n    return 1;\n}\n"), ("tests/sums.lyr", tests));
+        using var dap = new Session();
+
+        dap.Response(dap.Send("initialize", new JsonObject { ["adapterID"] = "lyric", ["linesStartAt1"] = true }));
+        dap.Send("launch", new JsonObject { ["program"] = root, ["test"] = "adds" });
+        dap.Event("initialized");
+        dap.Response(dap.Send("setBreakpoints", new JsonObject
+        {
+            ["source"] = new JsonObject { ["path"] = Path.Combine(root, "tests", "sums.lyr") },
+            ["breakpoints"] = new JsonArray(new JsonObject { ["line"] = 6 }),
+        }));
+        dap.Response(dap.Send("setExceptionBreakpoints", new JsonObject { ["filters"] = new JsonArray() }));
+        dap.Send("configurationDone");
+
+        var stopped = dap.Event("stopped");
+        var frame = dap.Response(dap.Send("stackTrace", new JsonObject { ["threadId"] = (int)stopped["body"]!["threadId"]!, ["levels"] = 1 }))
+            ["body"]!["stackFrames"]![0]!;
+        Assert.Equal("app.tests.sums.adds", (string?)frame["name"]);
+        Assert.Equal(6, (int?)frame["line"]);
+
+        dap.Response(dap.Send("disconnect", new JsonObject { ["terminateDebuggee"] = true }));
+    }
+
     private const string Panics = "fn deep(xs: int[], i: int): int {\n    return xs[i];\n}\n\nfn main(): int {\n    let xs = [1, 2, 3];\n    return deep(xs, 5);\n}\n";
 
     [Fact]

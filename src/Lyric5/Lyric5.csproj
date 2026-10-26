@@ -29,6 +29,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Lyric's values in lldb, beside the binary: lyric dap imports it, and lldb can. -->
+    <Content Include="lldb\lyric_lldb.py" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The seed of the Lyric 5 standard library, beside the binary (the 4.x stdlib/ that the front
          end's project copies is not what lyric5 compiles against). -->
     <Content Include="..\..\stdlib5\**\*.lyr" Link="stdlib5\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

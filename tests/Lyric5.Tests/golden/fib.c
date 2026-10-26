@@ -11,19 +11,33 @@ void lyr__globals__9ee5f9b5(void);
 
 #line 3 "programs/fib.lyr"
 int64_t lyr_app_main_fib(int64_t l0_n) {
+#line 3
     LYR_STACK_CHECK();
+#line 3
     int64_t t0 = 0;
+#line 3
     int64_t t1 = 0;
+#line 3
     uint8_t t2 = 0;
+#line 3
     int64_t t3 = 0;
+#line 3
     int64_t t4 = 0;
+#line 3
     int64_t t5 = 0;
+#line 3
     int64_t t6 = 0;
+#line 3
     int64_t t7 = 0;
+#line 3
     int64_t t8 = 0;
+#line 3
     int64_t t9 = 0;
+#line 3
     int64_t t10 = 0;
+#line 3
     int64_t t11 = 0;
+#line 3
     int64_t t12 = 0;
 bb0:;
 #line 3
@@ -64,28 +78,51 @@ bb2:;
 
 #line 8 "programs/fib.lyr"
 int64_t lyr_app_main_fibIter(int64_t l0_n) {
+#line 8
     int64_t l1_a = 0;
+#line 8
     int64_t l2_b = 0;
+#line 8
     int64_t l3__range0 = 0;
+#line 8
     int64_t l4__last1 = 0;
+#line 8
     int64_t l5_i = 0;
+#line 8
     int64_t l6_next = 0;
+#line 8
     int64_t t0 = 0;
+#line 8
     int64_t t1 = 0;
+#line 8
     int64_t t2 = 0;
+#line 8
     int64_t t3 = 0;
+#line 8
     int64_t t4 = 0;
+#line 8
     int64_t t5 = 0;
+#line 8
     uint8_t t6 = 0;
+#line 8
     int64_t t7 = 0;
+#line 8
     int64_t t8 = 0;
+#line 8
     int64_t t9 = 0;
+#line 8
     int64_t t10 = 0;
+#line 8
     int64_t t11 = 0;
+#line 8
     int64_t t12 = 0;
+#line 8
     int64_t t13 = 0;
+#line 8
     int64_t t14 = 0;
+#line 8
     int64_t t15 = 0;
+#line 8
     uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 8
@@ -156,14 +193,23 @@ bb4:;
 
 #line 19 "programs/fib.lyr"
 LYR_NOINLINE int64_t lyr_app_main_main(void) {
+#line 19
     LYR_STACK_CHECK();
+#line 19
     int64_t t0 = 0;
+#line 19
     int64_t t1 = 0;
+#line 19
     int64_t t2 = 0;
+#line 19
     int64_t t3 = 0;
+#line 19
     uint8_t t4 = 0;
+#line 19
     int64_t t5 = 0;
+#line 19
     int64_t t6 = 0;
+#line 19
     int64_t t7 = 0;
 bb0:;
 #line 19

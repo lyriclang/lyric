@@ -9,47 +9,89 @@ void lyr__globals__9ee5f9b5(void);
 
 #line 4 "programs/count.lyr"
 LYR_NOINLINE int64_t lyr_app_main_main(void) {
+#line 4
     int64_t l0_total = 0;
+#line 4
     int64_t l1__range0 = 0;
+#line 4
     int64_t l2__last1 = 0;
+#line 4
     int64_t l3_i = 0;
+#line 4
     int64_t l4__range2 = 0;
+#line 4
     int64_t l5__last3 = 0;
+#line 4
     int64_t l6_j = 0;
+#line 4
     int64_t t0 = 0;
+#line 4
     int64_t t1 = 0;
+#line 4
     int64_t t2 = 0;
+#line 4
     int64_t t3 = 0;
+#line 4
     int64_t t4 = 0;
+#line 4
     uint8_t t5 = 0;
+#line 4
     int64_t t6 = 0;
+#line 4
     int64_t t7 = 0;
+#line 4
     int64_t t8 = 0;
+#line 4
     int64_t t9 = 0;
+#line 4
     uint8_t t10 = 0;
+#line 4
     int64_t t11 = 0;
+#line 4
     int64_t t12 = 0;
+#line 4
     int64_t t13 = 0;
+#line 4
     int64_t t14 = 0;
+#line 4
     int64_t t15 = 0;
+#line 4
     uint8_t t16 = 0;
+#line 4
     int64_t t17 = 0;
+#line 4
     int64_t t18 = 0;
+#line 4
     int64_t t19 = 0;
+#line 4
     int64_t t20 = 0;
+#line 4
     int64_t t21 = 0;
+#line 4
     int64_t t22 = 0;
+#line 4
     uint8_t t23 = 0;
+#line 4
     int64_t t24 = 0;
+#line 4
     int64_t t25 = 0;
+#line 4
     uint8_t t26 = 0;
+#line 4
     int64_t t27 = 0;
+#line 4
     int64_t t28 = 0;
+#line 4
     int64_t t29 = 0;
+#line 4
     int64_t t30 = 0;
+#line 4
     int64_t t31 = 0;
+#line 4
     int64_t t32 = 0;
+#line 4
     int64_t t33 = 0;
+#line 4
     uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 4

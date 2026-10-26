@@ -279,6 +279,19 @@ public class TestCommandTests
         Assert.Contains("'test' runs a package's tests and takes no file", error);
     }
 
+    [Fact]
+    public void No_run_builds_the_tests_and_names_the_binary()
+    {
+        // what a debugger launches: the program 'test' would run, run by nobody
+        var dir = App(("tests/says.lyr", "import std.io { println };\n\n@Test\nfn says(): void {\n    println(\"ran\");\n}\n"));
+        var (exit, output, error) = Run("test", "-C", dir, "--no-run", "-f", "says");
+        Assert.True(exit == 0, output + error);
+        var binary = output.TrimEnd('\n').Split('\n')[^1];
+        Assert.True(File.Exists(binary), output);
+        Assert.DoesNotContain("ran", output);
+        Assert.DoesNotContain("1 test", output);
+    }
+
     /// <summary><c>--target</c> as <c>build</c> and <c>run</c> take it: the tests are built for another machine and named, not run there — exit 2.</summary>
     [CrossTargetFact]
     public void A_cross_target_builds_the_tests_and_runs_none()

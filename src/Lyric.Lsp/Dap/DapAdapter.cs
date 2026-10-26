@@ -6,18 +6,21 @@ using Lyric.Lsp.Protocol;
 
 namespace Lyric.Lsp.Dap;
 
-/// <summary>How the adapter builds the program it launches: the binary to debug and its names,
-/// or why there is none.</summary>
+/// <summary>A program built to debug: the binary, or <c>null</c>; what the build said; and the
+/// names its debug information writes for the places its sources lie, with the places.</summary>
+public sealed record DebugBuild(string? Executable, string Said, IReadOnlyList<(string Name, string Place)> Places);
+
+/// <summary>How the adapter builds the program it launches.</summary>
 /// <param name="Build">Builds what a <c>launch</c> names — a package's directory or a file — in the
-/// debug profile, and answers the binary, or <c>null</c> and what the build said.</param>
-public sealed record DapAdapterOptions(Func<string, (string? Executable, string Said)> Build)
+/// debug profile; with a test's name, the package's tests whose names hold it.</param>
+public sealed record DapAdapterOptions(Func<string, string?, DebugBuild> Build)
 {
     /// <summary>The lldb-dap to run; found where it usually is without it.</summary>
     public string? LldbDap { get; init; }
 
-    /// <summary>The commands lldb reads at the start — the toolchain's <c>lyric.lldbinit</c>,
-    /// where it has one.</summary>
-    public string? LldbInit { get; init; }
+    /// <summary>The Python lldb imports at the start: the toolchain's <c>lldb/lyric_lldb.py</c>,
+    /// which shows Lyric's values as Lyric writes them.</summary>
+    public string? LldbScript { get; init; }
 }
 
 /// <summary>
@@ -46,6 +49,7 @@ public sealed class DapAdapter(Stream clientInput, Stream clientOutput, DapAdapt
     private LspConnection? _lldb;
     private Process? _process;
     private readonly Dictionary<string, string> _names = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _globals = new(StringComparer.Ordinal);
     private bool _panics = true;
     private bool _launched;
 
@@ -140,6 +144,22 @@ public sealed class DapAdapter(Stream clientInput, Stream clientOutput, DapAdapt
             filters.Add((JsonNode)new JsonObject { ["filter"] = PanicFilter, ["label"] = "Panic", ["default"] = true });
             body["exceptionBreakpointFilters"] = filters;
         }
+        else if (command == "variables" && response["body"] is JsonObject scope && scope["variables"] is JsonArray variables)
+        {
+            // a local by its Lyric name, l3_count is count; what the compiler made — a temporary,
+            // its storage, the error in flight, the poll's count, a local of its own (l7__match1) — left out
+            foreach (var variable in variables.OfType<JsonObject>().ToList())
+            {
+                if ((string?)variable["name"] is not { } name) continue;
+                if (LocalName(name) is { } lyric) variable["name"] = lyric;
+                else if (_globals.TryGetValue(name, out var global)) variable["name"] = global;
+                else if (IsCompilers(name) || name.StartsWith("lyr_", StringComparison.Ordinal)) { variables.Remove(variable); continue; }
+                // a reference shows what it holds, not where: '0x7fbe… "hello"' is '"hello"'
+                if ((string?)variable["value"] is { } value && value.StartsWith("0x", StringComparison.Ordinal)
+                    && value.IndexOf(' ') is > 2 and var space)
+                    variable["value"] = value[(space + 1)..];
+            }
+        }
         else if (command == "stackTrace" && response["body"] is JsonObject trace && trace["stackFrames"] is JsonArray frames)
         {
             foreach (var frame in frames.OfType<JsonObject>())
@@ -153,6 +173,24 @@ public sealed class DapAdapter(Stream clientInput, Stream clientOutput, DapAdapt
             }
         }
     }
+
+    /// <summary>A local's Lyric name: <c>l3_count</c> is <c>count</c>; <c>null</c> for any other
+    /// name, and for a local the compiler made (<c>l7__match1</c>).</summary>
+    public static string? LocalName(string name)
+    {
+        if (name.Length < 3 || name[0] != 'l' || !char.IsAsciiDigit(name[1])) return null;
+        var at = 1;
+        while (at < name.Length && char.IsAsciiDigit(name[at])) at++;
+        if (at >= name.Length - 1 || name[at] != '_' || name[at + 1] == '_') return null;
+        return name[(at + 1)..];
+    }
+
+    /// <summary>Whether a variable is the compiler's: a temporary (<c>t4</c>, <c>t4_s</c>), a local
+    /// it introduced (<c>l7__match1</c>), the error in flight and the stashes, the poll's count.</summary>
+    public static bool IsCompilers(string name) =>
+        (name.Length > 1 && name[0] == 't' && name[1..].Split('_')[0].All(char.IsAsciiDigit) && name[1..].Split('_')[0].Length > 0)
+        || (name.Length > 1 && name[0] == 'l' && char.IsAsciiDigit(name[1]) && name.Contains("__", StringComparison.Ordinal))
+        || name is "lyr_e" or "lyr_poll" or "lyr_env" or "lyr_err" || (name.StartsWith("lyr_s", StringComparison.Ordinal) && name[5..].All(char.IsAsciiDigit));
 
     /// <summary>A frame's name as Lyric writes it: <c>lyr_app_main_main</c> is <c>app.main.main</c>,
     /// by the names the build wrote; a name lldb adds to — an argument list, an offset — keeps its
@@ -177,7 +215,10 @@ public sealed class DapAdapter(Stream clientInput, Stream clientOutput, DapAdapt
             await AnswerAsync(launch, null, cancellationToken, "the launch names no program: a package's directory or a .lyr file").ConfigureAwait(false);
             return null;
         }
-        var (executable, said) = options.Build(program);
+        // 'test': the package's tests whose names hold it, the program 'lyric test' runs
+        var test = (string?)arguments["test"];
+        arguments.Remove("test");
+        var (executable, said, places) = options.Build(program, test);
         if (said.Length > 0) await OutputAsync(said, cancellationToken).ConfigureAwait(false);
         if (executable is null)
         {
@@ -186,15 +227,24 @@ public sealed class DapAdapter(Stream clientInput, Stream clientOutput, DapAdapt
         }
 
         _names.Clear();
+        _globals.Clear();
         var namesFile = executable + ".lyric-names";
         if (File.Exists(namesFile))
             foreach (var line in File.ReadAllLines(namesFile))
-                if (line.Split('\t') is [var c, var lyric]) _names[c] = lyric;
+                switch (line.Split('\t'))
+                {
+                    case [var c, var lyric]: _names[c] = lyric; break;
+                    case ["global", var c, var lyric]: _globals[c] = lyric; break;
+                }
 
         arguments["program"] = executable;
         arguments["cwd"] ??= Directory.Exists(program) ? program : Path.GetDirectoryName(Path.GetFullPath(program));
         var init = arguments["initCommands"] as JsonArray ?? [];
-        if (options.LldbInit is { } lldbInit && File.Exists(lldbInit)) init.Add((JsonNode)JsonValue.Create($"command source '{lldbInit}'"));
+        if (options.LldbScript is { } script && File.Exists(script)) init.Add((JsonNode)JsonValue.Create($"command script import '{script}'"));
+        // the binary names its sources by their packages' names (app/src/main.lyr), the same
+        // wherever it was built: lldb finds them where they lie
+        if (places.Count > 0)
+            init.Add((JsonNode)JsonValue.Create("settings set target.source-map " + string.Join(' ', places.Select(p => $"'{p.Name}' '{p.Place}'"))));
         arguments["initCommands"] = init;
         var preRun = arguments["preRunCommands"] as JsonArray ?? [];
         preRun.Add((JsonNode)JsonValue.Create($"breakpoint set -n {PanicFunction} -N {PanicBreakpoint}"));

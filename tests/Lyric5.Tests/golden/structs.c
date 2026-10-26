@@ -22,21 +22,37 @@ void lyr__globals__9ee5f9b5(void);
 
 #line 7 "programs/structs.lyr"
 lyr_ty_app_main_Point lyr_app_main_shift(lyr_ty_app_main_Point l0_p, int64_t l1_dx) {
+#line 7
     lyr_ty_app_main_Point l2_q = {0};
+#line 7
     lyr_ty_app_main_Point t0_s = {0};
+#line 7
     lyr_ty_app_main_Point *t0 = &t0_s;
+#line 7
     lyr_ty_app_main_Point t1_s = {0};
+#line 7
     lyr_ty_app_main_Point *t1 = &t1_s;
+#line 7
     lyr_ty_app_main_Point t2_s = {0};
+#line 7
     lyr_ty_app_main_Point *t2 = &t2_s;
+#line 7
     lyr_ty_app_main_Point t3_s = {0};
+#line 7
     lyr_ty_app_main_Point *t3 = &t3_s;
+#line 7
     int64_t t4 = 0;
+#line 7
     int64_t t5 = 0;
+#line 7
     int64_t t6 = 0;
+#line 7
     lyr_ty_app_main_Point t7_s = {0};
+#line 7
     lyr_ty_app_main_Point *t7 = &t7_s;
+#line 7
     lyr_ty_app_main_Point t8_s = {0};
+#line 7
     lyr_ty_app_main_Point *t8 = &t8_s;
 bb0:;
 #line 7
@@ -67,51 +83,97 @@ bb0:;
 
 #line 13 "programs/structs.lyr"
 LYR_NOINLINE int64_t lyr_app_main_main(void) {
+#line 13
     LYR_STACK_CHECK();
+#line 13
     lyr_ty_app_main_Point l0_p = {0};
+#line 13
     lyr_ty_app_main_Segment l1_s = {0};
+#line 13
     int64_t t0 = 0;
+#line 13
     int64_t t1 = 0;
+#line 13
     lyr_ty_app_main_Point t2_s = {0};
+#line 13
     lyr_ty_app_main_Point *t2 = &t2_s;
+#line 13
     lyr_ty_app_main_Point t3_s = {0};
+#line 13
     lyr_ty_app_main_Point *t3 = &t3_s;
+#line 13
     lyr_ty_app_main_Point t4_s = {0};
+#line 13
     lyr_ty_app_main_Point *t4 = &t4_s;
+#line 13
     lyr_ty_app_main_Point t5_s = {0};
+#line 13
     lyr_ty_app_main_Point *t5 = &t5_s;
+#line 13
     lyr_ty_app_main_Point t6_s = {0};
+#line 13
     lyr_ty_app_main_Point *t6 = &t6_s;
+#line 13
     int64_t t7 = 0;
+#line 13
     lyr_ty_app_main_Point t8_s = {0};
+#line 13
     lyr_ty_app_main_Point *t8 = &t8_s;
+#line 13
     lyr_ty_app_main_Segment t9_s = {0};
+#line 13
     lyr_ty_app_main_Segment *t9 = &t9_s;
+#line 13
     lyr_ty_app_main_Point t10_s = {0};
+#line 13
     lyr_ty_app_main_Point *t10 = &t10_s;
+#line 13
     int64_t t11 = 0;
+#line 13
     lyr_ty_app_main_Segment t12_s = {0};
+#line 13
     lyr_ty_app_main_Segment *t12 = &t12_s;
+#line 13
     lyr_ty_app_main_Point t13_s = {0};
+#line 13
     lyr_ty_app_main_Point *t13 = &t13_s;
+#line 13
     int64_t t14 = 0;
+#line 13
     int64_t t15 = 0;
+#line 13
     uint8_t t16 = 0;
+#line 13
     int64_t t17 = 0;
+#line 13
     lyr_ty_app_main_Segment t18_s = {0};
+#line 13
     lyr_ty_app_main_Segment *t18 = &t18_s;
+#line 13
     lyr_ty_app_main_Point t19_s = {0};
+#line 13
     lyr_ty_app_main_Point *t19 = &t19_s;
+#line 13
     int64_t t20 = 0;
+#line 13
     lyr_ty_app_main_Segment t21_s = {0};
+#line 13
     lyr_ty_app_main_Segment *t21 = &t21_s;
+#line 13
     lyr_ty_app_main_Point t22_s = {0};
+#line 13
     lyr_ty_app_main_Point *t22 = &t22_s;
+#line 13
     int64_t t23 = 0;
+#line 13
     int64_t t24 = 0;
+#line 13
     lyr_ty_app_main_Point t25_s = {0};
+#line 13
     lyr_ty_app_main_Point *t25 = &t25_s;
+#line 13
     int64_t t26 = 0;
+#line 13
     int64_t t27 = 0;
 bb0:;
 #line 13
