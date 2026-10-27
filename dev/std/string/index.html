@@ -47,34 +47,34 @@ println(sb.toString());</code></pre>
 <pre class="output"><code>1,2,3,</code></pre>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.concat">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> concat(a: <span class="ty">string</span>, b: <span class="ty">string</span>): <span class="ty">string</span></code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> concat(a: <span class="ty">string</span>, b: <span class="ty">string</span>): <span class="ty">string</span> = <span class="str">"lyr_str_concat"</span></code></pre>
 <p>Returns <code>a</code> followed by <code>b</code>.</p>
 </section>
 <section class="member" id="fn.fromInt">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fromInt(value: <span class="ty">int</span>): <span class="ty">string</span></code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> fromInt(value: <span class="ty">int</span>): <span class="ty">string</span> = <span class="str">"lyr_str_from_int"</span></code></pre>
 <p>Returns the decimal text of a signed integer.</p>
 </section>
 <section class="member" id="fn.fromUint">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fromUint(value: <span class="ty">uint</span>): <span class="ty">string</span></code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> fromUint(value: <span class="ty">uint</span>): <span class="ty">string</span> = <span class="str">"lyr_str_from_uint"</span></code></pre>
 <p>Returns the decimal text of an unsigned integer.</p>
 </section>
 <section class="member" id="fn.fromFloat">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fromFloat(value: <span class="ty">float</span>): <span class="ty">string</span></code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> fromFloat(value: <span class="ty">float</span>): <span class="ty">string</span> = <span class="str">"lyr_str_from_float"</span></code></pre>
 <p>Returns the shortest decimal text that reads back as the same <code>float</code>.</p>
 <p>Infinities are written <code>inf</code> and <code>-inf</code>, a NaN as <code>NaN</code>.</p>
 </section>
 <section class="member" id="fn.fromFloat32">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fromFloat32(value: <span class="ty">float32</span>): <span class="ty">string</span></code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> fromFloat32(value: <span class="ty">float32</span>): <span class="ty">string</span> = <span class="str">"lyr_str_from_float32"</span></code></pre>
 <p>Returns the shortest decimal text that reads back as the same <code>float32</code>.</p>
 <p>The text is the <code>float32</code>'s own: <code>0.1</code>, not the <code>0.10000000149011612</code> of the <code>float</code> it
 widens to.</p>
 </section>
 <section class="member" id="fn.fromChar">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fromChar(value: <span class="ty">char</span>): <span class="ty">string</span></code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> fromChar(value: <span class="ty">char</span>): <span class="ty">string</span> = <span class="str">"lyr_str_from_char"</span></code></pre>
 <p>Returns the character as a one-character string.</p>
 </section>
 <section class="member" id="fn.fromBool">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fromBool(value: <span class="ty">bool</span>): <span class="ty">string</span></code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> fromBool(value: <span class="ty">bool</span>): <span class="ty">string</span> = <span class="str">"lyr_str_from_bool"</span></code></pre>
 <p>Returns <code>true</code> or <code>false</code>.</p>
 </section>
 <h2 id="constants">Constants</h2>

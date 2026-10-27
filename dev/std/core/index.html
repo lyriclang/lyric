@@ -322,7 +322,7 @@ nobody
 <div class="listed"><a href="../../std/core/MemberInfo/">MemberInfo</a> <span class="kind">struct</span> <span class="summary">— Describes a member of a type's own body.</span></div>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.panic">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> panic(message: <span class="ty">string</span>): <span class="ty">never</span></code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> panic(message: <span class="ty">string</span>): <span class="ty">never</span> = <span class="str">"lyr_panic_message"</span></code></pre>
 <p>Ends the process with a message and a backtrace.</p>
 <p>The report is <code>LYR-RT0008</code> and the exit code 101. Its type is <code>never</code>, so a call stands
 wherever a value is wanted and ends the path it is on.</p>
@@ -341,13 +341,13 @@ built only when the assertion fails.</p>
 written, then the message where one is given.</p>
 </section>
 <section class="member" id="fn.unreachable">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> unreachable(message: <span class="ty">string</span> = <span class="str">""</span>): <span class="ty">never</span></code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> unreachable(message: <span class="ty">string</span> = <span class="str">""</span>): <span class="ty">never</span> = <span class="str">"lyr_panic_unreachable"</span></code></pre>
 <p>Marks a branch the program never takes.</p>
 <h4 id="panics">Panics</h4>
 <p>Always, when reached: <code>LYR-RT0012</code>, &quot;unreachable&quot; and <code>message</code> behind it where one is given.</p>
 </section>
 <section class="member" id="fn.todo">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> todo(message: <span class="ty">string</span> = <span class="str">""</span>): <span class="ty">never</span></code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> todo(message: <span class="ty">string</span> = <span class="str">""</span>): <span class="ty">never</span> = <span class="str">"lyr_panic_todo"</span></code></pre>
 <p>Marks a place still to be written.</p>
 <h4 id="panics">Panics</h4>
 <p>Always, when reached: <code>LYR-RT0013</code>, &quot;not implemented&quot; and <code>message</code> behind it where one is
