@@ -1,7 +1,7 @@
 // Each case twice: at compile time, through the IR interpreter ('comptime'), and in the binary.
 // The two texts must be the same to the byte (design/v5/spec/09 Q7; 13 M9a P2) — every value a
 // case computes goes into its text, a float by its bits as well. Expected stdout:
-//   14 cases, 0 differ
+//   15 cases, 0 differ
 import std.io { println };
 import std.core { ParseError };
 import std.math { abs, ceil, floor, round, sqrt, trunc };
@@ -247,6 +247,14 @@ fn unicode(): string {
     return out + "\u{3000}  wide\u{2003}".trim().toString();
 }
 
+// bytes to text through std's slice wrappers, which hand the runtime an address and a length
+fn utf8(): string {
+    let bytes: uint8[] = [104, 195, 169, 0xFF, 0xE2, 0x82, 0xAC];
+    let strict = (try? string.fromUtf8(bytes[0..3])) ?? "bad";
+    let refused = (try? string.fromUtf8(bytes[..])) ?? "bad";
+    return f"{strict} {refused} {string.fromUtf8Lossy(bytes[..])} {string.fromUtf8Lossy(bytes[4..])}";
+}
+
 fn least32(): int32 {
     let x: int32 = -2147483647;
     return x - 1;
@@ -284,6 +292,7 @@ fn main(): int {
             + f"{4294967295 as uint32} {18446744073709551615u64} {-9223372036854775807 - 1} {'é'} {1 < 2}");
     differ += alike("values", f"{comptime record():?}", f"{record():?}");
     differ += alike("unicode", comptime unicode(), unicode());
-    println(f"14 cases, {differ} differ");
+    differ += alike("utf8", comptime utf8(), utf8());
+    println(f"15 cases, {differ} differ");
     return differ;
 }

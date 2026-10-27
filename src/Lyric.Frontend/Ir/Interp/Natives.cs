@@ -130,6 +130,17 @@ public sealed class Natives(Interpreter interpreter)
 
     private static StrObj S(Value v) => (StrObj)v.Ref!;
     private static Value Str(string text) => Value.Of(StrObj.Of(text));
+
+    /// <summary>The bytes at an address: the first <paramref name="length"/> of the object it
+    /// points into. An address that is a number only — computed, or C's — names nothing here.</summary>
+    private static byte[] Addressed(Value address, Value length)
+    {
+        if (address.Ref is null)
+            throw ComptimeFailure.NotYet("memory at an address — std.ffi's — is C's, and C does not run at compile time");
+        var bytes = Bytes.Of(address);
+        return length.AsInt >= 0 && length.AsInt <= bytes.Length ? bytes[..(int)length.AsInt]
+            : throw new Lyric.Core.InternalCompilationException($"comptime: {length.AsInt} bytes at an address of {bytes.Length}");
+    }
     private static Value Str(byte[] bytes) => Value.Of(new StrObj(bytes));
     private static IrScalar K(IrType t) => t is IrScalarType s ? s.Kind : IrScalar.Void;
     private static long I(Value v) => v.AsInt;
@@ -217,6 +228,10 @@ public sealed class Natives(Interpreter interpreter)
         ["std.core.viewBytes"] = (a, _, _) => a[0],
         ["std.core.utf8Invalid"] = (a, _, _) => Value.Int(InvalidAt(Bytes.Of(a[0]))),
         ["std.core.stringOfUtf8Lossy"] = (a, _, _) => Str(Lossy(Bytes.Of(a[0]))),
+        // std's wrappers hand the runtime a slice as its address and its length
+        ["std.core.utf8InvalidRaw"] = (a, _, _) => Value.Int(InvalidAt(Addressed(a[0], a[1]))),
+        ["std.core.stringOfSliceRaw"] = (a, _, _) => Str(Addressed(a[0], a[1])),
+        ["std.core.stringOfUtf8LossyRaw"] = (a, _, _) => Str(Lossy(Addressed(a[0], a[1]))),
 
         // --- byte arrays (string.c)
         ["std.core.putBytes"] = (a, _, _) =>
