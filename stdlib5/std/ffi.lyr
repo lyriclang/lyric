@@ -61,6 +61,42 @@ pub struct Ptr<T> {
     }
 }
 
+/// A Lyric closure C calls, with its state: C's `void *userdata` beside a function pointer.
+///
+/// `C` is the C function's type as C calls it, `extern "C" fn(…) -> T`; its first or its last
+/// parameter is the `Ptr<void>` that C hands back, and the closure takes the others —
+/// `Callback<extern "C" fn(Ptr<void>, int) -> void>.new((event) => { seen += event; })`, handed
+/// to C as `on_event(cb.function, cb.userdata)`.
+///
+/// The closure stays alive until [Callback.release] — C may call it as long — and C calls it on
+/// the thread Lyric runs on, as any function C calls.
+pub class Callback<C> {
+    /// The pointer C calls: it finds the closure through [Callback.userdata].
+    pub function: C,
+    /// What C hands back to [Callback.function]: the closure's handle.
+    pub userdata: Ptr<void>,
+    root: uint,
+    var released: bool = false,
+
+    /// Returns the callback for the closure it is given, a function of the parameters of `C` but
+    /// its userdata. The compiler writes the function C calls; this body never runs.
+    pub static fn new(_closure: C): Callback<C> {
+        unreachable("std.ffi's Callback.new is the compiler's");
+    }
+
+    /// Lets the closure go: after it C must not call [Callback.function] again.
+    ///
+    /// # Panics
+    /// Where the callback was released already.
+    pub mut fn release(): void {
+        if (this.released) {
+            panic("a Callback released twice: C may still hold it, and the closure is gone");
+        }
+        this.released = true;
+        lyr_ffi_closure_release(this.root);
+    }
+}
+
 /// Returns `count` values of `T` from C's heap, each set to zero — what C's `calloc` gives, to
 /// be given back with [free]. Unsafe: nothing frees it but the program.
 ///
@@ -160,3 +196,4 @@ extern "C" fn lyr_ffi_cstr_string(address: uint): string;
 extern "C" fn lyr_ffi_string_address(s: string): uint;
 extern "C" fn lyr_ffi_alloc(count: int, size: uint): uint;
 extern "C" fn lyr_ffi_free(address: uint): void;
+extern "C" fn lyr_ffi_closure_release(root: uint): void;

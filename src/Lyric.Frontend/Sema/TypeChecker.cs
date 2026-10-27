@@ -876,7 +876,7 @@ public sealed class TypeChecker
                 return null;
             case NamedRef r when IsFfiType(r.Symbol, "CStr"):
                 return null;
-            case Optional { Inner: var inner } when IsFfiPointer(inner):
+            case Optional { Inner: var inner } when IsFfiPointer(inner) || inner is FnType { IsC: true }:
                 return site == CSite.Field
                     ? "an optional pointer is wider than a pointer in a struct; a field of C's that may be null is a 'Ptr' C never leaves null, or the struct holds an integer"
                     : null;
@@ -3203,6 +3203,43 @@ public sealed class TypeChecker
     /// <summary>How many <c>unsafe { … }</c> blocks enclose what is checked: within one,
     /// <c>std.ffi</c>'s memory operations may be called.</summary>
     private int _unsafeDepth;
+
+    /// <summary>
+    /// <c>Callback&lt;C&gt;.new(closure)</c>: <c>C</c> is a C function's type whose first or last
+    /// parameter is the <c>Ptr&lt;void&gt;</c> C hands back; the closure is a Lyric function of the
+    /// others, which throws nothing. The type it takes, and where the userdata stands for the
+    /// lowering; <c>null</c> for any other call, and where <c>C</c> is refused.
+    /// </summary>
+    private FnType? CallbackClosureType(FnType fn, FunctionDecl? decl, CallExpr call)
+    {
+        if (decl is null || _comp.FindModule(["std", "ffi"])?.Members.LookupLocal("Callback") is not TypeSymbol callback
+            || !ReferenceEquals(callback.Members.LookupLocal("new")?.Declaration, decl)
+            || fn.Return is not GenericInstance { Arguments: [var c] } || c.IsError || MentionsTypeParam(c))
+            return null;
+        if (c is not FnType { IsC: true } cFunction)
+        {
+            _de.Report("LYR-SEM0099", Severity.Error, call.Span,
+                $"a Callback's type is the C function's, 'extern \"C\" fn(…)', not '{TypeFacts.Display(c)}'");
+            return null;
+        }
+        bool IsUserdata(LyrType t) => t is GenericInstance { Arguments: [PrimitiveType { Kind: PrimitiveKind.Void }] } p
+                                      && IsFfiType(p.Definition, "Ptr");
+        var parameters = cFunction.Parameters;
+        var first = parameters.Length > 0 && IsUserdata(parameters[0]);
+        var last = parameters.Length > 1 && IsUserdata(parameters[^1]);
+        if (first == last)
+        {
+            _de.Report("LYR-SEM0099", Severity.Error, call.Span,
+                first
+                    ? $"'{TypeFacts.Display(c)}' has a 'Ptr<void>' first and last — the userdata is one of them: "
+                      + "type the other as what it points at"
+                    : $"'{TypeFacts.Display(c)}' has no userdata — its first or last parameter is the 'Ptr<void>' C hands back");
+            return null;
+        }
+        var at = first ? 0 : parameters.Length - 1;
+        _result.SetCallbackUserdata(call, at);
+        return new FnType([.. parameters.Where((_, i) => i != at)], cFunction.Return);
+    }
 
     /// <summary>
     /// <c>std.ffi</c>'s memory operations — a pointer's <c>read</c>, <c>write</c>,
@@ -7592,6 +7629,8 @@ public sealed class TypeChecker
         // In parameter order, a named argument where its name says; a hole is a parameter
         // the call leaves to its default.
         var args = ArrangeArguments(call, decl);
+        // std.ffi's 'Callback<C>.new(closure)': the closure takes C's parameters but its userdata
+        if (CallbackClosureType(fn, decl, call) is { } closureType) fn = fn with { Parameters = [closureType] };
         _callees.Add(call.Callee);
         if (_currentModule is { } asker && IsMetaQuery(fsym)) _result.SetMetaFrom(call, asker);
         if (IsMetaQuery(fsym) && fsym!.Name is "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute") _metaAttributeCalls.Add(call);

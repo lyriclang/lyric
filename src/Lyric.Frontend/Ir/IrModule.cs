@@ -126,6 +126,9 @@ public enum IrCKind
     /// <summary><c>?CStr</c>: a C string, null for <c>none</c>.</summary>
     OptionalCString,
 
+    /// <summary><c>?extern "C" fn(…)</c>: a C function's pointer, null for <c>none</c>.</summary>
+    OptionalFunction,
+
     /// <summary>An enum with <c>@Layout</c>: the integer of its variant.</summary>
     Enum,
 }

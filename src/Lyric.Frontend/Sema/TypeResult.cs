@@ -93,6 +93,13 @@ public sealed class TypeResult
     public bool IsCCallback(Expr source) => _cCallbacks.Contains(source);
     internal void MarkCCallback(Expr source) => _cCallbacks.Add(source);
 
+    private readonly Dictionary<CallExpr, int> _callbackUserdata = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary><c>Callback&lt;C&gt;.new(closure)</c>: which of <c>C</c>'s parameters is the
+    /// userdata — its first or its last —, or <c>null</c> for any other call.</summary>
+    public int? CallbackUserdataOf(CallExpr call) => _callbackUserdata.TryGetValue(call, out var at) ? at : null;
+    internal void SetCallbackUserdata(CallExpr call, int at) => _callbackUserdata[call] = at;
+
     /// <summary>The parameter whose argument's text <paramref name="parameter"/> takes, or
     /// <c>null</c> where no <c>@callerExpr</c> sits on it.</summary>
     public string? CallerExprOf(Param parameter) => _callerExpr.GetValueOrDefault(parameter);

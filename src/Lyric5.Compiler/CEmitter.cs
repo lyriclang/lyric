@@ -787,6 +787,13 @@ public sealed class CEmitter
             prototypes.AppendLine("/* trampolines: a Lyric function as C calls it */");
             foreach (var callback in callbacks) prototypes.AppendLine(Trampoline(callback));
         }
+        var closures = ScopeOps().OfType<CClosureCallback>().DistinctBy(ClosureTrampolineName).ToList();
+        if (closures.Count > 0)
+        {
+            prototypes.AppendLine();
+            prototypes.AppendLine("/* trampolines: a Lyric closure as C calls it, found through its userdata */");
+            foreach (var callback in closures) prototypes.AppendLine(ClosureTrampoline(callback));
+        }
 
         // A coroutine starts from an environment — the arguments it was called with and the
         // place its body leaves the result, on the heap, where the coroutine keeps it alive — and
@@ -1858,6 +1865,8 @@ public sealed class CEmitter
         CallImport call when Intrinsics.IsForeign(_module.Imports[call.Target.Value].Name) => ForeignCall(call),
         CCallback cb => $"{Temp(cb.Dest)} = (uint64_t)(uintptr_t)&{TrampolineName(_module.Functions[cb.Function.Value])};",
         CallCPointer cp => CPointerCall(cp),
+        RootClosure r => $"{Temp(r.Dest)} = lyr_ffi_closure_root((void *){Temp(r.Closure)}.fn, {Temp(r.Closure)}.env);",
+        CClosureCallback c => $"{Temp(c.Dest)} = (uint64_t)(uintptr_t)&{ClosureTrampolineName(c)};",
         CallImport call => Assign(call.Dest, Intrinsics.Call(_module.Imports[call.Target.Value].Name, call.Args.Select(Value).ToArray())),
         NewObject { Result: IrRefType r } n => $"{Temp(n.Dest)} = ({CType(r)})lyr_alloc(&{DescriptorName(r.Type)});",
         NewObject n => $"{Storage(n.Dest)} = ({CType(n.Result)}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
@@ -2021,7 +2030,7 @@ public sealed class CEmitter
     /// <c>std.ffi</c>'s, an enum's integer, C's <c>bool</c>, the rest as Lyric holds it.</summary>
     private string CAbiType(IrType type, IrCForm? form) => form?.Kind switch
     {
-        IrCKind.Pointer or IrCKind.OptionalPointer => "void *",
+        IrCKind.Pointer or IrCKind.OptionalPointer or IrCKind.OptionalFunction => "void *",
         IrCKind.CString or IrCKind.OptionalCString => "const char *",
         IrCKind.Enum => form.Integer!,
         _ when type is IrScalarType { Kind: IrScalar.Bool } => "bool",
@@ -2072,6 +2081,7 @@ public sealed class CEmitter
             IrCKind.CString => $"(const char *)(uintptr_t)({value}).{address}",
             IrCKind.OptionalPointer => $"(({value}).has ? (void *)(uintptr_t)({value}).value.{address} : NULL)",
             IrCKind.OptionalCString => $"(({value}).has ? (const char *)(uintptr_t)({value}).value.{address} : NULL)",
+            IrCKind.OptionalFunction => $"(({value}).has ? (void *)(uintptr_t)({value}).value : NULL)",
             IrCKind.Enum => $"({form.Integer})({value}).tag",
             _ => value,
         };
@@ -2088,6 +2098,7 @@ public sealed class CEmitter
             IrCKind.Pointer or IrCKind.CString => $"({CType(type)}){{ .{address} = (uint64_t)(uintptr_t){c} }}",
             IrCKind.OptionalPointer or IrCKind.OptionalCString =>
                 $"({CType(type)}){{ .value = {{ .{address} = (uint64_t)(uintptr_t){c} }}, .has = {c} != NULL }}",
+            IrCKind.OptionalFunction => $"({CType(type)}){{ .value = (uint64_t)(uintptr_t){c}, .has = {c} != NULL }}",
             IrCKind.Enum => $"({CType(type)}){{ .tag = lyr_ffi_enum_tag((int64_t){c}, {form.Variants}, \"{form.EnumName}\") }}",
             _ => c,
         };
@@ -2108,6 +2119,7 @@ public sealed class CEmitter
                 $"{{ const void *lyr_r = {c}; {Storage(dest)} = ({type}){{ .value = {{ .{address} = (uint64_t)(uintptr_t)lyr_r }}, "
                 + $".has = lyr_r != NULL }}; }} {Temp(dest)} = &{Storage(dest)};",
             IrCKind.Enum => $"{Storage(dest)} = {ComingIn(c, TypeOf(dest), form)}; {Temp(dest)} = &{Storage(dest)};",
+            IrCKind.OptionalFunction => $"{{ void *lyr_r = (void *){c}; {Assign(dest, ComingIn("lyr_r", TypeOf(dest), form))} }}",
             _ => Assign(dest, c),
         };
     }
@@ -2144,6 +2156,26 @@ public sealed class CEmitter
     }
 
     private string TrampolineName(IrFunction target) => "lyr_cb_" + FunctionName(target.Name)[4..];
+
+    /// <summary>The trampoline of a <c>Callback</c>: one per closure type and userdata place.</summary>
+    private string ClosureTrampolineName(CClosureCallback c) => $"lyr_cbc_{Mangle(c.Closure)}_{c.Userdata}";
+
+    /// <summary>The trampoline C calls for a <c>Callback</c>: the closure out of the userdata, C's
+    /// values into Lyric's, the call through the closure's code with its environment, the result back
+    /// — between the marks that count C's frames, as a function's trampoline.</summary>
+    private string ClosureTrampoline(CClosureCallback c)
+    {
+        var signature = string.Join(", ", c.ParamTypes.Select((t, i) => $"{CAbiType(t, c.Params[i])} lyr_a{i}"));
+        var arguments = c.ParamTypes.Select((t, i) => (t, i)).Where(p => p.i != c.Userdata)
+            .Select(p => ComingIn($"lyr_a{p.i}", p.t, c.Params[p.i]));
+        var closure = $"(({CType(c.Closure)}){{ ({CodePointer(c.Closure, "")})lyr_c->code, lyr_c->env }})";
+        var call = $"{closure}.fn({closure}.env{string.Concat(arguments.Select(a => ", " + a))}, NULL)";
+        var head = $"lyr_ffi_callback_enter(); LyrFfiClosure *lyr_c = lyr_ffi_closure_of((void *)lyr_a{c.Userdata});";
+        var body = IsVoid(c.ReturnType)
+            ? $"{head} {call}; lyr_ffi_callback_leave();"
+            : $"{head} {CType(c.ReturnType)} lyr_r = {call}; lyr_ffi_callback_leave(); return {CrossingOut("lyr_r", c.Return)};";
+        return $"static {CAbiType(c.ReturnType, c.Return)} {ClosureTrampolineName(c)}({signature}) {{ {body} }}";
+    }
 
     private string Arguments(IrFunction callee, TempId[] args) =>
         string.Join(", ", args.Select((arg, i) => callee.ReceiverByRef && i == 0 ? Temp(arg) : Value(arg)));

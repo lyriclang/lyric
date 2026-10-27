@@ -490,6 +490,124 @@ public class NativeTests
         Assert.Contains(why, error);
     }
 
+    private const string ClosureC = """
+        #include <stdint.h>
+        #include <stddef.h>
+
+        static void (*handler)(void *, int64_t);
+        static void *handler_data;
+        void on_event(void (*f)(void *, int64_t), void *userdata) { handler = f; handler_data = userdata; }
+        void fire(int64_t event) { handler(handler_data, event); }
+
+        void sort_with(int64_t *xs, int64_t n, int32_t (*cmp)(const int64_t *, const int64_t *, void *), void *userdata) {
+            for (int64_t i = 1; i < n; i++)
+                for (int64_t j = i; j > 0 && cmp(&xs[j - 1], &xs[j], userdata) > 0; j--) {
+                    int64_t t = xs[j]; xs[j] = xs[j - 1]; xs[j - 1] = t;
+                }
+        }
+
+        static int64_t (*hook)(int64_t);
+        void set_hook(int64_t (*h)(int64_t)) { hook = h; }
+        int64_t run_hook(int64_t x) { return hook != NULL ? hook(x) : -1; }
+        int64_t (*get_hook(void))(int64_t) { return hook; }
+
+        """;
+
+    private static string Closures(string body) => Package(
+        ("lyric.toml", AppManifest + "\n[native]\nsources = [\"native/*.c\"]\n"),
+        ("native/closure.c", ClosureC),
+        ("src/main.lyr", """
+            import std.io { println };
+            import std.ffi { Ptr, Callback };
+
+            extern "C" {
+                fn on_event(handler: extern "C" fn(Ptr<void>, int) -> void, userdata: Ptr<void>): void;
+                fn fire(event: int): void;
+                fn sort_with(xs: Ptr<int>, n: int, cmp: extern "C" fn(Ptr<int>, Ptr<int>, Ptr<void>) -> int32, userdata: Ptr<void>): void;
+                fn set_hook(h: ?extern "C" fn(int) -> int): void;
+                fn run_hook(x: int): int;
+                fn get_hook(): ?extern "C" fn(int) -> int;
+            }
+
+            fn double(x: int): int {
+                return x * 2;
+            }
+
+            fn main(): void {
+
+            """ + body + "}\n"));
+
+    /// <summary>A closure C calls with its state: the userdata first and last, the state shared with
+    /// the code around it; a C function's pointer that may be null, both ways.</summary>
+    [Fact]
+    public void C_calls_a_closure_through_its_userdata()
+    {
+        var dir = Closures("""
+                var seen = 0;
+                let cb = Callback<extern "C" fn(Ptr<void>, int) -> void>.new((event) => {
+                    seen += event;
+                });
+                on_event(cb.function, cb.userdata);
+                fire(3);
+                fire(4);
+                cb.release();
+                let descending = true;
+                let cmp = Callback<extern "C" fn(Ptr<int>, Ptr<int>, Ptr<void>) -> int32>.new((a, b) => {
+                    var order: int32 = 0;
+                    unsafe {
+                        let x = a.read();
+                        let y = b.read();
+                        order = if (x < y) -1 else if (x > y) 1 else 0;
+                    }
+                    return if (descending) -order else order;
+                });
+                let xs = [5, 3, 8, 1, 2];
+                sort_with(xs.asPtr(), 5, cmp.function, cmp.userdata);
+                cmp.release();
+                println(f"{seen} {xs[0]} {xs[1]} {xs[2]} {xs[3]} {xs[4]}");
+                set_hook(null);
+                println(f"{run_hook(5)} {get_hook() == null}");
+                set_hook(double);
+                println(f"{run_hook(5)} {get_hook() == null}");
+
+            """);
+        Assert.Equal("7 8 5 3 2 1\n-1 true\n10 false\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    [Fact]
+    public void A_callback_released_twice_panics()
+    {
+        var dir = Closures("""
+                let cb = Callback<extern "C" fn(Ptr<void>, int) -> void>.new((event) => { });
+                cb.release();
+                cb.release();
+                println("never");
+
+            """);
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.True(exit == 0, error);
+        var host = Lyric5.Toolchain.Target.Host;
+        var ran = Lyric5.Toolchain.ProcessRunner.Run(Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix),
+            [], TimeSpan.FromMinutes(1));
+        Assert.Equal(101, ran.ExitCode);
+        Assert.Contains("panic [LYR-RT0008]: a Callback released twice", ran.Stderr);
+    }
+
+    [Theory]
+    [InlineData("let cb = Callback<int>.new(1);", "LYR-SEM0099", "a Callback's type is the C function's, 'extern \"C\" fn(…)', not 'int'")]
+    [InlineData("let cb = Callback<extern \"C\" fn(int) -> void>.new((x) => { });", "LYR-SEM0099", "has no userdata")]
+    [InlineData("let cb = Callback<extern \"C\" fn(Ptr<void>, Ptr<void>) -> void>.new((x) => { });", "LYR-SEM0099",
+        "has a 'Ptr<void>' first and last")]
+    [InlineData("let cb = Callback<extern \"C\" fn(Ptr<void>, int) -> void>.new((x, y) => { });", "LYR-SEM", "")]
+    public void A_callback_is_checked(string line, string code, string why)
+    {
+        var dir = Closures("    " + line + "\n");
+        var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
+        Assert.Equal(1, exit);
+        Assert.Contains($"error[{code}", error);
+        Assert.Contains(why, error);
+    }
+
     [Theory]
     [InlineData("[native]\nsources = \"native/a.c\"\n", "LYR-PKG0002", "'sources' of [native] is an array of patterns")]
     [InlineData("[native]\ninclude = [\"native/*\"]\n", "LYR-PKG0002", "'native/*' in 'include' of [native] is no directory of the package")]
