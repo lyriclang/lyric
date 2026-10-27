@@ -4087,6 +4087,21 @@ $ ./out/debug/x86_64-linux-gnu/app
 panic [LYR-RT0022]: C called a Lyric function on a thread Lyric does not run
 '''
 
+[LYR-RT0023]
+title = "a GcHandle that holds another class's object"
+severity = "panic"
+area = "13-abi"
+summary = "A GcHandle made again from C's pointer with `GcHandle<T>.from` was read, and the object its root holds is of another class than `T`, or the root holds none."
+explanation = '''
+`GcHandle.from` turns the pointer C kept back into a handle; the type it is read as is the program's word, in an `unsafe` block. Reading checks that word against the object: a handle of one class read as another's stops the program rather than hand out an object of the wrong layout.
+
+Read the handle as the class it was pinned with — the pointer C hands back is the one `asPtr()` of that handle gave.
+'''
+example = '''
+$ ./out/debug/x86_64-linux-gnu/app
+panic [LYR-RT0023]: a GcHandle of app.main.Counter read as a handle of app.main.Other
+'''
+
 [LYR-SEM0001]
 title = "a value of another type than the place takes"
 severity = "error"
@@ -6655,7 +6670,7 @@ fn main(): void {
 title = "an extern declaration that cannot cross into C"
 severity = "error"
 area = "13-abi"
-summary = "An `extern` function names an ABI other than \"C\", a symbol that is no C name, type parameters, `throws`, a place parameter, or a parameter or return type that does not cross into C; a bare `...` with no parameter before it, or a variadic argument of a type that does not cross; a C function type, `extern \"C\" fn(…)`, whose parameters or result do not cross, that throws, or that names another ABI; a `Callback` whose type is no C function's, or has no userdata `Ptr<void>` as its first or last parameter; or `@Layout` stands where C cannot lay the type out, or in another form than `@Layout(C)` or an integer type."
+summary = "An `extern` function names an ABI other than \"C\", a symbol that is no C name, type parameters, `throws`, a place parameter, or a parameter or return type that does not cross into C; a bare `...` with no parameter before it, or a variadic argument of a type that does not cross; a C function type, `extern \"C\" fn(…)`, whose parameters or result do not cross, that throws, or that names another ABI; a `Callback` whose type is no C function's, or has no userdata `Ptr<void>` as its first or last parameter; a `GcHandle` of a value that is no object of a class; or `@Layout` stands where C cannot lay the type out, or in another form than `@Layout(C)` or an integer type."
 explanation = '''
 Lyric 5's one foreign boundary is C. Integers, floats, `bool` and `char` cross it (and `void` as a return); `std.ffi`'s `Ptr<T>` and `CStr` cross as C's pointers, `?Ptr<T>` and `?CStr` as pointers that may be null; a struct with `@Layout(C)` crosses as C's struct, by value, and an enum with `@Layout` as its integer. A `string` argument crosses into a `CStr` parameter as its bytes. Classes, arrays, other optionals, places, generics and thrown errors do not, so a declaration nobody could bind is refused where it stands, whether or not it is called.
 
@@ -10995,7 +11010,7 @@ fn main(): void {
 title = "a memory operation outside an unsafe block"
 severity = "error"
 area = "13-abi"
-summary = "A pointer's `read`, `write`, `offset` or `cast`, or `std.ffi`'s `alloc` or `free`, is called outside an `unsafe { … }` block."
+summary = "A pointer's `read`, `write`, `offset` or `cast`, `std.ffi`'s `alloc` or `free`, or `GcHandle.from`, is called outside an `unsafe { … }` block."
 explanation = '''
 These operations hold to what the compiler cannot see: that memory is there, that it holds a value of the type, that nothing else frees it. The `unsafe` block is where the program says it holds to that, and the one place a reader looks for it. Calling a C function is not unsafe, and neither is an array's `asPtr()`; what reads and writes through the pointer is.
 

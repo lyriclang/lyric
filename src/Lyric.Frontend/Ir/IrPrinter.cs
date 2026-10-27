@@ -222,6 +222,8 @@ public static class IrPrinter
         SizeOf s => $"{s.Dest}: u64 = sizeof {TypeStr(s.Type)}",
         CCallback c => $"{c.Dest}: u64 = ccallback fn#{c.Function.Value}",
         RootClosure r => $"{r.Dest}: u64 = rootclosure {r.Closure}",
+        RootObject r => $"{r.Dest}: u64 = rootobject {r.Value}",
+        RootedObject r => $"{r.Dest}: {TypeStr(r.Type)} = rootedobject {r.Root}",
         CClosureCallback c => $"{c.Dest}: u64 = cclosurecallback {TypeStr(c.Closure)} userdata#{c.Userdata}",
         CallCPointer c => (c.Dest is { } d ? $"{d}: {TypeStr(c.ReturnType)} = " : "")
                           + $"callc {c.Callee}({string.Join(", ", c.Args)})",

@@ -66,4 +66,9 @@ static inline LyrFfiClosure *lyr_ffi_closure_of(void *userdata) {
 }
 void lyr_ffi_closure_release(uint64_t root);
 
+/* std.ffi.GcHandle: the object a root holds, which must be of the class `desc` — a handle made
+ * again from C's pointer (GcHandle.from) may be another class's: a panic (LYR-RT0023). A root
+ * released is gone with its memory; reading it is the unsafe block's word, not this check's. */
+void *lyr_ffi_rooted(uint64_t root, const LyrDesc *desc);
+
 #endif

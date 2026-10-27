@@ -830,6 +830,16 @@ public static class IrVerifier
                         Report(block, index, $"ccallback gives {N(c.Params.Length)} form(s) for the parameters of fn#{c.Function.Value}");
                     RequireDestType(c.Dest, new IrScalarType(IrScalar.U64), "ccallback", block, index);
                     break;
+                case RootObject r:
+                    if (TypeOf(r.Value) is not IrRefType)
+                        Report(block, index, $"rootobject {r.Value} is {Show(TypeOf(r.Value))}, expected an object");
+                    RequireDestType(r.Dest, new IrScalarType(IrScalar.U64), "rootobject", block, index);
+                    break;
+                case RootedObject r:
+                    if (!IrType.Equal(TypeOf(r.Root), new IrScalarType(IrScalar.U64)))
+                        Report(block, index, $"rootedobject {r.Root} is {Show(TypeOf(r.Root))}, expected a root, u64");
+                    RequireDestType(r.Dest, r.Type, "rootedobject", block, index);
+                    break;
                 case RootClosure r:
                     if (TypeOf(r.Closure) is not IrFunctionType)
                         Report(block, index, $"rootclosure {r.Closure} is {Show(TypeOf(r.Closure))}, expected a function value");

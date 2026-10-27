@@ -3256,6 +3256,14 @@ public sealed class TypeChecker
             if (ReferenceEquals(ptr?.Members.LookupLocal(name)?.Declaration, decl)) operation = $"Ptr.{name}";
         foreach (var name in (string[])["alloc", "free"])
             if (ReferenceEquals(ffi.LookupLocal(name)?.Declaration, decl)) operation = name;
+        var handle = ffi.LookupLocal("GcHandle") as TypeSymbol;
+        if (ReferenceEquals(handle?.Members.LookupLocal("from")?.Declaration, decl)) operation = "GcHandle.from";
+        // a handle holds an object: what the collector keeps by a root
+        if (ReferenceEquals(handle?.Members.LookupLocal("pin")?.Declaration, decl)
+            && fn.Parameters is [{ IsError: false } held] && !MentionsTypeParam(held)
+            && held is not (NamedRef { Symbol.Kind: TypeSymbolKind.Class } or GenericInstance { Definition.Kind: TypeSymbolKind.Class }))
+            _de.Report("LYR-SEM0099", Severity.Error, call.Span,
+                $"a GcHandle holds an object of a class, which the collector keeps by its handle — not a '{TypeFacts.Display(held)}'");
         if (operation is null) return;
         if (_unsafeDepth == 0)
             _de.Report(Lyric5Code("LYR-SEM0233"), Severity.Error, call.Span,
