@@ -23,6 +23,8 @@
 <li><a href="../../std/ffi/Ptr/">Ptr</a></li>
 <li><a href="../../std/ffi/Callback/">Callback</a></li>
 <li><a href="../../std/ffi/CStr/">CStr</a></li>
+<li><a href="../../std/ffi/#fn.stash">stash()</a></li>
+<li><a href="../../std/ffi/#fn.takeStashed">takeStashed()</a></li>
 <li><a href="../../std/ffi/#fn.alloc">alloc()</a></li>
 <li><a href="../../std/ffi/#fn.free">free()</a></li>
 </ul>
@@ -54,6 +56,19 @@ function is not unsafe, and neither is <a href="../../std/ffi/Ptr/">Ptr</a> of a
 <div class="listed"><a href="../../std/ffi/Callback/">Callback</a> <span class="kind">class</span> <span class="summary">— A Lyric closure C calls, with its state: C's <code>void *userdata</code> beside a function pointer.</span></div>
 <div class="listed"><a href="../../std/ffi/CStr/">CStr</a> <span class="kind">struct</span> <span class="summary">— A C string: the address of bytes a NUL ends, <code>const char *</code> at a C function's boundary.</span></div>
 <h2 id="functions">Functions</h2>
+<section class="member" id="fn.stash">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> stash(e: <span class="ty">Error</span>): <span class="ty">void</span></code></pre>
+<p>Keeps <code>e</code> for the code around the C call that called this function: a function C calls
+throws nothing, since C would not know what to do with it, and this is how its error crosses.
+The code that called C takes it with <a href="../../std/ffi/#fn.takeStashed">takeStashed</a> when C returns.</p>
+<p>One error waits at a time, the running task's: a second, before the first is taken, is
+dropped — the first went wrong first.</p>
+</section>
+<section class="member" id="fn.takeStashed">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> takeStashed(): ?<span class="ty">Error</span></code></pre>
+<p>Returns the error a function C called kept with <a href="../../std/ffi/#fn.stash">stash</a>, and forgets it; <code>null</code> where none
+waits.</p>
+</section>
 <section class="member" id="fn.alloc">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> alloc&lt;<span class="ty">T</span>&gt;(count: <span class="ty">int</span>): <span class="ty">Ptr</span>&lt;<span class="ty">T</span>&gt;</code></pre>
 <p>Returns <code>count</code> values of <code>T</code> from C's heap, each set to zero — what C's <code>calloc</code> gives, to
@@ -91,6 +106,8 @@ the slice is empty.</p>
 <ul>
 <li class="level-2"><a href="#types">Types</a></li>
 <li class="level-2"><a href="#functions">Functions</a></li>
+<li class="level-3"><a href="#fn.stash">stash</a></li>
+<li class="level-3"><a href="#fn.takeStashed">takeStashed</a></li>
 <li class="level-3"><a href="#fn.alloc">alloc</a></li>
 <li class="level-3"><a href="#fn.free">free</a></li>
 <li class="level-2"><a href="#extensions">Extensions</a></li>

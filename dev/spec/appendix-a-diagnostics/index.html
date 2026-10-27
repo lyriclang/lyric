@@ -2845,7 +2845,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>P</td>
 <td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
 <td>a coroutine misused</td>
-<td>A coroutine is used against its rules: a <code>yield</code> where no coroutine runs, or in a task outside every generator; a coroutine resumed while it runs, after it ended, or on another thread; a coroutine closed while it runs or is parked; a yield of another type than the running generator's.</td>
+<td>A coroutine is used against its rules: a <code>yield</code> where no coroutine runs, or in a task outside every generator; a coroutine resumed while it runs, after it ended, or on another thread; a coroutine closed while it runs or is parked, or with C frames on its stack — a callback that yielded in it; a yield of another type than the running generator's.</td>
 </tr>
 <tr>
 <td>LYR-RT0015</td>

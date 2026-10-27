@@ -228,7 +228,7 @@ with the line <code>panic while panicking [CODE]: message</code>, still with 101
 </tr>
 <tr>
 <td><code>LYR-RT0014</code></td>
-<td>a coroutine resumed while it runs, after its body returned or on a thread other than its own; a yield or a park with no coroutine running; a yield of another type than the running coroutine yields (<a href="../../spec/10-concurrency/">10 §1.13</a>), or in a task where no generator runs; a yield while the coroutine is being closed; a close of one that runs or is parked (§1.6)</td>
+<td>a close of a coroutine with C frames on its stack (§1.6 rule 6); a coroutine resumed while it runs, after its body returned or on a thread other than its own; a yield or a park with no coroutine running; a yield of another type than the running coroutine yields (<a href="../../spec/10-concurrency/">10 §1.13</a>), or in a task where no generator runs; a yield while the coroutine is being closed; a close of one that runs or is parked (§1.6)</td>
 </tr>
 <tr>
 <td><code>LYR-RT0015</code></td>
@@ -316,7 +316,10 @@ whose body returned, or one that runs on another thread, and yielding where no c
 is a panic (<code>LYR-RT0014</code>).</li>
 <li>C frames may lie on a coroutine's stack between a resume and a yield — a callback from C that
 yields (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 K4</a>).
-The runtime counts them for each coroutine: a stack with C frames on it cannot be unwound.</li>
+The runtime counts them for each coroutine: a stack with C frames on it cannot be unwound.
+Closing such a coroutine is a panic (<code>LYR-RT0014</code>); one that nothing references any more is not
+collected — its stack stays, as C may still point into it, and the runtime says so once on the
+error output — and nothing on it runs again.</li>
 <li>A <strong>park</strong> stops the coroutine that runs where it stands and hands control back to the thread's
 own stack — where a scheduler runs — past every coroutine between
 (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/06-nebenlaeufigkeit.md">06 N3</a>):
@@ -483,6 +486,16 @@ calls it, as a function C calls is called (rule 9) — on the thread Lyric runs 
 frames counted. <code>cb.userdata</code> is what C hands back to it.</li>
 <li>The closure lives until <code>cb.release()</code>; C must not call <code>cb.function</code> afterwards. A second
 <code>release()</code> is a panic (<code>LYR-RT0008</code>).</li>
+</ul>
+</li>
+<li><strong>Errors across C</strong>: a function C calls throws nothing (rule 9); its error crosses as
+<code>std.ffi.stash(e)</code>, which keeps <code>e</code> for the code around the C call, and <code>std.ffi.takeStashed()</code>
+there, which returns it and forgets it — <code>null</code> where none waits.
+<ul>
+<li>What is kept is the running task's own (<a href="../../spec/10-concurrency/">10 §2</a>): a callback that parked
+leaves it for its task, not for whichever runs next. Where no task runs, it is the program's.</li>
+<li>One error waits at a time: a second <code>stash</code>, before the first is taken, is dropped — the
+first went wrong first.</li>
 </ul>
 </li>
 </ol>
