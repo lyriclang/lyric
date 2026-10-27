@@ -104,3 +104,6 @@ artifacts/
 # Agent instructions (local, not part of the repository)
 # =============================================================================
 CLAUDE.md
+
+# what a C compiler leaves without -o
+a.out
