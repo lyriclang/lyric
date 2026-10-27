@@ -255,6 +255,10 @@ with the line <code>panic while panicking [CODE]: message</code>, still with 101
 <td>a C function returned, for an enum with <code>@Layout</code>, an integer no variant stands for: <code>C returned &lt;n&gt;, which is no variant of &lt;enum&gt; (it has &lt;count&gt;)</code> (§3 rule 5)</td>
 </tr>
 <tr>
+<td><code>LYR-RT0023</code></td>
+<td>a <code>GcHandle</code> read as a handle of another class than its object's, or of none (§3 rule 12)</td>
+</tr>
+<tr>
 <td><code>LYR-RT0022</code></td>
 <td>C called a Lyric function through its pointer on a thread Lyric does not run: <code>C called a Lyric function on a thread Lyric does not run</code> (§3 rule 9)</td>
 </tr>
@@ -433,7 +437,7 @@ not <code>%d</code>.)</em></li>
 <li><strong>Memory and <code>unsafe</code></strong>: <code>unsafe { … }</code> — the word contextual, a statement — is a block
 within which <code>std.ffi</code>'s memory operations may be called: a pointer's <code>read()</code>, <code>write(v)</code>,
 <code>offset(n)</code> and <code>cast&lt;U&gt;()</code>, <code>alloc&lt;T&gt;(n)</code> and <code>free(p)</code>. Called outside one, each is refused
-(<code>LYR-SEM0233</code>); the block is lexical, a lambda written within it is within it. Nothing else
+(<code>LYR-SEM0233</code>), as <code>GcHandle.from</code> is (rule 12); the block is lexical, a lambda written within it is within it. Nothing else
 about the block differs, and calling a C function is not unsafe.
 <ul>
 <li><code>read()</code> is the <code>T</code> at the pointer's address, <code>write(v)</code> puts one there; <code>T</code> is what a field
@@ -496,6 +500,19 @@ there, which returns it and forgets it — <code>null</code> where none waits.
 leaves it for its task, not for whichever runs next. Where no task runs, it is the program's.</li>
 <li>One error waits at a time: a second <code>stash</code>, before the first is taken, is dropped — the
 first went wrong first.</li>
+</ul>
+</li>
+<li><strong>Objects held for C</strong>: <code>std.ffi.GcHandle&lt;T&gt;</code> holds an object of a class for C.
+<ul>
+<li><code>GcHandle.pin(object)</code> holds it: the collector keeps it, wherever C keeps the handle, until
+<code>release()</code>; <code>T</code> is a class (<code>LYR-SEM0099</code>). <code>get()</code> is the object.</li>
+<li><code>asPtr()</code> is the <code>Ptr&lt;void&gt;</code> C keeps and hands back, the same for every handle of the object;
+<code>GcHandle&lt;T&gt;.from(pointer)</code> is a handle of it again. <code>from</code> is a memory operation of rule 8
+(<code>LYR-SEM0233</code> outside an <code>unsafe</code> block): the pointer is one <code>asPtr()</code> gave and that is not
+released. Reading a handle whose object is of another class than <code>T</code> is a panic
+(<code>LYR-RT0023</code>).</li>
+<li><code>release()</code> lets the object go; reading or releasing that handle again is a panic
+(<code>LYR-RT0008</code>). Reading another handle of a released object is undefined.</li>
 </ul>
 </li>
 </ol>

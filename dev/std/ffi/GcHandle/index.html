@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en" data-root="../../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>class GcHandle — Lyric</title>
+<link rel="stylesheet" href="../../../site.css" />
+<script src="../../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../../book/">Book</a><a class="current" href="../../../std/">std</a><a href="../../../spec/">Spec</a><a href="../../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">std.ffi</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../../std/ffi/">std.ffi</a></li>
+<li><a href="../../../std/ffi/Ptr/">Ptr</a></li>
+<li><a href="../../../std/ffi/Callback/">Callback</a></li>
+<li><a class="current" href="../../../std/ffi/GcHandle/">GcHandle</a></li>
+<li><a href="../../../std/ffi/CStr/">CStr</a></li>
+<li><a href="../../../std/ffi/#fn.stash">stash()</a></li>
+<li><a href="../../../std/ffi/#fn.takeStashed">takeStashed()</a></li>
+<li><a href="../../../std/ffi/#fn.alloc">alloc()</a></li>
+<li><a href="../../../std/ffi/#fn.free">free()</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
+<h1>class GcHandle</h1>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">GcHandle</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>An object of a class held for C: the collector keeps it while the handle does, and
+<a href="../../../std/ffi/GcHandle/#method.asPtr">GcHandle.asPtr</a> is the <code>void *</code> C keeps and hands back — the userdata of a C API that holds
+a Lyric object across its calls.</p>
+<p>A handle made again from that pointer, with <a href="../../../std/ffi/GcHandle/#method.from">GcHandle.from</a>, reads the same object; one
+<a href="../../../std/ffi/GcHandle/#method.release">GcHandle.release</a> lets it go, after which no handle of it is read again.</p>
+<h2 id="methods">Methods</h2>
+<section class="member" id="method.pin">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> pin(object: <span class="ty">T</span>): <span class="ty">GcHandle</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Returns a handle that holds <code>object</code> until <a href="../../../std/ffi/GcHandle/#method.release">GcHandle.release</a>.</p>
+</section>
+<section class="member" id="method.from">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> from(pointer: <span class="ty">Ptr</span>&lt;<span class="ty">void</span>&gt;): <span class="ty">GcHandle</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+<p>Returns the handle a pointer <a href="../../../std/ffi/GcHandle/#method.asPtr">GcHandle.asPtr</a> gave stands for. Unsafe: the pointer must be
+a handle's that is not released.</p>
+<h4 id="panics">Panics</h4>
+<p>Where it holds an object of another class than <code>T</code> — when it is read.</p>
+</section>
+<section class="member" id="method.get">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> get(): <span class="ty">T</span></code></pre>
+<p>Returns the object it holds.</p>
+<h4 id="panics">Panics</h4>
+<p>Where this handle was released.</p>
+</section>
+<section class="member" id="method.asPtr">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asPtr(): <span class="ty">Ptr</span>&lt;<span class="ty">void</span>&gt;</code></pre>
+<p>Returns the pointer C keeps for it: the same for every handle of the object.</p>
+</section>
+<section class="member" id="method.release">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> release(): <span class="ty">void</span></code></pre>
+<p>Lets the object go: the collector may take it once nothing else holds it.</p>
+<h4 id="panics">Panics</h4>
+<p>Where this handle was released already.</p>
+</section>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#methods">Methods</a></li>
+<li class="level-3"><a href="#method.pin">pin</a></li>
+<li class="level-3"><a href="#method.from">from</a></li>
+<li class="level-3"><a href="#method.get">get</a></li>
+<li class="level-3"><a href="#method.asPtr">asPtr</a></li>
+<li class="level-3"><a href="#method.release">release</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../../nav.js" defer="defer"></script>
+<script src="../../../version.js" defer="defer"></script>
+<script src="../../../search.js" defer="defer"></script>
+</body>
+</html>

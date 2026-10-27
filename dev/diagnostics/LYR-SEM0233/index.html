@@ -244,7 +244,7 @@
 <h1>LYR-SEM0233</h1>
 <p class="code-title">a memory operation outside an unsafe block</p>
 <p class="meta">error · <a href="../../spec/13-abi/">spec 13-abi</a></p>
-<p>A pointer's <code>read</code>, <code>write</code>, <code>offset</code> or <code>cast</code>, or <code>std.ffi</code>'s <code>alloc</code> or <code>free</code>, is called outside an <code>unsafe { … }</code> block.</p>
+<p>A pointer's <code>read</code>, <code>write</code>, <code>offset</code> or <code>cast</code>, <code>std.ffi</code>'s <code>alloc</code> or <code>free</code>, or <code>GcHandle.from</code>, is called outside an <code>unsafe { … }</code> block.</p>
 <h2 id="explanation">Explanation</h2>
 <p>These operations hold to what the compiler cannot see: that memory is there, that it holds a value of the type, that nothing else frees it. The <code>unsafe</code> block is where the program says it holds to that, and the one place a reader looks for it. Calling a C function is not unsafe, and neither is an array's <code>asPtr()</code>; what reads and writes through the pointer is.</p>
 <p>Put the call in an <code>unsafe { … }</code> block, as small as it can be.</p>
