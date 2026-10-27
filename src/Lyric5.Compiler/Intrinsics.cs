@@ -10,13 +10,7 @@ public static class Intrinsics
     {
         // The console's buffers (lyr/console.h): std.io's print family puts, and flushes
         // where a flush is due — on the I/O pool where a scheduler runs.
-        ["std.io.consolePut"] = "LYR_CONSOLE_PUT",
-        ["std.io.consoleFlush"] = "lyr_console_flush",
-        ["std.io.consoleRead"] = "LYR_CONSOLE_READ",
-        ["std.io.consoleGone"] = "lyr_console_gone",
         // The terminal (std.term): whether a standard stream is one, and its size.
-        ["std.term.consoleIsTerminal"] = "lyr_console_is_terminal",
-        ["std.term.consoleSize"] = "lyr_console_size",
         ["std.string.concat"] = "lyr_str_concat",
         ["std.string.fromInt"] = "lyr_str_from_int",
         ["std.string.fromUint"] = "lyr_str_from_uint",
@@ -64,30 +58,10 @@ public static class Intrinsics
         // another thread wakes; the pause of a spinning lock.
         ["std.task.startThread"] = "LYR_THREAD_START",
         // The processors, for the program's pool (std.thread's parallelMap).
-        ["std.thread.processorCount"] = "lyr_os_cpu_count",
         // The file system's calls (lyr/fs.h): one system call each, run on std.fs's I/O
         // pool; a view crosses as its pointer and length.
         // The zone database and TZ (std.time): std.fs and std.os import std.time, so it
         // reads the file and the variable through the same calls itself.
-        ["std.time.zoneFileOpen"] = "lyr_fs_open",
-        ["std.time.zoneFileRead"] = "LYR_FS_READ",
-        ["std.time.zoneFileClose"] = "lyr_fs_close",
-        ["std.time.zoneEnv"] = "LYR_OS_ENV",
-        ["std.fs.fsOpen"] = "lyr_fs_open",
-        ["std.fs.fsRead"] = "LYR_FS_READ",
-        ["std.fs.fsWrite"] = "LYR_FS_WRITE",
-        ["std.fs.fsSeek"] = "lyr_fs_seek",
-        ["std.fs.fsClose"] = "lyr_fs_close",
-        ["std.fs.fsStat"] = "LYR_FS_STAT",
-        ["std.fs.fsMakeDir"] = "lyr_fs_mkdir",
-        ["std.fs.fsRemoveDir"] = "lyr_fs_rmdir",
-        ["std.fs.fsRemove"] = "lyr_fs_unlink",
-        ["std.fs.fsRename"] = "lyr_fs_rename",
-        ["std.fs.fsDirOpen"] = "lyr_fs_dir_open",
-        ["std.fs.fsDirNext"] = "LYR_FS_DIR_NEXT",
-        ["std.fs.fsDirClose"] = "lyr_fs_dir_close",
-        ["std.fs.fsCanonical"] = "LYR_FS_CANONICAL",
-        ["std.fs.fsAbsolute"] = "LYR_FS_ABSOLUTE",
         ["std.task.currentPoller"] = "lyr_task_poller",
         ["std.task.wakePoller"] = "lyr_task_wake",
         // A descriptor's readiness on the thread's poller (lyr/task.h): std.net's waits.
@@ -96,52 +70,11 @@ public static class Intrinsics
         ["std.task.takeFromPoller"] = "LYR_TASK_TAKE",
         // The network (lyr/net.h): std.net's sockets, non-blocking, waited for on the
         // poller.
-        ["std.net.netSocket"] = "lyr_net_socket",
-        ["std.net.netBind"] = "LYR_NET_BIND",
-        ["std.net.netListen"] = "lyr_net_listen",
-        ["std.net.netAccept"] = "lyr_net_accept",
-        ["std.net.netConnect"] = "LYR_NET_CONNECT",
-        ["std.net.netConnected"] = "lyr_net_connected",
-        ["std.net.netRecv"] = "LYR_NET_RECV",
-        ["std.net.netSend"] = "LYR_NET_SEND",
-        ["std.net.netShutdown"] = "lyr_net_shutdown",
-        ["std.net.netSetNoDelay"] = "lyr_net_set_nodelay",
-        ["std.net.netName"] = "LYR_NET_NAME",
-        ["std.net.netClose"] = "lyr_net_close",
-        ["std.net.netSendTo"] = "LYR_NET_SENDTO",
-        ["std.net.netRecvFrom"] = "LYR_NET_RECVFROM",
-        ["std.net.netResolve"] = "LYR_NET_RESOLVE",
         // Processes (lyr/process.h): a child started, reaped, signalled; its pipes.
-        ["std.process.processSpawn"] = "LYR_PROCESS_SPAWN",
-        ["std.process.processAttach"] = "lyr_process_attach",
-        ["std.process.processNudge"] = "lyr_process_nudge",
-        ["std.process.processReap"] = "lyr_process_reap",
-        ["std.process.processSignal"] = "lyr_process_signal",
-        ["std.process.processRead"] = "LYR_PROCESS_READ",
-        ["std.process.processWrite"] = "LYR_PROCESS_WRITE",
-        ["std.process.processClose"] = "lyr_process_close",
         ["std.task.spin"] = "lyr_task_spin",
         // Signals as a channel: the abstract names and the system's numbers, the
         // handler on or off, the watcher's poller, the caught ones.
-        ["std.os.signalNumber"] = "lyr_signal_number",
-        ["std.os.signalKind"] = "lyr_signal_kind",
-        ["std.os.catchSignal"] = "lyr_signal_catch",
-        ["std.os.attachSignals"] = "lyr_signal_attach",
-        ["std.os.takeSignals"] = "lyr_signal_take",
         // The system (lyr/os.h): a text through the caller's buffer.
-        ["std.os.osPlatform"] = "lyr_os_platform",
-        ["std.os.osArch"] = "lyr_os_arch",
-        ["std.os.osPid"] = "lyr_os_pid",
-        ["std.os.osArgCount"] = "lyr_os_arg_count",
-        ["std.os.osArg"] = "LYR_OS_ARG",
-        ["std.os.osEnv"] = "LYR_OS_ENV",
-        ["std.os.osEnvs"] = "LYR_OS_ENVS",
-        ["std.os.osSetEnv"] = "lyr_os_set_env",
-        ["std.os.osCwd"] = "LYR_OS_CWD",
-        ["std.os.osSetCwd"] = "lyr_os_set_cwd",
-        ["std.os.osHostname"] = "LYR_OS_HOSTNAME",
-        ["std.os.osExit"] = "lyr_os_exit",
-        ["std.os.osTempRoot"] = "LYR_FS_TEMP_ROOT",
         // The atomic operations: the C11 builtins on a
         // place — a field of the scheduler's, the value of std.sync's Atomic<T> —, as macros that
         // serve every T.

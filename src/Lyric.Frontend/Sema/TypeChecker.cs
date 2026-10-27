@@ -829,7 +829,7 @@ public sealed class TypeChecker
                     $"parameter '{p.Name}' of extern '{fn.Name}' takes a place ('&'), which does not cross into C — "
                     + "what C takes by address is a 'Ptr'");
             var type = ResolveType(p.Type, module.Members);
-            if (CFault(type, CSite.Parameter) is { } fault)
+            if (CFault(type, CSite.Parameter, IsStdModule(module)) is { } fault)
                 _de.Report("LYR-SEM0099", Severity.Error, p.Type.Span,
                     $"parameter '{p.Name}' of extern '{fn.Name}' has type '{TypeFacts.Display(type)}', which does not "
                     + $"cross into C — {fault}");
@@ -837,7 +837,7 @@ public sealed class TypeChecker
         if (fn.ReturnType is { } ret)
         {
             var type = ResolveType(ret, module.Members);
-            if (CFault(type, CSite.Return) is { } fault)
+            if (CFault(type, CSite.Return, IsStdModule(module)) is { } fault)
                 _de.Report("LYR-SEM0099", Severity.Error, ret.Span,
                     $"extern '{fn.Name}' returns '{TypeFacts.Display(type)}', which does not come back from C — {fault}");
         }
@@ -856,10 +856,16 @@ public sealed class TypeChecker
     /// by value; an enum with <c>@Layout</c> as its integer, beside a struct's fields; an inline
     /// array as a field. A <c>string</c> crosses where a <c>CStr</c> parameter takes it, as its
     /// bytes.
+    /// <para>One row more for the standard library's own C functions, which are the runtime's
+    /// (<paramref name="std"/>): an object of the runtime's — a <c>string</c>, an array, an object of
+    /// a class, a coroutine, or the optional of one — crosses as the runtime's pointer to it, a
+    /// parameter or a result. The runtime is the one C that knows those objects.</para>
     /// </summary>
-    private string? CFault(LyrType type, CSite site)
+    private string? CFault(LyrType type, CSite site, bool std = false)
     {
         const string table = "integers, floats, bool, char, a 'Ptr', a 'CStr' and a '@Layout(C)' struct do";
+        if (std && site != CSite.Field && IsRuntimeObject(type is Optional { Inner: var held } ? held : type))
+            return null;
         switch (type)
         {
             case { IsError: true }:
@@ -927,6 +933,15 @@ public sealed class TypeChecker
                 $"a C function's result of type '{TypeFacts.Display(result)}' does not come back from C — {returned}");
         return new FnType(parameters, result) { IsC = true };
     }
+
+    /// <summary>A module of the standard library, whose C functions are the runtime's.</summary>
+    private static bool IsStdModule(ModuleSymbol module) => module.Path is ["std", ..];
+
+    /// <summary>An object the runtime holds and knows: a <c>string</c>, an array, an object of a
+    /// class, a coroutine — what std's C functions take and give as the runtime's pointer.</summary>
+    private static bool IsRuntimeObject(LyrType type) => type is PrimitiveType { Kind: PrimitiveKind.String }
+        or ArrayOf or CoroutineOf
+        or NamedRef { Symbol.Kind: TypeSymbolKind.Class } or GenericInstance { Definition.Kind: TypeSymbolKind.Class };
 
     /// <summary>Is this <c>std.ffi</c>'s type of this name?</summary>
     private bool IsFfiType(TypeSymbol symbol, string name) =>

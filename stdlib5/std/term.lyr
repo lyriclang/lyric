@@ -20,8 +20,8 @@
 import std.os { env };
 import std.core { StringBuilder };
 
-fn consoleIsTerminal(stream: int): int;
-fn consoleSize(stream: int): int;
+extern "C" fn consoleIsTerminal(stream: int): int = "lyr_console_is_terminal";
+extern "C" fn consoleSize(stream: int): int = "lyr_console_size";
 
 /// One of the three standard streams of the process.
 pub enum StdStream :: [Equatable, Debug] {

@@ -22,6 +22,7 @@ import std.collections { List, Map };
 import std.io { IoError, failure };
 import std.task { Channel, here, Scheduler, SpinLock };
 import std.thread { Thread, processorCount };
+import std.core { sliceAddress };
 
 /// The system and machine kinds, defined in std.core beside the build's `target`.
 pub import std.core { Platform, Arch };
@@ -221,19 +222,49 @@ fn bytesFrom(doing: string, call: fn(Slice<uint8>) -> int): (uint8[], int) throw
     }
 }
 
-fn osPlatform(): int;
-fn osArch(): int;
-fn osPid(): int;
-fn osArgCount(): int;
-fn osArg(i: int, into: Slice<uint8>): int;
-fn osEnv(name: string, into: Slice<uint8>): int;
-fn osEnvs(into: Slice<uint8>): int;
-fn osSetEnv(name: string, value: string): int;
-fn osCwd(into: Slice<uint8>): int;
-fn osSetCwd(path: string): int;
-fn osHostname(into: Slice<uint8>): int;
-fn osExit(code: int): never;
-fn osTempRoot(into: Slice<uint8>): int;
+extern "C" fn osPlatform(): int = "lyr_os_platform";
+extern "C" fn osArch(): int = "lyr_os_arch";
+extern "C" fn osPid(): int = "lyr_os_pid";
+extern "C" fn osArgCount(): int = "lyr_os_arg_count";
+
+inline fn osArg(i: int, into: Slice<uint8>): int {
+    return osArgRaw(i, sliceAddress(into), into.length());
+}
+
+extern "C" fn osArgRaw(i: int, intoAt: uint, intoLength: int): int = "lyr_os_arg";
+
+inline fn osEnv(name: string, into: Slice<uint8>): int {
+    return osEnvRaw(name, sliceAddress(into), into.length());
+}
+
+extern "C" fn osEnvRaw(name: string, intoAt: uint, intoLength: int): int = "lyr_os_env";
+
+inline fn osEnvs(into: Slice<uint8>): int {
+    return osEnvsRaw(sliceAddress(into), into.length());
+}
+
+extern "C" fn osEnvsRaw(intoAt: uint, intoLength: int): int = "lyr_os_envs";
+extern "C" fn osSetEnv(name: string, value: string): int = "lyr_os_set_env";
+
+inline fn osCwd(into: Slice<uint8>): int {
+    return osCwdRaw(sliceAddress(into), into.length());
+}
+
+extern "C" fn osCwdRaw(intoAt: uint, intoLength: int): int = "lyr_os_cwd";
+extern "C" fn osSetCwd(path: string): int = "lyr_os_set_cwd";
+
+inline fn osHostname(into: Slice<uint8>): int {
+    return osHostnameRaw(sliceAddress(into), into.length());
+}
+
+extern "C" fn osHostnameRaw(intoAt: uint, intoLength: int): int = "lyr_os_hostname";
+extern "C" fn osExit(code: int): never = "lyr_os_exit";
+
+inline fn osTempRoot(into: Slice<uint8>): int {
+    return osTempRootRaw(sliceAddress(into), into.length());
+}
+
+extern "C" fn osTempRootRaw(intoAt: uint, intoLength: int): int = "lyr_fs_temp_root";
 
 // ---------------------------------------------------------------------------------------------
 // The signals.
@@ -435,8 +466,8 @@ fn signalOf(number: int): Signal {
 /// Signals (lyr/signal.h): the system's number of an abstract signal and back — -1 where it has
 /// none —; the handler on or off — false where the runtime may not catch it —; this thread as the
 /// watcher, whose poller a caught signal wakes; the caught ones as a mask, taken.
-fn signalNumber(kind: int): int;
-fn signalKind(number: int): int;
-fn catchSignal(number: int, on: bool): bool;
-fn attachSignals(): void;
-fn takeSignals(): int;
+extern "C" fn signalNumber(kind: int): int = "lyr_signal_number";
+extern "C" fn signalKind(number: int): int = "lyr_signal_kind";
+extern "C" fn catchSignal(number: int, on: bool): bool = "lyr_signal_catch";
+extern "C" fn attachSignals(): void = "lyr_signal_attach";
+extern "C" fn takeSignals(): int = "lyr_signal_take";
