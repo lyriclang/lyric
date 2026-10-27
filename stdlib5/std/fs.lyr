@@ -37,7 +37,7 @@
 //! false
 //! ```
 import std.collections { List };
-import std.core { Utf8Error };
+import std.core { Utf8Error, sliceAddress };
 import std.crypto { randomUint64 };
 import std.io;
 import std.io {
@@ -56,21 +56,56 @@ import std.os;
 import std.path { join, normalize, parent };
 import std.time { Instant, instantOfEpochNanos };
 
-fn fsOpen(path: string, how: int): int;
-fn fsRead(file: int, into: Slice<uint8>): int;
-fn fsWrite(file: int, from: Slice<uint8>): int;
-fn fsSeek(file: int, offset: int, whence: int): int;
-fn fsClose(file: int): int;
-fn fsStat(path: string, follow: int, into: Slice<int>): int;
-fn fsMakeDir(path: string): int;
-fn fsRemoveDir(path: string): int;
-fn fsRemove(path: string): int;
-fn fsRename(from: string, to: string): int;
-fn fsDirOpen(path: string): int;
-fn fsDirNext(dir: int, into: Slice<uint8>): int;
-fn fsDirClose(dir: int): int;
-fn fsCanonical(path: string, into: Slice<uint8>): int;
-fn fsAbsolute(path: string, into: Slice<uint8>): int;
+extern "C" fn fsOpen(path: string, how: int): int = "lyr_fs_open";
+
+inline fn fsRead(file: int, into: Slice<uint8>): int {
+    return fsReadRaw(file, sliceAddress(into), into.length());
+}
+
+extern "C" fn fsReadRaw(file: int, intoAt: uint, intoLength: int): int = "lyr_fs_read";
+
+inline fn fsWrite(file: int, from: Slice<uint8>): int {
+    return fsWriteRaw(file, sliceAddress(from), from.length());
+}
+
+extern "C" fn fsWriteRaw(file: int, fromAt: uint, fromLength: int): int = "lyr_fs_write";
+extern "C" fn fsSeek(file: int, offset: int, whence: int): int = "lyr_fs_seek";
+extern "C" fn fsClose(file: int): int = "lyr_fs_close";
+
+inline fn fsStat(path: string, follow: int, into: Slice<int>): int {
+    return fsStatRaw(path, follow, sliceAddress(into), into.length());
+}
+
+extern "C" fn fsStatRaw(
+    path: string,
+    follow: int,
+    intoAt: uint,
+    intoLength: int
+): int = "lyr_fs_stat";
+extern "C" fn fsMakeDir(path: string): int = "lyr_fs_mkdir";
+extern "C" fn fsRemoveDir(path: string): int = "lyr_fs_rmdir";
+extern "C" fn fsRemove(path: string): int = "lyr_fs_unlink";
+extern "C" fn fsRename(from: string, to: string): int = "lyr_fs_rename";
+extern "C" fn fsDirOpen(path: string): int = "lyr_fs_dir_open";
+
+inline fn fsDirNext(dir: int, into: Slice<uint8>): int {
+    return fsDirNextRaw(dir, sliceAddress(into), into.length());
+}
+
+extern "C" fn fsDirNextRaw(dir: int, intoAt: uint, intoLength: int): int = "lyr_fs_dir_next";
+extern "C" fn fsDirClose(dir: int): int = "lyr_fs_dir_close";
+
+inline fn fsCanonical(path: string, into: Slice<uint8>): int {
+    return fsCanonicalRaw(path, sliceAddress(into), into.length());
+}
+
+extern "C" fn fsCanonicalRaw(path: string, intoAt: uint, intoLength: int): int = "lyr_fs_canonical";
+
+inline fn fsAbsolute(path: string, into: Slice<uint8>): int {
+    return fsAbsoluteRaw(path, sliceAddress(into), into.length());
+}
+
+extern "C" fn fsAbsoluteRaw(path: string, intoAt: uint, intoLength: int): int = "lyr_fs_absolute";
 
 /// How a file is opened: to read, to write, to append at its end, created where it is not there,
 /// truncated to nothing where it is. [File.openWith] refuses with `InvalidInput` a file opened

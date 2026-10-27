@@ -32,16 +32,26 @@
 // so the way back to its own reading of the monotonic clock would close a cycle. The zone files
 // and the environment are reached the same way: `std.fs` and `std.os` import this module too.
 import std.collections { List };
-import std.core { Add, Div, Mul, Parse, ParseError, Sub, StringBuilder, viewBytes };
+import std.core { Add, Div, Mul, Parse, ParseError, Sub, StringBuilder, viewBytes, sliceAddress };
 
 extern "C" fn lyr_clock_realtime_ns(): int;
 extern "C" fn lyr_clock_monotonic_ns(): int;
 
 // The runtime's file and environment calls, as std.fs and std.os bind them (Intrinsics.cs).
-fn zoneFileOpen(path: string, how: int): int;
-fn zoneFileRead(file: int, into: Slice<uint8>): int;
-fn zoneFileClose(file: int): int;
-fn zoneEnv(name: string, into: Slice<uint8>): int;
+extern "C" fn zoneFileOpen(path: string, how: int): int = "lyr_fs_open";
+
+inline fn zoneFileRead(file: int, into: Slice<uint8>): int {
+    return zoneFileReadRaw(file, sliceAddress(into), into.length());
+}
+
+extern "C" fn zoneFileReadRaw(file: int, intoAt: uint, intoLength: int): int = "lyr_fs_read";
+extern "C" fn zoneFileClose(file: int): int = "lyr_fs_close";
+
+inline fn zoneEnv(name: string, into: Slice<uint8>): int {
+    return zoneEnvRaw(name, sliceAddress(into), into.length());
+}
+
+extern "C" fn zoneEnvRaw(name: string, intoAt: uint, intoLength: int): int = "lyr_os_env";
 
 /// A span of time in whole nanoseconds, negative or not: some 292 years either way.
 ///

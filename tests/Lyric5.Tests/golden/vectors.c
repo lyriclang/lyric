@@ -58,6 +58,10 @@ _Static_assert(sizeof(lyr_fn_to_i64) == 16, "layout of lyr_fn_to_i64");
 _Static_assert(sizeof(uint8_t) == 1, "layout of u8[]");
 const LyrDesc lyr_desc_arr_u8 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(uint8_t), 0, NULL, "u8[]", NULL };
 
+extern int64_t lyr_c_lyr_console_put(int64_t, uint64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_console_put"));
+extern void lyr_c_lyr_console_gone(void) __asm__(LYR_C_SYMBOL("lyr_console_gone"));
+extern int64_t lyr_c_lyr_console_flush(int64_t) __asm__(LYR_C_SYMBOL("lyr_console_flush"));
+
 /* string literals */
 static const LyrStaticStr(5) lyr_lit0 = LYR_STR_INIT("add ");
 static const LyrStaticStr(2) lyr_lit1 = LYR_STR_INIT(" ");
@@ -3748,6 +3752,12 @@ void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text) {
 #line _
     int64_t l3_answer = 0;
 #line _
+    int64_t l4__inline0 = 0;
+#line _
+    int64_t l5_stream = 0;
+#line _
+    lyr_slice_u8 l6_from = {0};
+#line _
     lyr_slice_u8 t0 = {0};
 #line _
     lyr_slice_u8 t1 = {0};
@@ -3764,19 +3774,19 @@ void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text) {
 #line _
     int64_t t7 = 0;
 #line _
-    int64_t t8 = 0;
+    lyr_slice_u8 t8 = {0};
 #line _
-    int64_t t9 = 0;
+    uint64_t t9 = 0;
 #line _
-    int64_t t10 = 0;
+    lyr_slice_u8 t10 = {0};
 #line _
     int64_t t11 = 0;
 #line _
-    uint8_t t12 = 0;
+    int64_t t12 = 0;
 #line _
     int64_t t13 = 0;
 #line _
-    lyr_slice_u8 t14 = {0};
+    int64_t t14 = 0;
 #line _
     int64_t t15 = 0;
 #line _
@@ -3784,9 +3794,21 @@ void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text) {
 #line _
     int64_t t17 = 0;
 #line _
-    int64_t t18 = 0;
+    uint8_t t18 = 0;
 #line _
-    lyr_slice_u8 t19 = {0};
+    int64_t t19 = 0;
+#line _
+    lyr_slice_u8 t20 = {0};
+#line _
+    int64_t t21 = 0;
+#line _
+    int64_t t22 = 0;
+#line _
+    int64_t t23 = 0;
+#line _
+    int64_t t24 = 0;
+#line _
+    lyr_slice_u8 t25 = {0};
 #line _
     uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
@@ -3813,46 +3835,67 @@ bb2:;
 #line _
     t6 = l2_rest;
 #line _
-    t7 = LYR_CONSOLE_PUT(t5, t6);
+    l5_stream = t5;
 #line _
-    l3_answer = t7;
+    l6_from = t6;
 #line _
-    t8 = l3_answer;
+    t7 = l5_stream;
 #line _
-    t9 = (int64_t)INT64_C(32);
+    t8 = l6_from;
 #line _
-    t10 = LYR_CHECKED_SHR(int64_t, uint64_t, 64, t8, t9);
+    t9 = (uint64_t)(uintptr_t)t8.ptr;
 #line _
-    t11 = (int64_t)INT64_C(0);
+    t10 = l6_from;
 #line _
-    t12 = (uint8_t)(t10 != t11);
+    t11 = t10.len;
 #line _
-    if (t12) goto bb4; else goto bb5;
+    t12 = lyr_c_lyr_console_put(t7, t9, t11);
+#line _
+    l4__inline0 = t12;
+#line _
+    goto bb4;
 bb3:;
 #line _
     return;
 bb4:;
 #line _
-    t13 = l0_stream;
+    t13 = l4__inline0;
 #line _
-    lyr_std_io_drop(t13);
+    l3_answer = t13;
 #line _
-    goto bb5;
+    t14 = l3_answer;
+#line _
+    t15 = (int64_t)INT64_C(32);
+#line _
+    t16 = LYR_CHECKED_SHR(int64_t, uint64_t, 64, t14, t15);
+#line _
+    t17 = (int64_t)INT64_C(0);
+#line _
+    t18 = (uint8_t)(t16 != t17);
+#line _
+    if (t18) goto bb5; else goto bb6;
 bb5:;
 #line _
-    t14 = l2_rest;
+    t19 = l0_stream;
 #line _
-    t15 = l3_answer;
+    lyr_std_io_drop(t19);
 #line _
-    t16 = (int64_t)INT64_C(4294967295);
+    goto bb6;
+bb6:;
 #line _
-    t17 = (int64_t)(t15 & t16);
+    t20 = l2_rest;
 #line _
-    t18 = t14.len;
+    t21 = l3_answer;
 #line _
-    LYR_CHECK_RANGE(t17, t18, t14.len); t19 = (lyr_slice_u8){ t14.ptr + t17, t18 - t17 };
+    t22 = (int64_t)INT64_C(4294967295);
 #line _
-    l2_rest = t19;
+    t23 = (int64_t)(t21 & t22);
+#line _
+    t24 = t20.len;
+#line _
+    LYR_CHECK_RANGE(t23, t24, t20.len); t25 = (lyr_slice_u8){ t20.ptr + t23, t24 - t23 };
+#line _
+    l2_rest = t25;
 #line _
     goto bb1;
 }
@@ -3958,7 +4001,7 @@ bb4:;
     if (t15) goto bb5; else goto bb6;
 bb5:;
 #line _
-    lyr_console_gone();
+    lyr_c_lyr_console_gone();
 #line _
     goto bb6;
 bb6:;
@@ -4066,7 +4109,7 @@ bb0:;
 #line _
     t1 = t0->f_stream;
 #line _
-    t2 = lyr_console_flush(t1);
+    t2 = lyr_c_lyr_console_flush(t1);
 #line _
     return t2;
 }

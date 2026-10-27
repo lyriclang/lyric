@@ -22,7 +22,7 @@
 //! }
 //! ```
 import std.collections { List };
-import std.core { StringBuilder, viewBytes };
+import std.core { StringBuilder, viewBytes, sliceAddress };
 import std.io { IoError, Reader, Writer, failure };
 import std.os { Signal, numberOf, signalOf };
 import std.task;
@@ -38,14 +38,48 @@ fn processSpawn(
     cwd: string,
     modes: int,
     ends: Slice<int>
-): int;
-fn processAttach(): void;
-fn processNudge(): void;
-fn processReap(pid: int): int;
-fn processSignal(pid: int, number: int): int;
-fn processRead(fd: int, into: Slice<uint8>): int;
-fn processWrite(fd: int, from: Slice<uint8>): int;
-fn processClose(fd: int): int;
+): int {
+    return processSpawnRaw(
+        program,
+        sliceAddress(args),
+        argc,
+        sliceAddress(env),
+        envc,
+        cwd,
+        modes,
+        sliceAddress(ends),
+        ends.length()
+    );
+}
+
+extern "C" fn processSpawnRaw(
+    program: string,
+    argsAt: uint,
+    argc: int,
+    envAt: uint,
+    envc: int,
+    cwd: string,
+    modes: int,
+    endsAt: uint,
+    endsLength: int
+): int = "lyr_process_spawn";
+extern "C" fn processAttach(): void = "lyr_process_attach";
+extern "C" fn processNudge(): void = "lyr_process_nudge";
+extern "C" fn processReap(pid: int): int = "lyr_process_reap";
+extern "C" fn processSignal(pid: int, number: int): int = "lyr_process_signal";
+
+inline fn processRead(fd: int, into: Slice<uint8>): int {
+    return processReadRaw(fd, sliceAddress(into), into.length());
+}
+
+extern "C" fn processReadRaw(fd: int, intoAt: uint, intoLength: int): int = "lyr_process_read";
+
+inline fn processWrite(fd: int, from: Slice<uint8>): int {
+    return processWriteRaw(fd, sliceAddress(from), from.length());
+}
+
+extern "C" fn processWriteRaw(fd: int, fromAt: uint, fromLength: int): int = "lyr_process_write";
+extern "C" fn processClose(fd: int): int = "lyr_process_close";
 
 /// The answer of a call that would block (lyr/net.h).
 let wouldBlock = -(64 << 32);

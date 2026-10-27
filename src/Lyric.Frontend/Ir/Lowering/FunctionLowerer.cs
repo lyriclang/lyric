@@ -8582,9 +8582,13 @@ internal sealed class FunctionLowerer
     {
         result = null;
         var ffi = _typeTable.Compilation?.FindModule(["std", "ffi"])?.Members;
-        if (ffi is null || symbol.Name is not ("load" or "store" or "sizeOf" or "dataAddress" or "sliceAddress"
+        // where elements begin is std.core's, which every module of std may ask without std.ffi
+        var host = symbol.Name is "dataAddress" or "sliceAddress"
+            ? _typeTable.Compilation?.FindModule(["std", "core"])?.Members
+            : ffi;
+        if (host is null || symbol.Name is not ("load" or "store" or "sizeOf" or "dataAddress" or "sliceAddress"
                 or "rootObject" or "rootedObject")
-            || !ReferenceEquals(ffi.LookupLocal(symbol.Name), symbol))
+            || !ReferenceEquals(host.LookupLocal(symbol.Name), symbol))
             return false;
         result = FfiMemory(symbol.Name, expr);
         return true;

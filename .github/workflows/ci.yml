@@ -295,7 +295,7 @@ jobs:
           "$lyric5" --version | head -1 | grep -q "^lyric 5\.0\.0"
           "$lyric5" build tests/Lyric5.Tests/programs/hello.lyr --emit ir | tee hello.ir
           grep -q "call std.io.println<string>" hello.ir
-          grep -q "callimport std.io.consolePut" hello.ir
+          grep -q "callimport C:lyr_console_put" hello.ir
           "$lyric5" run tests/Lyric5.Tests/programs/hello.lyr | tee hello.out
           grep -qx "Hello, Lyric!" hello.out
           code=0; "$lyric5" run tests/Lyric5.Tests/programs/fib.lyr --profile release || code=$?

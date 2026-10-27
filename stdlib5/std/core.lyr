@@ -171,6 +171,20 @@ pub fn arrayOf<T, E :: [Error]>(n: int, f: fn(int) -> T throws E): T[] throws E 
 /// When `n` is negative.
 internal fn filled<T>(n: int, x: T): T[];
 
+/// Returns where an array's elements begin in memory: the address std hands a C function of the
+/// runtime's beside a length. The compiler's own; this body never runs.
+@Allow("unused")
+internal fn dataAddress<T>(xs: T[]): uint {
+    unreachable("std.core's dataAddress is the compiler's");
+}
+
+/// Returns where a slice's elements begin in memory, in its array's. The compiler's own; this body
+/// never runs.
+@Allow("unused")
+internal fn sliceAddress<T>(xs: Slice<T>): uint {
+    unreachable("std.core's sliceAddress is the compiler's");
+}
+
 /// Repeats `xs` `n` times, every slot a `clone()` of the pattern's element.
 ///
 /// The operator `[x] * n` over an element that is or holds an object becomes this call, so no

@@ -507,7 +507,13 @@ public sealed class Interpreter
                 Set(b.Dest, Heap.Copy(T(b.Value)));
                 return null;
 
-            case PlaceAt or SizeOf or DataAddress or CCallback or CallCPointer or RootClosure or CClosureCallback or RootObject or RootedObject:
+            // an address names no memory here: std passes a slice's to a C function, which is
+            // refused where it is called, as anything that would read through it is
+            case DataAddress d:
+                Set(d.Dest, Value.Uint(0));
+                return null;
+
+            case PlaceAt or SizeOf or CCallback or CallCPointer or RootClosure or CClosureCallback or RootObject or RootedObject:
                 throw ComptimeFailure.NotYet("memory at an address — std.ffi's — is C's, and C does not run at compile time");
 
             case MakeCoroutine or ResumePull or CoroutineDone or CoroutineResult or CoroutineClosing or CoroutineClose or YieldSuspend:

@@ -27,7 +27,7 @@
 //! ```output
 //! 5
 //! ```
-import std.core { Utf8Error };
+import std.core { Utf8Error, dataAddress, sliceAddress };
 import std.task { stashForeign, takeForeign };
 
 /// A pointer to a `T` in memory C manages, never null: `T *` where a C function takes or returns
@@ -216,16 +216,6 @@ fn store<T>(address: uint, value: T): void {
 @Allow("unused")
 fn sizeOf<T>(): uint {
     unreachable("std.ffi's sizeOf is the compiler's");
-}
-
-@Allow("unused")
-fn dataAddress<T>(xs: T[]): uint {
-    unreachable("std.ffi's dataAddress is the compiler's");
-}
-
-@Allow("unused")
-fn sliceAddress<T>(xs: Slice<T>): uint {
-    unreachable("std.ffi's sliceAddress is the compiler's");
 }
 
 @Allow("unused")

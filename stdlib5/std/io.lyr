@@ -24,7 +24,7 @@
 //! one, two
 //! 17
 //! ```
-import std.core { Join, Utf8Error, viewBytes };
+import std.core { Join, Utf8Error, viewBytes, sliceAddress };
 import std.task { Cancelled, SpinLock, schedulerRuns };
 import std.thread { Pool };
 
@@ -36,9 +36,13 @@ import std.thread { Pool };
 // f-string formats more, `println(f"{n} left")`.
 // ---------------------------------------------------------------------------------------------
 
-fn consolePut(stream: int, from: Slice<uint8>): int;
-fn consoleFlush(stream: int): int;
-fn consoleGone(): void;
+inline fn consolePut(stream: int, from: Slice<uint8>): int {
+    return consolePutRaw(stream, sliceAddress(from), from.length());
+}
+
+extern "C" fn consolePutRaw(stream: int, fromAt: uint, fromLength: int): int = "lyr_console_put";
+extern "C" fn consoleFlush(stream: int): int = "lyr_console_flush";
+extern "C" fn consoleGone(): void = "lyr_console_gone";
 
 /// Writes `v`'s text on the standard output.
 pub fn print<T :: [Display]>(v: T): void {
@@ -104,7 +108,11 @@ fn flushed(stream: int): int {
 // time; the standard output and error as `Writer`s over the buffers print writes into.
 // ---------------------------------------------------------------------------------------------
 
-fn consoleRead(into: Slice<uint8>): int;
+inline fn consoleRead(into: Slice<uint8>): int {
+    return consoleReadRaw(sliceAddress(into), into.length());
+}
+
+extern "C" fn consoleReadRaw(intoAt: uint, intoLength: int): int = "lyr_console_read";
 
 @Allow("global-var-without-sync")
 var theStdin: ?Stdin = null;

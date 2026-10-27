@@ -69,7 +69,7 @@ public class DriverTests
         Assert.Contains("fn hello.main -> i64", output);
         // println is std.io's, a Lyric function over the console's buffer
         Assert.Contains("call std.io.println<string>(", output);
-        Assert.Contains("callimport std.io.consolePut(", output);
+        Assert.Contains("callimport C:lyr_console_put(", output);
         // An f-string writes into one builder, no chain of concat.
         Assert.Contains("call std.core.fstringEnd(", output);
         Assert.DoesNotContain("std.string.concat", output);
@@ -118,7 +118,9 @@ public class DriverTests
         var (exit, output, err) = Run("build", Program_("hello.lyr"), "--emit", "c");
         Assert.True(exit == 0, err);
         Assert.Contains("lyr_std_io_println_string_", output);
-        Assert.Contains("LYR_CONSOLE_PUT(", output);
+        // std calls its runtime as any C function: under its symbol, declared, no wrapper
+        Assert.Contains("__asm__(LYR_C_SYMBOL(\"lyr_console_put\"))", output);
+        Assert.Contains("= lyr_c_lyr_console_put(", output);
         Assert.Contains("LYR_STR_INIT(\"Hello, \")", output);
     }
 
