@@ -221,6 +221,8 @@ public static class IrPrinter
         PlaceAt p => $"{p.Dest}: {TypeStr(new IrPlaceType(p.Type))} = placeat {p.Address}",
         SizeOf s => $"{s.Dest}: u64 = sizeof {TypeStr(s.Type)}",
         CCallback c => $"{c.Dest}: u64 = ccallback fn#{c.Function.Value}",
+        RootClosure r => $"{r.Dest}: u64 = rootclosure {r.Closure}",
+        CClosureCallback c => $"{c.Dest}: u64 = cclosurecallback {TypeStr(c.Closure)} userdata#{c.Userdata}",
         CallCPointer c => (c.Dest is { } d ? $"{d}: {TypeStr(c.ReturnType)} = " : "")
                           + $"callc {c.Callee}({string.Join(", ", c.Args)})",
         DataAddress d => $"{d.Dest}: u64 = dataaddress {d.Value}",

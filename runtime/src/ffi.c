@@ -44,6 +44,21 @@ void lyr_ffi_callback_enter(void) {
 
 void lyr_ffi_callback_leave(void) { lyr_coro_leave_foreign(); }
 
+/* word 2 of the object, the environment, is a reference; the code is not the collector's */
+static const uint64_t closure_refs[1] = { 1u << 2 };
+static const LyrDesc closure_desc = {
+    sizeof(LyrFfiClosure), LYR_DESC_HAS_REFS, 0, 1, closure_refs, "std.ffi.Callback", NULL,
+};
+
+uint64_t lyr_ffi_closure_root(void *code, void *env) {
+    LyrFfiClosure *closure = lyr_alloc(&closure_desc);
+    closure->code = code;
+    LYR_WRITE_BARRIER(closure, &closure->env, env);
+    return (uint64_t)(uintptr_t)lyr_root_new(closure);
+}
+
+void lyr_ffi_closure_release(uint64_t root) { lyr_root_free((LyrRoot *)(uintptr_t)root); }
+
 int64_t lyr_ffi_enum_tag(int64_t value, int64_t variants, const char *enum_name) {
     if (value < 0 || value >= variants)
         lyr_panic(LYR_RT_FOREIGN_ENUM, "C returned %lld, which is no variant of %s (it has %lld)",

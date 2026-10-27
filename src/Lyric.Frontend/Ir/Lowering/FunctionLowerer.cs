@@ -2680,6 +2680,8 @@ internal sealed class FunctionLowerer
         AssignExpr e => LowerAssign(e),
         CastExpr e => LowerCast(e),
         TypeTestExpr typeTest => LowerTypeTest(typeTest),
+        // std.ffi's 'Callback<C>.new(closure)': the closure behind a root, C's function to it
+        CallExpr e when _types.CallbackUserdataOf(e) is { } userdata => LowerCallbackNew(e, userdata),
         CallExpr e => LowerCall(e),
         IfExpr e => LowerIfExpr(e),
         BlockExpr e => LowerBlockExpr(e),
@@ -8652,6 +8654,46 @@ internal sealed class FunctionLowerer
             [.. signature.Parameters.Select(p => ModuleLowerer.CFormOf(p, _typeTable, compilation))],
             ModuleLowerer.CFormOf(signature.Return, _typeTable, compilation), source.Span));
         return address;
+    }
+
+    /// <summary>
+    /// <c>Callback&lt;C&gt;.new(closure)</c>: the closure's code and environment in an object a root
+    /// keeps alive, the root's address as the userdata, a trampoline of <c>C</c>'s type that finds
+    /// the closure through it — and the <c>Callback</c> that holds all three.
+    /// </summary>
+    private TempId LowerCallbackNew(CallExpr expr, int userdata)
+    {
+        if (_types.TypeOf(expr) is not GenericInstance { Arguments: [FnType { IsC: true } cFunction] }
+            || LowerType(_types.TypeOf(expr), expr.Span) is not IrRefType callbackType)
+            throw Bug($"a Callback.new without its C function's type, for {expr.Span}");
+        var compilation = _typeTable.Compilation!;
+        var closure = LowerExpr(expr.Arguments[0]);
+        if (_slots.TypeOfTemp(closure) is not IrFunctionType closureType)
+            throw Bug($"a Callback.new of no function value, for {expr.Span}");
+        var u64 = new IrScalarType(IrScalar.U64);
+        var root = _slots.NewTemp(u64);
+        _b.Emit(new RootClosure(root, closure, expr.Span));
+        var parameters = cFunction.Parameters.Select(p => LowerType(p, expr.Span)).ToArray();
+        var returned = LowerType(cFunction.Return, expr.Span);
+        var function = _slots.NewTemp(u64);
+        _b.Emit(new CClosureCallback(function, closureType, userdata, parameters, returned,
+            [.. parameters.Select(p => ModuleLowerer.CFormOf(p, _typeTable, compilation))],
+            ModuleLowerer.CFormOf(returned, _typeTable, compilation), expr.Span));
+
+        var layout = _typeTable.Defs[callbackType.Type.Value];
+        int Field(string name) => Array.IndexOf(layout.FieldNames, name);
+        if (layout.FieldTypes[Field("userdata")] is not IrStructType pointer)
+            throw Bug($"a Callback whose userdata is no Ptr, for {expr.Span}");
+        var handle = _slots.NewTemp(pointer);
+        _b.Emit(new NewObject(handle, pointer.Type, pointer, expr.Span));
+        _b.Emit(new StoreField(handle, pointer.Type, new FieldId(0), root, expr.Span));
+
+        var made = _slots.NewTemp(callbackType);
+        _b.Emit(new NewObject(made, callbackType.Type, callbackType, expr.Span));
+        _b.Emit(new StoreField(made, callbackType.Type, new FieldId(Field("function")), function, expr.Span));
+        _b.Emit(new StoreField(made, callbackType.Type, new FieldId(Field("userdata")), handle, expr.Span));
+        _b.Emit(new StoreField(made, callbackType.Type, new FieldId(Field("root")), root, expr.Span));
+        return made;
     }
 
     /// <summary>A call through a C function's pointer: as a call of an <c>extern "C"</c>

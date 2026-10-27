@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "lyr/types.h"
+#include "lyr/gc.h"
 
 /* The name the linker knows a C function by: its own, behind the platform's prefix ('_' on
  * macOS, none elsewhere). The program declares a C function under a name of its own and binds it
@@ -49,5 +50,20 @@ void lyr_ffi_free(uint64_t address);
  * no collector — there is no Lyric to call, and the process ends with a report. */
 void lyr_ffi_callback_enter(void);
 void lyr_ffi_callback_leave(void);
+
+/* std.ffi.Callback: a Lyric closure C holds through its userdata — its code and its environment
+ * in an object a root keeps alive until the callback is released. The userdata C hands back is the
+ * root's address; the trampoline reads the closure through it. */
+typedef struct LyrFfiClosure {
+    LyrObj header;
+    void *code;
+    void *env;
+} LyrFfiClosure;
+
+uint64_t lyr_ffi_closure_root(void *code, void *env);
+static inline LyrFfiClosure *lyr_ffi_closure_of(void *userdata) {
+    return (LyrFfiClosure *)lyr_root_get((const LyrRoot *)userdata);
+}
+void lyr_ffi_closure_release(uint64_t root);
 
 #endif

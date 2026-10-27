@@ -215,7 +215,7 @@ public static class SubsetGate
                     break;
                 case BlackBox:
                     break;
-                case PlaceAt or SizeOf or DataAddress or CCallback or CallCPointer:
+                case PlaceAt or SizeOf or DataAddress or CCallback or CallCPointer or RootClosure or CClosureCallback:
                     break;
                 case LoadGlobal or StoreGlobal:
                     break;

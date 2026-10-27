@@ -877,6 +877,9 @@ public static class ModuleLowerer
         {
             if (Is(inner, "Ptr")) return new IrCForm(IrCKind.OptionalPointer);
             if (Is(inner, "CStr")) return new IrCForm(IrCKind.OptionalCString);
+            // an address that may be absent: only a C function's pointer crosses so, the checker's
+            // table refusing every other optional integer
+            if (inner is IrScalarType { Kind: IrScalar.U64 }) return new IrCForm(IrCKind.OptionalFunction);
         }
         if (type is IrEnumType e && typeTable.SymbolOfId(e.Type) is { Declaration: EnumDecl declared } symbol
             && declared.Attributes.FirstOrDefault(a => a.Path is ["Layout"])?.Positional is IdentifierExpr { Name: var form })

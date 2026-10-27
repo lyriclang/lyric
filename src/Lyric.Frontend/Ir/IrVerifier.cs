@@ -830,6 +830,18 @@ public static class IrVerifier
                         Report(block, index, $"ccallback gives {N(c.Params.Length)} form(s) for the parameters of fn#{c.Function.Value}");
                     RequireDestType(c.Dest, new IrScalarType(IrScalar.U64), "ccallback", block, index);
                     break;
+                case RootClosure r:
+                    if (TypeOf(r.Closure) is not IrFunctionType)
+                        Report(block, index, $"rootclosure {r.Closure} is {Show(TypeOf(r.Closure))}, expected a function value");
+                    RequireDestType(r.Dest, new IrScalarType(IrScalar.U64), "rootclosure", block, index);
+                    break;
+                case CClosureCallback c:
+                    if (c.Userdata < 0 || c.Userdata >= c.ParamTypes.Length || c.Params.Length != c.ParamTypes.Length
+                        || c.Closure.Parameters.Length != c.ParamTypes.Length - 1)
+                        Report(block, index, $"cclosurecallback: userdata#{c.Userdata} among {N(c.ParamTypes.Length)} C parameter(s), "
+                                             + $"{N(c.Closure.Parameters.Length)} of the closure");
+                    RequireDestType(c.Dest, new IrScalarType(IrScalar.U64), "cclosurecallback", block, index);
+                    break;
                 case CallCPointer c:
                     if (!IrType.Equal(TypeOf(c.Callee), new IrScalarType(IrScalar.U64)))
                         Report(block, index, $"callc {c.Callee} is {Show(TypeOf(c.Callee))}, expected a C function's pointer, u64");

@@ -343,6 +343,17 @@ public sealed record CCallback(TempId Dest, FunctionId Function, IrCForm[] Param
 /// <summary>A call through a C function's pointer, <paramref name="Callee"/> a <c>uint</c>: each
 /// argument of <paramref name="ParamTypes"/> in its form, the result back from its own — as a call
 /// of an <c>extern "C"</c> function is.</summary>
+/// <summary><c>Callback&lt;C&gt;.new</c>'s state: the closure's code and environment in an object a
+/// root keeps alive; <paramref name="Dest"/> is the root's address, a <c>uint</c>, which is the
+/// userdata C hands back.</summary>
+public sealed record RootClosure(TempId Dest, TempId Closure, Span Span) : IrOp(Span);
+
+/// <summary><c>Callback&lt;C&gt;.new</c>'s function: the address of a trampoline of C's type —
+/// <paramref name="ParamTypes"/> with the userdata at <paramref name="Userdata"/> — that finds the
+/// closure through the userdata and calls it with the others.</summary>
+public sealed record CClosureCallback(TempId Dest, IrFunctionType Closure, int Userdata, IrType[] ParamTypes,
+    IrType ReturnType, IrCForm[] Params, IrCForm Return, Span Span) : IrOp(Span);
+
 public sealed record CallCPointer(TempId? Dest, TempId Callee, TempId[] Args, IrType[] ParamTypes, IrType ReturnType,
     IrCForm[] Params, IrCForm Return, Span Span) : IrOp(Span);
 

@@ -488,6 +488,8 @@ public sealed partial class Parser
                 case TokenKind.LParen:
                 case TokenKind.RParen:
                     break;
+                case TokenKind.StringLiteral when IsExternAbiAt(offset):
+                    break;
 
                 // Anything else cannot be a type, so the '<' was a comparison.
                 default:
@@ -1144,6 +1146,13 @@ public sealed partial class Parser
     // Skips a balanced type argument group starting at Peek(start)=='<' (depth over '<' and '>',
     // '>>' closes two). Returns the index past the closing '>', or -1 when it is unbalanced or a
     // non-type-like token appears, in which case the '<' was a comparison.
+    /// <summary>Whether the string literal at <paramref name="offset"/> is the ABI of a C
+    /// function's type, <c>extern "C" fn(…)</c>: the one literal a type holds.</summary>
+    private bool IsExternAbiAt(int offset) =>
+        offset > 0 && _buffer.Peek(offset - 1).TokenKind == TokenKind.Identifier
+                   && _sm.Slice(_buffer.Peek(offset - 1).Span) is "extern"
+                   && _buffer.Peek(offset + 1).TokenKind == TokenKind.Fn;
+
     private int SkipTypeArgs(int start)
     {
         var depth = 0;
@@ -1158,6 +1167,8 @@ public sealed partial class Parser
                     or TokenKind.LBracket or TokenKind.RBracket or TokenKind.Question
                     or TokenKind.LParen or TokenKind.RParen or TokenKind.Fn or TokenKind.Arrow:
                     break; // type-like, depth unchanged
+                case TokenKind.StringLiteral when IsExternAbiAt(i):
+                    break; // the ABI of 'extern "C" fn(…)'
                 default: return -1; // ';', '{', a literal or an operator is no type argument
             }
             if (depth == 0) return i + 1; // closed cleanly
