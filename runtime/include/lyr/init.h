@@ -4,23 +4,11 @@
 
 #include "lyr/types.h"
 
-/* Where the runtime's own output goes. NULL means the process's standard stream; a host passes a
- * function to capture it (an editor showing a program's println). */
-typedef void (*LyrWriteFn)(const char *bytes, size_t len, void *context);
+/* LyrConfig, lyr_init and lyr_shutdown: the host's, in its public header. */
+#include "lyric.h"
 
-typedef struct LyrConfig {
-    int argc;
-    char **argv;
-    size_t heap_limit;             /* bytes; 0 = no limit. Beyond it allocation panics (RT0005) */
-    int install_signal_handlers;   /* crash reports for fault signals; an embedding host says 0 */
-    LyrWriteFn stdout_write;
-    LyrWriteFn stderr_write;
-    void *write_context;
-} LyrConfig;
-
-/* One runtime per process: a second call returns -1 and changes nothing. */
-int lyr_init(const LyrConfig *config);
-void lyr_shutdown(void);
+/* Whether lyr_init started the runtime and lyr_shutdown has not stopped it. */
+int lyr_started(void);
 
 /* The whole `main` of an emitted program: start with defaults, run the program's main, stop, and
  * answer the exit code — the program's value masked to 0..255. */

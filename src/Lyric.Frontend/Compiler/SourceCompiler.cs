@@ -89,6 +89,7 @@ public static class SourceCompiler
             var built = new Compilation(sources, diagnostics)
             {
                 Lyric5Modules = options.PackageRoots is not null,
+                Library = options.Library,
                 WarnNative = options.WarnDeps,
                 PackageDependencies = options.PackageDependencies,
                 ModuleOnDisk = ModuleProbe(options),
@@ -706,6 +707,10 @@ public sealed record CompilerOptions
     /// <summary>Whether the compilation is lowered after it checked. An editor's is not: it shows
     /// what the checker and the evaluation say, and the lowering's findings are the build's.</summary>
     public bool Lower { get; init; } = true;
+
+    /// <summary>Whether the build is a library C links (<c>lyric build --lib</c>): the entry module
+    /// is the library's root, which has no <c>main</c> to start from — its exports are the roots.</summary>
+    public bool Library { get; init; }
 
     /// <summary>Stops the compilation between its phases — an editor's, when the text it reads has
     /// changed meanwhile — with an <see cref="OperationCanceledException"/>.</summary>

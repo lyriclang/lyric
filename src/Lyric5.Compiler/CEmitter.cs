@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "r1f";
+    public const string Version = "r1g";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -155,6 +155,33 @@ public sealed class CEmitter
         foreach (var instance in instances)
             units.Add(new Unit(instance, new CEmitter(module, sources, stdlibRoot, instance, overflowChecks).Text()));
         return units;
+    }
+
+    /// <summary>
+    /// The header of a library C links (<c>lyric build --lib</c>), <c>&lt;name&gt;.h</c>: the
+    /// runtime's API (<c>runtime/include/lyric.h</c>, <paramref name="api"/>) as it is, then the
+    /// <c>@Layout</c> types the exports name and the exports, as the checker wrote them.
+    /// </summary>
+    public static string Header(IrModule module, string name, string api)
+    {
+        var guard = "LYRIC_LIBRARY_" + new string([.. name.ToUpperInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '_')]) + "_H";
+        var text = new StringBuilder();
+        text.Append($"/* {name}.h: the Lyric library {name} as C calls it — written by lyric build --lib. */\n");
+        text.Append($"#ifndef {guard}\n#define {guard}\n\n");
+        text.Append(api.TrimEnd()).Append("\n\n");
+        text.Append("#ifdef __cplusplus\nextern \"C\" {\n#endif\n");
+        if (module.Header.Types.Length > 0)
+        {
+            text.Append("\n/* the types the exports name */\n");
+            foreach (var type in module.Header.Types) text.Append(type).Append('\n');
+        }
+        if (module.Header.Declarations.Length > 0)
+        {
+            text.Append("\n/* the exports */\n");
+            foreach (var declaration in module.Header.Declarations) text.Append("LYRIC_API ").Append(declaration).Append(";\n");
+        }
+        text.Append("\n#ifdef __cplusplus\n}\n#endif\n\n#endif\n");
+        return text.ToString();
     }
 
     /// <summary>
@@ -843,6 +870,7 @@ public sealed class CEmitter
         var body = new StringBuilder();
         foreach (var function in Scope()) body.Append(Function(function));
         if (_main && _module.EntryFunction is { } entry) body.Append(Entry(_module.Functions[entry.Value]));
+        if (_main) body.Append(Exports());
 
         if (_constants.Length > 0) _out.AppendLine(_data > 0 ? "/* string literals, comptime data */" : "/* string literals */").Append(_constants).AppendLine();
         _out.Append(prototypes).AppendLine();
@@ -1572,16 +1600,7 @@ public sealed class CEmitter
         var text = new StringBuilder();
         text.AppendLine();
         text.AppendLine("/* the program */");
-        // The globals are filled first, in declaration order, then the entry runs —
-        // registered with the collector before anything is stored in them.
-        var init = _module.GlobalInit is { } id ? FunctionName(_module.Functions[id.Value].Name) + "(); " : "";
-        if (_module.Globals.Count > 0)
-        {
-            var (words, whole) = GlobalRoots();
-            var register = words.Count > 0 ? $"lyr_gc_add_globals(lyr_global_refs, {words.Count}); " : "";
-            foreach (var global in whole) register += $"lyr_register_stack((void *)&{global}, (void *)(&{global} + 1)); ";
-            init = register + init;
-        }
+        var init = GlobalStart();
         if (entry.Throws)
         {
             // An error that escapes main: its message and its causes on the error
@@ -1603,6 +1622,69 @@ public sealed class CEmitter
         }
         text.AppendLine($"int main(int argc, char **argv) {{ return {RunMain(name)}; }}");
         return text.ToString();
+    }
+
+    /// <summary>What runs before the program's first own code: the globals registered with the
+    /// collector before anything is stored in them, then filled in declaration order. Statements,
+    /// each with its trailing space; empty where there are none.</summary>
+    private string GlobalStart()
+    {
+        var init = _module.GlobalInit is { } id ? FunctionName(_module.Functions[id.Value].Name) + "(); " : "";
+        if (_module.Globals.Count == 0) return init;
+        var (words, whole) = GlobalRoots();
+        var register = words.Count > 0 ? $"lyr_gc_add_globals(lyr_global_refs, {words.Count}); " : "";
+        foreach (var global in whole) register += $"lyr_register_stack((void *)&{global}, (void *)(&{global} + 1)); ";
+        return register + init;
+    }
+
+    /// <summary>
+    /// The functions C calls by their symbols (<c>@Export</c>): each a wrapper that takes C's values
+    /// as Lyric's, calls the function and gives its result back as C's, between the runtime's marks
+    /// (<c>lyr_export_enter</c>). One that throws answers <c>LyrStatus</c> and writes its result
+    /// through the last parameter. A library has no main to start its globals: the first export's
+    /// call does.
+    /// </summary>
+    private string Exports()
+    {
+        if (_module.Exports.Count == 0) return "";
+        var text = new StringBuilder();
+        text.AppendLine();
+        text.AppendLine("/* the exports */");
+        var start = "NULL";
+        if (_module.EntryFunction is null)
+        {
+            text.AppendLine($"static void lyr_library_start(void) {{ {GlobalStart()}}}");
+            start = "lyr_library_start";
+        }
+        foreach (var export in _module.Exports) text.AppendLine(Export(export, start));
+        return text.ToString();
+    }
+
+    private string Export(IrExport export, string start)
+    {
+        var target = _module.Functions[export.Function.Value];
+        var environment = TakesEnvironment(target) ? 1 : 0;
+        var parameters = target.Locals.Skip(environment).Take(target.ParamCount - environment).ToList();
+        var signature = parameters.Select((p, i) => $"{CAbiType(p.Type, export.Params[i])} lyr_a{i}").ToList();
+        var arguments = (environment == 1 ? ["NULL"] : Array.Empty<string>())
+            .Concat(parameters.Select((p, i) => ComingIn($"lyr_a{i}", p.Type, export.Params[i]))).ToList();
+        var returns = !IsVoid(target.ReturnType);
+        if (export.Throws)
+        {
+            if (returns) signature.Add($"{CAbiType(target.ReturnType, export.Return)} *lyr_out");
+            arguments.Add("&lyr_e");
+        }
+        var call = $"{FunctionName(target.Name)}({string.Join(", ", arguments)})";
+        var result = export.Throws ? "LyrStatus" : CAbiType(target.ReturnType, export.Return);
+        var body = new StringBuilder($"lyr_export_enter({start}); ");
+        if (export.Throws) body.Append("LyrErr *lyr_e = NULL; ");
+        body.Append(returns ? $"{CType(target.ReturnType)} lyr_r = {call}; " : $"{call}; ");
+        body.Append("lyr_export_leave(); ");
+        if (export.Throws)
+            body.Append("if (LYR_UNLIKELY(lyr_e != NULL)) return LYR_ERROR; "
+                        + (returns ? $"*lyr_out = {CrossingOut("lyr_r", export.Return)}; " : "") + "return LYR_OK; ");
+        else if (returns) body.Append($"return {CrossingOut("lyr_r", export.Return)}; ");
+        return $"LYRIC_API {result} {export.Symbol}({(signature.Count == 0 ? "void" : string.Join(", ", signature))}) {{ {body}}}";
     }
 
     /// <summary>The runtime's start around the program's main function, as a task under std.task's

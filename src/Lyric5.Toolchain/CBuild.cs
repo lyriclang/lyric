@@ -228,9 +228,22 @@ public sealed class CBuild
         return output;
     }
 
+    /// <summary>
+    /// Links objects and archives into a shared library — <c>lib&lt;name&gt;.so</c>, a
+    /// <c>.dylib</c> that the loader finds by <c>@rpath</c>, or a <c>.dll</c> with its import
+    /// library beside it (<c>&lt;name&gt;.lib</c>) —, the program's
+    /// exports and the runtime's start and stop its only symbols (<c>LYRIC_API</c>).
+    /// </summary>
+    public string LinkShared(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries = null)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
+        Link(inputs, output, libraries, debugMap: false, shared: true);
+        return output;
+    }
+
     /// <summary>One link. A Mach-O image keeps its debug map only when asked: <c>-S</c> leaves out
     /// what would name every object by its path and time.</summary>
-    private void Link(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries, bool debugMap)
+    private void Link(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries, bool debugMap, bool shared = false)
     {
         var arguments = Driver();
         // No LTO flag at the link: lld runs LTO over bitcode inputs by itself, and with the flag
@@ -238,12 +251,15 @@ public sealed class CBuild
         // symbols then went missing (frexpf, wmemcpy, __DENORM …).
         arguments.AddRange(Profile.Codegen.Where(f => !IsLto(f)));
         arguments.AddRange(Profile.Instrumentation);
+        if (shared) arguments.Add("-shared");
         arguments.AddRange(inputs);
         foreach (var library in libraries ?? []) arguments.Add("-l" + library);
         arguments.AddRange(["-o", output]);
         arguments.AddRange(Target.Os switch
         {
             TargetOs.MacOs => ["-Wl,-dead_strip"],
+            // A library's thread is its host's, with the host's stack.
+            TargetOs.Windows when shared => ["-Wl,--gc-sections", "-lshell32", "-lws2_32"],
             // The thread's stack as large as the main task's (runtime/include/lyr/task.h,
             // LYR_MAIN_TASK_STACK): what main has as a task it has on the thread. zig's
             // default for a Windows image is 16 MiB (MSVC's 1 MiB); a POSIX thread's comes from
@@ -253,6 +269,11 @@ public sealed class CBuild
             TargetOs.Windows => ["-Wl,--gc-sections", "-Wl,--stack," + MainThreadStack, "-lshell32", "-lws2_32"],
             _ => ["-Wl,--gc-sections", "-lpthread", "-lm"],
         });
+        // the name the loader records in what links the library, not the path it was built at
+        if (shared && Target.Os == TargetOs.MacOs) arguments.Add("-Wl,-install_name,@rpath/" + Path.GetFileName(output));
+        if (shared && Target.Os == TargetOs.Linux) arguments.Add("-Wl,-soname," + Path.GetFileName(output));
+        // named after the library, not after the first object, as zig would
+        if (shared && Target.Os == TargetOs.Windows) arguments.Add("-Wl,--out-implib," + Path.ChangeExtension(output, ".lib"));
         if (Target.Os == TargetOs.MacOs && !debugMap) arguments.Add("-Wl,-S");
         if (Compiler.Kind == CCompilerKind.Zig) arguments.Add("-fno-sanitize=undefined");
         if (Target.Os == TargetOs.Linux && Compiler.Kind == CCompilerKind.Zig) arguments.Add("-lunwind");

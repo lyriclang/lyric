@@ -519,6 +519,15 @@ pub struct MustUse :: [OnCallable, OnType] { }
 /// attribute a type is the compiler's to lay out, and does not cross.
 pub struct Layout :: [OnType] { }
 
+/// Makes a function C's to call, by a symbol of its own.
+///
+/// `@Export("geo_area")` on a `pub fn` gives C the function `geo_area`; a bare `@Export` names it
+/// as the function is named. Its parameters and its result are what crosses into C, as for an
+/// `extern "C"` function. One that throws returns C's `LyrStatus` and hands its result through a
+/// last parameter, a pointer. An exported function is always part of the program, and
+/// `lyric build --lib` builds the library C links, with a header that declares every export.
+pub struct Export :: [OnFunction] { }
+
 /// Marks an enum or a `sealed` interface that may grow.
 ///
 /// A `match` over it outside its package needs a `_` arm, so a new variant or conformer breaks

@@ -51,6 +51,13 @@ void lyr_ffi_free(uint64_t address);
 void lyr_ffi_callback_enter(void);
 void lyr_ffi_callback_leave(void);
 
+/* An export's wrapper (@Export), around the Lyric function C calls by its symbol: as a
+ * callback's, and before it the runtime started (lyr_init) — else the process ends with a report —
+ * and, at the first call, the library's own start: its globals registered and filled. `start` is
+ * NULL in a program, whose main did that. */
+void lyr_export_enter(void (*start)(void));
+void lyr_export_leave(void);
+
 /* std.ffi.Callback: a Lyric closure C holds through its userdata — its code and its environment
  * in an object a root keeps alive until the callback is released. The userdata C hands back is the
  * root's address; the trampoline reads the closure through it. */

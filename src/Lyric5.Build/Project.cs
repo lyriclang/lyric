@@ -60,7 +60,41 @@ public sealed record Project(string Source, string Name, string Module, string R
         : Path.Combine(OutDir, profile.Name, target.Triple, "test", BinaryName + target.ExecutableSuffix);
 
     public string BinaryName =>
-        Binary ?? (Manifest is null || Module == $"{Name}.main" ? Name : Module[(Module.LastIndexOf('.') + 1)..]);
+        Library is not null ? "lib" + Name
+        : Binary ?? (Manifest is null || Module == $"{Name}.main" ? Name : Module[(Module.LastIndexOf('.') + 1)..]);
+
+    /// <summary>For a library C links (<c>lyric build --lib</c>), which kind; <c>null</c> for a
+    /// program. Its entry is the package's root module, <c>src/lib.lyr</c>.</summary>
+    public LibraryKind? Library { get; init; }
+
+    /// <summary>The library C links, beside where the package's binaries go: <c>lib&lt;name&gt;.a</c>,
+    /// or shared — <c>lib&lt;name&gt;.so</c>, <c>lib&lt;name&gt;.dylib</c>, <c>&lt;name&gt;.dll</c>.</summary>
+    public string LibraryFile(BuildProfile profile, Target target) =>
+        Path.Combine(OutDir, profile.Name, target.Triple, Library != LibraryKind.Shared ? $"lib{Name}.a" : target.Os switch
+        {
+            TargetOs.Windows => $"{Name}.dll",
+            TargetOs.MacOs => $"lib{Name}.dylib",
+            _ => $"lib{Name}.so",
+        });
+
+    /// <summary>The library's header, <c>&lt;name&gt;.h</c>, beside it.</summary>
+    public string HeaderFile(BuildProfile profile, Target target) => Path.Combine(OutDir, profile.Name, target.Triple, $"{Name}.h");
+
+    /// <summary>The library of the package of a directory — the nearest manifest at or above it
+    /// —: its root module, <c>src/lib.lyr</c>, which may be missing. <c>null</c> where there is no
+    /// manifest.</summary>
+    /// <exception cref="ManifestException">The manifest, or one of the graph's, is refused.</exception>
+    public static Project? LibraryOf(string directory, LibraryKind kind, bool offline = false, bool locked = false)
+    {
+        if (FindManifest(Path.GetFullPath(directory)) is not { } manifestFile) return null;
+        var manifest = Manifest.Read(manifestFile);
+        var root = Path.Combine(manifest.SourceRoot, "lib.lyr");
+        return new Project(root, manifest.Name, manifest.Name, manifest.Root, manifest)
+        {
+            Graph = Resolve(manifest, offline, locked: locked),
+            Library = kind,
+        };
+    }
 
     /// <summary>Every package's source root by name, for the module loader — none for a single file,
     /// whose only module is its own.</summary>
@@ -240,3 +274,7 @@ public sealed record Project(string Source, string Name, string Module, string R
         return start;
     }
 }
+
+/// <summary>What <c>lyric build --lib</c> makes: an archive C links into its program, or a library
+/// the system's loader loads.</summary>
+public enum LibraryKind { Static, Shared }

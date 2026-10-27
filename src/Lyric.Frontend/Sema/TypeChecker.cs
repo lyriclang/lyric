@@ -603,6 +603,9 @@ public sealed class TypeChecker
                 var fnAttributes = CheckAttributes(fn.Attributes, AttributeSite.Function, fn.Generics.Length > 0,
                     module.Members, "a function");
                 if (fnAttributes.Exists(IsCanonicalTest)) CheckTest(fn, module);
+                foreach (var attribute in fn.Attributes)
+                    if (_result.RefOf(attribute) is TypeSymbol named && ReferenceEquals(named, _coreMembers?.LookupLocal("Export")))
+                        CheckExport(fn, attribute, module);
                 RequireBody(fn, module);
                 if (fn.IsMacro) CheckMacroSignature(fn);
                 CheckFunction(fn, module.Members, thisType: null);
@@ -1038,6 +1041,181 @@ public sealed class TypeChecker
         if (declared.Variants.Length - 1 > max)
             _de.Report("LYR-SEM0099", Severity.Error, layout.Span,
                 $"'{type.Name}' has {declared.Variants.Length} variants, and '{form}' holds 0 to {max}");
+    }
+
+    /// <summary><c>@Export</c> and <c>@Export("c_name")</c>: a bare one, or the symbol as a string
+    /// written out — the header and the linker read it before anything is computed.</summary>
+    private void CheckExportForm(AttributeNode attribute)
+    {
+        if (attribute.Fields.Length == 0 && attribute.Positional is null or StringLiteralExpr) return;
+        _de.Report("LYR-SEM0099", Severity.Error, attribute.Span,
+            "'@Export' takes the C symbol as a string written out, '@Export(\"geo_area\")', or nothing for the function's own name");
+    }
+
+    /// <summary>The symbols the program exports, each with where it was claimed: two functions
+    /// cannot both be one symbol.</summary>
+    private readonly Dictionary<string, Span> _exportSymbols = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// <c>@Export("geo_area") pub fn area(…)</c>: a function C calls by a symbol. It has a body
+    /// and one signature — <c>pub</c>, no type parameters, not <c>inline</c> —, and what it takes and
+    /// gives crosses as for a C function the program calls (<see cref="CFault"/>), the other way:
+    /// a <c>string</c> is no parameter here, C's text comes in as a <c>CStr</c>. It may throw; C
+    /// then gets <c>LyrStatus</c>. Its declaration in C, and the types that declaration names, go
+    /// into the header the library carries.
+    /// </summary>
+    private void CheckExport(FunctionDecl fn, AttributeNode export, ModuleSymbol module)
+    {
+        // a function is one export, however often a declaration is checked
+        if (_result.Exports.Exists(e => ReferenceEquals(e.Function, fn))) return;
+        var symbol = (export.Positional as StringLiteralExpr)?.Value ?? fn.Name;
+        var faults = 0;
+        void Refuse(Span span, string message)
+        {
+            _de.Report("LYR-SEM0099", Severity.Error, span, message);
+            faults++;
+        }
+        if (!CIdentifier.IsMatch(symbol)) Refuse(export.Span, $"'{symbol}' is no C function's name");
+        else if (symbol.StartsWith("lyr_", StringComparison.Ordinal) || symbol.StartsWith("LYR_", StringComparison.Ordinal))
+            Refuse(export.Span, $"'{symbol}' begins as the runtime's own names do ('lyr_') — name the export otherwise");
+        else if (_exportSymbols.TryGetValue(symbol, out var first) && first != export.Span)
+            Refuse(export.Span, $"'{symbol}' is exported already by another function — one C symbol is one function");
+        else _exportSymbols[symbol] = export.Span;
+        if (fn.Body is null) Refuse(fn.NameSpan, $"'{fn.Name}' has no body to export — an export is a Lyric function C calls");
+        if (!fn.IsPublic) Refuse(fn.NameSpan, $"'{fn.Name}' is exported, and an export is 'pub': C calls it from outside every module");
+        if (fn.Generics.Length > 0) Refuse(fn.NameSpan, $"'{fn.Name}' is generic — an export is one signature, and C has no type arguments");
+        if (fn.IsInline) Refuse(fn.NameSpan, $"'{fn.Name}' is 'inline', set in place at every call — an export is a function C calls");
+        if (fn.IsMacro) Refuse(fn.NameSpan, $"'{fn.Name}' is a macro, which runs while the program compiles — C cannot call it");
+        var parameters = new List<LyrType>();
+        foreach (var p in fn.Parameters)
+        {
+            var type = ResolveType(p.Type, module.Members);
+            parameters.Add(type);
+            if (p.IsPlace)
+                Refuse(p.Span, $"parameter '{p.Name}' of export '{fn.Name}' takes a place ('&'), which C cannot hand — what C hands by address is a 'Ptr'");
+            else if (type is PrimitiveType { Kind: PrimitiveKind.String })
+                Refuse(p.Type.Span, $"parameter '{p.Name}' of export '{fn.Name}' is a 'string', and C hands its text as a 'CStr' (std.ffi) — "
+                                    + "declare it so, and 'toString()' copies it");
+            else if (CFault(type, CSite.Parameter) is { } fault)
+                Refuse(p.Type.Span, $"parameter '{p.Name}' of export '{fn.Name}' has type '{TypeFacts.Display(type)}', which C cannot hand — {fault}");
+        }
+        var result = fn.ReturnType is { } written ? ResolveType(written, module.Members) : LyrType.Void;
+        if (fn.ReturnType is { } returned && CFault(result, CSite.Return) is { } resultFault)
+            Refuse(returned.Span, $"export '{fn.Name}' returns '{TypeFacts.Display(result)}', which C cannot take — {resultFault}");
+        if (faults > 0 || parameters.Concat([result]).Any(t => t.IsError)) return;
+
+        // its declaration as C reads it: the parameters by their names, a throwing export's result
+        // through the last one
+        var names = fn.Parameters.Select(p => CHeaderName(p.Name)).ToList();
+        var declared = parameters.Select((t, i) => CDeclarator(t, names[i])).ToList();
+        string declaration;
+        if (fn.Throws is not null)
+        {
+            if (result is not PrimitiveType { Kind: PrimitiveKind.Void }) declared.Add(CDeclarator(result, "*lyr_out"));
+            declaration = $"LyrStatus {symbol}({(declared.Count == 0 ? "void" : string.Join(", ", declared))})";
+        }
+        else declaration = CDeclarator(result, $"{symbol}({(declared.Count == 0 ? "void" : string.Join(", ", declared))})");
+        _result.Exports.Add(new CExport(fn, symbol, declaration));
+    }
+
+    /// <summary>C's keywords, which a parameter's name in the header is not.</summary>
+    private static readonly HashSet<string> CKeywords =
+    [
+        "auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern",
+        "float", "for", "goto", "if", "inline", "int", "long", "register", "restrict", "return", "short", "signed",
+        "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while",
+        "bool", "true", "false",
+    ];
+
+    private static string CHeaderName(string name) => CKeywords.Contains(name) || name.StartsWith("lyr_", StringComparison.Ordinal) ? name + "_" : name;
+
+    /// <summary>
+    /// The C declaration of <paramref name="inner"/> — a name, a pointer to it, a function's head —
+    /// of a type that crosses (<see cref="CFault"/>): C's integer of each width, <c>bool</c>, a
+    /// <c>char</c> as its scalar value; a <c>Ptr&lt;T&gt;</c> as <c>T *</c> (<c>void *</c> where C
+    /// has no name for <c>T</c>), a <c>CStr</c> as <c>const char *</c>, either's optional alike; a
+    /// C function's pointer in C's form; a <c>@Layout</c> type by the name the header defines it
+    /// under, its module's path and its own (<c>geo_Point</c>).
+    /// </summary>
+    private string CDeclarator(LyrType type, string inner)
+    {
+        string Named(string c) => inner.Length == 0 ? c : $"{c} {inner}";
+        switch (type)
+        {
+            case PrimitiveType { Kind: var kind }:
+                return Named(kind switch
+                {
+                    PrimitiveKind.Int => "int64_t", PrimitiveKind.Uint => "uint64_t",
+                    PrimitiveKind.Int8 => "int8_t", PrimitiveKind.Int16 => "int16_t", PrimitiveKind.Int32 => "int32_t",
+                    PrimitiveKind.Uint8 => "uint8_t", PrimitiveKind.Uint16 => "uint16_t", PrimitiveKind.Uint32 => "uint32_t",
+                    PrimitiveKind.Float => "double", PrimitiveKind.Float32 => "float",
+                    PrimitiveKind.Bool => "bool", PrimitiveKind.Char => "uint32_t",
+                    _ => "void",
+                });
+            case Optional { Inner: var held }:
+                return CDeclarator(held, inner);
+            case GenericInstance g when IsFfiType(g.Definition, "Ptr"):
+                var pointee = g.Arguments is [var target] && CFault(target, CSite.Field) is null && target is not FnType
+                    ? target : LyrType.Void;
+                return CDeclarator(pointee, "*" + inner);
+            case NamedRef r when IsFfiType(r.Symbol, "CStr"):
+                return Named("const char *").Replace("* ", "*");
+            case FnType f:
+                var parameters = f.Parameters.Length == 0 ? "void" : string.Join(", ", f.Parameters.Select(p => CDeclarator(p, "")));
+                return CDeclarator(f.Return, $"(*{inner})({parameters})");
+            case InlineArrayOf ia:
+                return CDeclarator(ia.Element, $"{inner}[{ia.Length}]");
+            case NamedRef { Symbol: var s }:
+                return Named(CHeaderType(s));
+            default:
+                return Named("void");
+        }
+    }
+
+    /// <summary>A <c>@Layout</c> type's name in the header, its definition added to the header's
+    /// types — after every type its fields name, a type through a pointer only declared ahead.</summary>
+    private string CHeaderType(TypeSymbol type)
+    {
+        var name = $"{string.Join('_', ModuleOfType(type))}_{type.Name}".TrimStart('_');
+        // a struct whose fields are still being written — through a pointer to itself — by its tag
+        if (!_headerTypes.Add(type))
+            return type.Kind == TypeSymbolKind.Struct && !_headerTypesDone.Contains(type) ? $"struct {name}" : name;
+        if (type.Kind == TypeSymbolKind.Enum && type.Declaration is EnumDecl declared)
+        {
+            var constants = string.Join(", ", declared.Variants.Select((v, i) => $"{name}_{v.Name} = {i}"));
+            var definition = LayoutOf(type) == "C"
+                ? $"typedef enum {name} {{ {constants} }} {name};"
+                : $"typedef {CDeclarator(new PrimitiveType(LayoutKind(LayoutOf(type)!)), "")} {name};\nenum {{ {constants} }};";
+            _result.CHeaderTypes.Add(definition);
+            return name;
+        }
+        var fields = new List<string>();
+        foreach (var field in (type.Declaration as StructDecl)?.Members.OfType<FieldDecl>() ?? [])
+            if (type.Members.LookupLocal(field.Name) is FieldSymbol fs)
+                fields.Add($"    {CDeclarator(FieldType(fs), CHeaderName(field.Name))};");
+        _result.CHeaderTypes.Add($"typedef struct {name} {{\n{string.Join('\n', fields)}\n}} {name};");
+        _headerTypesDone.Add(type);
+        return name;
+    }
+
+    private readonly HashSet<TypeSymbol> _headerTypes = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<TypeSymbol> _headerTypesDone = new(ReferenceEqualityComparer.Instance);
+
+    private static PrimitiveKind LayoutKind(string form) => form switch
+    {
+        "int8" => PrimitiveKind.Int8, "int16" => PrimitiveKind.Int16, "int32" => PrimitiveKind.Int32,
+        "uint8" => PrimitiveKind.Uint8, "uint16" => PrimitiveKind.Uint16, "uint32" => PrimitiveKind.Uint32,
+        "uint" or "uint64" => PrimitiveKind.Uint,
+        _ => PrimitiveKind.Int,
+    };
+
+    /// <summary>The path of the module that declares a type, by identity; empty where none does.</summary>
+    private string[] ModuleOfType(TypeSymbol type)
+    {
+        foreach (var module in _comp.Modules)
+            if (ReferenceEquals(module.Members.LookupLocal(type.Name), type))
+                return module.Path;
+        return [];
     }
 
     private static readonly System.Text.RegularExpressions.Regex CIdentifier = new("^[A-Za-z_][A-Za-z0-9_]*$");
@@ -10889,6 +11067,11 @@ public sealed class TypeChecker
             CheckLayoutForm(attribute);
             return ts;
         }
+        if (ReferenceEquals(ts, _coreMembers?.LookupLocal("Export")))
+        {
+            CheckExportForm(attribute);
+            return ts;
+        }
 
         var fields = attribute.Fields.ToList();
         if (attribute.Positional is { } positional)
@@ -15522,7 +15705,7 @@ public sealed class TypeChecker
     /// <summary>The compiler instructions of <c>std.core</c> beside <c>@Test</c>, <c>@Bench</c> and
     /// <c>@callerExpr</c> (the closed list of T2): what changes what the compiler does.</summary>
     private static readonly string[] CompilerInstructions =
-        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "Warn", "Deny", "When", "Shared", "SeesConformer", "Layout"];
+        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "Warn", "Deny", "When", "Shared", "SeesConformer", "Layout", "Export"];
 
     /// <summary>Whether this is one of <see cref="CompilerInstructions"/>, by identity.</summary>
     private bool IsCompilerInstruction(TypeSymbol ts) =>

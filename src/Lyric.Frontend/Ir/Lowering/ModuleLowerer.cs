@@ -132,6 +132,10 @@ public static class ModuleLowerer
         var exportRoots = new List<FunctionId>();
         FunctionId? entry = null;
         var failed = false;
+        // the functions C calls (@Export): roots of every build, the program's and the library's
+        var exported = new Dictionary<FunctionDecl, CExport>(ReferenceEqualityComparer.Instance);
+        foreach (var export in types.Exports) exported[export.Function] = export;
+        var exports = new List<IrExport>();
 
         // Pass 1: the function table. The order is module order then declaration order and therefore
         // deterministic; FunctionIds land as indices in the bytecode.
@@ -245,10 +249,34 @@ public static class ModuleLowerer
                 if (libraryRoots && function.IsPublic && !compilation.IsNative(module))
                     exportRoots.Add(id);
 
+                // An export: C's values come in and go back in their forms, as a C function's go
+                // out and come back.
+                if (exported.TryGetValue(function, out var exportedAs))
+                {
+                    try
+                    {
+                        var aliases = LocalAliases(compilation, module);
+                        var parameters = function.Parameters
+                            .Select(p => typeTable.Lower(ResolveLocalAliases(p.Type, aliases, binding)!)).ToArray();
+                        var returned = function.ReturnType is { } written
+                            ? typeTable.Lower(ResolveLocalAliases(written, aliases, binding)!)
+                            : new IrScalarType(IrScalar.Void);
+                        exports.Add(new IrExport(id, exportedAs.Symbol, [.. parameters.Select(t => CFormOf(t, typeTable, compilation))],
+                            CFormOf(returned, typeTable, compilation), function.Throws is not null));
+                        exportRoots.Add(id);
+                    }
+                    catch (UnsupportedConstructException ex)
+                    {
+                        LoweringDiagnostics.ReportUnsupported(de, ex);
+                        failed = true;
+                    }
+                }
+
                 // The entry contract: exactly one 'main' per executable. The sema checked that it is
                 // unique; here it is only recorded — the entry module's, where the compilation knows
-                // one (in Lyric 5 a 'main' elsewhere is an ordinary function).
-                if (function.Name != "main") continue;
+                // one (in Lyric 5 a 'main' elsewhere is an ordinary function). A library C links
+                // starts from nothing of its own.
+                if (function.Name != "main" || compilation.Library) continue;
                 if (compilation.Entry is { } home && !ReferenceEquals(module, home)) continue;
 
                 if (function.Parameters.Length == 0) { entry = id; continue; }
@@ -637,6 +665,12 @@ public static class ModuleLowerer
             Attributes = attributes,
             ExportRoots = exportRoots,
             Quotes = typeTable.Quotes,
+            // the hoisting pass computes the sites alone, whose functions are its only roots
+            Exports = comptime is { Hoist: true } ? [] : exports,
+            Header = comptime is { Hoist: true } || exports.Count == 0
+                ? IrHeader.Empty
+                : new IrHeader([.. types.CHeaderTypes],
+                    [.. types.Exports.Where(e => exports.Exists(x => x.Symbol == e.Symbol)).Select(e => e.Declaration)]),
         };
         if (failed) return null;
 

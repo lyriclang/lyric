@@ -97,6 +97,10 @@ public sealed class Compilation
     /// </summary>
     public bool Lyric5Modules { get; init; }
 
+    /// <summary>Whether the program is a library C links: <see cref="Entry"/> is its root module,
+    /// which has no <c>main</c>; the exports are what it starts from.</summary>
+    public bool Library { get; init; }
+
     /// <summary>What each package of the program declares it imports from: a module imports
     /// from its own package, from <c>std</c>, and from these alone. <c>null</c> where no package
     /// rules apply.</summary>

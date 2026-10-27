@@ -42,6 +42,14 @@ public sealed class TypeResult
     /// </summary>
     public SiteList ComptimeSites { get; } = new();
 
+    /// <summary>The program's exports (<c>@Export</c>) in the order the checker met them: each
+    /// function with its C symbol and its declaration as the library's header writes it.</summary>
+    public List<CExport> Exports { get; } = [];
+
+    /// <summary>The definitions of the <c>@Layout</c> types the exports' declarations name, each
+    /// after the types its own fields name.</summary>
+    public List<string> CHeaderTypes { get; } = [];
+
     /// <summary>The quotes of the program, in the order the checker met them, each
     /// with the module it stands in: the lowering numbers them for the interpreter, which builds
     /// the tree, and a free name of the content is that module's.</summary>
@@ -816,3 +824,8 @@ public enum CallerPlace
     /// <summary><c>@callerFile</c>: the file the call stands in.</summary>
     File,
 }
+
+/// <summary>A function C calls (<c>@Export</c>): its declaration, the symbol C calls it by, and
+/// that symbol's declaration in C — <c>int64_t geo_add(int64_t a, int64_t b)</c>, or with
+/// <c>LyrStatus</c> where it throws.</summary>
+public sealed record CExport(FunctionDecl Function, string Symbol, string Declaration);
