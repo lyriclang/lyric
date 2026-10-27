@@ -86,7 +86,8 @@ is over the profile (<a href="https://github.com/lyriclang/lyric/blob/main/desig
 names the binary.</li>
 <li>Without a file and without a manifest at or above the directory there is nothing to build
 (<code>LYR-CLI0004</code>). A package without <code>src/main.lyr</code> is a library: <code>build</code> checks it
-(<a href="../../spec/15-project/">15 §2</a>), and <code>run</code> has no program there (<code>LYR-CLI0005</code>).</li>
+(<a href="../../spec/15-project/">15 §2</a>) — <code>build --lib</code> builds it for C (rule 9) —, and <code>run</code> has no program
+there (<code>LYR-CLI0005</code>).</li>
 <li><strong><code>lyric expand [&lt;file.lyr&gt;]</code></strong> prints the program's entry module after its macros' expansion
 (<a href="../../spec/11-metaprogramming/">11 §5</a>) to standard output: the results in the sites' places, the
 rest as written, in the formatter's form — comments fall, as do the module's header line and
@@ -101,7 +102,12 @@ files, and <strong><code>--dry-run</code></strong> prints them as a diff instead
 <code>build</code> does — through everything a build does before the C: the build scripts, for what they
 write into <code>gen/</code> (<a href="../../spec/15-project/">15 §8</a>), the front end and the lints, <code>comptime</code>, and the
 lowering. It says what <code>build</code> says, exits as <code>build</code> does (§1.3), and makes neither C nor a
-binary. It takes <code>build</code>'s options but <code>--emit</code>.</li>
+binary. It takes <code>build</code>'s options but <code>--emit</code>, <code>--lib</code> and <code>--shared</code>.</li>
+<li><strong><code>lyric build --lib</code></strong> builds the package's library for C — its <code>src/lib.lyr</code> and what that
+imports — instead of its programs (<a href="../../spec/13-abi/#4-exports-and-libraries">13 §4</a>): the archive
+<code>lib&lt;name&gt;.a</code> and the header <code>&lt;name&gt;.h</code>, or with <strong><code>--shared</code></strong> a shared library in the
+archive's place. Without <code>src/lib.lyr</code> there is nothing to build (<code>LYR-CLI0001</code>); <code>--shared</code>
+without <code>--lib</code>, and <code>--lib</code> with a file, <code>--bin</code> or <code>--emit</code>, are refused (exit 2).</li>
 </ol>
 <h3 id="12-where-the-files-go">1.2 Where the files go</h3>
 <ol>
@@ -113,7 +119,8 @@ file beside a package's <code>src/</code>; without one, at the nearest directory
 without that, by the file (P5). Under it, the binary is <code>out/&lt;profile&gt;/&lt;target&gt;/&lt;name&gt;</code>, with
 the executable suffix of the target — named after the package for its <code>src/main.lyr</code>, after
 the module's last segment for another module of the package, after the file for a single file
-—, and <code>out/cache/</code> holds what the build keeps between runs (P4; 01 L7).</li>
+—, a library for C beside it (<a href="../../spec/13-abi/#4-exports-and-libraries">13 §4</a> rule 7), and
+<code>out/cache/</code> holds what the build keeps between runs (P4; 01 L7).</li>
 <li>An unchanged program compiles nothing twice: the same sources — every module of the program,
 the standard library's included —, toolchain and options reuse the cache, and the binary is
 linked only when an input to it changed (11 C9). A build that reuses the cache <strong>says again
@@ -301,7 +308,7 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <tr>
 <td><code>build</code></td>
 <td><code>[&lt;file.lyr&gt;]</code></td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--emit &lt;ir|c&gt;</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--emit &lt;ir|c&gt;</code>, <code>--lib</code>, <code>--shared</code></td>
 <td>yes</td>
 <td>yes</td>
 </tr>

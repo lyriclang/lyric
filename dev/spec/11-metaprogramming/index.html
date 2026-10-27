@@ -95,9 +95,9 @@ built. A test is reached from the program <code>lyric test</code> writes.</li>
 reads (09 A11, T2): <code>@Test</code> (rule 2), <code>@callerExpr</code> (rule 3), <code>@callerLine</code> and <code>@callerFile</code>
 (rule 8), <code>@Deprecated</code> (rule 9), <code>@AlwaysInline</code>, <code>@NoInline</code> and <code>@Cold</code> (rule 10),
 <code>@MustUse</code> (rule 11), <code>@NonExhaustive</code> (rule 12), <code>@Allow</code> (rule 13), <code>@Shared</code> (rule 14),
-<code>@SeesConformer</code> (rule 15), <code>@Layout</code> (rule 16) and <code>@When</code> (§3). What one says holds for
-every instance, so beside <code>@Test</code> they sit on a generic declaration too, where data may not
-(<code>LYR-SEM0067</code>).</li>
+<code>@SeesConformer</code> (rule 15), <code>@Layout</code> (rule 16), <code>@Export</code> (rule 17) and <code>@When</code> (§3). What
+one says holds for every instance, so beside <code>@Test</code> they sit on a generic declaration too,
+where data may not (<code>LYR-SEM0067</code>).</li>
 <li><strong><code>@callerLine</code></strong> on an <code>int</code> parameter and <strong><code>@callerFile</code></strong> on a <code>string</code> one: where a call
 leaves the parameter out, it gets the line the call begins on, or the file the call stands in —
 the package's name, then the path within the package, with <code>/</code> on every system:
@@ -139,6 +139,10 @@ it, and its documentation says that it does (the sweep after M10, W10).</li>
 enum: the type is laid out as C's and crosses into C (<a href="../../spec/13-abi/#3-the-type-table-stage-2">13 §3</a>).
 Its form is a name, as <code>@callerExpr</code>'s; a generic type does not take it, since one layout is
 not one per instance.</li>
+<li><strong><code>@Export(&quot;geo_area&quot;)</code></strong> on a <code>pub fn</code>, or a bare <strong><code>@Export</code></strong>: C calls the function by that
+symbol, or by the function's own name (<a href="../../spec/13-abi/#4-exports-and-libraries">13 §4</a>). Its form is a
+string written out, which the header and the linker read before anything is computed; a generic
+function does not take it, since C has no type arguments.</li>
 </ol>
 <h2 id="2-comptime">2. <code>comptime</code></h2>
 <p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/09-metaprogrammierung.md">09 A4, Q1–Q7</a>)</p>

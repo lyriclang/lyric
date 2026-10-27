@@ -532,6 +532,67 @@ waits (10 §2 rule 12): a call from C may come and wake one.</li>
 </ul>
 </li>
 </ol>
+<h2 id="4-exports-and-libraries">4. Exports and libraries</h2>
+<p>A Lyric function C calls by a symbol, and the library <code>lyric build --lib</code> makes of a package for
+a C program to link (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 X8, H1–H3</a>).
+A call of an export is C's call of a Lyric function on the thread Lyric runs on, as through a
+C function's pointer (§3 rule 9).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code>; that a C program links the library — the archive
+and the shared one — and calls its exports, in the toolchain's own tests (<code>tests/Lyric5.Tests</code>,
+<code>ExportTests</code>).</p>
+<ol>
+<li><strong><code>@Export(&quot;geo_area&quot;)</code></strong> on a function — a compiler instruction of the prelude
+(<a href="../../spec/11-metaprogramming/">11 §1</a> rule 17) — makes it C's to call as the function <code>geo_area</code>; a
+bare <code>@Export</code> names it as the function is named. The symbol is written out as a string, or
+not at all (<code>LYR-SEM0099</code>); it is a C identifier, does not begin with <code>lyr_</code> or <code>LYR_</code> — the
+runtime's names —, and is one function's in the program (<code>LYR-SEM0099</code> for each).</li>
+<li>What is exported is a free function with a body, <code>pub</code>, without type parameters, neither
+<code>inline</code> nor a macro (<code>LYR-SEM0099</code>). On a method the attribute stands out of its place
+(<code>LYR-SEM0065</code>).</li>
+<li>Its parameters and its result cross as a C function's do (§2 rule 2, §3), the other way: C
+hands the parameters and takes the result. A <code>string</code> is no parameter — C hands its text as a
+<code>CStr</code>, which <code>toString()</code> copies —, a place is none, and every type that does not cross is
+refused, as a parameter and as a result (<code>LYR-SEM0099</code>).</li>
+<li>An export that <strong>throws</strong> is C's <code>LyrStatus name(parameters…, R *out)</code>: <code>LYR_OK</code> with its
+result written through <code>out</code>, <code>LYR_ERROR</code> where it threw, <code>out</code> left as it was. Without a
+result there is no <code>out</code>. The error itself stays behind.</li>
+<li>An export is a <strong>root</strong> of every build: of a program's — a C function of its native part
+(<a href="../../spec/15-project/">15 §5</a>) may call it — and of a library's.</li>
+<li>C calls an export after the runtime started (§1.5 rule 2), on the thread that started it: before
+it, or on another thread, the process ends with its report (<code>LYR-RT0022</code>). The first call into
+a library fills the library's module-level bindings, once, as a program's start does before
+<code>main</code> (<a href="../../spec/04-modules/">04 §1</a> rule 2); in a program <code>main</code>'s start filled them. The function
+runs as one C calls through its pointer does (§3 rule 9): its C frames are counted, it may park,
+and a panic in it ends the process with its report.</li>
+<li><strong><code>lyric build --lib</code></strong> (<a href="../../spec/14-cli/">14 §1.1</a> rule 9) builds the package's <strong>library</strong>: its root
+module <code>src/lib.lyr</code> and the modules it reaches by import, as a program is its entry module's
+(<a href="../../spec/04-modules/">04 §2</a>) — without a <code>main</code> to start from; one there is an ordinary function.
+Under <code>out/&lt;profile&gt;/&lt;target&gt;/</code> it writes <strong><code>lib&lt;name&gt;.a</code></strong>, the archive that holds the library
+and the runtime, and the header <strong><code>&lt;name&gt;.h</code></strong>. With <code>--shared</code> a shared library takes the
+archive's place: <code>lib&lt;name&gt;.so</code>, <code>lib&lt;name&gt;.dylib</code>, or <code>&lt;name&gt;.dll</code> beside its import library
+<code>&lt;name&gt;.lib</code>.</li>
+<li>The <strong>header</strong> declares, in this order:
+<ul>
+<li>the runtime's API: <code>LyrConfig</code>, <code>lyr_init</code>, <code>lyr_shutdown</code>, and <code>LyrStatus</code> with <code>LYR_OK</code>,
+<code>LYR_ERROR</code>, <code>LYR_PANIC</code>;</li>
+<li>the <code>@Layout</code> types the exports name, each before the first that needs it, named by its
+module's path and its own name joined by <code>_</code> — <code>geo.Point</code> is <code>geo_Point</code> —: a struct as C's
+<code>struct</code> of the same fields in their order, an enum with <code>@Layout(C)</code> as C's <code>enum</code>, one with
+an integer type as that integer with a constant per variant (<code>geo_Shape_Square = 0</code>, on in
+the order written);</li>
+<li>the exports, each as C declares it: the integers by their widths (<code>int64_t</code> for <code>int</code>),
+<code>double</code> and <code>float</code>, <code>bool</code>, a <code>char</code> as <code>uint32_t</code>, a <code>Ptr&lt;T&gt;</code> as <code>T *</code> — <code>void *</code> where C
+has no name for <code>T</code> —, a <code>CStr</code> as <code>const char *</code>, an optional pointer as the pointer, a C
+function's pointer in C's form. A parameter is named as in Lyric, with a <code>_</code> after a name C
+reserves.</li>
+</ul>
+</li>
+<li>A shared library gives the system's loader its exports, <code>lyr_init</code> and <code>lyr_shutdown</code>, and no
+other symbol. A C program that links the archive links the libraries the runtime calls too — on
+Linux <code>-lpthread -lm</code>, with zig cc <code>-lunwind</code>; on Windows <code>-lshell32 -lws2_32</code> — and those the
+packages' native parts name (<a href="../../spec/15-project/">15 §5</a>), which a shared library is linked against
+itself.</li>
+</ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -547,6 +608,7 @@ waits (10 §2 rule 12): a call from C may come and wake one.</li>
 <li class="level-3"><a href="#17-waiting">1.7 Waiting</a></li>
 <li class="level-2"><a href="#2-c-functions-stage-1">2. C functions, stage 1</a></li>
 <li class="level-2"><a href="#3-the-type-table-stage-2">3. The type table, stage 2</a></li>
+<li class="level-2"><a href="#4-exports-and-libraries">4. Exports and libraries</a></li>
 </ul>
 </aside>
 </div>

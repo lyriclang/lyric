@@ -138,7 +138,7 @@ know and refuses a version it does not know.</li>
 <code>applicability</code> <code>safe</code> or <code>needs-review</code>), and <code>rendered</code>, the finding in the text form without colour.
 A span is <code>null</code> or <code>{file, start, end}</code>, <code>start</code> and <code>end</code> each <code>{line, column, offset}</code>, the file as
 the text form says it (§1 rule 5). Every finding is a line — §2's limit is the text form's.</li>
-<li><strong><code>artifact</code></strong>: what a build wrote — <code>kind</code> (<code>binary</code>), <code>name</code>, <code>path</code>.</li>
+<li><strong><code>artifact</code></strong>: what a build wrote — <code>kind</code> (<code>binary</code>, or <code>library</code> for <code>build --lib</code>), <code>name</code>, <code>path</code>.</li>
 <li><strong><code>test</code></strong>: a test of <code>lyric test</code> as it ends — <code>name</code>, <code>outcome</code> (<code>passed</code>, <code>failed</code>, <code>skipped</code>), and
 where there is one a <code>message</code> (why it was skipped, what ended it) and the <code>panic</code>'s code. <strong><code>tests</code></strong>:
 the run's count — <code>passed</code>, <code>failed</code>, <code>skipped</code>. <strong><code>output</code></strong>: a line the program wrote that is no event
