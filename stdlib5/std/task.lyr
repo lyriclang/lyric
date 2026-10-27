@@ -1944,6 +1944,8 @@ class Scheduler {
     /// Runs one turn: the next ready context runs until it waits; with none ready, the thread waits for
     /// the earliest sleeper — without end where there is none, until another thread wakes it.
     mut fn step(): void {
+        // what C's threads handed this thread's Callbacks, before the tasks
+        lyr_ffi_drain();
         this.takeInbox();
         if (this.sleepers != null) {
             this.wakeSleepers(monotonicNanos());
@@ -2047,7 +2049,12 @@ class Scheduler {
     /// it leaves the count, so with the count at one they are all there to be seen. A task that
     /// waits on a descriptor waits on the system, which may end it: no deadlock while one does. A file's call waits on the pool, a thread that lives.
     mut fn deadlock(): bool {
-        if (this.liveFirst == null || this.ioCount > 0 || living.others(this) || this.pending()) {
+        // a Callback of this thread a thread of C's may call: a call may come and wake a task
+        if (this.liveFirst == null
+            || this.ioCount > 0
+            || living.others(this)
+            || this.pending()
+            || lyr_ffi_callbacks_alive() > 0) {
             return false;
         }
         var at = this.liveFirst;
@@ -2312,6 +2319,9 @@ fn repanic(code: string, message: string, trace: string): never;
 
 /// The running thread's scheduler, as `runMain` set it.
 fn currentScheduler(): ?Scheduler;
+
+extern "C" fn lyr_ffi_drain(): void;
+extern "C" fn lyr_ffi_callbacks_alive(): int;
 
 /// What `stashForeign` keeps where no task runs — the program's, behind its lock, as threads
 /// without a scheduler share it.

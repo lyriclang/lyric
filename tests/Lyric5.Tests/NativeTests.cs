@@ -801,6 +801,141 @@ public class NativeTests
         Assert.Contains($"error[{code}]: {why}", error);
     }
 
+    private const string ThreadC = """
+        #include <stdint.h>
+        #include <stdlib.h>
+        #ifdef _WIN32
+        #include <windows.h>
+        #else
+        #include <pthread.h>
+        #endif
+
+        typedef struct { void (*f)(void *, int64_t); int64_t (*g)(void *, int64_t); void *userdata; int64_t n; } Job;
+
+        static void work(Job *job) {
+            for (int64_t i = 0; i < job->n; i++) {
+                if (job->f != NULL) job->f(job->userdata, i); else (void)job->g(job->userdata, i);
+            }
+            free(job);
+        }
+
+        #ifdef _WIN32
+        static DWORD WINAPI run(LPVOID arg) { work(arg); return 0; }
+        static void start(Job *job, int wait) {
+            HANDLE t = CreateThread(NULL, 0, run, job, 0, NULL);
+            if (wait) WaitForSingleObject(t, INFINITE);
+            CloseHandle(t);
+        }
+        #else
+        static void *run(void *arg) { work(arg); return NULL; }
+        static void start(Job *job, int wait) {
+            pthread_t t;
+            pthread_create(&t, NULL, run, job);
+            if (wait) pthread_join(t, NULL); else pthread_detach(t);
+        }
+        #endif
+
+        static Job *job(void (*f)(void *, int64_t), int64_t (*g)(void *, int64_t), void *userdata, int64_t n) {
+            Job *j = malloc(sizeof *j);
+            j->f = f; j->g = g; j->userdata = userdata; j->n = n;
+            return j;
+        }
+
+        void start_ticker(void (*f)(void *, int64_t), void *userdata, int64_t n) { start(job(f, NULL, userdata, n), 0); }
+        void ask_elsewhere(int64_t (*g)(void *, int64_t), void *userdata) { start(job(NULL, g, userdata, 1), 1); }
+        void tick_elsewhere_and_wait(void (*f)(void *, int64_t), void *userdata) { start(job(f, NULL, userdata, 1), 1); }
+
+        """;
+
+    private static string Threads(string main) => Package(
+        ("lyric.toml", AppManifest + "\n[native]\nsources = [\"native/*.c\"]\n\n[native.linux]\nlibs = [\"pthread\"]\n"),
+        ("native/thread.c", ThreadC),
+        ("src/main.lyr", """
+            import std.io { println };
+            import std.ffi { Ptr, Callback };
+            import std.task { sleep };
+            import std.time { Duration };
+
+            extern "C" {
+                fn start_ticker(f: extern "C" fn(Ptr<void>, int) -> void, userdata: Ptr<void>, n: int): void;
+                fn ask_elsewhere(g: extern "C" fn(Ptr<void>, int) -> int, userdata: Ptr<void>): void;
+                fn tick_elsewhere_and_wait(f: extern "C" fn(Ptr<void>, int) -> void, userdata: Ptr<void>): void;
+            }
+
+            """ + main));
+
+    /// <summary>A Callback that returns nothing, called on a thread of C's own: each call goes to the
+    /// thread that made it and runs there, in the order C made them, while C's thread goes on.</summary>
+    [Fact]
+    public void A_callback_from_a_thread_of_Cs_runs_on_its_owner()
+    {
+        var dir = Threads("""
+            fn main(): void throws Error {
+                var seen = 0;
+                let cb = Callback<extern "C" fn(Ptr<void>, int) -> void>.new((i) => {
+                    println(f"tick {i}");
+                    seen += 1;
+                });
+                start_ticker(cb.function, cb.userdata, 3);
+                while (seen < 3) {
+                    try sleep(Duration.ofMillis(1));
+                }
+                cb.release();
+                println(f"done {seen}");
+            }
+
+            """);
+        Assert.Equal("tick 0\ntick 1\ntick 2\ndone 3\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    /// <summary>The call may come before the owner's scheduler took another turn: here C calls on
+    /// its thread while main waits in C for it, right after the Callback is made. It is handed over
+    /// and runs when main is back.</summary>
+    [Fact]
+    public void A_callback_from_a_thread_of_Cs_may_come_at_once()
+    {
+        var dir = Threads("""
+            fn main(): void throws Error {
+                var seen = 0;
+                let cb = Callback<extern "C" fn(Ptr<void>, int) -> void>.new((i) => {
+                    seen += 1;
+                });
+                tick_elsewhere_and_wait(cb.function, cb.userdata);
+                println(f"back {seen}");
+                while (seen < 1) {
+                    try sleep(Duration.ofMillis(1));
+                }
+                cb.release();
+                println(f"done {seen}");
+            }
+
+            """);
+        Assert.Equal("back 0\ndone 1\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    /// <summary>One that returns a value cannot wait for its owner: C's thread would block on a
+    /// thread that may be blocked on it. It ends the program with LYR-RT0022.</summary>
+    [Fact]
+    public void A_returning_callback_from_a_thread_of_Cs_ends_the_program()
+    {
+        var dir = Threads("""
+            fn main(): void {
+                let cb = Callback<extern "C" fn(Ptr<void>, int) -> int>.new((i) => i + 1);
+                ask_elsewhere(cb.function, cb.userdata);
+                println("never");
+            }
+
+            """);
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.True(exit == 0, error);
+        var host = Lyric5.Toolchain.Target.Host;
+        var ran = Lyric5.Toolchain.ProcessRunner.Run(Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix),
+            [], TimeSpan.FromMinutes(1));
+        Assert.Equal(101, ran.ExitCode);
+        Assert.Contains("panic [LYR-RT0022]: C called a Lyric function on a thread Lyric does not run", ran.Stderr);
+        Assert.DoesNotContain("never", ran.Stdout);
+    }
+
     [Theory]
     [InlineData("[native]\nsources = \"native/a.c\"\n", "LYR-PKG0002", "'sources' of [native] is an array of patterns")]
     [InlineData("[native]\ninclude = [\"native/*\"]\n", "LYR-PKG0002", "'native/*' in 'include' of [native] is no directory of the package")]

@@ -4076,7 +4076,7 @@ panic [LYR-RT0021]: C returned 7, which is no variant of app.main.Color (it has 
 title = "a Lyric function called from a thread Lyric does not run"
 severity = "panic"
 area = "13-abi"
-summary = "C called a Lyric function through its pointer on a thread the runtime does not know: one C started itself, which no collector attached. There is no Lyric to run it on, and the process ends."
+summary = "C called a Lyric function through its pointer on a thread the runtime does not know: one C started itself, which no collector attached. A Callback that returns nothing goes to the thread that made it; any other call — a function's, a Callback's that returns a value, one whose thread runs no scheduler — has no Lyric to run on, and the process ends."
 explanation = '''
 A Lyric function C calls runs on the thread that calls it, with that thread's stack, its collector and its tasks. A thread C started itself has none of them: the runtime never saw it. The callback ends the process with this report rather than run without them.
 

@@ -54,10 +54,13 @@ void lyr_ffi_callback_leave(void);
 /* std.ffi.Callback: a Lyric closure C holds through its userdata — its code and its environment
  * in an object a root keeps alive until the callback is released. The userdata C hands back is the
  * root's address; the trampoline reads the closure through it. */
+typedef struct LyrFfiOwner LyrFfiOwner;
+
 typedef struct LyrFfiClosure {
     LyrObj header;
     void *code;
     void *env;
+    LyrFfiOwner *owner;  /* the thread that made it, which runs what C calls on a thread of its own */
 } LyrFfiClosure;
 
 uint64_t lyr_ffi_closure_root(void *code, void *env);
@@ -65,6 +68,23 @@ static inline LyrFfiClosure *lyr_ffi_closure_of(void *userdata) {
     return (LyrFfiClosure *)lyr_root_get((const LyrRoot *)userdata);
 }
 void lyr_ffi_closure_release(uint64_t root);
+
+/* A Callback's end: its root freed, its owner told it has one fewer that a thread of C's may call. */
+void lyr_ffi_callback_release(uint64_t root);
+
+/* A Callback C calls on a thread Lyric does not run, and which returns nothing: the call — `run`
+ * with what C passed, copied into `payload`, malloc'd — goes to its owner, which runs it in its
+ * scheduler's next turn and frees the payload; C's thread goes on at once. An owner that never ran
+ * a scheduler has no turn to run it in: the process ends (LYR-RT0022). */
+void lyr_ffi_enqueue(LyrFfiOwner *owner, void (*run)(void *), void *payload);
+void *lyr_ffi_call_alloc(size_t size);  /* the payload's memory, never null (LYR-RT0005) */
+
+/* The owner's side, its scheduler's: runs what C's threads handed it, in the order they came. */
+void lyr_ffi_drain(void);
+
+/* How many Callbacks this thread owns, which a thread of C's may still call: while any lives, a
+ * scheduler with every task waiting is not deadlocked — a call may come and wake one. */
+int64_t lyr_ffi_callbacks_alive(void);
 
 /* std.ffi.GcHandle: the object a root holds, which must be of the class `desc` — a handle made
  * again from C's pointer (GcHandle.from) may be another class's: a panic (LYR-RT0023). A root

@@ -2174,10 +2174,25 @@ public sealed class CEmitter
         var closure = $"(({CType(c.Closure)}){{ ({CodePointer(c.Closure, "")})lyr_c->code, lyr_c->env }})";
         var call = $"{closure}.fn({closure}.env{string.Concat(arguments.Select(a => ", " + a))}, NULL)";
         var head = $"lyr_ffi_callback_enter(); LyrFfiClosure *lyr_c = lyr_ffi_closure_of((void *)lyr_a{c.Userdata});";
-        var body = IsVoid(c.ReturnType)
-            ? $"{head} {call}; lyr_ffi_callback_leave();"
-            : $"{head} {CType(c.ReturnType)} lyr_r = {call}; lyr_ffi_callback_leave(); return {CrossingOut("lyr_r", c.Return)};";
-        return $"static {CAbiType(c.ReturnType, c.Return)} {ClosureTrampolineName(c)}({signature}) {{ {body} }}";
+        if (!IsVoid(c.ReturnType))
+            return $"static {CAbiType(c.ReturnType, c.Return)} {ClosureTrampolineName(c)}({signature}) {{ {head} "
+                   + $"{CType(c.ReturnType)} lyr_r = {call}; lyr_ffi_callback_leave(); return {CrossingOut("lyr_r", c.Return)}; }}";
+
+        // One that returns nothing may be called on a thread Lyric does not run: what C passed goes,
+        // copied, to the thread that made the Callback, which runs it in its scheduler's next turn.
+        var name = ClosureTrampolineName(c);
+        var fields = string.Concat(c.ParamTypes.Select((t, i) => $" {CAbiType(t, c.Params[i])} lyr_a{i};"));
+        var queued = c.ParamTypes.Select((t, i) => (t, i)).Where(p => p.i != c.Userdata)
+            .Select(p => ComingIn($"lyr_q->lyr_a{p.i}", p.t, c.Params[p.i]));
+        var queuedCall = $"{closure}.fn({closure}.env{string.Concat(queued.Select(a => ", " + a))}, NULL)";
+        var copies = string.Concat(c.ParamTypes.Select((_, i) => $" lyr_q->lyr_a{i} = lyr_a{i};"));
+        var holder = $"typedef struct {{{fields} }} {name}_call;";
+        var run = $"static void {name}_run(void *lyr_p) {{ {name}_call *lyr_q = lyr_p; "
+                  + $"LyrFfiClosure *lyr_c = lyr_ffi_closure_of((void *)lyr_q->lyr_a{c.Userdata}); {queuedCall}; }}";
+        var away = $"if (!lyr_thread_attached()) {{ {name}_call *lyr_q = lyr_ffi_call_alloc(sizeof *lyr_q);" + copies
+                   + $" lyr_ffi_enqueue(lyr_ffi_closure_of((void *)lyr_a{c.Userdata})->owner, {name}_run, lyr_q); return; }}";
+        return $"{holder}\n{run}\n"
+               + $"static void {name}({signature}) {{ {away} {head} {call}; lyr_ffi_callback_leave(); }}";
     }
 
     private string Arguments(IrFunction callee, TempId[] args) =>
