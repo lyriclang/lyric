@@ -29,7 +29,7 @@ internal static class SchedulerFree
     /// <summary>Narrows the module where it sets no scheduler; true when something changed.</summary>
     public static bool Run(IrModule module)
     {
-        var guard = module.Imports.FindIndex(import => import.Name == Question);
+        var guard = module.Imports.FindIndex(import => import.Is(Question));
         if (guard < 0 || Reachability.CallsImport(module, Setter, unless: Question)) return false;
 
         var changed = false;

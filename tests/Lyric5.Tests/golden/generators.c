@@ -123,6 +123,11 @@ _Static_assert(offsetof(lyr_box_ty_app_main_ParseError, value) == 8, "layout of 
 extern const LyrItable lyr_itab_ty_app_main_ParseError[];
 const LyrDesc lyr_desc_box_ty_app_main_ParseError = { sizeof(lyr_box_ty_app_main_ParseError), LYR_DESC_HAS_REFS | LYR_DESC_CONSERVATIVE, 0, 0, NULL, "box<app.main.ParseError>", lyr_itab_ty_app_main_ParseError };
 
+extern LyrStr * lyr_c_lyr_str_concat(LyrStr *, LyrStr *) __asm__(LYR_C_SYMBOL("lyr_str_concat"));
+extern int64_t lyr_c_lyr_unicode_category(uint32_t) __asm__(LYR_C_SYMBOL("lyr_unicode_category"));
+extern LyrStr * lyr_c_lyr_str_from_byte_array(LyrArr *, int64_t) __asm__(LYR_C_SYMBOL("lyr_str_from_byte_array"));
+extern int64_t lyr_c_lyr_bytes_put_int(LyrArr *, int64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_bytes_put_int"));
+extern void lyr_c_lyr_bytes_copy(LyrArr *, LyrArr *, int64_t) __asm__(LYR_C_SYMBOL("lyr_bytes_copy"));
 extern int64_t lyr_c_lyr_console_put(int64_t, uint64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_console_put"));
 extern void lyr_c_lyr_console_gone(void) __asm__(LYR_C_SYMBOL("lyr_console_gone"));
 extern int64_t lyr_c_lyr_console_flush(int64_t) __asm__(LYR_C_SYMBOL("lyr_console_flush"));
@@ -3293,11 +3298,11 @@ bb29:;
 #line 234
     t319 = t318;
 #line 234
-    t320 = lyr_str_concat(t317, t319);
+    t320 = lyr_c_lyr_str_concat(t317, t319);
 #line 234
     t321 = (LyrStr *)&lyr_lit15;
 #line 234
-    t322 = lyr_str_concat(t320, t321);
+    t322 = lyr_c_lyr_str_concat(t320, t321);
 #line 234
     l45_joined = t322;
 #line 235
@@ -3428,7 +3433,7 @@ bb32:;
 #line 245
     t364 = lyr_std_core_fstringEnd(t363);
 #line 245
-    t365 = lyr_str_concat(t352, t364);
+    t365 = lyr_c_lyr_str_concat(t352, t364);
 #line 245
     l50_spanned = t365;
 #line 246
@@ -3663,7 +3668,7 @@ bb41:;
 #line 257
     t442 = lyr_std_core_fstringEnd(t441);
 #line 257
-    t443 = lyr_str_concat(t430, t442);
+    t443 = lyr_c_lyr_str_concat(t430, t442);
 #line 257
     l61_counted = t443;
 #line 258
@@ -5348,7 +5353,7 @@ bb2:;
 #line _
     t12 = l0_c;
 #line _
-    t13 = lyr_unicode_category(t12);
+    t13 = lyr_c_lyr_unicode_category(t12);
 #line _
     t14 = (int64_t)INT64_C(22);
 #line _
@@ -5734,7 +5739,7 @@ bb0:;
 #line _
     t9 = l1_v;
 #line _
-    t10 = lyr_bytes_put_int(t6, t8, t9);
+    t10 = lyr_c_lyr_bytes_put_int(t6, t8, t9);
 #line _
     t11 = LYR_CHECKED_ADD(t4, t10);
 #line _
@@ -6176,7 +6181,7 @@ bb0:;
 #line _
     t3 = t2->f_count;
 #line _
-    t4 = lyr_str_from_byte_array(t1, t3);
+    t4 = lyr_c_lyr_str_from_byte_array(t1, t3);
 #line _
     return t4;
 }
@@ -6467,7 +6472,7 @@ bb6:;
 #line _
     t27 = t26->f_count;
 #line _
-    lyr_bytes_copy(t23, t25, t27);
+    lyr_c_lyr_bytes_copy(t23, t25, t27);
 #line _
     t28 = l0_this;
 #line _
@@ -8549,11 +8554,11 @@ bb0:;
 #line 4
     t6 = lyr_std_core__extend__string_debug_a8a61b85(t5);
 #line 4
-    t7 = lyr_str_concat(t4, t6);
+    t7 = lyr_c_lyr_str_concat(t4, t6);
 #line 4
     t8 = (LyrStr *)&lyr_lit53;
 #line 4
-    t9 = lyr_str_concat(t7, t8);
+    t9 = lyr_c_lyr_str_concat(t7, t8);
 #line 4
     l1__match0 = t9;
 #line 4

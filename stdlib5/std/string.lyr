@@ -24,24 +24,24 @@
 pub import std.core { StringBuilder };
 
 /// Returns `a` followed by `b`.
-pub fn concat(a: string, b: string): string;
+pub extern "C" fn concat(a: string, b: string): string = "lyr_str_concat";
 /// Returns the decimal text of a signed integer.
-pub fn fromInt(value: int): string;
+pub extern "C" fn fromInt(value: int): string = "lyr_str_from_int";
 /// Returns the decimal text of an unsigned integer.
-pub fn fromUint(value: uint): string;
+pub extern "C" fn fromUint(value: uint): string = "lyr_str_from_uint";
 /// Returns the shortest decimal text that reads back as the same `float`.
 ///
 /// Infinities are written `inf` and `-inf`, a NaN as `NaN`.
-pub fn fromFloat(value: float): string;
+pub extern "C" fn fromFloat(value: float): string = "lyr_str_from_float";
 /// Returns the shortest decimal text that reads back as the same `float32`.
 ///
 /// The text is the `float32`'s own: `0.1`, not the `0.10000000149011612` of the `float` it
 /// widens to.
-pub fn fromFloat32(value: float32): string;
+pub extern "C" fn fromFloat32(value: float32): string = "lyr_str_from_float32";
 /// Returns the character as a one-character string.
-pub fn fromChar(value: char): string;
+pub extern "C" fn fromChar(value: char): string = "lyr_str_from_char";
 /// Returns `true` or `false`.
-pub fn fromBool(value: bool): string;
+pub extern "C" fn fromBool(value: bool): string = "lyr_str_from_bool";
 
 /// The version of the Unicode Character Database behind `char`'s answers.
 ///

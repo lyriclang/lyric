@@ -43,13 +43,14 @@ public sealed class Natives(Interpreter interpreter)
     public Value Call(IrImport import, Value[] args, IrType[] types, Core.Span at)
     {
         _at = at;
-        var name = import.Name;
+        var name = import.StdName ?? import.Name;
         // a quote: the tree of the module's quote by the import's index, the splices' values set in
         if (name.StartsWith("std.syntax.quote#", StringComparison.Ordinal))
             return Syntax.Quote(interpreter.Module.Quotes[int.Parse(name["std.syntax.quote#".Length..])], args, types, import.ReturnType);
-        if (Table.TryGetValue(name, out var native)) return native(args, types, import.ReturnType);
-        if (WorldNatives.Contains(name) || WorldModules.Any(m => name.StartsWith(m, StringComparison.Ordinal)) || name.StartsWith("C:", StringComparison.Ordinal))
-            throw ComptimeFailure.World($"'{Short(name)}' reaches outside the program — {What(name)} — and code run at compile time does not");
+        if (Table.TryGetValue(name, out var native) || Table.TryGetValue(import.Name, out native))
+            return native(args, types, import.ReturnType);
+        if (WorldNatives.Contains(name) || WorldModules.Any(m => name.StartsWith(m, StringComparison.Ordinal)) || import.Name.StartsWith("C:", StringComparison.Ordinal))
+            throw ComptimeFailure.World($"'{Short(name)}' reaches outside the program — {What(name, import.Name)} — and code run at compile time does not");
         throw ComptimeFailure.NotYet($"'{Short(name)}' does not run at compile time yet");
     }
 
@@ -91,22 +92,26 @@ public sealed class Natives(Interpreter interpreter)
 
     private static string Short(string name) => name.StartsWith("C:", StringComparison.Ordinal) ? name[2..] : name;
 
-    private static string What(string name) => name switch
+    /// <summary>The area of the world a native reaches: by its module where std names one, else by
+    /// the runtime's C symbol.</summary>
+    private static string What(string name, string symbol) => name switch
     {
-        // the runtime's own C calls, which std declares 'extern "C"', by their area
-        _ when name.StartsWith("C:lyr_os_", StringComparison.Ordinal) => "the system",
-        _ when name.StartsWith("C:lyr_fs_", StringComparison.Ordinal) => "a file",
-        _ when name.StartsWith("C:lyr_net_", StringComparison.Ordinal) => "the network",
-        _ when name.StartsWith("C:lyr_process_", StringComparison.Ordinal) => "a process",
-        _ when name.StartsWith("C:lyr_random", StringComparison.Ordinal) => "the system's randomness",
-        _ when name.StartsWith("C:", StringComparison.Ordinal) => "a C function",
         _ when name.StartsWith("std.io.", StringComparison.Ordinal) => "the console",
         _ when name.StartsWith("std.fs.", StringComparison.Ordinal) => "a file",
         _ when name.StartsWith("std.net.", StringComparison.Ordinal) => "the network",
         _ when name.StartsWith("std.process.", StringComparison.Ordinal) => "a process",
         _ when name.StartsWith("std.os.", StringComparison.Ordinal) => "the system",
+        _ when name.StartsWith("std.term.", StringComparison.Ordinal) => "the terminal",
         _ when name.Contains("Clock", StringComparison.Ordinal) || name.Contains("Nanos", StringComparison.Ordinal) => "the clock",
         _ when name.Contains("Alloc", StringComparison.Ordinal) => "the allocator",
+        // the runtime's own C calls by their area, for a module that holds more than one
+        _ when symbol.StartsWith("C:lyr_os_", StringComparison.Ordinal) => "the system",
+        _ when symbol.StartsWith("C:lyr_fs_", StringComparison.Ordinal) => "a file",
+        _ when symbol.StartsWith("C:lyr_net_", StringComparison.Ordinal) => "the network",
+        _ when symbol.StartsWith("C:lyr_process_", StringComparison.Ordinal) => "a process",
+        _ when symbol.StartsWith("C:lyr_random", StringComparison.Ordinal) => "the system's randomness",
+        _ when symbol.StartsWith("C:lyr_clock_", StringComparison.Ordinal) => "the clock",
+        _ when name.StartsWith("C:", StringComparison.Ordinal) => "a C function",
         _ => "a thread or a task",
     };
 
@@ -125,6 +130,17 @@ public sealed class Natives(Interpreter interpreter)
 
     private static StrObj S(Value v) => (StrObj)v.Ref!;
     private static Value Str(string text) => Value.Of(StrObj.Of(text));
+
+    /// <summary>The bytes at an address: the first <paramref name="length"/> of the object it
+    /// points into. An address that is a number only — computed, or C's — names nothing here.</summary>
+    private static byte[] Addressed(Value address, Value length)
+    {
+        if (address.Ref is null)
+            throw ComptimeFailure.NotYet("memory at an address — std.ffi's — is C's, and C does not run at compile time");
+        var bytes = Bytes.Of(address);
+        return length.AsInt >= 0 && length.AsInt <= bytes.Length ? bytes[..(int)length.AsInt]
+            : throw new Lyric.Core.InternalCompilationException($"comptime: {length.AsInt} bytes at an address of {bytes.Length}");
+    }
     private static Value Str(byte[] bytes) => Value.Of(new StrObj(bytes));
     private static IrScalar K(IrType t) => t is IrScalarType s ? s.Kind : IrScalar.Void;
     private static long I(Value v) => v.AsInt;
@@ -212,6 +228,10 @@ public sealed class Natives(Interpreter interpreter)
         ["std.core.viewBytes"] = (a, _, _) => a[0],
         ["std.core.utf8Invalid"] = (a, _, _) => Value.Int(InvalidAt(Bytes.Of(a[0]))),
         ["std.core.stringOfUtf8Lossy"] = (a, _, _) => Str(Lossy(Bytes.Of(a[0]))),
+        // std's wrappers hand the runtime a slice as its address and its length
+        ["std.core.utf8InvalidRaw"] = (a, _, _) => Value.Int(InvalidAt(Addressed(a[0], a[1]))),
+        ["std.core.stringOfSliceRaw"] = (a, _, _) => Str(Addressed(a[0], a[1])),
+        ["std.core.stringOfUtf8LossyRaw"] = (a, _, _) => Str(Lossy(Addressed(a[0], a[1]))),
 
         // --- byte arrays (string.c)
         ["std.core.putBytes"] = (a, _, _) =>

@@ -29,7 +29,7 @@
 ///
 /// The report is `LYR-RT0008` and the exit code 101. Its type is `never`, so a call stands
 /// wherever a value is wanted and ends the path it is on.
-pub fn panic(message: string): never;
+pub extern "C" fn panic(message: string): never = "lyr_panic_message";
 
 /// Ends the process unless `condition` holds.
 ///
@@ -50,20 +50,20 @@ pub inline fn assert(
 }
 
 /// Ends the process for a failed assertion: `LYR-RT0011`, the condition as written, the message.
-fn assertFailed(written: string, message: string): never;
+extern "C" fn assertFailed(written: string, message: string): never = "lyr_panic_assert";
 
 /// Marks a branch the program never takes.
 ///
 /// # Panics
 /// Always, when reached: `LYR-RT0012`, "unreachable" and `message` behind it where one is given.
-pub fn unreachable(message: string = ""): never;
+pub extern "C" fn unreachable(message: string = ""): never = "lyr_panic_unreachable";
 
 /// Marks a place still to be written.
 ///
 /// # Panics
 /// Always, when reached: `LYR-RT0013`, "not implemented" and `message` behind it where one is
 /// given.
-pub fn todo(message: string = ""): never;
+pub extern "C" fn todo(message: string = ""): never = "lyr_panic_todo";
 
 /// Returns the bytes of a file of the package, read while the program compiles.
 ///
@@ -252,7 +252,7 @@ pub struct Backtrace :: [Display] {
 }
 
 /// Returns the frames at `pcs` in a panic's trace form.
-fn traceText(pcs: int[]): string;
+extern "C" fn traceText(pcs: int[]): string = "lyr_trace_text";
 
 /// Returns the backtrace for a catch clause's `e.backtrace()`, or `null` where no program
 /// counters were kept.
@@ -440,11 +440,11 @@ fn timedRound(body: fn() -> void, n: int): (int, int, int) {
 }
 
 /// Returns the monotonic clock, in nanoseconds.
-fn benchClock(): int;
+extern "C" fn benchClock(): int = "lyr_clock_monotonic_ns";
 
 /// Returns the allocations this thread has made since it started, and their bytes.
-fn threadAllocations(): int;
-fn threadAllocatedBytes(): int;
+extern "C" fn threadAllocations(): int = "lyr_gc_thread_allocations";
+extern "C" fn threadAllocatedBytes(): int = "lyr_gc_thread_allocated_bytes";
 
 /// Returns `x` through a point the compiler cannot see through.
 ///
@@ -2263,10 +2263,10 @@ pub enum UnicodeCategory :: [Equatable, Hashable, Debug] {
 
 // The Unicode Character Database's answers (lyr/unicode.h): the category as its index in
 // UnicodeCategory's order, the simple case mappings, White_Space.
-fn unicodeCategory(c: char): int;
-fn unicodeUpper(c: char): char;
-fn unicodeLower(c: char): char;
-fn unicodeWhiteSpace(c: char): bool;
+extern "C" fn unicodeCategory(c: char): int = "lyr_unicode_category";
+extern "C" fn unicodeUpper(c: char): char = "lyr_unicode_upper";
+extern "C" fn unicodeLower(c: char): char = "lyr_unicode_lower";
+extern "C" fn unicodeWhiteSpace(c: char): bool = "lyr_unicode_white_space";
 
 fn categoryOf(k: int): UnicodeCategory {
     return match (k) {
@@ -3457,14 +3457,14 @@ fn viewFind(s: StringView, p: StringView, from: int): int;
 /// Returns the eight bytes from byte `i` as a word, the lowest first, as `writeUint` writes them.
 fn viewWordAt(s: StringView, i: int): uint64;
 /// Compares byte by byte, then by length: -1, 0 or 1.
-fn compareBytes(a: string, b: string): int;
+extern "C" fn compareBytes(a: string, b: string): int = "lyr_str_cmp";
 /// Returns the bytes `from..to` as a string.
 ///
 /// # Panics
 /// When the range is out of bounds or off a character's boundary.
-fn byteSlice(s: string, from: int, to: int): string;
+extern "C" fn byteSlice(s: string, from: int, to: int): string = "lyr_str_slice";
 /// Creates a string of the array's first `count` bytes.
-fn stringOfBytes(bytes: uint8[], count: int): string;
+extern "C" fn stringOfBytes(bytes: uint8[], count: int): string = "lyr_str_from_byte_array";
 // --- strings ----------------------------------------------------------------------------------
 // UTF-8, immutable, the length in bytes. The members stand once on `StringView`, which a string
 // reaches through a view of all of itself: what cuts gives a view, no copy; what builds gives a
@@ -4186,7 +4186,7 @@ pub class StringBuilder {
 /// # Panics
 /// When a range is out of bounds, as an index is.
 fn putBytes(bytes: uint8[], at: int, s: StringView): void;
-fn copyBytes(into: uint8[], from: uint8[], count: int): void;
+extern "C" fn copyBytes(into: uint8[], from: uint8[], count: int): void = "lyr_bytes_copy";
 
 /// Copies the first `count` elements of `from` into `into`.
 ///
@@ -4195,7 +4195,7 @@ fn copyBytes(into: uint8[], from: uint8[], count: int): void;
 fn moveElements<T>(into: Slice<T>, from: Slice<T>, count: int): void;
 /// Ends the process for a range `low..high` outside `length` (`LYR-RT0003`), as `xs[a..b]`
 /// does.
-fn panicRange(low: int, high: int, length: int): never;
+extern "C" fn panicRange(low: int, high: int, length: int): never = "lyr_panic_range";
 
 // --- StringView: the view of a string's bytes -------------------------------------------------
 // A pointer into a string's bytes and a length, read and never written. `s[a..b]` takes one on
@@ -4339,9 +4339,26 @@ extend string {
 }
 
 /// Returns -1 where the bytes are well-formed UTF-8, else the offset of the first that is not.
-fn utf8Invalid(bytes: Slice<uint8>): int;
-fn stringOfSlice(bytes: Slice<uint8>): string;
-fn stringOfUtf8Lossy(bytes: Slice<uint8>): string;
+inline fn utf8Invalid(bytes: Slice<uint8>): int {
+    return utf8InvalidRaw(sliceAddress(bytes), bytes.length());
+}
+
+extern "C" fn utf8InvalidRaw(bytesAt: uint, bytesLength: int): int = "lyr_utf8_invalid_at";
+
+inline fn stringOfSlice(bytes: Slice<uint8>): string {
+    return stringOfSliceRaw(sliceAddress(bytes), bytes.length());
+}
+
+extern "C" fn stringOfSliceRaw(bytesAt: uint, bytesLength: int): string = "lyr_str_from_bytes";
+
+inline fn stringOfUtf8Lossy(bytes: Slice<uint8>): string {
+    return stringOfUtf8LossyRaw(sliceAddress(bytes), bytes.length());
+}
+
+extern "C" fn stringOfUtf8LossyRaw(
+    bytesAt: uint,
+    bytesLength: int
+): string = "lyr_str_from_utf8_lossy";
 
 // --- f-strings into one builder ---------------------------------------------------------------
 // What an f-string compiles to: a builder sized for its text, each piece appended in
@@ -4429,13 +4446,13 @@ pub fn fstringDebugged<T :: [Debug]>(out: StringBuilder, value: T, spec: StringV
 
 /// Returns a float's shortest text that reads back as the same value, as
 /// `std.string.fromFloat` gives it.
-fn textOfFloat(value: float): string;
-fn textOfFloat32(value: float32): string;
+extern "C" fn textOfFloat(value: float): string = "lyr_str_from_float";
+extern "C" fn textOfFloat32(value: float32): string = "lyr_str_from_float32";
 /// Writes an integer's decimal digits into `bytes` from `at` on and returns how many.
 ///
 /// The caller makes sure there is room.
-fn putIntDigits(bytes: uint8[], at: int, value: int): int;
-fn putUintDigits(bytes: uint8[], at: int, value: uint): int;
+extern "C" fn putIntDigits(bytes: uint8[], at: int, value: int): int = "lyr_bytes_put_int";
+extern "C" fn putUintDigits(bytes: uint8[], at: int, value: uint): int = "lyr_bytes_put_uint";
 
 // --- the format language ----------------------------------------------------------------------
 
@@ -4826,9 +4843,9 @@ fn firstChars(text: string, count: int): string {
 /// digits.
 ///
 /// `form` 0 is fixed, 1 with an exponent, 2 the same upper case, 3 fixed a hundredfold.
-fn floatText(value: float, precision: int, form: int): string;
+extern "C" fn floatText(value: float, precision: int, form: int): string = "lyr_str_float_text";
 /// Returns a `float32`'s own shortest text.
-fn shortestFloat32(value: float32): string;
+extern "C" fn shortestFloat32(value: float32): string = "lyr_str_from_float32";
 
 extend int :: [Format] {
     fn format(spec: StringView, out: StringBuilder): void {
@@ -4978,8 +4995,8 @@ pub struct CharIndicesIter :: [Iterator] {
 }
 
 fn asTypeOf<T, U>(v: T, like: U): U;
-fn floatOfText(s: string): float;
-fn float32OfText(s: string): float32;
+extern "C" fn floatOfText(s: string): float = "lyr_str_to_float64";
+extern "C" fn float32OfText(s: string): float32 = "lyr_str_to_float32";
 
 // ---------------------------------------------------------------------------------------------
 // Iteration: a source of values, one at a time, and what `for` walks.

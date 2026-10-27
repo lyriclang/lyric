@@ -79,6 +79,10 @@ _Static_assert(offsetof(lyr_box_ty_app_main_Bad, value) == 8, "layout of lyr_box
 extern const LyrItable lyr_itab_ty_app_main_Bad[];
 const LyrDesc lyr_desc_box_ty_app_main_Bad = { sizeof(lyr_box_ty_app_main_Bad), 0, 0, 0, NULL, "box<app.main.Bad>", lyr_itab_ty_app_main_Bad };
 
+extern void lyr_c_lyr_panic_message(LyrStr *) __asm__(LYR_C_SYMBOL("lyr_panic_message"));
+extern LyrStr * lyr_c_lyr_str_from_byte_array(LyrArr *, int64_t) __asm__(LYR_C_SYMBOL("lyr_str_from_byte_array"));
+extern int64_t lyr_c_lyr_bytes_put_int(LyrArr *, int64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_bytes_put_int"));
+extern void lyr_c_lyr_bytes_copy(LyrArr *, LyrArr *, int64_t) __asm__(LYR_C_SYMBOL("lyr_bytes_copy"));
 extern int64_t lyr_c_lyr_console_put(int64_t, uint64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_console_put"));
 extern void lyr_c_lyr_console_gone(void) __asm__(LYR_C_SYMBOL("lyr_console_gone"));
 extern int64_t lyr_c_lyr_console_flush(int64_t) __asm__(LYR_C_SYMBOL("lyr_console_flush"));
@@ -335,7 +339,7 @@ bb1:;
 #line 20
     t1 = (LyrStr *)&lyr_lit0;
 #line 20
-    lyr_panic_message(t1);
+    lyr_c_lyr_panic_message(t1);
 #line 20
     LYR_UNREACHABLE();
 bb2:;
@@ -383,7 +387,7 @@ bb1:;
 #line 22
     t3 = (LyrStr *)&lyr_lit1;
 #line 22
-    lyr_panic_message(t3);
+    lyr_c_lyr_panic_message(t3);
 #line 22
     LYR_UNREACHABLE();
 bb2:;
@@ -431,7 +435,7 @@ bb1:;
 #line 24
     t3 = (LyrStr *)&lyr_lit2;
 #line 24
-    lyr_panic_message(t3);
+    lyr_c_lyr_panic_message(t3);
 #line 24
     LYR_UNREACHABLE();
 bb2:;
@@ -488,7 +492,7 @@ bb2:;
 #line 26
     t3 = (LyrStr *)&lyr_lit3;
 #line 26
-    lyr_panic_message(t3);
+    lyr_c_lyr_panic_message(t3);
 #line 26
     LYR_UNREACHABLE();
 bb3:;
@@ -533,7 +537,7 @@ bb1:;
 #line 28
     t1 = (LyrStr *)&lyr_lit4;
 #line 28
-    lyr_panic_message(t1);
+    lyr_c_lyr_panic_message(t1);
 #line 28
     LYR_UNREACHABLE();
 bb2:;
@@ -593,7 +597,7 @@ bb1:;
 #line 30
     t1 = (LyrStr *)&lyr_lit5;
 #line 30
-    lyr_panic_message(t1);
+    lyr_c_lyr_panic_message(t1);
 #line 30
     LYR_UNREACHABLE();
 bb2:;
@@ -671,7 +675,7 @@ bb1:;
 #line 32
     t3 = (LyrStr *)&lyr_lit6;
 #line 32
-    lyr_panic_message(t3);
+    lyr_c_lyr_panic_message(t3);
 #line 32
     LYR_UNREACHABLE();
 bb2:;
@@ -764,7 +768,7 @@ bb1:;
 #line 36
     t3 = (LyrStr *)&lyr_lit7;
 #line 36
-    lyr_panic_message(t3);
+    lyr_c_lyr_panic_message(t3);
 #line 36
     LYR_UNREACHABLE();
 bb2:;
@@ -838,7 +842,7 @@ bb1:;
 #line 42
     t2 = (LyrStr *)&lyr_lit8;
 #line 42
-    lyr_panic_message(t2);
+    lyr_c_lyr_panic_message(t2);
 #line 42
     LYR_UNREACHABLE();
 bb2:;
@@ -906,7 +910,7 @@ bb1:;
 #line 48
     t2 = (LyrStr *)&lyr_lit9;
 #line 48
-    lyr_panic_message(t2);
+    lyr_c_lyr_panic_message(t2);
 #line 48
     LYR_UNREACHABLE();
 bb2:;
@@ -984,14 +988,14 @@ bb3:;
 #line 54
     t4 = (LyrStr *)&lyr_lit10;
 #line 54
-    lyr_panic_message(t4);
+    lyr_c_lyr_panic_message(t4);
 #line 54
     LYR_UNREACHABLE();
 bb4:;
 #line 54
     t5 = (LyrStr *)&lyr_lit11;
 #line 54
-    lyr_panic_message(t5);
+    lyr_c_lyr_panic_message(t5);
 #line 54
     LYR_UNREACHABLE();
 bb5:;
@@ -1058,14 +1062,14 @@ bb3:;
 #line 58
     t6 = (LyrStr *)&lyr_lit12;
 #line 58
-    lyr_panic_message(t6);
+    lyr_c_lyr_panic_message(t6);
 #line 58
     LYR_UNREACHABLE();
 bb4:;
 #line 58
     t7 = (LyrStr *)&lyr_lit13;
 #line 58
-    lyr_panic_message(t7);
+    lyr_c_lyr_panic_message(t7);
 #line 58
     LYR_UNREACHABLE();
 bb5:;
@@ -1104,7 +1108,7 @@ bb1:;
 #line 65
     t1 = (LyrStr *)&lyr_lit14;
 #line 65
-    lyr_panic_message(t1);
+    lyr_c_lyr_panic_message(t1);
 #line 65
     LYR_UNREACHABLE();
 bb2:;
@@ -1183,7 +1187,7 @@ bb1:;
 #line 73
     t1 = (LyrStr *)&lyr_lit15;
 #line 73
-    lyr_panic_message(t1);
+    lyr_c_lyr_panic_message(t1);
 #line 73
     LYR_UNREACHABLE();
 bb2:;
@@ -1275,7 +1279,7 @@ bb4:;
 #line 79
     t5 = (LyrStr *)&lyr_lit16;
 #line 79
-    lyr_panic_message(t5);
+    lyr_c_lyr_panic_message(t5);
 #line 79
     LYR_UNREACHABLE();
 bb5:;
@@ -1348,7 +1352,7 @@ bb1:;
 #line 84
     t1 = (LyrStr *)&lyr_lit17;
 #line 84
-    lyr_panic_message(t1);
+    lyr_c_lyr_panic_message(t1);
 #line 84
     LYR_UNREACHABLE();
 bb2:;
@@ -1438,7 +1442,7 @@ bb1:;
 #line 89
     t1 = (LyrStr *)&lyr_lit18;
 #line 89
-    lyr_panic_message(t1);
+    lyr_c_lyr_panic_message(t1);
 #line 89
     LYR_UNREACHABLE();
 bb2:;
@@ -1559,7 +1563,7 @@ bb1:;
 #line 95
     t3 = (LyrStr *)&lyr_lit19;
 #line 95
-    lyr_panic_message(t3);
+    lyr_c_lyr_panic_message(t3);
 #line 95
     LYR_UNREACHABLE();
 bb2:;
@@ -1687,7 +1691,7 @@ bb3:;
 #line 102
     t3 = (LyrStr *)&lyr_lit20;
 #line 102
-    lyr_panic_message(t3);
+    lyr_c_lyr_panic_message(t3);
 #line 102
     LYR_UNREACHABLE();
 bb4:;
@@ -1805,7 +1809,7 @@ bb3:;
 #line 106
     t3 = (LyrStr *)&lyr_lit21;
 #line 106
-    lyr_panic_message(t3);
+    lyr_c_lyr_panic_message(t3);
 #line 106
     LYR_UNREACHABLE();
 bb4:;
@@ -3112,7 +3116,7 @@ bb0:;
 #line _
     t9 = l1_v;
 #line _
-    t10 = lyr_bytes_put_int(t6, t8, t9);
+    t10 = lyr_c_lyr_bytes_put_int(t6, t8, t9);
 #line _
     t11 = LYR_CHECKED_ADD(t4, t10);
 #line _
@@ -3188,7 +3192,7 @@ bb0:;
 #line _
     t3 = t2->f_count;
 #line _
-    t4 = lyr_str_from_byte_array(t1, t3);
+    t4 = lyr_c_lyr_str_from_byte_array(t1, t3);
 #line _
     return t4;
 }
@@ -3424,7 +3428,7 @@ bb6:;
 #line _
     t27 = t26->f_count;
 #line _
-    lyr_bytes_copy(t23, t25, t27);
+    lyr_c_lyr_bytes_copy(t23, t25, t27);
 #line _
     t28 = l0_this;
 #line _
@@ -3775,7 +3779,7 @@ bb1:;
 #line 68
     t1 = (LyrStr *)&lyr_lit36;
 #line 68
-    lyr_panic_message(t1);
+    lyr_c_lyr_panic_message(t1);
 #line 68
     LYR_UNREACHABLE();
 bb2:;

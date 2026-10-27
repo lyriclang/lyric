@@ -169,7 +169,7 @@ LyrStr *lyr_str_from_byte_array(const LyrArr *bytes, int64_t count) {
     return lyr_str_from_bytes(bytes->data, count);
 }
 
-int lyr_str_cmp(const LyrStr *a, const LyrStr *b) {
+int64_t lyr_str_cmp(const LyrStr *a, const LyrStr *b) {
     int64_t common = a->len < b->len ? a->len : b->len;
     int order = memcmp(a->bytes, b->bytes, (size_t)common);
     if (order != 0) return order < 0 ? -1 : 1;
