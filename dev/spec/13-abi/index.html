@@ -452,7 +452,9 @@ points at nothing where it is empty.</li>
 crossing as C's function pointer wherever C holds one — a parameter, a result, a field. Its
 parameters and result are what a C function's are (rules 1–5, <code>LYR-SEM0099</code>); it throws
 nothing and takes no place (<code>LYR-SEM0099</code>); its ABI is <code>&quot;C&quot;</code> (<code>LYR-SEM0099</code>). A Lyric function
-type, <code>fn(int) -&gt; int</code>, is a closure and does not cross (<code>LYR-SEM0099</code>).
+type, <code>fn(int) -&gt; int</code>, is a closure and does not cross (<code>LYR-SEM0099</code>). <code>?extern &quot;C&quot; fn(…)</code>
+is a pointer that may be null, as a parameter and as a result: <code>null</code> crosses as C's null, and a
+null pointer C returns comes back as <code>null</code> — not as a field, as for <code>?Ptr&lt;T&gt;</code> (rule 4).
 <ul>
 <li>Where such a type is expected, a function given by its name — free or static, with a body,
 without type parameters — or a lambda that captures nothing becomes the pointer, when its
@@ -465,6 +467,22 @@ process with its report (§1.6 rule 10) — C's frames cannot be unwound. On a t
 does not run — one C started itself — the call ends the process with <code>LYR-RT0022</code>.</li>
 <li>A value of the type is called as a function is: a call of the C function it points at, each
 value crossing as for an <code>extern &quot;C&quot;</code> declaration.</li>
+</ul>
+</li>
+<li><strong>Closures C calls</strong>: <code>std.ffi</code>'s <code>Callback&lt;C&gt;</code> holds a closure — a Lyric function value with
+its state — for C, which hands back a <code>void *userdata</code> beside its function pointer.
+<ul>
+<li><code>C</code> is the C function's type as C calls it, an <code>extern &quot;C&quot; fn(…)</code> (<code>LYR-SEM0099</code> for another),
+whose first or last parameter is the userdata, a <code>Ptr&lt;void&gt;</code>; with none there, or with one
+at either end, it is refused (<code>LYR-SEM0099</code>).</li>
+<li><code>Callback&lt;C&gt;.new(closure)</code> takes a function of <code>C</code>'s other parameters, in their order, with
+<code>C</code>'s result, that throws nothing; a closure of another shape is refused as any argument of
+the wrong type is.</li>
+<li><code>cb.function</code>, of type <code>C</code>, is what C calls: it finds the closure through the userdata and
+calls it, as a function C calls is called (rule 9) — on the thread Lyric runs on, its C
+frames counted. <code>cb.userdata</code> is what C hands back to it.</li>
+<li>The closure lives until <code>cb.release()</code>; C must not call <code>cb.function</code> afterwards. A second
+<code>release()</code> is a panic (<code>LYR-RT0008</code>).</li>
 </ul>
 </li>
 </ol>

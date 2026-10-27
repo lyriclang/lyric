@@ -21,6 +21,7 @@
 <ul class="sidebar-box" id="sidebar-box">
 <li><a class="current" href="../../std/ffi/">std.ffi</a></li>
 <li><a href="../../std/ffi/Ptr/">Ptr</a></li>
+<li><a href="../../std/ffi/Callback/">Callback</a></li>
 <li><a href="../../std/ffi/CStr/">CStr</a></li>
 <li><a href="../../std/ffi/#fn.alloc">alloc()</a></li>
 <li><a href="../../std/ffi/#fn.free">free()</a></li>
@@ -50,6 +51,7 @@ function is not unsafe, and neither is <a href="../../std/ffi/Ptr/">Ptr</a> of a
 <pre class="output"><code>5</code></pre>
 <h2 id="types">Types</h2>
 <div class="listed"><a href="../../std/ffi/Ptr/">Ptr</a> <span class="kind">struct</span> <span class="summary">— A pointer to a <code>T</code> in memory C manages, never null: <code>T *</code> where a C function takes or returns one.</span></div>
+<div class="listed"><a href="../../std/ffi/Callback/">Callback</a> <span class="kind">class</span> <span class="summary">— A Lyric closure C calls, with its state: C's <code>void *userdata</code> beside a function pointer.</span></div>
 <div class="listed"><a href="../../std/ffi/CStr/">CStr</a> <span class="kind">struct</span> <span class="summary">— A C string: the address of bytes a NUL ends, <code>const char *</code> at a C function's boundary.</span></div>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.alloc">
