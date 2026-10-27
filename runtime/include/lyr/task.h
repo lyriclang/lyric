@@ -64,7 +64,6 @@ void lyr_task_wake(int64_t poller);
 int64_t lyr_task_arm(int64_t fd, int64_t interest, int64_t token);
 void lyr_task_forget(int64_t fd);
 int64_t lyr_task_take(int64_t *into, int64_t n);
-#define LYR_TASK_TAKE(slice) lyr_task_take((slice).ptr, (slice).len)
 
 /* A thread that spins on a lock lets another run: the lock's holder, perhaps. */
 void lyr_task_spin(void);

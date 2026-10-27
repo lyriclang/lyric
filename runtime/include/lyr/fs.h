@@ -94,14 +94,4 @@ int64_t lyr_fs_absolute(const LyrStr *path, uint8_t *into, int64_t n);
  * GetTempPathW —, without a separator at its end, into `into` as lyr_fs_canonical. */
 int64_t lyr_fs_temp_root(uint8_t *into, int64_t n);
 
-/* A Slice<uint8> of emitted code, `lyr_slice_u8`, is a pointer and a length (CEmitter); a
- * Slice<int> the same. */
-#define LYR_FS_READ(file, slice) lyr_fs_read((file), (slice).ptr, (slice).len)
-#define LYR_FS_WRITE(file, slice) lyr_fs_write((file), (slice).ptr, (slice).len)
-#define LYR_FS_STAT(path, follow, slice) lyr_fs_stat((path), (follow), (slice).ptr, (slice).len)
-#define LYR_FS_TEMP_ROOT(slice) lyr_fs_temp_root((slice).ptr, (slice).len)
-#define LYR_FS_DIR_NEXT(dir, slice) lyr_fs_dir_next((dir), (slice).ptr, (slice).len)
-#define LYR_FS_CANONICAL(path, slice) lyr_fs_canonical((path), (slice).ptr, (slice).len)
-#define LYR_FS_ABSOLUTE(path, slice) lyr_fs_absolute((path), (slice).ptr, (slice).len)
-
 #endif

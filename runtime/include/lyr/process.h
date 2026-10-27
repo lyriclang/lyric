@@ -73,10 +73,4 @@ int lyr_process_owns(int64_t fd);
 int64_t lyr_process_pipe_completed(void *overlapped, int *writing);
 #endif
 
-/* A Slice<uint8> or Slice<int> of emitted code is a pointer and a length (CEmitter). */
-#define LYR_PROCESS_SPAWN(program, args, argc, env, envc, cwd, modes, ends) \
-    lyr_process_spawn((program), (args).ptr, (argc), (env).ptr, (envc), (cwd), (modes), (ends).ptr, (ends).len)
-#define LYR_PROCESS_READ(fd, slice) lyr_process_read((fd), (slice).ptr, (slice).len)
-#define LYR_PROCESS_WRITE(fd, slice) lyr_process_write((fd), (slice).ptr, (slice).len)
-
 #endif

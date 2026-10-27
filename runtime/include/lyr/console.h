@@ -50,8 +50,4 @@ int64_t lyr_console_is_terminal(int64_t stream);
  * none. */
 int64_t lyr_console_size(int64_t stream);
 
-/* A Slice<uint8> of emitted code is a pointer and a length (CEmitter). */
-#define LYR_CONSOLE_PUT(stream, slice) lyr_console_put((stream), (slice).ptr, (slice).len)
-#define LYR_CONSOLE_READ(slice) lyr_console_read((slice).ptr, (slice).len)
-
 #endif

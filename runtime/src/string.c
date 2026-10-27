@@ -143,7 +143,7 @@ bool lyr_bytes_equal(const uint8_t *a, int64_t alen, const uint8_t *b, int64_t b
     return alen == blen && (alen == 0 || a == b || memcmp(a, b, (size_t)alen) == 0);
 }
 
-int lyr_bytes_compare(const uint8_t *a, int64_t alen, const uint8_t *b, int64_t blen) {
+int64_t lyr_bytes_compare(const uint8_t *a, int64_t alen, const uint8_t *b, int64_t blen) {
     int64_t n = alen < blen ? alen : blen;
     int c = n > 0 ? memcmp(a, b, (size_t)n) : 0;
     if (c != 0) return c < 0 ? -1 : 1;

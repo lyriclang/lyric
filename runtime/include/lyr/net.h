@@ -77,14 +77,4 @@ int64_t lyr_net_recvfrom(int64_t fd, uint8_t *into, int64_t n, uint8_t *sender, 
 #define LYR_NET_HOST_BYTES 17
 int64_t lyr_net_resolve(const LyrStr *host, uint8_t *into, int64_t n);
 
-/* A Slice<uint8> of emitted code is a pointer and a length (CEmitter). */
-#define LYR_NET_BIND(fd, family, address, port, reuse) lyr_net_bind((fd), (family), (address).ptr, (port), (reuse))
-#define LYR_NET_CONNECT(fd, family, address, port) lyr_net_connect((fd), (family), (address).ptr, (port))
-#define LYR_NET_RECV(fd, slice) lyr_net_recv((fd), (slice).ptr, (slice).len)
-#define LYR_NET_SEND(fd, slice) lyr_net_send((fd), (slice).ptr, (slice).len)
-#define LYR_NET_NAME(fd, peer, slice) lyr_net_name((fd), (peer), (slice).ptr, (slice).len)
-#define LYR_NET_SENDTO(fd, slice, family, address, port) lyr_net_sendto((fd), (slice).ptr, (slice).len, (family), (address).ptr, (port))
-#define LYR_NET_RECVFROM(fd, slice, sender) lyr_net_recvfrom((fd), (slice).ptr, (slice).len, (sender).ptr, (sender).len)
-#define LYR_NET_RESOLVE(host, slice) lyr_net_resolve((host), (slice).ptr, (slice).len)
-
 #endif
