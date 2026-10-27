@@ -78,10 +78,9 @@ pub class Callback<C> {
     root: uint,
     var released: bool = false,
 
-    /// Returns the callback for `closure`, a function of the parameters of `C` but its userdata.
-    /// The compiler writes the function C calls; this body never runs.
-    @Allow("unused")
-    pub static fn new(closure: C): Callback<C> {
+    /// Returns the callback for the closure it is given, a function of the parameters of `C` but
+    /// its userdata. The compiler writes the function C calls; this body never runs.
+    pub static fn new(_closure: C): Callback<C> {
         unreachable("std.ffi's Callback.new is the compiler's");
     }
 
