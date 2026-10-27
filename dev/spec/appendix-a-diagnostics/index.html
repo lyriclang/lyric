@@ -2901,7 +2901,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>P</td>
 <td><a href="../../spec/13-abi/">13-abi</a></td>
 <td>a Lyric function called from a thread Lyric does not run</td>
-<td>C called a Lyric function through its pointer on a thread the runtime does not know: one C started itself, which no collector attached. There is no Lyric to run it on, and the process ends.</td>
+<td>C called a Lyric function through its pointer on a thread the runtime does not know: one C started itself, which no collector attached. A Callback that returns nothing goes to the thread that made it; any other call — a function's, a Callback's that returns a value, one whose thread runs no scheduler — has no Lyric to run on, and the process ends.</td>
 </tr>
 <tr>
 <td>LYR-RT0023</td>

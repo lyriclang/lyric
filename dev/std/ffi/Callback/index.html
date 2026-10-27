@@ -38,8 +38,10 @@
 parameter is the <code>Ptr&lt;void&gt;</code> that C hands back, and the closure takes the others —
 <code>Callback&lt;extern &quot;C&quot; fn(Ptr&lt;void&gt;, int) -&gt; void&gt;.new((event) =&gt; { seen += event; })</code>, handed
 to C as <code>on_event(cb.function, cb.userdata)</code>.</p>
-<p>The closure stays alive until <a href="../../../std/ffi/Callback/#method.release">Callback.release</a> — C may call it as long — and C calls it on
-the thread Lyric runs on, as any function C calls.</p>
+<p>The closure stays alive until <a href="../../../std/ffi/Callback/#method.release">Callback.release</a> — C may call it as long. C calls it on the
+thread Lyric runs on, as any function C calls; one that returns nothing may be called on a
+thread of C's own too, and goes to the thread that made it, which runs it in its scheduler's
+next turn — with what C passed, while C's thread goes on.</p>
 <h2 id="fields">Fields</h2>
 <section class="member" id="field.function">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> function: <span class="ty">C</span></code></pre>

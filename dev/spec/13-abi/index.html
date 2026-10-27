@@ -260,7 +260,7 @@ with the line <code>panic while panicking [CODE]: message</code>, still with 101
 </tr>
 <tr>
 <td><code>LYR-RT0022</code></td>
-<td>C called a Lyric function through its pointer on a thread Lyric does not run: <code>C called a Lyric function on a thread Lyric does not run</code> (§3 rule 9)</td>
+<td>C called a Lyric function through its pointer on a thread Lyric does not run: <code>C called a Lyric function on a thread Lyric does not run …</code> — but for a Callback's that returns nothing, which goes to its thread (§3 rules 9, 13)</td>
 </tr>
 </tbody>
 </table>
@@ -471,7 +471,8 @@ refused (<code>LYR-SEM0001</code>): a closure's state has no place in C's pointe
 as Lyric's (rules 1–5) and gives the result back as C's. The coroutine it runs in counts the
 C frames below it (§1.6 rule 6): the function may park and yield, and a panic in it ends the
 process with its report (§1.6 rule 10) — C's frames cannot be unwound. On a thread Lyric
-does not run — one C started itself — the call ends the process with <code>LYR-RT0022</code>.</li>
+does not run — one C started itself — the call ends the process with <code>LYR-RT0022</code>, but for
+a <code>Callback</code>'s that returns nothing (rule 13).</li>
 <li>A value of the type is called as a function is: a call of the C function it points at, each
 value crossing as for an <code>extern &quot;C&quot;</code> declaration.</li>
 </ul>
@@ -513,6 +514,17 @@ released. Reading a handle whose object is of another class than <code>T</code> 
 (<code>LYR-RT0023</code>).</li>
 <li><code>release()</code> lets the object go; reading or releasing that handle again is a panic
 (<code>LYR-RT0008</code>). Reading another handle of a released object is undefined.</li>
+</ul>
+</li>
+<li><strong>Callbacks from C's threads</strong>: a <code>Callback</code> belongs to the thread that made it. Called on a
+thread Lyric does not run, one whose type returns nothing does not run there: the call — what C
+passed, copied — goes to its thread, which runs it in its scheduler's next turn
+(<a href="../../spec/10-concurrency/">10 §2</a>), in the order C's calls came; C's thread goes on at once.
+<ul>
+<li>One whose type returns a value would have C's thread wait for its own: the process ends
+(<code>LYR-RT0022</code>), as it does where the thread that made the Callback runs no scheduler.</li>
+<li>While a thread's Callbacks are not released, its scheduler is not deadlocked when every task
+waits (10 §2 rule 12): a call from C may come and wake one.</li>
 </ul>
 </li>
 </ol>
