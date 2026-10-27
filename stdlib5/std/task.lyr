@@ -1328,6 +1328,9 @@ class Context {
     /// Cancelled: every wait from here on throws `Cancelled`. Atomic: a cancel may come
     /// from another thread.
     var cancelled: bool = false,
+    /// The error a function C called left for the code around the C call (std.ffi's `stash`),
+    /// until it takes it: the task's own, as the callback that left it may have parked.
+    var stashed: ?Error = null,
     /// What becomes of a panic of it: its handle's — a context without one, main's or a
     /// detached task's, ends the process with the panic.
     var onPanic: ?fn(PanicInfo) -> void = null,
@@ -2309,6 +2312,49 @@ fn repanic(code: string, message: string, trace: string): never;
 
 /// The running thread's scheduler, as `runMain` set it.
 fn currentScheduler(): ?Scheduler;
+
+/// What `stashForeign` keeps where no task runs — the program's, behind its lock, as threads
+/// without a scheduler share it.
+@Allow("global-var-without-sync")
+var unscheduledStash: ?Error = null;
+
+let unscheduledGuard = SpinLock { };
+
+/// std.ffi's `stash`: the error a function C called leaves for the code around the C call — the
+/// running task's, or the program's where no task runs. One waits at a time: a second, before the
+/// first is taken, is the first's consequence, and the first stays.
+internal fn stashForeign(e: Error): void {
+    if (let s = currentScheduler()) {
+        if (let me = s.running) {
+            if (me.stashed == null) {
+                me.stashed = e;
+            }
+            return;
+        }
+    }
+    unscheduledGuard.acquire();
+    if (unscheduledStash == null) {
+        unscheduledStash = e;
+    }
+    unscheduledGuard.release();
+}
+
+/// std.ffi's `takeStashed`: the error `stashForeign` kept, which it forgets; `null` where none waits.
+internal fn takeForeign(): ?Error {
+    if (let s = currentScheduler()) {
+        if (let me = s.running) {
+            let kept = me.stashed;
+            me.stashed = null;
+            return kept;
+        }
+    }
+    unscheduledGuard.acquire();
+    let kept = unscheduledStash;
+    unscheduledStash = null;
+    unscheduledGuard.release();
+    return kept;
+}
+
 fn setCurrentScheduler(s: ?Scheduler): void;
 
 /// Returns whether a scheduler runs on this thread — the question the I/O pool's callers ask:

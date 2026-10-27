@@ -28,6 +28,7 @@
 //! 5
 //! ```
 import std.core { Utf8Error };
+import std.task { stashForeign, takeForeign };
 
 /// A pointer to a `T` in memory C manages, never null: `T *` where a C function takes or returns
 /// one.
@@ -95,6 +96,22 @@ pub class Callback<C> {
         this.released = true;
         lyr_ffi_closure_release(this.root);
     }
+}
+
+/// Keeps `e` for the code around the C call that called this function: a function C calls
+/// throws nothing, since C would not know what to do with it, and this is how its error crosses.
+/// The code that called C takes it with [takeStashed] when C returns.
+///
+/// One error waits at a time, the running task's: a second, before the first is taken, is
+/// dropped — the first went wrong first.
+pub fn stash(e: Error): void {
+    stashForeign(e);
+}
+
+/// Returns the error a function C called kept with [stash], and forgets it; `null` where none
+/// waits.
+pub fn takeStashed(): ?Error {
+    return takeForeign();
 }
 
 /// Returns `count` values of `T` from C's heap, each set to zero — what C's `calloc` gives, to

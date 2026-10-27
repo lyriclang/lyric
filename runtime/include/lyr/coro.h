@@ -108,10 +108,11 @@ void *lyr_coro_arg(const LyrCoro *co);
 /* The coroutine running on the calling thread; NULL on the thread's own stack. */
 LyrCoro *lyr_coro_current(void);
 
-/* Foreign frames: C code that may call back into Lyric — and so may yield with its frames
- * on a coroutine's stack — brackets itself with these, and the coroutine keeps the count. Nothing
- * asks it yet: what a cancellation or the collector does with C frames on a stack comes with the
- * callbacks from C. On a thread's own stack they do nothing. */
+/* Foreign frames: a function C calls (std.ffi's trampolines) brackets itself with these, and the
+ * coroutine keeps the count of C frames on its stack. A coroutine with any is not closed — that
+ * is a panic, as C's frames cannot be unwound — and not collected: its stack is kept, with one
+ * warning per process. A panic in it ends the process (lyr_coro_panic_leave). On a thread's own
+ * stack they do nothing. */
 void lyr_coro_enter_foreign(void);
 void lyr_coro_leave_foreign(void);
 int lyr_coro_foreign_depth(const LyrCoro *co);

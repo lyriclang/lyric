@@ -3944,7 +3944,7 @@ fn main(): void {
 title = "a coroutine misused"
 severity = "panic"
 area = "10-concurrency"
-summary = "A coroutine is used against its rules: a `yield` where no coroutine runs, or in a task outside every generator; a coroutine resumed while it runs, after it ended, or on another thread; a coroutine closed while it runs or is parked; a yield of another type than the running generator's."
+summary = "A coroutine is used against its rules: a `yield` where no coroutine runs, or in a task outside every generator; a coroutine resumed while it runs, after it ended, or on another thread; a coroutine closed while it runs or is parked, or with C frames on its stack — a callback that yielded in it; a yield of another type than the running generator's."
 program = '''
 import std.task { Cancelled };
 
