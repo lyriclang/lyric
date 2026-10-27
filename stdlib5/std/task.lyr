@@ -2050,7 +2050,10 @@ class Scheduler {
     /// waits on a descriptor waits on the system, which may end it: no deadlock while one does. A file's call waits on the pool, a thread that lives.
     mut fn deadlock(): bool {
         // a Callback of this thread a thread of C's may call: a call may come and wake a task
-        if (this.liveFirst == null || this.ioCount > 0 || living.others(this) || this.pending()
+        if (this.liveFirst == null
+            || this.ioCount > 0
+            || living.others(this)
+            || this.pending()
             || lyr_ffi_callbacks_alive() > 0) {
             return false;
         }
