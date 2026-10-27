@@ -62,8 +62,7 @@ internal sealed class ImportTable
         _byName[import.Name] = import;
         // a C function goes by its symbol; std's are also found by their Lyric name, which the
         // lowering asks for a runtime helper by ('std.string.concat' for a string's '+')
-        if (import.Name.StartsWith("C:", StringComparison.Ordinal) && symbol.Home is { } home)
-            _byName.TryAdd(home.FullName + "." + symbol.Name, import);
+        if (import.StdName is { } lyricName) _byName.TryAdd(lyricName, import);
         if (shape is not null) _shapes[import.Name] = shape;
     }
 

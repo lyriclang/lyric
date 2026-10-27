@@ -108,9 +108,9 @@ internal static class Reachability
     /// a spawned task takes that branch.</remarks>
     public static bool CallsImport(IrModule module, string name, string? unless = null)
     {
-        var target = module.Imports.FindIndex(import => import.Name == name);
+        var target = module.Imports.FindIndex(import => import.Is(name));
         if (target < 0) return false;
-        var guard = unless is null ? -1 : module.Imports.FindIndex(import => import.Name == unless);
+        var guard = unless is null ? -1 : module.Imports.FindIndex(import => import.Is(unless));
         foreach (var function in Collect(module, guard))
             foreach (var block in BlocksOf(module.Functions[function], guard))
                 foreach (var op in block.Insts)

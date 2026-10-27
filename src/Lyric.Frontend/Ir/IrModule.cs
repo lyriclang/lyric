@@ -106,6 +106,15 @@ public record struct IrImport(string Name, IrType[] ParamTypes, IrType ReturnTyp
     /// <summary>For a C function: whether C's variadic arguments follow its parameters — a call
     /// may hand more arguments than <see cref="ParamTypes"/> has.</summary>
     public bool CVariadic { get; init; }
+
+    /// <summary>For a C function of std: its Lyric name (<c>std.string.concat</c>), by which the
+    /// lowering asks for a helper and the compile-time interpreter computes it; <c>null</c> for
+    /// every other import, whose <see cref="Name"/> is the Lyric name.</summary>
+    public string? StdName { get; init; }
+
+    /// <summary>Whether this is std's native <paramref name="lyricName"/>, whichever way it
+    /// crosses.</summary>
+    public readonly bool Is(string lyricName) => (StdName ?? Name) == lyricName;
 }
 
 /// <summary>What a value is at C's boundary.</summary>

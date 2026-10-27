@@ -25,7 +25,7 @@ LyrStr *lyr_str_concat(const LyrStr *a, const LyrStr *b);
 bool lyr_str_eq(const LyrStr *a, const LyrStr *b);
 
 /* <0, 0, >0 in byte order, which is code point order for UTF-8. */
-int lyr_str_cmp(const LyrStr *a, const LyrStr *b);
+int64_t lyr_str_cmp(const LyrStr *a, const LyrStr *b);
 
 /* The bytes from..to as a string of its own: out of 0 ≤ from ≤ to ≤ len, or off a
  * character's boundary, a panic (LYR-RT0003). */

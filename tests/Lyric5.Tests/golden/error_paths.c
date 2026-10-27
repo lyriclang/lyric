@@ -98,6 +98,10 @@ _Static_assert(offsetof(lyr_box_ty_app_main_BoxErr_int__78c7c358, value) == 8, "
 extern const LyrItable lyr_itab_ty_app_main_BoxErr_int__78c7c358[];
 const LyrDesc lyr_desc_box_ty_app_main_BoxErr_int__78c7c358 = { sizeof(lyr_box_ty_app_main_BoxErr_int__78c7c358), 0, 0, 0, NULL, "box<app.main.BoxErr<int>>", lyr_itab_ty_app_main_BoxErr_int__78c7c358 };
 
+extern LyrStr * lyr_c_lyr_str_concat(LyrStr *, LyrStr *) __asm__(LYR_C_SYMBOL("lyr_str_concat"));
+extern LyrStr * lyr_c_lyr_str_from_byte_array(LyrArr *, int64_t) __asm__(LYR_C_SYMBOL("lyr_str_from_byte_array"));
+extern int64_t lyr_c_lyr_bytes_put_int(LyrArr *, int64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_bytes_put_int"));
+extern void lyr_c_lyr_bytes_copy(LyrArr *, LyrArr *, int64_t) __asm__(LYR_C_SYMBOL("lyr_bytes_copy"));
 extern int64_t lyr_c_lyr_console_put(int64_t, uint64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_console_put"));
 extern void lyr_c_lyr_console_gone(void) __asm__(LYR_C_SYMBOL("lyr_console_gone"));
 extern int64_t lyr_c_lyr_console_flush(int64_t) __asm__(LYR_C_SYMBOL("lyr_console_flush"));
@@ -400,7 +404,7 @@ bb2:;
 #line 19
     t18 = lyr_std_core_fstringEnd(t17);
 #line 19
-    t19 = lyr_str_concat(t5, t18);
+    t19 = lyr_c_lyr_str_concat(t5, t18);
 #line 19
     l2_log = t19;
 #line 20
@@ -441,7 +445,7 @@ bb3:;
 #line 20
     t33 = lyr_std_core_fstringEnd(t32);
 #line 20
-    t34 = lyr_str_concat(t20, t33);
+    t34 = lyr_c_lyr_str_concat(t20, t33);
 #line 20
     l2_log = t34;
 #line 18
@@ -492,7 +496,7 @@ bb4:;
 #line 21
     t53 = lyr_std_core_fstringEnd(t52);
 #line 21
-    t54 = lyr_str_concat(t38, t53);
+    t54 = lyr_c_lyr_str_concat(t38, t53);
 #line 21
     l2_log = t54;
 #line 18
@@ -706,7 +710,7 @@ bb2:;
 #line 36
     t16 = lyr_std_core_fstringEnd(t15);
 #line 36
-    t17 = lyr_str_concat(t3, t16);
+    t17 = lyr_c_lyr_str_concat(t3, t16);
 #line 36
     l1_log = t17;
 #line 37
@@ -747,7 +751,7 @@ bb3:;
 #line 37
     t31 = lyr_std_core_fstringEnd(t30);
 #line 37
-    t32 = lyr_str_concat(t18, t31);
+    t32 = lyr_c_lyr_str_concat(t18, t31);
 #line 37
     l1_log = t32;
 #line 35
@@ -798,7 +802,7 @@ bb4:;
 #line 38
     t51 = lyr_std_core_fstringEnd(t50);
 #line 38
-    t52 = lyr_str_concat(t36, t51);
+    t52 = lyr_c_lyr_str_concat(t36, t51);
 #line 38
     l1_log = t52;
 #line 35
@@ -1010,7 +1014,7 @@ bb2:;
 #line 49
     t17 = lyr_std_core_fstringEnd(t16);
 #line 49
-    t18 = lyr_str_concat(t1, t17);
+    t18 = lyr_c_lyr_str_concat(t1, t17);
 #line 49
     l0_log = t18;
 #line 50
@@ -1057,7 +1061,7 @@ bb3:;
 #line 50
     t35 = lyr_std_core_fstringEnd(t34);
 #line 50
-    t36 = lyr_str_concat(t19, t35);
+    t36 = lyr_c_lyr_str_concat(t19, t35);
 #line 50
     l0_log = t36;
 #line 48
@@ -1108,7 +1112,7 @@ bb4:;
 #line 51
     t55 = lyr_std_core_fstringEnd(t54);
 #line 51
-    t56 = lyr_str_concat(t40, t55);
+    t56 = lyr_c_lyr_str_concat(t40, t55);
 #line 51
     l0_log = t56;
 #line 48
@@ -1243,7 +1247,7 @@ bb1:;
 #line 62
     t6 = (LyrStr *)&lyr_lit6;
 #line 62
-    t7 = lyr_str_concat(t5, t6);
+    t7 = lyr_c_lyr_str_concat(t5, t6);
 #line 62
     l0_log = t7;
 #line 63
@@ -1254,7 +1258,7 @@ bb2:;
 #line 60
     t9 = (LyrStr *)&lyr_lit7;
 #line 60
-    t10 = lyr_str_concat(t8, t9);
+    t10 = lyr_c_lyr_str_concat(t8, t9);
 #line 60
     l0_log = t10;
 #line 63
@@ -1265,7 +1269,7 @@ bb3:;
 #line 58
     t12 = (LyrStr *)&lyr_lit8;
 #line 58
-    t13 = lyr_str_concat(t11, t12);
+    t13 = lyr_c_lyr_str_concat(t11, t12);
 #line 58
     l0_log = t13;
 #line 63
@@ -1311,7 +1315,7 @@ bb5:;
 #line 64
     t25 = lyr_std_core_fstringEnd(t24);
 #line 64
-    t26 = lyr_str_concat(t14, t25);
+    t26 = lyr_c_lyr_str_concat(t14, t25);
 #line 64
     l0_log = t26;
 #line 62
@@ -1319,7 +1323,7 @@ bb5:;
 #line 62
     t28 = (LyrStr *)&lyr_lit6;
 #line 62
-    t29 = lyr_str_concat(t27, t28);
+    t29 = lyr_c_lyr_str_concat(t27, t28);
 #line 62
     l0_log = t29;
 #line 60
@@ -1327,7 +1331,7 @@ bb5:;
 #line 60
     t31 = (LyrStr *)&lyr_lit7;
 #line 60
-    t32 = lyr_str_concat(t30, t31);
+    t32 = lyr_c_lyr_str_concat(t30, t31);
 #line 60
     l0_log = t32;
 #line 58
@@ -1335,7 +1339,7 @@ bb5:;
 #line 58
     t34 = (LyrStr *)&lyr_lit8;
 #line 58
-    t35 = lyr_str_concat(t33, t34);
+    t35 = lyr_c_lyr_str_concat(t33, t34);
 #line 58
     l0_log = t35;
 #line 57
@@ -1348,7 +1352,7 @@ bb6:;
 #line 67
     t39 = (LyrStr *)&lyr_lit9;
 #line 67
-    t40 = lyr_str_concat(t38, t39);
+    t40 = lyr_c_lyr_str_concat(t38, t39);
 #line 67
     l0_log = t40;
 #line 57
@@ -1546,7 +1550,7 @@ bb4:; LYR_LOOP_POLL(lyr_poll);
 #line 80
     t51 = (LyrStr *)&lyr_lit11;
 #line 80
-    t52 = lyr_str_concat(t50, t51);
+    t52 = lyr_c_lyr_str_concat(t50, t51);
 #line 80
     return t52;
 bb5:;
@@ -1610,7 +1614,7 @@ bb8:;
 #line 75
     t24 = lyr_std_core_fstringEnd(t23);
 #line 75
-    t25 = lyr_str_concat(t13, t24);
+    t25 = lyr_c_lyr_str_concat(t13, t24);
 #line 75
     l0_log = t25;
 #line 75
@@ -1650,7 +1654,7 @@ bb10:;
 #line 77
     t40 = lyr_std_core_fstringEnd(t39);
 #line 77
-    t41 = lyr_str_concat(t29, t40);
+    t41 = lyr_c_lyr_str_concat(t29, t40);
 #line 77
     l0_log = t41;
 #line 74
@@ -1663,7 +1667,7 @@ bb11:;
 #line 78
     t45 = (LyrStr *)&lyr_lit12;
 #line 78
-    t46 = lyr_str_concat(t44, t45);
+    t46 = lyr_c_lyr_str_concat(t44, t45);
 #line 78
     l0_log = t46;
 #line 78
@@ -1935,7 +1939,7 @@ bb2:;
 #line 95
     t16 = lyr_std_core_fstringEnd(t15);
 #line 95
-    t17 = lyr_str_concat(t5, t16);
+    t17 = lyr_c_lyr_str_concat(t5, t16);
 #line 95
     l0_log = t17;
 #line 93
@@ -1997,7 +2001,7 @@ bb6:;
 #line 97
     t35 = lyr_std_core_fstringEnd(t34);
 #line 97
-    t36 = lyr_str_concat(t24, t35);
+    t36 = lyr_c_lyr_str_concat(t24, t35);
 #line 97
     l0_log = t36;
 #line 97
@@ -2010,7 +2014,7 @@ bb7:;
 #line 98
     t40 = (LyrStr *)&lyr_lit15;
 #line 98
-    t41 = lyr_str_concat(t39, t40);
+    t41 = lyr_c_lyr_str_concat(t39, t40);
 #line 98
     l0_log = t41;
 #line 97
@@ -2608,7 +2612,7 @@ bb0:;
 #line _
     t9 = l1_v;
 #line _
-    t10 = lyr_bytes_put_int(t6, t8, t9);
+    t10 = lyr_c_lyr_bytes_put_int(t6, t8, t9);
 #line _
     t11 = LYR_CHECKED_ADD(t4, t10);
 #line _
@@ -2684,7 +2688,7 @@ bb0:;
 #line _
     t3 = t2->f_count;
 #line _
-    t4 = lyr_str_from_byte_array(t1, t3);
+    t4 = lyr_c_lyr_str_from_byte_array(t1, t3);
 #line _
     return t4;
 }
@@ -2920,7 +2924,7 @@ bb6:;
 #line _
     t27 = t26->f_count;
 #line _
-    lyr_bytes_copy(t23, t25, t27);
+    lyr_c_lyr_bytes_copy(t23, t25, t27);
 #line _
     t28 = l0_this;
 #line _
@@ -3456,6 +3460,8 @@ struct lyr_ty_app_main_BoxErr_int__78c7c358 {
     int64_t f_v;
 };
 
+extern LyrStr * lyr_c_lyr_str_concat(LyrStr *, LyrStr *) __asm__(LYR_C_SYMBOL("lyr_str_concat"));
+
 /* string literals */
 static const LyrStaticStr(10) lyr_lit0 = LYR_STR_INIT("BoxErr { ");
 static const LyrStaticStr(5) lyr_lit1 = LYR_STR_INIT("v = ");
@@ -3495,7 +3501,7 @@ bb0:;
 #line 4
     t1 = (LyrStr *)&lyr_lit1;
 #line 3
-    t2 = lyr_str_concat(t0, t1);
+    t2 = lyr_c_lyr_str_concat(t0, t1);
 #line 4
     t3 = l0_this;
 #line 4
@@ -3503,11 +3509,11 @@ bb0:;
 #line 4
     t5 = lyr_std_core__extend__int_debug_970869d7(t4);
 #line 3
-    t6 = lyr_str_concat(t2, t5);
+    t6 = lyr_c_lyr_str_concat(t2, t5);
 #line 5
     t7 = (LyrStr *)&lyr_lit2;
 #line 3
-    t8 = lyr_str_concat(t6, t7);
+    t8 = lyr_c_lyr_str_concat(t6, t7);
 #line 3
     return t8;
 }

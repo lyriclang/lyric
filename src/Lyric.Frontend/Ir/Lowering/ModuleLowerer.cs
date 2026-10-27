@@ -190,6 +190,7 @@ public static class ModuleLowerer
                                     CParams = [.. cTypes.Select(t => CFormOf(t, typeTable, compilation))],
                                     CReturn = CFormOf(cReturn, typeTable, compilation),
                                     CVariadic = function.CVariadic is not null,
+                                    StdName = compilation.IsNative(module) ? NameMangling.ForFunction(module, function.Name) : null,
                                 },
                                 new ImportShape([.. cTypes.Select(t => new ImportParam(t, null, []))], null));
                             continue;
@@ -738,7 +739,7 @@ public static class ModuleLowerer
         // reaches may call it, what the program runs never does. Asked of the pruned module — a
         // function only a site called was lowered all the same, and is gone now.
         if (comptime is not { Hoist: true } && entry is not null
-            && result.Imports.FindIndex(import => import.Name == "std.core.embed") is var embed and >= 0)
+            && result.Imports.FindIndex(import => import.Is("std.core.embed")) is var embed and >= 0)
         {
             var calls = result.Functions.SelectMany(f => f.Blocks).SelectMany(b => b.Insts)
                 .OfType<CallImport>().Where(call => call.Target.Value == embed).ToList();

@@ -85,6 +85,9 @@ const LyrDesc lyr_desc_arr_ty12_0tup_i64_i64 = { (uint32_t)offsetof(LyrArr, data
 _Static_assert(sizeof(uint8_t) == 1, "layout of u8[]");
 const LyrDesc lyr_desc_arr_u8 = { (uint32_t)offsetof(LyrArr, data), LYR_DESC_ARRAY, sizeof(uint8_t), 0, NULL, "u8[]", NULL };
 
+extern LyrStr * lyr_c_lyr_str_from_byte_array(LyrArr *, int64_t) __asm__(LYR_C_SYMBOL("lyr_str_from_byte_array"));
+extern int64_t lyr_c_lyr_bytes_put_int(LyrArr *, int64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_bytes_put_int"));
+extern void lyr_c_lyr_bytes_copy(LyrArr *, LyrArr *, int64_t) __asm__(LYR_C_SYMBOL("lyr_bytes_copy"));
 extern int64_t lyr_c_lyr_console_put(int64_t, uint64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_console_put"));
 extern void lyr_c_lyr_console_gone(void) __asm__(LYR_C_SYMBOL("lyr_console_gone"));
 extern int64_t lyr_c_lyr_console_flush(int64_t) __asm__(LYR_C_SYMBOL("lyr_console_flush"));
@@ -1558,7 +1561,7 @@ bb0:;
 #line _
     t9 = l1_v;
 #line _
-    t10 = lyr_bytes_put_int(t6, t8, t9);
+    t10 = lyr_c_lyr_bytes_put_int(t6, t8, t9);
 #line _
     t11 = LYR_CHECKED_ADD(t4, t10);
 #line _
@@ -1634,7 +1637,7 @@ bb0:;
 #line _
     t3 = t2->f_count;
 #line _
-    t4 = lyr_str_from_byte_array(t1, t3);
+    t4 = lyr_c_lyr_str_from_byte_array(t1, t3);
 #line _
     return t4;
 }
@@ -1870,7 +1873,7 @@ bb6:;
 #line _
     t27 = t26->f_count;
 #line _
-    lyr_bytes_copy(t23, t25, t27);
+    lyr_c_lyr_bytes_copy(t23, t25, t27);
 #line _
     t28 = l0_this;
 #line _
