@@ -49,13 +49,10 @@ static inline void lyr_check_char_range(const uint8_t *bytes, int64_t low, int64
  * out as { ptr, len }. Equal bytes; byte order, then the length (-1, 0, 1); the character that
  * begins at a byte, outside the bytes or on one that continues a character a panic (LYR-RT0003). */
 bool lyr_bytes_equal(const uint8_t *a, int64_t alen, const uint8_t *b, int64_t blen);
-int lyr_bytes_compare(const uint8_t *a, int64_t alen, const uint8_t *b, int64_t blen);
+int64_t lyr_bytes_compare(const uint8_t *a, int64_t alen, const uint8_t *b, int64_t blen);
 uint32_t lyr_char_at(const uint8_t *bytes, int64_t len, int64_t at);
 
 #define LYR_VIEW_EQ(a, b) lyr_bytes_equal((a).ptr, (a).len, (b).ptr, (b).len)
-#define LYR_VIEW_CMP(a, b) ((int64_t)lyr_bytes_compare((a).ptr, (a).len, (b).ptr, (b).len))
-#define LYR_VIEW_STR(v) lyr_str_from_bytes((v).ptr, (v).len)
-#define LYR_VIEW_CHAR(v, i) lyr_char_at((v).ptr, (v).len, (int64_t)(i))
 #define LYR_VIEW_BYTES(v) (v)
 
 /* Bytes to text, over a Slice<uint8>'s pointer and length: the offset of the
@@ -63,9 +60,6 @@ uint32_t lyr_char_at(const uint8_t *bytes, int64_t len, int64_t at);
  * each maximal part of a sequence that is not well-formed replaced by U+FFFD. */
 int64_t lyr_utf8_invalid_at(const uint8_t *bytes, int64_t len);
 LyrStr *lyr_str_from_utf8_lossy(const uint8_t *bytes, int64_t len);
-#define LYR_UTF8_INVALID(v) lyr_utf8_invalid_at((v).ptr, (v).len)
-#define LYR_STR_OF_SLICE(v) lyr_str_from_bytes((v).ptr, (v).len)
-#define LYR_STR_UTF8_LOSSY(v) lyr_str_from_utf8_lossy((v).ptr, (v).len)
 
 /* A string of the first `count` bytes of a byte array (StringBuilder's): they are UTF-8, the
  * builder wrote them; `count` past the array is a panic. */
@@ -95,7 +89,6 @@ LyrStr *lyr_str_float_text(double value, int64_t precision, int64_t form);
  * `at` on, and the first `count` bytes of one array into another — memcpy, the ranges checked as
  * an index is. */
 void lyr_bytes_put(LyrArr *bytes, int64_t at, const uint8_t *from, int64_t count);
-#define LYR_BYTES_PUT_VIEW(bytes, at, v) lyr_bytes_put((bytes), (int64_t)(at), (v).ptr, (v).len)
 void lyr_bytes_copy(LyrArr *into, const LyrArr *from, int64_t count);
 
 /* An integer's decimal digits into an array from `at` on — an f-string's builder:
@@ -109,16 +102,7 @@ int64_t lyr_bytes_put_uint(LyrArr *bytes, int64_t at, uint64_t value);
 double lyr_str_to_float64(const LyrStr *text);
 float lyr_str_to_float32(const LyrStr *text);
 
-/* A view's length and one byte of it, the bytes std.core's string members read;
- * the index is checked as `xs[i]` is. Whether `p`'s bytes stand in `s` at byte `at` (false where
- * they would run past it). */
-#define LYR_VIEW_LEN(v) ((int64_t)(v).len)
-#define LYR_VIEW_BYTE(v, i)                                                                         \
-    __extension__({                                                                                 \
-        const int64_t lyr_i_ = (i);                                                                 \
-        LYR_CHECK_INDEX(lyr_i_, (v).len);                                                           \
-        (int64_t)(v).ptr[lyr_i_];                                                                   \
-    })
+/* Whether `p`'s bytes stand in `s` at byte `at` (false where they would run past it). */
 static inline bool lyr_bytes_match_at(const uint8_t *s, int64_t slen, const uint8_t *p, int64_t plen, int64_t at) {
     return at >= 0 && at <= slen - plen && (plen == 0 || memcmp(s + at, p, (size_t)plen) == 0);
 }

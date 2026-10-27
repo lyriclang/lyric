@@ -3445,8 +3445,14 @@ fn isWord(s: StringView, i: int, a: int, b: int, c: int): bool {
 // The natives the text stands on: a view's length and bytes, which a string gives at the
 // argument; a number converted as `as` converts it to the type of `like` where that is a
 // parameter's; a float's text read by C (`strtod`, `strtof`) once its form is checked.
-fn byteCount(s: StringView): int;
-fn byteAt(s: StringView, i: int): int;
+inline fn byteCount(s: StringView): int {
+    return viewBytes(s).length();
+}
+
+inline fn byteAt(s: StringView, i: int): int {
+    return viewBytes(s)[i] as int;
+}
+
 /// Returns whether `p`'s bytes stand in `s` from byte `at` on; false where they would run past
 /// its end.
 fn viewMatchesAt(s: StringView, p: StringView, at: int): bool;
@@ -4185,7 +4191,17 @@ pub class StringBuilder {
 ///
 /// # Panics
 /// When a range is out of bounds, as an index is.
-fn putBytes(bytes: uint8[], at: int, s: StringView): void;
+inline fn putBytes(bytes: uint8[], at: int, s: StringView): void {
+    let from = viewBytes(s);
+    putBytesRaw(bytes, at, sliceAddress(from), from.length());
+}
+
+extern "C" fn putBytesRaw(
+    bytes: uint8[],
+    at: int,
+    fromAt: uint,
+    fromLength: int
+): void = "lyr_bytes_put";
 extern "C" fn copyBytes(into: uint8[], from: uint8[], count: int): void = "lyr_bytes_copy";
 
 /// Copies the first `count` elements of `from` into `into`.
@@ -4225,11 +4241,43 @@ pub fn charAtByte(v: StringView, i: int): char {
     return charOfView(v, i);
 }
 
-fn viewsHoldTheSameBytes(a: StringView, b: StringView): bool;
+inline fn viewsHoldTheSameBytes(a: StringView, b: StringView): bool {
+    let x = viewBytes(a);
+    let y = viewBytes(b);
+    return viewsHoldTheSameBytesRaw(sliceAddress(x), x.length(), sliceAddress(y), y.length());
+}
+
+extern "C" fn viewsHoldTheSameBytesRaw(
+    aAt: uint,
+    aLength: int,
+    bAt: uint,
+    bLength: int
+): bool = "lyr_bytes_equal";
+
 /// Compares byte by byte, then by length: -1, 0 or 1.
-fn compareViewBytes(a: StringView, b: StringView): int;
-fn viewToString(v: StringView): string;
-fn charOfView(v: StringView, i: int): char;
+inline fn compareViewBytes(a: StringView, b: StringView): int {
+    let x = viewBytes(a);
+    let y = viewBytes(b);
+    return compareViewBytesRaw(sliceAddress(x), x.length(), sliceAddress(y), y.length());
+}
+
+extern "C" fn compareViewBytesRaw(
+    aAt: uint,
+    aLength: int,
+    bAt: uint,
+    bLength: int
+): int = "lyr_bytes_compare";
+
+inline fn viewToString(v: StringView): string {
+    return stringOfSlice(viewBytes(v));
+}
+
+inline fn charOfView(v: StringView, i: int): char {
+    let bytes = viewBytes(v);
+    return charOfViewRaw(sliceAddress(bytes), bytes.length(), i);
+}
+
+extern "C" fn charOfViewRaw(vAt: uint, vLength: int, i: int): char = "lyr_char_at";
 /// Returns the view's bytes as a `Slice<uint8>`, for reading only.
 fn viewBytes(v: StringView): Slice<uint8>;
 

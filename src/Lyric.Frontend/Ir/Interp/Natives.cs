@@ -190,12 +190,6 @@ public sealed class Natives(Interpreter interpreter)
         },
 
         // --- views of bytes (string.h)
-        ["std.core.byteCount"] = (a, _, _) => Value.Int(Interpreter.View(a[0]).Length),
-        ["std.core.byteAt"] = (a, _, _) =>
-        {
-            var bytes = Bytes.Of(a[0]);
-            return Value.Int(bytes[Interpreter.Index(a[1], bytes.Length)]);
-        },
         ["std.core.viewMatchesAt"] = (a, _, _) =>
         {
             var s = Bytes.Of(a[0]);
@@ -220,11 +214,7 @@ public sealed class Natives(Interpreter interpreter)
             Interpreter.Index(Value.Int(i + 7), bytes.Length);
             return Value.Uint(System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(i, 8)));
         },
-        ["std.core.viewsHoldTheSameBytes"] = (a, _, _) => Value.Bool(Bytes.Of(a[0]).AsSpan().SequenceEqual(Bytes.Of(a[1]))),
-        ["std.core.compareViewBytes"] = (a, _, _) => Value.Int(Order(Bytes.Of(a[0]), Bytes.Of(a[1]))),
-        ["std.core.viewToString"] = (a, _, _) => Str(Bytes.Of(a[0])),
         ["std.core.stringOfSlice"] = (a, _, _) => Str(Bytes.Of(a[0])),
-        ["std.core.charOfView"] = (a, _, _) => Value.Uint(CharAt(Bytes.Of(a[0]), I(a[1]))),
         ["std.core.viewBytes"] = (a, _, _) => a[0],
         ["std.core.utf8Invalid"] = (a, _, _) => Value.Int(InvalidAt(Bytes.Of(a[0]))),
         ["std.core.stringOfUtf8Lossy"] = (a, _, _) => Str(Lossy(Bytes.Of(a[0]))),
@@ -232,14 +222,16 @@ public sealed class Natives(Interpreter interpreter)
         ["std.core.utf8InvalidRaw"] = (a, _, _) => Value.Int(InvalidAt(Addressed(a[0], a[1]))),
         ["std.core.stringOfSliceRaw"] = (a, _, _) => Str(Addressed(a[0], a[1])),
         ["std.core.stringOfUtf8LossyRaw"] = (a, _, _) => Str(Lossy(Addressed(a[0], a[1]))),
-
-        // --- byte arrays (string.c)
-        ["std.core.putBytes"] = (a, _, _) =>
+        ["std.core.viewsHoldTheSameBytesRaw"] = (a, _, _) => Value.Bool(Addressed(a[0], a[1]).AsSpan().SequenceEqual(Addressed(a[2], a[3]))),
+        ["std.core.compareViewBytesRaw"] = (a, _, _) => Value.Int(Order(Addressed(a[0], a[1]), Addressed(a[2], a[3]))),
+        ["std.core.charOfViewRaw"] = (a, _, _) => Value.Uint(CharAt(Addressed(a[0], a[1]), I(a[2]))),
+        ["std.core.putBytesRaw"] = (a, _, _) =>
         {
-            var into = (ArrayObj)a[0].Ref!;
-            Put(into, I(a[1]), Bytes.Of(a[2]));
+            Put((ArrayObj)a[0].Ref!, I(a[1]), Addressed(a[2], a[3]));
             return default;
         },
+
+        // --- byte arrays (string.c)
         ["std.core.putIntDigits"] = (a, _, _) =>
         {
             var digits = Encoding.ASCII.GetBytes(I(a[2]).ToString(System.Globalization.CultureInfo.InvariantCulture));
