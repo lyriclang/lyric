@@ -843,6 +843,7 @@ public class NativeTests
 
         void start_ticker(void (*f)(void *, int64_t), void *userdata, int64_t n) { start(job(f, NULL, userdata, n), 0); }
         void ask_elsewhere(int64_t (*g)(void *, int64_t), void *userdata) { start(job(NULL, g, userdata, 1), 1); }
+        void tick_elsewhere_and_wait(void (*f)(void *, int64_t), void *userdata) { start(job(f, NULL, userdata, 1), 1); }
 
         """;
 
@@ -858,6 +859,7 @@ public class NativeTests
             extern "C" {
                 fn start_ticker(f: extern "C" fn(Ptr<void>, int) -> void, userdata: Ptr<void>, n: int): void;
                 fn ask_elsewhere(g: extern "C" fn(Ptr<void>, int) -> int, userdata: Ptr<void>): void;
+                fn tick_elsewhere_and_wait(f: extern "C" fn(Ptr<void>, int) -> void, userdata: Ptr<void>): void;
             }
 
             """ + main));
@@ -884,6 +886,31 @@ public class NativeTests
 
             """);
         Assert.Equal("tick 0\ntick 1\ntick 2\ndone 3\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    /// <summary>The call may come before the owner's scheduler took another turn: here C calls on
+    /// its thread while main waits in C for it, right after the Callback is made. It is handed over
+    /// and runs when main is back.</summary>
+    [Fact]
+    public void A_callback_from_a_thread_of_Cs_may_come_at_once()
+    {
+        var dir = Threads("""
+            fn main(): void throws Error {
+                var seen = 0;
+                let cb = Callback<extern "C" fn(Ptr<void>, int) -> void>.new((i) => {
+                    seen += 1;
+                });
+                tick_elsewhere_and_wait(cb.function, cb.userdata);
+                println(f"back {seen}");
+                while (seen < 1) {
+                    try sleep(Duration.ofMillis(1));
+                }
+                cb.release();
+                println(f"done {seen}");
+            }
+
+            """);
+        Assert.Equal("back 0\ndone 1\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
     /// <summary>One that returns a value cannot wait for its owner: C's thread would block on a

@@ -71,6 +71,10 @@ struct LyrFfiOwner {
 
 static _Thread_local LyrFfiOwner *owner_here;
 
+/* The thread ran a scheduler's turn, which runs what it is handed: said before its first Callback
+ * may exist, and taken over by the owner record made later — a C thread may call at once. */
+static _Thread_local bool thread_drains;
+
 /* The calling thread's owner record, made at its first Callback; it lives as long as the process,
  * since C may hold a Callback's pointer past the thread. */
 static LyrFfiOwner *this_owner(void) {
@@ -79,6 +83,7 @@ static LyrFfiOwner *this_owner(void) {
         if (made == NULL) lyr_panic(LYR_RT_OUT_OF_MEMORY, "no memory left for a Callback's owner");
         atomic_flag_clear(&made->lock);
         made->poller = lyr_poller_current();
+        atomic_store(&made->drains, thread_drains);
         owner_here = made;
     }
     return owner_here;
@@ -130,6 +135,7 @@ void lyr_ffi_enqueue(LyrFfiOwner *owner, void (*run)(void *), void *payload) {
 }
 
 void lyr_ffi_drain(void) {
+    thread_drains = true;
     LyrFfiOwner *owner = owner_here;
     if (owner == NULL) return;  /* it made no Callback: nothing can come */
     atomic_store(&owner->drains, true);
