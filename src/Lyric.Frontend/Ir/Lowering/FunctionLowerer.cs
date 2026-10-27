@@ -8582,7 +8582,8 @@ internal sealed class FunctionLowerer
     {
         result = null;
         var ffi = _typeTable.Compilation?.FindModule(["std", "ffi"])?.Members;
-        if (ffi is null || symbol.Name is not ("load" or "store" or "sizeOf" or "dataAddress" or "sliceAddress")
+        if (ffi is null || symbol.Name is not ("load" or "store" or "sizeOf" or "dataAddress" or "sliceAddress"
+                or "rootObject" or "rootedObject")
             || !ReferenceEquals(ffi.LookupLocal(symbol.Name), symbol))
             return false;
         result = FfiMemory(symbol.Name, expr);
@@ -8611,6 +8612,20 @@ internal sealed class FunctionLowerer
                 _b.Emit(new PlaceAt(place, LowerExprAs(expr.Arguments[0], u64), type, span));
                 _b.Emit(new StorePlace(place, LowerExprAs(expr.Arguments[1], type), span));
                 return null;
+            }
+            case "rootObject":
+            {
+                var root = _slots.NewTemp(u64);
+                _b.Emit(new RootObject(root, LowerExpr(expr.Arguments[0]), span));
+                return root;
+            }
+            case "rootedObject":
+            {
+                if (TypeOfExpr(expr) is not IrRefType type)
+                    throw Bug($"a GcHandle of no object, for {span}");
+                var held = _slots.NewTemp(type);
+                _b.Emit(new RootedObject(held, LowerExprAs(expr.Arguments[0], u64), type, span));
+                return held;
             }
             case "sizeOf":
             {

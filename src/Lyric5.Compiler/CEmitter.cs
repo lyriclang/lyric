@@ -1386,6 +1386,7 @@ public sealed class CEmitter
             else if (op is Downcast dc) Add(dc.Target.Value);
             else if (op is CoroutineClose cc) Add(cc.Cancelled.Value);
             else if (op is SizeOf so) Visit(so.Type);
+            else if (op is RootedObject ro) Add(ro.Type.Type.Value);
 
         if (program)
         {
@@ -1866,6 +1867,8 @@ public sealed class CEmitter
         CCallback cb => $"{Temp(cb.Dest)} = (uint64_t)(uintptr_t)&{TrampolineName(_module.Functions[cb.Function.Value])};",
         CallCPointer cp => CPointerCall(cp),
         RootClosure r => $"{Temp(r.Dest)} = lyr_ffi_closure_root((void *){Temp(r.Closure)}.fn, {Temp(r.Closure)}.env);",
+        RootObject r => $"{Temp(r.Dest)} = (uint64_t)(uintptr_t)lyr_root_new({Temp(r.Value)});",
+        RootedObject r => $"{Temp(r.Dest)} = ({CType(r.Type)})lyr_ffi_rooted((uint64_t){Temp(r.Root)}, &{DescriptorName(r.Type.Type)});",
         CClosureCallback c => $"{Temp(c.Dest)} = (uint64_t)(uintptr_t)&{ClosureTrampolineName(c)};",
         CallImport call => Assign(call.Dest, Intrinsics.Call(_module.Imports[call.Target.Value].Name, call.Args.Select(Value).ToArray())),
         NewObject { Result: IrRefType r } n => $"{Temp(n.Dest)} = ({CType(r)})lyr_alloc(&{DescriptorName(r.Type)});",

@@ -98,6 +98,59 @@ pub class Callback<C> {
     }
 }
 
+/// An object of a class held for C: the collector keeps it while the handle does, and
+/// [GcHandle.asPtr] is the `void *` C keeps and hands back — the userdata of a C API that holds
+/// a Lyric object across its calls.
+///
+/// A handle made again from that pointer, with [GcHandle.from], reads the same object; one
+/// [GcHandle.release] lets it go, after which no handle of it is read again.
+pub class GcHandle<T> {
+    root: uint,
+    var released: bool = false,
+
+    /// Returns a handle that holds `object` until [GcHandle.release].
+    pub static fn pin(object: T): GcHandle<T> {
+        return GcHandle<T> { root = rootObject(object) };
+    }
+
+    /// Returns the handle a pointer [GcHandle.asPtr] gave stands for. Unsafe: the pointer must be
+    /// a handle's that is not released.
+    ///
+    /// # Panics
+    /// Where it holds an object of another class than `T` — when it is read.
+    pub static fn from(pointer: Ptr<void>): GcHandle<T> {
+        return GcHandle<T> { root = pointer.address };
+    }
+
+    /// Returns the object it holds.
+    ///
+    /// # Panics
+    /// Where this handle was released.
+    pub fn get(): T {
+        if (this.released) {
+            panic("a GcHandle read after its release");
+        }
+        return rootedObject<T>(this.root);
+    }
+
+    /// Returns the pointer C keeps for it: the same for every handle of the object.
+    pub fn asPtr(): Ptr<void> {
+        return Ptr<void> { address = this.root };
+    }
+
+    /// Lets the object go: the collector may take it once nothing else holds it.
+    ///
+    /// # Panics
+    /// Where this handle was released already.
+    pub mut fn release(): void {
+        if (this.released) {
+            panic("a GcHandle released twice");
+        }
+        this.released = true;
+        lyr_ffi_closure_release(this.root);
+    }
+}
+
 /// Keeps `e` for the code around the C call that called this function: a function C calls
 /// throws nothing, since C would not know what to do with it, and this is how its error crosses.
 /// The code that called C takes it with [takeStashed] when C returns.
@@ -171,6 +224,16 @@ fn dataAddress<T>(xs: T[]): uint {
 @Allow("unused")
 fn sliceAddress<T>(xs: Slice<T>): uint {
     unreachable("std.ffi's sliceAddress is the compiler's");
+}
+
+@Allow("unused")
+fn rootObject<T>(object: T): uint {
+    unreachable("std.ffi's rootObject is the compiler's");
+}
+
+@Allow("unused")
+fn rootedObject<T>(root: uint): T {
+    unreachable("std.ffi's rootedObject is the compiler's");
 }
 
 /// A C string: the address of bytes a NUL ends, `const char *` at a C function's boundary.

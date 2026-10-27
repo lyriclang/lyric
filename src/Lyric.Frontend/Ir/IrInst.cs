@@ -346,6 +346,14 @@ public sealed record CCallback(TempId Dest, FunctionId Function, IrCForm[] Param
 /// <summary><c>Callback&lt;C&gt;.new</c>'s state: the closure's code and environment in an object a
 /// root keeps alive; <paramref name="Dest"/> is the root's address, a <c>uint</c>, which is the
 /// userdata C hands back.</summary>
+/// <summary><c>GcHandle.pin</c>: <paramref name="Value"/>, an object, held by a root the collector
+/// keeps; <paramref name="Dest"/> is the root's address, a <c>uint</c>.</summary>
+public sealed record RootObject(TempId Dest, TempId Value, Span Span) : IrOp(Span);
+
+/// <summary><c>GcHandle.get</c>: the object a root holds, of <paramref name="Type"/> — a panic where
+/// the root holds another class's, as a pointer from C may say.</summary>
+public sealed record RootedObject(TempId Dest, TempId Root, IrRefType Type, Span Span) : IrOp(Span);
+
 public sealed record RootClosure(TempId Dest, TempId Closure, Span Span) : IrOp(Span);
 
 /// <summary><c>Callback&lt;C&gt;.new</c>'s function: the address of a trampoline of C's type —

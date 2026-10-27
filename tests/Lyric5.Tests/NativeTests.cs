@@ -705,6 +705,102 @@ public class NativeTests
         Assert.Contains("panic [LYR-RT0014]: a coroutine closed with C frames on its stack", ran.Stderr);
     }
 
+    private const string HandleC = """
+        #include <stdint.h>
+
+        void lyr_gc_collect(void);
+
+        static void (*handler)(void *, int64_t);
+        static void *handler_data;
+        void on_event(void (*f)(void *, int64_t), void *userdata) { handler = f; handler_data = userdata; }
+        void fire(int64_t event) { handler(handler_data, event); }
+        void collect(void) { lyr_gc_collect(); }
+
+        """;
+
+    private static string Handles(string main) => Package(
+        ("lyric.toml", AppManifest + "\n[native]\nsources = [\"native/*.c\"]\n"),
+        ("native/handle.c", HandleC),
+        ("src/main.lyr", """
+            import std.io { println };
+            import std.ffi { Ptr, GcHandle };
+
+            class Counter {
+                var total: int = 0,
+
+                mut fn add(x: int): void {
+                    this.total += x;
+                }
+            }
+
+            class Other {
+                var unused: int = 0,
+            }
+
+            extern "C" {
+                fn on_event(handler: extern "C" fn(Ptr<void>, int) -> void, userdata: Ptr<void>): void;
+                fn fire(event: int): void;
+                fn collect(): void;
+            }
+
+            fn handler(userdata: Ptr<void>, event: int): void {
+                unsafe {
+                    let counter = GcHandle<Counter>.from(userdata).get();
+                    counter.add(event);
+                }
+            }
+
+            """ + main));
+
+    /// <summary>An object held for C across collections, its handle's pointer C's userdata, read
+    /// again from that pointer by a function C calls.</summary>
+    [Fact]
+    public void A_handle_holds_an_object_for_C()
+    {
+        var dir = Handles("""
+            fn main(): void {
+                let handle = GcHandle.pin(Counter { });
+                on_event(handler, handle.asPtr());
+                fire(3);
+                collect();
+                fire(4);
+                collect();
+                println(f"{handle.get().total}");
+                handle.release();
+            }
+
+            """);
+        Assert.Equal("7\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    [Theory]
+    [InlineData("    let handle = GcHandle.pin(Counter { });\n    unsafe {\n        let _ = GcHandle<Other>.from(handle.asPtr()).get();\n    }\n",
+        "panic [LYR-RT0023]: a GcHandle of app.main.Counter read as a handle of app.main.Other")]
+    [InlineData("    let handle = GcHandle.pin(Counter { });\n    handle.release();\n    let _ = handle.get();\n",
+        "panic [LYR-RT0008]: a GcHandle read after its release")]
+    public void A_handle_read_wrongly_panics(string body, string report)
+    {
+        var dir = Handles("fn main(): void {\n" + body + "}\n");
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.True(exit == 0, error);
+        var host = Lyric5.Toolchain.Target.Host;
+        var ran = Lyric5.Toolchain.ProcessRunner.Run(Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix),
+            [], TimeSpan.FromMinutes(1));
+        Assert.Equal(101, ran.ExitCode);
+        Assert.Contains(report, ran.Stderr);
+    }
+
+    [Theory]
+    [InlineData("let _ = GcHandle.pin(3);", "LYR-SEM0099", "a GcHandle holds an object of a class")]
+    [InlineData("let _ = GcHandle<Counter>.from([1].asPtr().cast<void>());", "LYR-SEM0233", "'GcHandle.from' holds")]
+    public void A_handle_is_checked(string line, string code, string why)
+    {
+        var dir = Handles("fn main(): void {\n    " + line + "\n}\n");
+        var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
+        Assert.Equal(1, exit);
+        Assert.Contains($"error[{code}]: {why}", error);
+    }
+
     [Theory]
     [InlineData("[native]\nsources = \"native/a.c\"\n", "LYR-PKG0002", "'sources' of [native] is an array of patterns")]
     [InlineData("[native]\ninclude = [\"native/*\"]\n", "LYR-PKG0002", "'native/*' in 'include' of [native] is no directory of the package")]

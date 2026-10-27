@@ -59,6 +59,14 @@ uint64_t lyr_ffi_closure_root(void *code, void *env) {
 
 void lyr_ffi_closure_release(uint64_t root) { lyr_root_free((LyrRoot *)(uintptr_t)root); }
 
+void *lyr_ffi_rooted(uint64_t root, const LyrDesc *desc) {
+    LyrObj *object = lyr_root_get((const LyrRoot *)(uintptr_t)root);
+    if (object == NULL) lyr_panic(LYR_RT_FOREIGN_HANDLE, "a GcHandle that holds nothing, read as a handle of %s", desc->name);
+    if (object->desc != desc)
+        lyr_panic(LYR_RT_FOREIGN_HANDLE, "a GcHandle of %s read as a handle of %s", object->desc->name, desc->name);
+    return object;
+}
+
 int64_t lyr_ffi_enum_tag(int64_t value, int64_t variants, const char *enum_name) {
     if (value < 0 || value >= variants)
         lyr_panic(LYR_RT_FOREIGN_ENUM, "C returned %lld, which is no variant of %s (it has %lld)",
