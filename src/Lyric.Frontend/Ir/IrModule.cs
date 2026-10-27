@@ -350,4 +350,24 @@ public class IrModule(List<IrFunction> Functions)
     /// bare snippets (tests), whose functions would otherwise vanish.</para>
     /// </summary>
     public List<FunctionId> ExportRoots { get; init; } = new();
+
+    /// <summary>The functions C calls by a symbol (<c>@Export</c>), each a root of
+    /// <see cref="ExportRoots"/> too.</summary>
+    public List<IrExport> Exports { get; init; } = new();
+
+    /// <summary>What the library's header declares beside the runtime's own API: the
+    /// <c>@Layout</c> types the exports name, then the exports, each a C declaration.</summary>
+    public IrHeader Header { get; set; } = IrHeader.Empty;
+}
+
+/// <summary>A Lyric function C calls as <see cref="Symbol"/>: each parameter comes in from its C
+/// form, the result goes back in its own; one that <see cref="Throws"/> answers C's
+/// <c>LyrStatus</c> and hands its result through a last pointer.</summary>
+public sealed record IrExport(FunctionId Function, string Symbol, IrCForm[] Params, IrCForm Return, bool Throws);
+
+/// <summary>The library's header beyond the runtime's API: the types' definitions in the
+/// order C needs them, and each export's declaration.</summary>
+public sealed record IrHeader(string[] Types, string[] Declarations)
+{
+    public static readonly IrHeader Empty = new([], []);
 }

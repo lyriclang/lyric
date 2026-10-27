@@ -51,6 +51,19 @@ public static class RuntimeArchive
         return File.Exists(archive) ? archive : Build();
     }
 
+    /// <summary>The runtime's objects themselves, which a static library carries inside its own
+    /// archive — the ones the runtime's archive is made of, compiled once and found again by their
+    /// content.</summary>
+    public static IReadOnlyList<string> Objects(CCompiler compiler, Target target, BuildProfile profile, string toolchainVersion)
+    {
+        var root = SourceRoot()
+            ?? throw new CBuildException("this toolchain carries no runtime source (runtime/include/lyr not found above it)");
+        var cache = CacheDir(toolchainVersion);
+        var objects = new CBuild(compiler, target, profile, cache).Compile(RuntimeLayout.Units(root, target, profile.Gc));
+        MarkUsed(cache);
+        return objects;
+    }
+
     /// <summary>How long a version's archives may go unused before a new archive's build removes them.</summary>
     public static readonly TimeSpan VersionAge = TimeSpan.FromDays(14);
 

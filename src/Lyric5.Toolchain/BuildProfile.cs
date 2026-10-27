@@ -30,6 +30,11 @@ public sealed record BuildProfile(string Name, Profile Base, int Opt, bool Debug
     /// with the type and the word. For the toolchain's tests; no profile field sets it.</summary>
     public bool GcVerify { get; init; }
 
+    /// <summary>What a library's build adds to every unit, the runtime's among them: code a library
+    /// may be loaded anywhere with, and for a shared library every symbol hidden but its API's
+    /// (<c>lyric build --lib</c>). Empty for a program.</summary>
+    public IReadOnlyList<string> Linkage { get; init; } = [];
+
     /// <summary>The names <c>--profile</c> knows without a manifest.</summary>
     public static readonly IReadOnlyList<string> BuiltIn = ["debug", "release", "asan", "tsan"];
 
@@ -69,6 +74,7 @@ public sealed record BuildProfile(string Name, Profile Base, int Opt, bool Debug
             if (Lto) flags.Add("-flto=thin");
             if (Gc == Collector.Boehm) flags.Add("-DLYR_GC_BOEHM");
             if (GcVerify) flags.Add("-DLYR_GC_VERIFY");
+            flags.AddRange(Linkage);
             return flags;
         }
     }

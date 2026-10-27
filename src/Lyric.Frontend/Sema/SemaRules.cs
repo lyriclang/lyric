@@ -413,10 +413,11 @@ public sealed class SemaRules
     private void CheckMain()
     {
         // Lyric 5: the entry module's 'main' alone has a contract; a library checked as a
-        // workspace has no entry, and its 'main's are ordinary functions.
+        // workspace has no entry, and its 'main's are ordinary functions; nor has a library C
+        // links, whose root starts nothing.
         if (_comp.Lyric5Modules)
         {
-            if (_comp.Entry is { } entry) CheckEntry(entry);
+            if (_comp.Entry is { } entry && !_comp.Library) CheckEntry(entry);
             return;
         }
 

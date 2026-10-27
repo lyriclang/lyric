@@ -47,6 +47,8 @@ void lyr_shutdown(void) {
     started = 0;
 }
 
+int lyr_started(void) { return started; }
+
 int lyr_stream_hooked(int fd) { return fd == 2 ? config.stderr_write != NULL : config.stdout_write != NULL; }
 
 static int process_args;

@@ -105,6 +105,7 @@ public static class Pipeline
             WarnDeps = project.LintArgs.WarnDeps,
             // what 'target' and 'profile' hold: the build's, a cross-build's target
             Build = FactsOf(target ?? Target.Host, profile),
+            Library = project.Library is not null,
         };
     }
 
@@ -203,6 +204,8 @@ public static class Pipeline
         // what a debugger shows a frame and a value as (lyric dap, lyric.lldbinit) — the C name is
         // not read back, '.' and '_' are both '_' in it.
         var names = manifest + ".names";
+        // A library's header: the runtime's API, the types its exports name, its exports.
+        var header = manifest + ".h";
         List<string> sources;
         if (File.Exists(manifest))
         {
@@ -225,6 +228,9 @@ public static class Pipeline
                 paths.Add(path);
             }
             WriteOnce(names, string.Concat(CEmitter.DebugNames(result.Ir!, result.Sources).Select(line => line + "\n")));
+            if (project.Library is not null && RuntimeArchive.SourceRoot() is { } api)
+                WriteOnce(header, CEmitter.Header(result.Ir!, project.Name,
+                    File.ReadAllText(Path.Combine(RuntimeLayout.IncludeDir(api), "lyric.h"))));
             if (read.Count > 0) File.WriteAllLines(embeds, read);
             else File.Delete(embeds);
             // findings that cannot be read back — in a synthesized file — leave the units unlisted:
@@ -236,8 +242,10 @@ public static class Pipeline
 
         try
         {
-            var archive = RuntimeArchive.For(request.Compiler, request.Target, request.Profile, request.ToolchainVersion);
-            var build = new CBuild(request.Compiler, request.Target, request.Profile, project.CacheDir);
+            // a library's code, the runtime's too, as a library's must be (LinkageOf)
+            var profile = project.Library is { } kind ? request.Profile with { Linkage = LinkageOf(kind, request.Target) } : request.Profile;
+            var archive = RuntimeArchive.For(request.Compiler, request.Target, profile, request.ToolchainVersion);
+            var build = new CBuild(request.Compiler, request.Target, profile, project.CacheDir);
             var runtimeRoot = RuntimeArchive.SourceRoot()!;
             // The program's units carry what the profile asks of the program alone (fast-math), and
             // every unit names its paths by the packages' names, not by where they lie.
@@ -249,6 +257,21 @@ public static class Pipeline
                 if (!libraries.Contains(library)) libraries.Add(library);
             var scripts = directives.Sources.Select(unit => unit with { ExtraFlags = [.. unit.ExtraFlags ?? [], .. paths] }).ToList();
             var objects = build.Compile([.. units, .. native, .. scripts]);
+            if (project.Library is { } libraryKind)
+            {
+                // The archive holds the runtime too: a C program links one file and the libraries the
+                // packages' native parts ask for. A shared library is linked against them itself.
+                var file = project.LibraryFile(request.Profile, request.Target);
+                Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                if (libraryKind == LibraryKind.Static)
+                {
+                    var runtime = RuntimeArchive.Objects(request.Compiler, request.Target, profile, request.ToolchainVersion);
+                    File.Copy(build.Archive([.. objects, .. runtime], Path.Combine(project.CacheDir, "lib", $"lib{project.Name}.a")), file, overwrite: true);
+                }
+                else build.LinkShared([.. objects, archive], file, libraries);
+                File.Copy(header, project.HeaderFile(request.Profile, request.Target), overwrite: true);
+                return (0, file);
+            }
             var executable = project.Executable(request.Profile, request.Target);
             string[] inputs = [.. objects, archive];
             var record = Path.Combine(project.CacheDir, $"{project.BinaryName}-{Key(executable)}.link");
@@ -266,6 +289,17 @@ public static class Pipeline
             return (2, null);
         }
     }
+
+    /// <summary>What a library's units are compiled with, the runtime's among them: code that may be
+    /// loaded at any address — a Windows image is such code anyway —, and in a shared library every
+    /// symbol hidden but those <c>LYRIC_API</c> names, its exports and the runtime's start and stop.</summary>
+    private static IReadOnlyList<string> LinkageOf(LibraryKind kind, Target target) => (kind, target.Os) switch
+    {
+        (LibraryKind.Static, TargetOs.Windows) => [],
+        (LibraryKind.Static, _) => ["-fPIC"],
+        (LibraryKind.Shared, TargetOs.Windows) => ["-DLYRIC_BUILDING_SHARED"],
+        _ => ["-fPIC", "-fvisibility=hidden", "-DLYRIC_BUILDING_SHARED"],
+    };
 
     /// <summary>The native parts of the program's packages for the target: their C
     /// sources, each with its package's include directories, and their libraries, each once.</summary>

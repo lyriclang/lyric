@@ -54,6 +54,10 @@ public static partial class Program
         // '--locked': the lock as it is — what it does not hold, or holds besides, refused.
         var locked = flags.Contains("--locked");
 
+        if (flags.Contains("--shared") && !flags.Contains("--lib"))
+            return Unknown("'--shared' says which library '--lib' builds; without '--lib' there is none");
+        if (flags.Contains("--lib")) return BuildLibrary(values, flags, baseDirectory, file, lints, offline, locked);
+
         // The programs this command is about: a package's every one, or the file's.
         List<Project> programs;
         LibraryException? library = null;
@@ -178,6 +182,54 @@ public static partial class Program
         // the build's count before the program, whose output follows on the same stream
         Lyric.Core.Rendering.RenderStyle.Current.Events?.Summary();
         return ProcessRunner.RunInherited(executable!, programArgs);
+    }
+
+    /// <summary>
+    /// <c>build --lib</c>: the package's <c>src/lib.lyr</c> and what it imports as a library C links
+    /// — <c>lib&lt;name&gt;.a</c>, or with <c>--shared</c> the system's shared library — and its
+    /// header <c>&lt;name&gt;.h</c>, under <c>out/&lt;profile&gt;/&lt;target&gt;/</c>.
+    /// </summary>
+    private static int BuildLibrary(Dictionary<string, string> values, HashSet<string> flags, string baseDirectory, string? file,
+        LintArgs lints, bool offline, bool locked)
+    {
+        if (file is not null) return Unknown("'--lib' builds the package's library, src/lib.lyr; a file is a program by itself");
+        if (values.ContainsKey("--bin")) return Unknown("'--bin' names a program of the package; '--lib' builds its library");
+        if (values.ContainsKey("--emit")) return Unknown("'--emit' prints a program's IR or C; '--lib' builds the library");
+        Project? project;
+        try { project = Project.LibraryOf(baseDirectory, flags.Contains("--shared") ? LibraryKind.Shared : LibraryKind.Static, offline, locked); }
+        catch (ManifestException manifestRefused)
+        {
+            Say.Manifest(Console.Error, manifestRefused);
+            return manifestRefused.Exit;
+        }
+        if (project is null)
+        {
+            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above", "'--lib' builds a package's src/lib.lyr");
+            return 2;
+        }
+        if (!File.Exists(project.Source))
+        {
+            Say.Error(Console.Error, "LYR-CLI0001", $"no such file '{project.Source}'", "a library C links starts from the package's src/lib.lyr");
+            return 2;
+        }
+        try { ToolchainCheck.Check(project.Graph!, DisplayVersion()); }
+        catch (ManifestException manifestRefused)
+        {
+            Say.Manifest(Console.Error, manifestRefused);
+            return manifestRefused.Exit;
+        }
+        if (ProfileOf(values, flags, project.Manifest) is not { } profile) return 2;
+        Target target;
+        try { target = values.TryGetValue("--target", out var triple) ? Target.Parse(triple) : Target.Host; }
+        catch (ArgumentException)
+        {
+            return Unknown($"unknown target '{values["--target"]}': {string.Join(", ", Target.Tier1.Select(t => t.Triple))}");
+        }
+        if (CompilerFor(profile) is not { } compiler) return 2;
+        var (exit, built) = Pipeline.Build(new BuildRequest(project with { LintArgs = lints }, profile, target, compiler, DisplayVersion()), Console.Error);
+        if (exit != 0 || built is null) return exit;
+        Lyric.Core.Rendering.RenderStyle.Current.Events?.Artifact("library", project.Name, built);
+        return 0;
     }
 
     /// <summary>The profile: '--profile', else LYRIC_PROFILE, else debug — built in, or

@@ -2,6 +2,7 @@
 #include "lyr/ffi.h"
 #include "lyr/coro.h"
 #include "lyr/gc.h"
+#include "lyr/init.h"
 #include "lyr/panic.h"
 #include "lyr/string.h"
 
@@ -47,6 +48,28 @@ void lyr_ffi_callback_enter(void) {
 }
 
 void lyr_ffi_callback_leave(void) { lyr_coro_leave_foreign(); }
+
+/* 0: the library has not started, 1: a thread starts it, 2: started */
+static atomic_int library_state;
+
+void lyr_export_enter(void (*start)(void)) {
+    if (!lyr_started())
+        lyr_panic(LYR_RT_FOREIGN_THREAD, "C called an export before lyr_init started the runtime");
+    if (!lyr_thread_attached())
+        lyr_panic(LYR_RT_FOREIGN_THREAD, "C called an export on a thread Lyric does not run — "
+                                         "the thread that called lyr_init is Lyric's");
+    lyr_coro_enter_foreign();
+    if (start == NULL || atomic_load_explicit(&library_state, memory_order_acquire) == 2) return;
+    int expected = 0;
+    if (atomic_compare_exchange_strong(&library_state, &expected, 1)) {
+        start();
+        atomic_store_explicit(&library_state, 2, memory_order_release);
+        return;
+    }
+    while (atomic_load_explicit(&library_state, memory_order_acquire) != 2) { }
+}
+
+void lyr_export_leave(void) { lyr_coro_leave_foreign(); }
 
 /* word 2 of the object, the environment, is a reference; the code is not the collector's */
 static const uint64_t closure_refs[1] = { 1u << 2 };

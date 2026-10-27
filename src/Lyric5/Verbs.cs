@@ -53,7 +53,10 @@ internal static class Verbs
     public static readonly VerbSpec[] All =
     [
         new("build", "[<file.lyr>]", "compile the package here — its src/main.lyr and its [[bin]] programs —, or the file, to binaries under out/",
-            [.. Building, new("--emit", "<ir|c>", "print the IR or the C instead of building")], Lints: true, Json: true),
+            [.. Building, new("--emit", "<ir|c>", "print the IR or the C instead of building"),
+             new("--lib", null, "build the package's src/lib.lyr as a library C links: lib<name>.a and its header <name>.h"),
+             new("--shared", null, "with --lib: a shared library — lib<name>.so, lib<name>.dylib, <name>.dll — instead of the archive")],
+            Lints: true, Json: true),
         new("run", "[<file.lyr>] [-- <args>…]", "build, then run the binary with the arguments after --", Building, Lints: true, Json: true),
         new("check", "[<file.lyr>]", "what build says of the package or the file, without making C or a binary", Building, Lints: true, Json: true),
         new("expand", "[<file.lyr>]", "print the program's entry module with its macros expanded", Building, Lints: true),

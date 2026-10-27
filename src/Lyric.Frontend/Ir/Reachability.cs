@@ -75,6 +75,8 @@ internal static class Reachability
             module.TaskMain = new FunctionId(neueId[loop.Value]);
         for (var i = 0; i < module.ExportRoots.Count; i++)
             module.ExportRoots[i] = new FunctionId(neueId[module.ExportRoots[i].Value]);
+        for (var i = 0; i < module.Exports.Count; i++)
+            module.Exports[i] = module.Exports[i] with { Function = new FunctionId(neueId[module.Exports[i].Function.Value]) };
 
         // The attribute rows follow the renumbering. Their function targets are roots above, so
         // the lookup cannot miss; type targets are untouched, the table keeps every entry.
