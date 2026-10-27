@@ -66,6 +66,7 @@ Zeilen**, Meilensteine M0–M18.
 | **M13a fmt, doc, api** | E5/E7: Formatter mit Trivia (Kommentare, Klammern), Semantik-Erhalt-Test, `lyric doc` (Site aus `///`, über `Lyric5.Doc` aus M12c; die std unter `/dev/std/`, ihre `# Examples` als Doc-Tests), `///`-Doc-Tests, `lyric api` + `--diff` | Repo hält `lyric fmt --check`; Doc-Site der std | M |
 | **M13b LSP, DAP, Clients** | E1–E4, E8: `lyric lsp` mit modulgranularer Wiederverwendung, Code Actions, Tests im Editor; `lyric dap` über lldb-dap + `lyric.lldbinit` (Summaries, Panik-Breakpoint, Tasks-Scope); `tree-sitter-lyric`; VS Code/JetBrains-Clients auf 5 | Editor: Hover/Completion/Rename/Fix, Test-CodeLens; Debugger hält an Panik mit Lyric-Werten; Windows-lldb-Risiko gemessen | XL |
 | **M14 FFI und Einbettung** | W4/W5 nutzerseitig: `extern "C"` vollständig, `@Layout`, `Ptr`/`CStr`/`unsafe`, `ffi.Callback`/`GcHandle`, fremde Threads (X7), `@Export` + Header, `lyric build --lib`, `LyrConfig`/`LyrStatus`/`lyr_step` (H1–H6), `ffi.Library` | `examples/ffi` (C-Bibliothek gebunden), `embedded-host` in C gegen `lib<app>.a`; Spec `13-abi` | L |
+| **M14b C-Bibliotheken** | 11 „Review 2026-10-28“ (E1–E13, N1–N8): `[native]` mit `archives`, `defines`, `frameworks`, `pkgConfig`, Tabellen je Tripel; `[native.vendor]` (Git, URL mit Hash, lazy, im Lock); Bindungen aus dem Header (`bindings`, `lyric bindgen`); `std.build` neu (`Target`, `cLibrary`, `link*`, `cEnv`); `--lib` bündelt Archive; `LNK`-Diagnosen — Plan im Nachtrag 2026-10-28 | `examples/native-prebuilt` (vorgebautes Archiv, CoreFoundation auf macOS), `examples/raylib` aus dem Quelltext mit erzeugten Bindungen | L |
 | **M15 Distribution** | W9: Archive Tier 1, minisign, `lyric toolchain install/list/default/update`, Go-1.21-Re-exec nach `[package] toolchain`, `lyric toolchain install zig`, `dev`/`stable`-Kanäle, Website-Mirror auf dem VPS des Maintainers (14 C9: härten, `dl.lyric.oil1i.de`, Upload im Release-Job) | `lyric toolchain install dev` auf drei OS; Release-Pipeline probeweise `5.0.0-dev` | M |
 
 ### Phase 4 — Abschluss
@@ -81,7 +82,7 @@ Zeilen**, Meilensteine M0–M18.
 ```
 M0 → M1 → M2 → M3 → M4 → M5 → M6
                  │      │    │    └→ M8b → M10
-                 │      │    └→ M14
+                 │      │    └→ M14 → M14b
                  │      └→ M8a → M9a → M9b
                  └→ M7 ─┴→ M13a/M13b (nach M12)
 M2 → M11 (parallele Spur, jederzeit; vor M10 für Messpunkt 5)
@@ -1381,3 +1382,68 @@ in eine Queue gelegt statt ausgeführt, weil eine Koroutine ihren Thread nicht w
 **Nicht in M14**: `lyric bindgen` (X9, Tür); `@Pure` an `extern` (X10, Tür); Unions und Bitfelder (X2, Tür);
 Lyric-Plugins in Lyric (H7, Tür); ein Compiler im Host (H8); Lyric-Script in Lyric 5 (H9, neu zu planen, wenn die
 native Script-VM steht); `lyr_gc_stats` für Stellschrauben (Tür, 01).
+
+*Nachtrag 2026-10-28:* `lyric bindgen` ist mit M14b entschieden (11 „Review 2026-10-28“ N2) und dort geplant.
+
+## Nachtrag 2026-10-28 — der Plan für M14b
+
+M14b nach 11 „Review 2026-10-28“ (E1–E13, N1–N8) und 07 „Review 2026-10-28“: **C-Bibliotheken einbinden, so
+angenehm wie möglich** — vorgebaut, aus fremdem Quelltext oder aus dem System, mit erzeugten Bindungen. Das
+Artefakt: **`examples/native-prebuilt` linkt ein vorgebautes Archiv aus dem Paket und nutzt auf macOS ein
+Framework; `examples/raylib` baut raylib aus seinem Repository und ruft es über erzeugte Bindungen.** Grundlage
+ist der Stand nach M14 S7 (#596), gemessen vor dem Plan:
+
+- `[native]` hat `sources`, `include`, `libs` und Tabellen je OS (`NativePart`); `libs` und `build.linkLib`
+  werden `-l<name>` (`CBuild.Link`), ohne Suchpfad.
+- Die nativen Einheiten bekommen nur das `include` ihres Pakets; die `compileC`-Einheiten eines Skripts nur die
+  Paketwurzel und die `cFlags` desselben Skripts (`BuildScripts.Run`).
+- Der Link-Record (`Pipeline.UpToDate`) hält Pfade und `-l`-Namen, verglichen über Zeitstempel; die Pakete
+  linken nach Namen geordnet.
+- Ein statisches `--lib` legt die Objekte und die Laufzeit in `lib<name>.a`; welche Bibliotheken der C-Nutzer
+  dazulinkt, sagt niemand.
+- zig 0.16 (gemessen): Archive linken auf allen Tier-1-Tripeln über Pfad und `-L`/`-l`; Frameworks und
+  Linux-Systembibliotheken cross nicht; der clang-AST als JSON kommt aus `zig cc` (mit Exit 1 danach).
+
+| # | Entscheidung | Vergleich / Verworfen |
+|---|---|---|
+| P1 | **Ein Modell für „das C eines Pakets“**: `NativePart` wächst um `archives`, `defines`, `frameworks`, `pkgConfig`, `bindings` und die Tabellen je Tripel (E1, E2, E4, E6, N2, N3); die Schichtung `[native]` → OS → Tripel ist **eine** Funktion, die Manifest, Build und `lyric metadata` teilen. Pfade sind Paketpfade oder `@name/…` (N1), geprüft beim Lesen des Manifests | CMake-Targets mit `INTERFACE`-Eigenschaften; verworfen: je Schlüssel eine eigene Schichtung |
+| P2 | **Der Link nach Plan**: ein `LinkPlan` (Objekte, Archive, Bibliotheken nach Namen, Frameworks, die Zeilen aus `pkg-config`) entsteht aus dem Graphen in Abhängigkeitsreihenfolge (E12); `CBuild` linkt ihn, der Link-Record hält ihn mit den **Inhalts-Hashes** der Archive; `--lib` bündelt seine Archive und nennt den Rest (E11). Was heute `libraries` heißt, geht darin auf | heute: drei Listen, zweimal zusammengesetzt (`Pipeline`, `BuildScripts`) |
+| P3 | **Quellbäume über den Git-Cache** (N1): ein Eintrag `[native.vendor]` ist im Cache und im Lock eine Revision wie eine Git-Abhängigkeit, aber ohne Manifest (`kind = "native"` im Lock); URLs laden in den Benutzer-Cache unter ihrem Hash, entpacken einmal; lazy nach Ziel. Laden darf nur, wer den Graphen liest — `--offline` und `--locked` gelten unverändert | Zig `build.zig.zon`; verworfen: Submodule |
+| P4 | **Bindungen als erzeugter Modulraum** (N2): je Ziel unter `out/cache/bindings/<tripel>/`, gelesen wie `gen/` (BS6), Schlüssel = Header samt Includes, Defines, Ziel, Generator-Version. Die Abbildung ist eine Funktion über den JSON-AST nach der Typtabelle von `CrossesC` (M14 P1) — dieselbe Liste, die Checker und Spec lesen; `lyric bindgen` ruft sie ohne Bau | Rust `bindgen`; verworfen: libclang einbinden (NativeAOT + eine C++-Bibliothek je Plattform) |
+| P5 | **`std.build` neu** (N4): `Target` als Struct, `cLibrary` als Builder über Direktiven (eine Bibliothek je Direktive mit ihren Flags), `linkArchive`/`linkFramework`/`pkgConfig`, `vendorDir`, `cEnv`; `compileC` und `cFlags` fallen samt ihren Tests | Rusts `cc`-Crate |
+| P6 | **`LNK`-Diagnosen** (N6): der Linker spricht zig/lld- und ld64-Text; eine kleine Lesart je Linker zieht Symbol und Bibliothek heraus und sucht die `extern`-Deklaration im IR (`C:<sym>`); was sie nicht erkennt, bleibt `BLD0001` mit dem rohen Text — nie ein falscher Hinweis | rustc gibt den Linker roh aus |
+| P7 | **Spec spec-first**: 15 §5 (der native Teil), §6 (Reproduzierbarkeit), §8 (das Build-Skript), 13 §4 Regel 9 (die Link-Zeile) und 16 §1 (Bereich `LNK`) gehen in L1 als Text voraus; die Fälle und die Codes kommen mit ihrem Slice. 14 (`add --vendor`, `bindgen`, `-v`) kommt mit L3, L4, L7 — die Verbtabelle ist aus dem Code gedruckt | wie M14 P11 |
+
+| Slice | Inhalt | Artefakt |
+|---|---|---|
+| **L1** Entwurf und Spec | 07, 11, dieser Plan; Spec 15 §5/§6/§8, 13 §4, 16 §1 | die Regeln als Text |
+| **L2** der Kern des nativen Teils | P1, P2 ohne `--lib`: `archives`, `defines`, Tripel-Tabellen, `lyric.h` (E9), Header der Abhängigkeiten (N8), Reihenfolge und Inhaltsschlüssel (E12) | `NativeTests`: ein Archiv, im Test gebaut, auf dem Wirt gelaufen und auf alle Tier-1-Tripel cross gelinkt; `ReproducibilityTests` mit Archiv; Ablehnungen als Konformanzfälle |
+| **L3** Quellbäume | P3: Git, dann URL mit Hash; Lock; lazy; `lyric add --vendor` (N5) | ein Paket baut einen Baum aus einem lokalen Git-Repository und einer URL eines lokalen Servers; Hash-Fehler, `--offline`, `--locked` |
+| **L4** Bindungen | P4: der Generator, das Modul je Ziel, `lyric bindgen` | Header mit Struct, Enum, Typedef, Funktionszeiger, Variadik, Konstanten → aufrufbares Modul; das Übersprungene aufgelistet; je Tier-1-Tripel erzeugt |
+| **L5** `std.build`, Frameworks, `pkgConfig` | P5, E4, N3; der macOS-Messlauf zuerst (zig + Framework auf dem Wirt) | ein Skript baut eine `cLibrary` und linkt ein Framework; `pkgConfig` auf Linux; cross abgelehnt |
+| **L6** `--lib` | P2 für Bibliotheken (E11) | ein C-Programm linkt `lib<name>.a` mit gebündeltem Archiv und der genannten Zeile |
+| **L7** `LNK`-Diagnosen | P6, `lyric build -v` | undefiniertes Symbol → die `extern`-Zeile; fehlende Bibliothek → die Manifestzeile; doppeltes Symbol → die Pakete |
+| **L8** Beispiele und Abschluss | `examples/native-prebuilt` (Archive je Tripel mit Quelle und Skript zum Neuerzeugen, die CI prüft die Bytes; CoreFoundation auf macOS), `examples/raylib` (gebaut, nicht gefahren: die Runner haben kein Display); STATUS, CHANGELOG, Bericht, die Uhr von E7 | die Zeile oben, im vollen Plattformlauf |
+
+Nach Aufwand: groß L4; mittel L2, L3, L5; klein L1, L6, L7, L8. Zusammen **L**. Die Reihenfolge folgt den
+Abhängigkeiten: der Kern (L2) trägt alles; Quellbäume (L3) vor den Bindungen (L4), die ihre Header lesen; die
+Skript-API (L5) nach beiden, weil `vendorDir` und `cLibrary` sie nennen; `--lib` (L6) und die Diagnosen (L7)
+lesen den fertigen Link-Plan. **L2 beginnt nach dem Merge von M14 S8** — beide ändern `Pipeline` und `CBuild`.
+
+**Plattformen**: L2, L5, L6 und L8 fahren den vollen Plattformlauf vor dem Merge; macOS ist die Stelle mit dem
+Risiko (Frameworks über den Mach-O-Linker von zig, ungeprüft), Windows die mit der ABI-Frage (E3: nur mingw).
+
+**Reflexion**: Die Vorbilder liegen an zwei Enden. Cargo lässt fast alles das Build-Skript tun (`build.rs`,
+`cc`, `pkg-config`, `bindgen` als Crates) — mächtig, aber jede C-Bibliothek ist ein kleines Programm, und die
+Suche über `rustc-link-search` macht das Ergebnis von der Maschine abhängig. Zig macht den Build zur Wahrheit
+(`build.zig`) und holt C-Bäume über `build.zig.zon` mit Hash — die angenehmste Erfahrung heute, weil `zig cc`
+alles cross übersetzt, aber Lyric hat sich gegen das Skript als Wahrheit entschieden (W3). Lyric nimmt Zigs
+Bezug (Hash, lazy) und Zigs Compiler, Cargos Trennung (Manifest erklärt, Skript tut) und CMakes Sicht auf eine
+Bibliothek als Bündel aus Ort, Headern und Defines. cgo zeigt, was man meidet: freie Flags im Quelltext. Das
+Risiko ist der Umfang — die Oil-Lehre: darum kein C-Paketindex und kein eingebauter CMake-Lauf, und der
+Generator (L4) bildet nur ab, was die Typtabelle schon trägt; was sie nicht trägt, fällt sichtbar weg, statt
+eine zweite Tabelle zu bekommen.
+
+**Nicht in M14b**: ein Sysroot je Tripel (E5, Uhr M15); Objective-C-Quellen (N7, Uhr M15); freie Linker-Flags
+(E7, Uhr: Abschluss von M14b); mitgebrachte dynamische Bibliotheken (E3, verworfen für 5.0); ein C-Paketindex
+und ein eingebauter CMake-Lauf (verworfen für 5.0).

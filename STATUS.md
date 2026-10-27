@@ -58,6 +58,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M13a | fmt, doc, api | M | **done** 2026-10-25 |
 | M13b | LSP, DAP, clients | XL | **done** 2026-10-26 |
 | M14 | FFI and embedding | L | — |
+| M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | — (planned 2026-10-28) |
 | M15 | Distribution | M | — |
 | M16 | Migration (`lyric fix --from-4`) | L | — |
 | M17 | Spec 5.0, suite, guide | L | — |
