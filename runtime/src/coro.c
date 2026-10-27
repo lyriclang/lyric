@@ -584,6 +584,17 @@ static void release_stack(LyrCoro *co) {
  * stack goes. Called by the collector stage on any thread, at an allocation or a collection. The
  * debug profile says so where the body had cleanup that now never runs. */
 void lyr_coro_abandoned(LyrCoro *co) {
+    /* C's frames on it — a callback that yielded — may be what C still points into: the stack
+     * stays, said once per process, and no frame on it runs again */
+    if (co->foreign > 0) {
+        static atomic_int said;
+        if (atomic_exchange(&said, 1) == 0) {
+            static const char line[] =
+                "warning: a coroutine was dropped with C frames on its stack; the stack is kept, as C may point into it\n";
+            lyr_write_stderr(line, sizeof line - 1);
+        }
+        return;
+    }
 #ifndef NDEBUG
     if (co->cleanup) {
         static const char line[] =
@@ -774,6 +785,11 @@ void lyr_coro_close(LyrCoro *co) {
     }
     if (LYR_UNLIKELY(co->status == LYR_CORO_RUNNING)) {
         lyr_panic(LYR_RT_COROUTINE, "a coroutine closed while it runs — by itself, or while a coroutine it resumed runs");
+    }
+    /* closing unwinds the frames, and C's cannot be */
+    if (LYR_UNLIKELY(co->foreign > 0)) {
+        lyr_panic(LYR_RT_COROUTINE, "a coroutine closed with C frames on its stack — a callback yielded in it, and "
+                                    "C's frames cannot be unwound: let it run to its end");
     }
     if (co->mapping == NULL) {  /* never resumed: no frame holds anything to unwind */
         co->status = LYR_CORO_DONE;

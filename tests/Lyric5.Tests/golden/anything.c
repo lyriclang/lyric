@@ -6,10 +6,10 @@
 /* types: a struct is a value, a class an object behind its header, an enum a tag and a union */
 typedef struct lyr_ty_std_task_Scheduler lyr_ty_std_task_Scheduler;
 typedef struct lyr_ty_std_task_Context lyr_ty_std_task_Context;
-typedef struct lyr_ty_std_task_PanicInfo lyr_ty_std_task_PanicInfo;
-typedef struct lyr_ty_std_task_TaskScope lyr_ty_std_task_TaskScope;
 typedef struct lyr_vt_ty_std_core_Error lyr_vt_ty_std_core_Error;
 const char lyr_ifid_ty_std_core_Error[] = "std.core.Error";
+typedef struct lyr_ty_std_task_PanicInfo lyr_ty_std_task_PanicInfo;
+typedef struct lyr_ty_std_task_TaskScope lyr_ty_std_task_TaskScope;
 typedef struct lyr_ty_std_task_Waiters lyr_ty_std_task_Waiters;
 typedef struct lyr_ty_std_task_Hold lyr_ty_std_task_Hold;
 typedef struct lyr_ty_std_task_LockState lyr_ty_std_task_LockState;
@@ -252,6 +252,12 @@ _Static_assert(offsetof(lyr_ty_std_task_Scheduler, f_ioFired) == 200, "layout of
 extern const LyrItable lyr_itab_ty_std_task_Scheduler[];
 static const uint64_t lyr_refmap_ty_std_task_Scheduler[] = { UINT64_C(0x20fddee) };
 const LyrDesc lyr_desc_ty_std_task_Scheduler = { sizeof(lyr_ty_std_task_Scheduler), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_task_Scheduler, "std.task.Scheduler", lyr_itab_ty_std_task_Scheduler };
+struct lyr_vt_ty_std_core_Error {
+    const LyrDesc *desc;
+    void (*s0)(LyrIface);
+    void (*s1)(LyrIface);
+};
+typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface14_std_core_Error;
 typedef struct { void (*fn)(void *, lyr_ty_std_task_PanicInfo *, LyrErr **); void *env; } lyr_fn_ref18_std_task_PanicInfo_to_void;
 _Static_assert(sizeof(lyr_fn_ref18_std_task_PanicInfo_to_void) == 16, "layout of lyr_fn_ref18_std_task_PanicInfo_to_void");
 typedef struct { lyr_fn_ref18_std_task_PanicInfo_to_void value; uint8_t has; } lyr_opt_fn_ref18_std_task_PanicInfo_to_void;
@@ -273,6 +279,7 @@ struct lyr_ty_std_task_Context {
     lyr_ty_std_task_Context *f_up;
     int64_t f_rank;
     uint8_t f_cancelled;
+    lyr_opt_iface14_std_core_Error f_stashed;
     lyr_opt_fn_ref18_std_task_PanicInfo_to_void f_onPanic;
     lyr_ty_std_task_TaskScope *f_scope;
     lyr_ty_std_task_Context *f_nextChild;
@@ -285,7 +292,7 @@ struct lyr_ty_std_task_Context {
     lyr_ty_std_task_Hold *f_holds;
     lyr_ty_std_task_Hold *f_spareHold;
 };
-_Static_assert(sizeof(lyr_ty_std_task_Context) == 232, "layout of lyr_ty_std_task_Context");
+_Static_assert(sizeof(lyr_ty_std_task_Context) == 256, "layout of lyr_ty_std_task_Context");
 _Static_assert(offsetof(lyr_ty_std_task_Context, f_body) == 8, "layout of lyr_ty_std_task_Context");
 _Static_assert(offsetof(lyr_ty_std_task_Context, f_home) == 16, "layout of lyr_ty_std_task_Context");
 _Static_assert(offsetof(lyr_ty_std_task_Context, f_next) == 24, "layout of lyr_ty_std_task_Context");
@@ -302,19 +309,20 @@ _Static_assert(offsetof(lyr_ty_std_task_Context, f_right) == 104, "layout of lyr
 _Static_assert(offsetof(lyr_ty_std_task_Context, f_up) == 112, "layout of lyr_ty_std_task_Context");
 _Static_assert(offsetof(lyr_ty_std_task_Context, f_rank) == 120, "layout of lyr_ty_std_task_Context");
 _Static_assert(offsetof(lyr_ty_std_task_Context, f_cancelled) == 128, "layout of lyr_ty_std_task_Context");
-_Static_assert(offsetof(lyr_ty_std_task_Context, f_onPanic) == 136, "layout of lyr_ty_std_task_Context");
-_Static_assert(offsetof(lyr_ty_std_task_Context, f_scope) == 160, "layout of lyr_ty_std_task_Context");
-_Static_assert(offsetof(lyr_ty_std_task_Context, f_nextChild) == 168, "layout of lyr_ty_std_task_Context");
-_Static_assert(offsetof(lyr_ty_std_task_Context, f_prevChild) == 176, "layout of lyr_ty_std_task_Context");
-_Static_assert(offsetof(lyr_ty_std_task_Context, f_live) == 184, "layout of lyr_ty_std_task_Context");
-_Static_assert(offsetof(lyr_ty_std_task_Context, f_liveNext) == 192, "layout of lyr_ty_std_task_Context");
-_Static_assert(offsetof(lyr_ty_std_task_Context, f_livePrev) == 200, "layout of lyr_ty_std_task_Context");
-_Static_assert(offsetof(lyr_ty_std_task_Context, f_stuck) == 208, "layout of lyr_ty_std_task_Context");
-_Static_assert(offsetof(lyr_ty_std_task_Context, f_awaits) == 209, "layout of lyr_ty_std_task_Context");
-_Static_assert(offsetof(lyr_ty_std_task_Context, f_holds) == 216, "layout of lyr_ty_std_task_Context");
-_Static_assert(offsetof(lyr_ty_std_task_Context, f_spareHold) == 224, "layout of lyr_ty_std_task_Context");
+_Static_assert(offsetof(lyr_ty_std_task_Context, f_stashed) == 136, "layout of lyr_ty_std_task_Context");
+_Static_assert(offsetof(lyr_ty_std_task_Context, f_onPanic) == 160, "layout of lyr_ty_std_task_Context");
+_Static_assert(offsetof(lyr_ty_std_task_Context, f_scope) == 184, "layout of lyr_ty_std_task_Context");
+_Static_assert(offsetof(lyr_ty_std_task_Context, f_nextChild) == 192, "layout of lyr_ty_std_task_Context");
+_Static_assert(offsetof(lyr_ty_std_task_Context, f_prevChild) == 200, "layout of lyr_ty_std_task_Context");
+_Static_assert(offsetof(lyr_ty_std_task_Context, f_live) == 208, "layout of lyr_ty_std_task_Context");
+_Static_assert(offsetof(lyr_ty_std_task_Context, f_liveNext) == 216, "layout of lyr_ty_std_task_Context");
+_Static_assert(offsetof(lyr_ty_std_task_Context, f_livePrev) == 224, "layout of lyr_ty_std_task_Context");
+_Static_assert(offsetof(lyr_ty_std_task_Context, f_stuck) == 232, "layout of lyr_ty_std_task_Context");
+_Static_assert(offsetof(lyr_ty_std_task_Context, f_awaits) == 233, "layout of lyr_ty_std_task_Context");
+_Static_assert(offsetof(lyr_ty_std_task_Context, f_holds) == 240, "layout of lyr_ty_std_task_Context");
+_Static_assert(offsetof(lyr_ty_std_task_Context, f_spareHold) == 248, "layout of lyr_ty_std_task_Context");
 extern const LyrItable lyr_itab_ty_std_task_Context[];
-static const uint64_t lyr_refmap_ty_std_task_Context[] = { UINT64_C(0x1b74719e) };
+static const uint64_t lyr_refmap_ty_std_task_Context[] = { UINT64_C(0xdba2719e) };
 const LyrDesc lyr_desc_ty_std_task_Context = { sizeof(lyr_ty_std_task_Context), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_task_Context, "std.task.Context", lyr_itab_ty_std_task_Context };
 struct lyr_ty_std_task_PanicInfo {
     LyrObj header;
@@ -329,12 +337,6 @@ _Static_assert(offsetof(lyr_ty_std_task_PanicInfo, f_trace) == 24, "layout of ly
 extern const LyrItable lyr_itab_ty_std_task_PanicInfo[];
 static const uint64_t lyr_refmap_ty_std_task_PanicInfo[] = { UINT64_C(0xe) };
 const LyrDesc lyr_desc_ty_std_task_PanicInfo = { sizeof(lyr_ty_std_task_PanicInfo), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_task_PanicInfo, "std.task.PanicInfo", lyr_itab_ty_std_task_PanicInfo };
-struct lyr_vt_ty_std_core_Error {
-    const LyrDesc *desc;
-    void (*s0)(LyrIface);
-    void (*s1)(LyrIface);
-};
-typedef struct { LyrIface value; uint8_t has; } lyr_opt_iface14_std_core_Error;
 struct lyr_ty_std_task_TaskScope {
     LyrObj header;
     lyr_ty_std_task_Context *f_firstChild;

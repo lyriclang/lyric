@@ -608,6 +608,103 @@ public class NativeTests
         Assert.Contains(why, error);
     }
 
+    private const string EachC = "#include <stdint.h>\n\nvoid each(void (*f)(int64_t), int64_t n) { for (int64_t i = 0; i < n; i++) f(i); }\n";
+
+    private static string Each(string program) => Package(
+        ("lyric.toml", AppManifest + "\n[native]\nsources = [\"native/*.c\"]\n"),
+        ("native/each.c", EachC),
+        ("src/main.lyr", program));
+
+    /// <summary>A function C calls throws nothing; its error crosses through std.ffi's stash, which
+    /// the code around the C call takes — the first of several, the running task's own.</summary>
+    [Fact]
+    public void An_error_crosses_C_through_the_stash()
+    {
+        var dir = Each("""
+            import std.io { println };
+            import std.ffi { stash, takeStashed };
+            import std.task { spawn };
+
+            extern "C" fn each(f: extern "C" fn(int) -> void, n: int): void;
+
+            fn check(i: int): void {
+                if (i >= 2) {
+                    stash(Exception(f"item {i} is too large"));
+                }
+            }
+
+            fn visit(n: int): void throws Error {
+                each(check, n);
+                if (let e = takeStashed()) {
+                    throw e;
+                }
+            }
+
+            fn main(): void throws Error {
+                try visit(2);
+                println("2 items: fine");
+                try {
+                    visit(4);
+                } catch (e: Error) {
+                    println(f"4 items: {e.message()}");
+                }
+                println(f"taken: {takeStashed() == null}");
+                let t = spawn(() => {
+                    try visit(3);
+                });
+                try {
+                    t.await();
+                } catch (e: Error) {
+                    println(f"task: {e.message()}");
+                }
+            }
+
+            """);
+        Assert.Equal("2 items: fine\n4 items: item 2 is too large\ntaken: true\ntask: item 2 is too large\n",
+            BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
+    /// <summary>A generator suspended in a callback — C's frames on its stack — is not closed:
+    /// the frames cannot be unwound, and the close is a panic that says so.</summary>
+    [Fact]
+    public void A_coroutine_with_C_frames_is_not_closed()
+    {
+        var dir = Each("""
+            import std.io { println };
+            import std.task { Cancelled };
+
+            extern "C" fn each(f: extern "C" fn(int) -> void, n: int): void;
+
+            fn step(i: int): void {
+                try {
+                    yield i;
+                } catch (_: Cancelled) {
+                }
+            }
+
+            fn numbers(): Coroutine<int> {
+                yield -1;
+                each(step, 3);
+            }
+
+            fn main(): void throws Error {
+                let g = numbers();
+                println(f"{g.next() ?? 99} {g.next() ?? 99}");
+                try g.close();
+                println("never");
+            }
+
+            """);
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.True(exit == 0, error);
+        var host = Lyric5.Toolchain.Target.Host;
+        var ran = Lyric5.Toolchain.ProcessRunner.Run(Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix),
+            [], TimeSpan.FromMinutes(1));
+        Assert.Equal(101, ran.ExitCode);
+        Assert.Equal("-1 0\n", ran.Stdout.Replace("\r\n", "\n"));
+        Assert.Contains("panic [LYR-RT0014]: a coroutine closed with C frames on its stack", ran.Stderr);
+    }
+
     [Theory]
     [InlineData("[native]\nsources = \"native/a.c\"\n", "LYR-PKG0002", "'sources' of [native] is an array of patterns")]
     [InlineData("[native]\ninclude = [\"native/*\"]\n", "LYR-PKG0002", "'native/*' in 'include' of [native] is no directory of the package")]
