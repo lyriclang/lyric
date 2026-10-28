@@ -31,6 +31,8 @@
   <ItemGroup>
     <!-- Lyric's values in lldb, beside the binary: lyric dap imports it, and lldb can. -->
     <Content Include="lldb\lyric_lldb.py" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- What lldb sources to load it from wherever the toolchain lies. -->
+    <Content Include="lldb\lyric.lldbinit" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -54,6 +56,8 @@
              Link="runtime\third_party\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\runtime\THIRD_PARTY.md" Link="runtime\THIRD_PARTY.md"
+             CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\LICENSE" Link="LICENSE"
              CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 

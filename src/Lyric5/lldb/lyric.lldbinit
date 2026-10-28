@@ -1,0 +1,4 @@
+# Lyric's values in lldb - strings as text, arrays, optionals, structs by their fields:
+#   (lldb) command source <toolchain>/lldb/lyric.lldbinit
+# or the same line in ~/.lldbinit. lyric dap loads the script itself.
+command script import -c lyric_lldb.py

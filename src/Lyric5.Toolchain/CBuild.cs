@@ -37,8 +37,15 @@ public sealed class CBuild
     public Target Target { get; }
     public BuildProfile Profile { get; }
 
-    public CBuild(CCompiler compiler, Target target, BuildProfile profile, string cacheDir)
+    /// <summary>Whether zig is told the target although it is the host's: for a <paramref name="portable"/>
+    /// build — an archive another machine links, which must not carry this machine's CPU features —,
+    /// and where zig is built for another architecture than this process and would build for its own.</summary>
+    private readonly bool _namesTarget;
+
+    public CBuild(CCompiler compiler, Target target, BuildProfile profile, string cacheDir, bool portable = false)
     {
+        _namesTarget = !target.IsHost || compiler.Kind == CCompilerKind.Zig
+            && (portable || compiler.Architecture is { } arch && arch != target.Arch);
         if (profile.RequiresClang && compiler.Kind != CCompilerKind.Clang)
         {
             throw new CBuildException($"the {profile.Name} profile needs clang; {compiler.Name} ships no sanitizer runtime for it");
@@ -61,7 +68,7 @@ public sealed class CBuild
         if (Compiler.Kind == CCompilerKind.Zig)
         {
             driver.Add("cc");
-            if (!Target.IsHost) { driver.Add("-target"); driver.Add(Target.Triple); }
+            if (_namesTarget) { driver.Add("-target"); driver.Add(Target.Triple); }
         }
         return driver;
     }

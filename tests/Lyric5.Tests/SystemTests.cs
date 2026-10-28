@@ -18,7 +18,7 @@ public class SystemTests
         var result = ProcessRunner.Run(program, ["one", "zwei é"], TimeSpan.FromSeconds(30),
             environment: new Dictionary<string, string> { ["LYRIC_TEST_SYSTEM"] = "set" });
         var platform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux";
-        var arch = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture
+        var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture
             == System.Runtime.InteropServices.Architecture.Arm64 ? "aarch64" : "x86_64";
         Assert.Equal(3, result.ExitCode);
         Assert.Equal($"2 one|zwei é\nset <none> after\n{platform} {arch}\nbefore exit\n", result.Stdout.Replace("\r\n", "\n"));

@@ -24,7 +24,46 @@ public sealed record CCompiler(CCompilerKind Kind, string Path, string Version)
     /// <summary>What goes into every cache key: a different compiler binary is a different build.</summary>
     public string Identity => $"{Kind}|{Path}|{Version}";
 
+    /// <summary>The architecture the compiler's binary is built for, as a triple names it —
+    /// <c>x86_64</c>, <c>aarch64</c> —; <c>null</c> where its header says neither, for a script, or
+    /// for a binary that carries both. zig cc without <c>-target</c> builds for its own
+    /// architecture, which is not this process's under Rosetta or Windows' emulation.</summary>
+    public string? Architecture => ExecutableArchitecture(Path);
+
     public static CCompiler? Locate() => Locate(Environment.GetEnvironmentVariable("LYRIC_CC"));
+
+    /// <summary>The architecture in an executable's header: ELF's machine, Mach-O's CPU type, or
+    /// PE's machine.</summary>
+    public static string? ExecutableArchitecture(string path)
+    {
+        try
+        {
+            using var file = File.OpenRead(path);
+            Span<byte> head = stackalloc byte[64];
+            if (file.ReadAtLeast(head, 64, throwOnEndOfStream: false) < 64) return null;
+            var magic = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(head);
+            if (magic == 0x464c457f)
+                return System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(head[18..]) switch { 0x3e => "x86_64", 0xb7 => "aarch64", _ => null };
+            if (magic == 0xfeedfacf)
+                return System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(head[4..]) switch { 0x01000007 => "x86_64", 0x0100000c => "aarch64", _ => null };
+            if (head[0] == 'M' && head[1] == 'Z')
+            {
+                file.Position = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(head[60..]);
+                Span<byte> pe = stackalloc byte[6];
+                if (file.ReadAtLeast(pe, 6, throwOnEndOfStream: false) < 6 || pe[0] != 'P' || pe[1] != 'E') return null;
+                return System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(pe[4..]) switch { 0x8664 => "x86_64", 0xaa64 => "aarch64", _ => null };
+            }
+            return null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 
     public static CCompiler? Locate(string? chosen)
     {
