@@ -1,0 +1,7 @@
+[package]
+name = "geometry"
+version = "0.1.0"
+description = "A C library bound from Lyric, and a shared library loaded while the program runs (design/v5/spec/13 M14 S9)"
+
+[native]
+sources = ["native/*.c"]

@@ -81,6 +81,14 @@ LyrStatus lyr_export_call(void (*start)(void), const LyrEmbedding *embedding, vo
  * causes' through Error's members, which the program defines. Inside the export's task. */
 void lyr_export_keep_error(const LyrErr *err, LyrErrMessage message, LyrErrCause cause);
 
+/* std.ffi.Library (runtime/src/library.c): a shared library loaded while the program runs. The
+ * handle, 0 where the loader refused it — lyr_ffi_library_error says why, on the same thread —;
+ * a symbol's address, 0 where the library has none; the library given back. */
+uint64_t lyr_ffi_library_open(const struct LyrStr *path);
+struct LyrStr *lyr_ffi_library_error(void);
+uint64_t lyr_ffi_library_symbol(uint64_t handle, const struct LyrStr *name);
+void lyr_ffi_library_close(uint64_t handle);
+
 /* std.ffi.Callback: a Lyric closure C holds through its userdata — its code and its environment
  * in an object a root keeps alive until the callback is released. The userdata C hands back is the
  * root's address; the trampoline reads the closure through it. */

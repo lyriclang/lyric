@@ -349,4 +349,40 @@ public class ExampleTests
         Assert.Contains("if (attempts__", expanded);
         Assert.DoesNotContain("retry!", expanded);
     }
+
+    private static string FfiExample([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "examples", "ffi"));
+
+    /// <summary>The FFI example, <c>examples/ffi</c>: the C library of its native part bound and
+    /// called — a struct by value and behind a pointer, strings, a callback with its state, a handle
+    /// C owns —, then its plugin, built here as the system's shared library, loaded while it runs
+    /// (<c>std.ffi.Library</c>): two symbols found, one not, a library that is not there refused.</summary>
+    [Fact]
+    public void The_ffi_example_binds_a_C_library_and_loads_another()
+    {
+        var dir = Package(("x", ""));
+        Copy(FfiExample(), dir);
+        var (built, _, why) = Run("build", "-C", dir);
+        Assert.True(built == 0, why);
+        var host = Target.Host;
+        var o = Path.Combine(dir, "out", "debug", host.Triple);
+        var plugin = Path.Combine(o, host.Os switch
+        {
+            TargetOs.Windows => "plugin.dll",
+            TargetOs.MacOs => "libplugin.dylib",
+            _ => "libplugin.so",
+        });
+        var zig = CCompiler.Locate(CCompilerKind.Zig) ?? throw new InvalidOperationException("zig is required to build the plugin");
+        var shared = ProcessRunner.Run(zig.Path, ["cc", "-shared", Path.Combine(dir, "plugin", "plugin.c"), "-o", plugin], TimeSpan.FromMinutes(5));
+        Assert.True(shared.ExitCode == 0, shared.Stderr + shared.Stdout);
+
+        const string bound = "length 5.0\nscaled(6.0, 8.0)\ncorners 4, coordinates summed 6.0\npath 9.0\n";
+        var exe = Path.Combine(o, "geometry" + host.ExecutableSuffix);
+        var ran = ProcessRunner.Run(exe, [plugin], TimeSpan.FromMinutes(1));
+        Assert.True(ran.ExitCode == 0, ran.Stderr);
+        Assert.Equal(bound + "plugin triple: 14 -> 42\nplugin_missing found: false\nno-such-library: not loaded\n",
+            ran.Stdout.Replace("\r\n", "\n"));
+        var alone = ProcessRunner.Run(exe, [], TimeSpan.FromMinutes(1));
+        Assert.Equal(bound + "no plugin given\n", alone.Stdout.Replace("\r\n", "\n"));
+    }
 }

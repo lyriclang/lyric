@@ -267,7 +267,8 @@ public sealed class CBuild
             // UTF-16 (runtime/src/os.c); ws2_32 for Winsock (runtime/src/net.c).
             // ntdll's AFD calls are looked up at run time (runtime/src/poll.c), as wepoll does.
             TargetOs.Windows => ["-Wl,--gc-sections", "-Wl,--stack," + MainThreadStack, "-lshell32", "-lws2_32"],
-            _ => ["-Wl,--gc-sections", "-lpthread", "-lm"],
+            // libdl for std.ffi's Library, where the C library keeps dlopen apart (glibc before 2.34)
+            _ => ["-Wl,--gc-sections", "-lpthread", "-lm", "-ldl"],
         });
         // the name the loader records in what links the library, not the path it was built at
         if (shared && Target.Os == TargetOs.MacOs) arguments.Add("-Wl,-install_name,@rpath/" + Path.GetFileName(output));
