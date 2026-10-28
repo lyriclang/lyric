@@ -128,6 +128,54 @@ does not hold. Compiling a tree runs nothing of it — there is no script in it 
 <p>A tree belongs to the package that names it. If two packages of a program compile the same C, its
 symbols are defined twice and the link fails — share a C library by wrapping it in one package
 that the others depend on.</p>
+<h2 id="bindings-from-the-header">Bindings from the header</h2>
+<p>Declaring every function by hand is where binding C gets tedious. A library's header already says
+what it has, so the build can write the declarations for you:</p>
+<pre><code class="language-toml">[native]
+sources  = ["@raylib/src/rcore.c", "@raylib/src/rshapes.c", "@raylib/src/utils.c"]
+include  = ["@raylib/src"]
+bindings = [{ header = "@raylib/src/raylib.h", module = "rl" }]</code></pre>
+<p>The build reads <code>raylib.h</code> with the C compiler, as your package's sources see it — the same
+<code>include</code> and <code>defines</code>, for the target you build for — and makes the module <code>rl</code> of your package:
+in a package <code>game</code>, <code>game.rl</code>. You import it like any module you wrote:</p>
+<pre><code class="language-text">import game.rl { InitWindow, WindowShouldClose, BeginDrawing, EndDrawing, CloseWindow };
+
+fn main(): void {
+    InitWindow(800, 450, "hello");
+    while (!WindowShouldClose()) {
+        BeginDrawing();
+        EndDrawing();
+    }
+    CloseWindow();
+}</code></pre>
+<p>The module holds the header's functions as <code>extern &quot;C&quot;</code> declarations — a variadic one with its
+<code>...</code> —, its structs as <code>@Layout(C)</code> structs, its enums as constants with the enum's name as their
+type, its typedefs as aliases, its pointers to functions as <code>extern &quot;C&quot; fn</code> types, and every
+<code>#define</code> that is one number or one string as a constant. Names stay C's: <code>InitWindow</code>, not
+<code>initWindow</code>. A name Lyric reserves gets a <code>_</code> after it — a parameter <code>in</code> is <code>in_</code>, a type
+<code>string</code> is <code>string_</code> — and no lint looks at the module, since you did not write it.</p>
+<p>The types are what each C type is <strong>on your target</strong>: a <code>long</code> is <code>int</code> on Linux and macOS and
+<code>int32</code> on Windows, a <code>char</code> is <code>uint8</code> on Linux for Arm, so the module is made for every target
+you build for. A pointer you hand to C may be null, so a parameter <code>const char *</code> is <code>?CStr</code> — a
+string goes in as it is — and <code>T *</code> is <code>?Ptr&lt;T&gt;</code>; in a struct's field, where Lyric takes no
+optional, they are <code>CStr</code> and <code>Ptr&lt;T&gt;</code>, and a null there is yours to look for. A struct the header
+names without its fields is a <code>Ptr&lt;void&gt;</code> behind its pointer.</p>
+<p>What the module cannot hold is left out and listed at its end, with the place in the header and why:</p>
+<pre><code class="language-text">// Left out:
+// - union Any (geo.h:16): a union does not cross
+// - geo_twice (geo.h:27): a static or inline function has no symbol to link
+// - GEO_SQ (geo.h:10): a function-like macro is no declaration</code></pre>
+<p>Unions, bit fields, function-like macros, <code>static inline</code> functions and variables are not in it;
+for one of those, write the declaration yourself, or a small C function in your package that wraps
+it. The module is made again only when the header, a header it includes, <code>include</code>, <code>defines</code>, the
+target or the toolchain changes.</p>
+<p>To see the module — or to keep it in your package instead of making it every build —, write it
+out:</p>
+<pre><code class="language-sh">lyric bindgen native/geo.h &gt; src/geo.lyr</code></pre>
+<p><code>lyric bindgen</code> uses the package's <code>include</code> and <code>defines</code>, <code>--target</code> picks another target, and a
+path <code>@name/…</code> reads a header of a source tree. A header that does not compile stops the build with
+<code>LYR-BLD0005</code> and what the C compiler said; a module that also lies under <code>src/</code> is
+<code>LYR-RES0016</code>.</p>
 <h2 id="libraries-of-the-system">Libraries of the system</h2>
 <p><code>libs</code> links libraries by name — <code>&quot;m&quot;</code> is <code>-lm</code>. What a build needs only on one system goes into a
 table for that system:</p>

@@ -409,8 +409,9 @@ returns comes back as <code>null</code>.</li>
 <li><strong><code>CStr</code></strong> is C's <code>const char *</code>: bytes up to a NUL, which C owns. Its <code>length()</code> counts the
 bytes before the NUL; its <code>toString()</code> copies them into a <code>string</code>, and throws <code>Utf8Error</code>
 where they are no well-formed UTF-8. <strong><code>?CStr</code></strong> may be null, as <code>?Ptr&lt;T&gt;</code>.</li>
-<li>A <code>string</code> argument where a C function's parameter is <code>CStr</code> crosses as the string's bytes,
-with the NUL every string holds (§1.2), without a copy. They are C's for the call: C does not
+<li>A <code>string</code> argument where a C function's parameter is <code>CStr</code> — or <code>?CStr</code>, which a string
+never leaves null — crosses as the string's bytes, with the NUL every string holds (§1.2),
+without a copy. They are C's for the call: C does not
 keep the address past its return.</li>
 <li>A struct with <strong><code>@Layout(C)</code></strong> is laid out as C lays out a struct of the same fields in the same
 order on the target platform, and crosses by value, as a parameter and as a result. Its fields

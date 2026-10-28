@@ -723,6 +723,13 @@ code is no longer reported, and its number is not given again.</p>
 <td>a test module under both src/tests/ and tests/</td>
 <td><code>lyric test</code> finds the same test module twice: as <code>src/tests/&lt;name&gt;.lyr</code> and as <code>tests/&lt;name&gt;.lyr</code>. Both are the module <code>&lt;package&gt;.tests.&lt;name&gt;</code>; the run stops before anything is compiled.</td>
 </tr>
+<tr>
+<td>LYR-RES0016</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a module made from a C header lies in the package's source too</td>
+<td>Reported when the module a <code>bindings</code> entry makes — <code>geo</code> in <code>app</code> is <code>app.geo</code> — is also a file under the package's <code>src/</code>, <code>gen/</code> or <code>tests/</code>: one module path would name two modules. Nothing is built; the exit code is 1.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a4-sem--semantic-errors-and-warnings">A.4 SEM — Semantic errors and warnings</h2>
@@ -2406,7 +2413,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/15-project/">15-project</a></td>
 <td>a manifest or lock field that is missing or malformed</td>
-<td>Reported when <code>lyric.toml</code> or <code>lyric.lock</code> parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a <code>[[bin]]</code> entry, a profile, <code>[native]</code>, <code>[trust]</code>, <code>[lints]</code>, a toolchain pin, a locked revision, a source tree of <code>[native.vendor]</code> or an <code>@name/</code> path that names none — and a prebuilt file <code>[native]</code> names that is not part of the package or not there, or a URL's tree without its <code>hash</code>, when the build needs it.</td>
+<td>Reported when <code>lyric.toml</code> or <code>lyric.lock</code> parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a <code>[[bin]]</code> entry, a profile, <code>[native]</code>, <code>[trust]</code>, <code>[lints]</code>, a toolchain pin, a locked revision, a source tree of <code>[native.vendor]</code> or an <code>@name/</code> path that names none, a <code>bindings</code> entry — and a prebuilt file <code>[native]</code> names that is not part of the package or not there, or a URL's tree without its <code>hash</code>, when the build needs it.</td>
 </tr>
 <tr>
 <td>LYR-PKG0003</td>
@@ -2513,6 +2520,13 @@ code is no longer reported, and its number is not given again.</p>
 <td><a href="../../spec/15-project/">15-project</a></td>
 <td>a warning a build script reported</td>
 <td>Reported when a package's <code>build.lyr</code> calls <code>std.build.warn</code>: the build shows the script's message as a warning, prefixed with the package's name.</td>
+</tr>
+<tr>
+<td>LYR-BLD0005</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a module cannot be made from a C header</td>
+<td>Reported when a header a package's <code>bindings</code> names does not compile — with what the C compiler said — or when the C compiler writes no syntax tree of it, which only zig cc and clang do. Nothing is built; the exit code is 1.</td>
 </tr>
 <tr>
 <td>LYR-BLD0006</td>

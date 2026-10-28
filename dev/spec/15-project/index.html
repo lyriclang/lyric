@@ -101,7 +101,7 @@ is refused (<code>LYR-PKG0002</code>).</li>
 <p>The packages a package imports from (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V7</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases that hold their dependencies in
 their own directories, and the git repositories they read as their versions
-(<a href="https://github.com/lyriclang/lyric-spec/blob/92299eb7aa442eafbeca875dfdcbc93087c2b836/conformance/README.md">the suite's README</a>); the toolchain's own tests
+(<a href="https://github.com/lyriclang/lyric-spec/blob/ea7df8f0b39b2bec2d3367daa954444870976710/conformance/README.md">the suite's README</a>); the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>: <code>DependencyTests</code>, <code>GitDependencyTests</code>, <code>PackageContentTests</code>).</p>
 <ol>
 <li><code>[dependencies]</code> names them, each where it is read from: a directory,
@@ -232,8 +232,7 @@ memory is not.</li>
 <p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code> and <code>conformance/cases/15-project/</code>, package cases
 that call their native part or whose manifest a rule refuses; the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>, <code>NativeTests</code>, <code>VendorTests</code>, <code>BindingsTests</code>).</p>
-<p><em>(Rules 9–11, the findings <code>LYR-LNK…</code> of rule 12, rules 17–21, and <code>bindings</code> in rule 14 are
-written ahead of their implementation, milestone M14b of the Lyric 5 plan — the
+<p><em>(Rules 9–11 and the findings <code>LYR-LNK…</code> of rule 12 are written ahead of their implementation, milestone M14b of the Lyric 5 plan — the
 decisions of <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11, review 2026-10-28</a>;
 each comes with its cases.)</em></p>
 <h3 id="51-sources">5.1 Sources</h3>
@@ -323,7 +322,8 @@ A tree is the package's own: another package's <code>@name</code> is another tre
 compile one tree define its symbols twice (rule 12).</p>
 </li>
 <li><p>A tree is read <strong>only where a build needs it</strong>: where a table that holds for the build's target
-names it. <code>lyric check</code>, <code>lyric metadata</code> and the editor read none. What a build reads is
+names it. <code>lyric check</code> reads only those its bindings need (§5.4); <code>lyric metadata</code> and the
+editor read none. What a build reads is
 fetched into the user's cache — a URL's file once by its hash, unpacked once —, under
 <code>--offline</code> not at all (<code>LYR-PKG0007</code>). A URL without <code>hash</code> is refused, the message giving the
 hash of what it loaded (<code>LYR-PKG0002</code>); a file whose hash is another is refused, the message
@@ -354,7 +354,7 @@ package from a C header</strong>: <code>rl</code> in <code>game</code> is the mo
 modules have, each a lowercase letter, then letters, digits and <code>_</code> (<code>LYR-PKG0002</code>). Its
 declarations are <code>pub</code>, its names C's. A module of that path under <code>src/</code>, <code>gen/</code> or <code>tests/</code>
 is refused (<code>LYR-RES0016</code>). The packages that declare the package as a dependency import it as
-any of its modules.</p>
+any of its modules. <code>bindings</code> is a key of every table of rule 4, layered as the others.</p>
 </li>
 <li><p>The module is made <strong>for the build's target</strong>, from what the C compiler reads of the header
 with the package's <code>include</code> and <code>defines</code> — C's types differ between targets. It holds the
@@ -373,20 +373,29 @@ alias of that type;</li>
 <p>The C types as <a href="../../spec/13-abi/">13 §2–§3</a> cross them: the integers by their width on the target —
 <code>char</code> as the target's <code>int8</code> or <code>uint8</code>, <code>size_t</code> as <code>uint</code>, <code>ptrdiff_t</code> as <code>int</code> —, <code>float</code>
 and <code>double</code>, <code>bool</code>; <code>const char *</code> as <code>?CStr</code>; any other <code>T *</code> as <code>?Ptr&lt;T&gt;</code>, <code>void *</code> as
-<code>?Ptr&lt;void&gt;</code>; an array parameter as the pointer it is. A name that is a word of Lyric gets a <code>_</code>
-after it.</p>
+<code>?Ptr&lt;void&gt;</code>; an array parameter as the pointer it is. In a <strong>field</strong>, where 13 §3 rule 4 takes
+no optional, a pointer is <code>Ptr&lt;T&gt;</code>, <code>CStr</code> or the function pointer's type — a null there is the
+program's to look for —, and an array of arrays is one array of all their elements,
+<code>float m[4][4]</code> as <code>float32[16]</code>, laid out alike. A constant is a <code>pub let</code>: an enum's of its
+integer type; a <code>#define</code>'s integer of the type C gives the literal — the first of <code>int32</code> and
+<code>int</code> it fits, unsigned with a <code>u</code> suffix or where a hexadecimal or octal one needs it, <code>int</code>
+or <code>uint</code> with an <code>l</code> —, so that it goes where C's <code>int</code> goes; its string as <code>string</code>. A name
+that is a word of Lyric or a builtin type's name gets a <code>_</code> after it: <code>string</code> as <code>string_</code>.</p>
 </li>
 <li><p>What it cannot write — a union, a bit field, a struct with one, a function-like macro, a
 <code>static inline</code> function, a variable, a declaration that needs one of them — is <strong>left out</strong>,
-and the module's last lines list each by its name, its file and line, and why. The lints
-<code>naming</code> and <code>dead-code</code> do not look at it (<a href="../../spec/16-diagnostics/#5-lints">16 §5</a>).</p>
+and the module's last lines list each by its name, its file and line, and why; a <code>#define</code>
+with an empty body — an include guard — is passed over. No lint looks at the module
+(<a href="../../spec/16-diagnostics/#5-lints">16 §5</a>): it is written by the toolchain, as a dependency's
+modules are written by others.</p>
 </li>
-<li><p>A header that does not compile, or a module the toolchain cannot write, stops the build
-(<code>LYR-BLD0005</code>, exit 1) with what the C compiler said. The module is made anew where the
+<li><p>A header that does not compile, or a module the toolchain cannot write — a C compiler that
+writes no syntax tree, which only zig cc and clang do —, stops the build (<code>LYR-BLD0005</code>, exit 1)
+with what the C compiler said. The module is made anew where the
 header, a header it reads, the <code>defines</code>, the target or the toolchain changed.</p>
 </li>
 <li><p><strong><code>lyric bindgen</code></strong> writes the module one entry makes to standard output, to keep it under
-<code>src/</code> instead (<a href="../../spec/14-cli/">14</a>).</p>
+<code>src/</code> instead (<a href="../../spec/14-cli/">14 §2</a> rule 6).</p>
 </li>
 </ol>
 <h2 id="6-reproducibility">6. Reproducibility</h2>
