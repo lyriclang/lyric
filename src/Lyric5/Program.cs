@@ -24,10 +24,12 @@ public static partial class Program
     /// with streams of their own.</summary>
     public static int Drive(string[] args)
     {
+        var given = args;
         try
         {
             if (TakeRenderOptions(ref args, out var lints) is { } refused) return refused;
             if (args.Length == 0) return Usage(Console.Out, 0);
+            if (Switch(args, given) is { } handedOn) return handedOn;
             var exit = Dispatch(args, lints);
             // the JSON form closes with the count (16 §4); 'run' said it before its program ran
             Lyric.Core.Rendering.RenderStyle.Current.Events?.Summary();
@@ -35,7 +37,7 @@ public static partial class Program
         }
         catch (Exception crash)
         {
-            return Crashed(crash);
+            return Crashed(crash, given);
         }
     }
 
@@ -66,15 +68,17 @@ public static partial class Program
             "api" => Api(rest),
             "lsp" => Lsp(rest),
             "dap" => Dap(rest),
-            "env" => Env(rest),
+            "env" => Env(rest, lints),
             "new" => New(rest, here: false),
             "init" => New(rest, here: true),
             "completions" => Completions(rest),
             "update" => Update(rest),
             "add" => Add(rest),
             "remove" => Remove(rest),
+            "bindgen" => BindgenVerb(rest),
             "clean" => Clean(rest),
             "metadata" => Metadata(rest),
+            "toolchain" => Toolchain(rest),
             "explain" => Explain(rest),
             "version" => Verbs.Read(verb, rest, Unknown, out var unread) is { Words.Count: 0, Rest: null } ? Version()
                 : unread != 0 ? unread : Unknown("'version' takes no words"),
@@ -99,26 +103,28 @@ public static partial class Program
         return 0;
     }
 
-    /// <summary>The toolchain's own failure: not the program's fault, and worth a report.</summary>
-    private static int Crashed(Exception crash)
+    /// <summary>The toolchain's own failure: not the program's fault, and worth a report — said with
+    /// its trace, and written to a file beside it (<see cref="IceReport"/>).</summary>
+    private static int Crashed(Exception crash, string[] command)
     {
+        var message = $"the toolchain failed: {crash.GetType().Name}: {crash.Message}";
+        var place = Lyric.Core.CompilerPosition.Describe();
+        var trace = crash is Lyric.Core.CompilerDepthException ? Head(crash.StackTrace, 24) : crash.StackTrace;
+        var style = Lyric.Core.Rendering.RenderStyle.Current;
+        var report = IceReport.Write(style.BaseDirectory ?? Directory.GetCurrentDirectory(), DisplayVersion(), command, message, place, trace);
+        if (style.Events is { } events)
         {
-            var message = $"the toolchain failed: {crash.GetType().Name}: {crash.Message}";
-            var place = Lyric.Core.CompilerPosition.Describe();
-            var trace = crash is Lyric.Core.CompilerDepthException ? Head(crash.StackTrace, 24) : crash.StackTrace;
-            if (Lyric.Core.Rendering.RenderStyle.Current.Events is { } events)
-            {
-                // the JSON form (16 §4) says it as an event of its own, and closes the stream
-                events.Ice("LYR-ICE0001", message, place, trace);
-                events.Summary();
-                return 101;
-            }
-            Console.Error.WriteLine($"error[LYR-ICE0001]: {message}");
-            if (place is not null) Console.Error.WriteLine($"  while {place}");
-            Console.Error.WriteLine("  = help: this is a bug in lyric5 — please report it with the program that triggered it");
-            Console.Error.WriteLine(trace);
+            // the JSON form (16 §4) says it as an event of its own, and closes the stream
+            events.Ice("LYR-ICE0001", message, place, trace);
+            events.Summary();
             return 101;
         }
+        Console.Error.WriteLine($"error[LYR-ICE0001]: {message}");
+        if (place is not null) Console.Error.WriteLine($"  while {place}");
+        Console.Error.WriteLine("  = help: this is a bug in lyric5 — please report it with the program that triggered it");
+        if (report is not null) Console.Error.WriteLine($"  = note: a report to attach is in {report}");
+        Console.Error.WriteLine(trace);
+        return 101;
     }
 
     /// <summary>
@@ -246,5 +252,5 @@ public static partial class Program
     }
 
     private static string DescribeCompiler(CCompiler? compiler) =>
-        compiler?.ToString() ?? "none found — install zig (recommended), clang or gcc";
+        compiler?.ToString() ?? "none found — lyric5 toolchain install zig installs one";
 }

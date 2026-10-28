@@ -1,0 +1,36 @@
+{
+  "channel": "stable",
+  "versions": [
+    {
+      "version": "8.0.0",
+      "date": "2026-11-05",
+      "archives": {
+        "x86_64-linux-gnu": {
+          "file": "lyric-8.0.0-linux-x64.tar.gz",
+          "size": 452,
+          "sha256": "e5177f5a56ea3191ae7f3c75e9621a7fa457cdc22b60a0db13b730d288d4df9c"
+        },
+        "aarch64-linux-gnu": {
+          "file": "lyric-8.0.0-linux-arm64.tar.gz",
+          "size": 451,
+          "sha256": "47c1f1d8ed55c4542175432d6711fdcb3044a98d534b6b9e6f4a01e12f126e9e"
+        },
+        "x86_64-windows-gnu": {
+          "file": "lyric-8.0.0-win-x64.zip",
+          "size": 770,
+          "sha256": "06209a75d27bd9bfad938b9f231db73867773b1c1935c62cce0ff3354055597f"
+        },
+        "aarch64-macos": {
+          "file": "lyric-8.0.0-osx-arm64.tar.gz",
+          "size": 444,
+          "sha256": "24796cbfd1467d674d84a2ac4786f08e9f017234396f7e1e4db1ff9cad0ad37b"
+        },
+        "x86_64-macos": {
+          "file": "lyric-8.0.0-osx-x64.tar.gz",
+          "size": 447,
+          "sha256": "5f9e327cbbedce242b5a8dd1c5882c62b11dbe3c9b6d8ed24ac81ed9c19adbd4"
+        }
+      }
+    }
+  ]
+}

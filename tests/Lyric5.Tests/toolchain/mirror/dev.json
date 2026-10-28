@@ -1,0 +1,98 @@
+{
+  "channel": "dev",
+  "versions": [
+    {
+      "version": "9.0.0-dev.20261101+aaaaaaa",
+      "date": "2026-11-01",
+      "archives": {
+        "x86_64-linux-gnu": {
+          "file": "lyric-9.0.0-dev.20261101-linux-x64.tar.gz",
+          "size": 466,
+          "sha256": "4298dc656b11999406c1ce8fa4c2c6faf29cbbadd156a0f7468475ac9b2723ba"
+        },
+        "aarch64-linux-gnu": {
+          "file": "lyric-9.0.0-dev.20261101-linux-arm64.tar.gz",
+          "size": 465,
+          "sha256": "7027d1a50c3a75d1c5e4fba7975e907704422cd839e6b3cb73b984fcec9c9092"
+        },
+        "x86_64-windows-gnu": {
+          "file": "lyric-9.0.0-dev.20261101-win-x64.zip",
+          "size": 833,
+          "sha256": "f8d9009b4515d3b6fd53b5ab5eac3171c3aa3cf65d9a869983ad3501f91a61fe"
+        },
+        "aarch64-macos": {
+          "file": "lyric-9.0.0-dev.20261101-osx-arm64.tar.gz",
+          "size": 460,
+          "sha256": "605e6f012e918d2fefda8c7dc0d04db0f5e1ede1d622e314c19a181cb5bb2fb9"
+        },
+        "x86_64-macos": {
+          "file": "lyric-9.0.0-dev.20261101-osx-x64.tar.gz",
+          "size": 461,
+          "sha256": "912109303db6e3abff9a9b7429fdaa9269cf3380b09cb85e316561b60068716d"
+        }
+      }
+    },
+    {
+      "version": "9.0.0-dev.20261102+bbbbbbb",
+      "date": "2026-11-02",
+      "archives": {
+        "x86_64-linux-gnu": {
+          "file": "lyric-9.0.0-dev.20261102-linux-x64.tar.gz",
+          "size": 466,
+          "sha256": "5a28a79aa6d2b73dc782fbfa05e5972d62fc4314b27106582cf94457cc7c7d51"
+        },
+        "aarch64-linux-gnu": {
+          "file": "lyric-9.0.0-dev.20261102-linux-arm64.tar.gz",
+          "size": 466,
+          "sha256": "5c803abcbf186dcfc3288164240d223b629cd2305730cd19ebb70b3352ddc279"
+        },
+        "x86_64-windows-gnu": {
+          "file": "lyric-9.0.0-dev.20261102-win-x64.zip",
+          "size": 833,
+          "sha256": "7c38e48b9bf65fecea3330738141428e6f5d3dd255b0c3c3766ee26ef168be44"
+        },
+        "aarch64-macos": {
+          "file": "lyric-9.0.0-dev.20261102-osx-arm64.tar.gz",
+          "size": 460,
+          "sha256": "74f7d6d528dba9a915a90d30c13b885b535a795ade682b08285d34cfdadb93e8"
+        },
+        "x86_64-macos": {
+          "file": "lyric-9.0.0-dev.20261102-osx-x64.tar.gz",
+          "size": 461,
+          "sha256": "0486fcde7be622f6e69005a2bc89b342d64c785061517a2f5d0f98bea3c14681"
+        }
+      }
+    },
+    {
+      "version": "9.0.0-dev.20261031+ccccccc",
+      "date": "2026-11-31",
+      "archives": {
+        "x86_64-linux-gnu": {
+          "file": "lyric-9.0.0-dev.20261031-linux-x64.tar.gz",
+          "size": 499,
+          "sha256": "b12824704563c6d99e5c21dc05acfe81ec75d352b0ac20125cd519efa04c6902"
+        },
+        "aarch64-linux-gnu": {
+          "file": "lyric-9.0.0-dev.20261031-linux-arm64.tar.gz",
+          "size": 498,
+          "sha256": "a5bc4799bda9b1a5b31849832c13303ba13bd801a539eea6ea1c26e7d0f4e5fc"
+        },
+        "x86_64-windows-gnu": {
+          "file": "lyric-9.0.0-dev.20261031-win-x64.zip",
+          "size": 947,
+          "sha256": "6da390a2fa60ede29d075019908b2a96b18a9cc2d5c9a5e084a457c8c6aace05"
+        },
+        "aarch64-macos": {
+          "file": "lyric-9.0.0-dev.20261031-osx-arm64.tar.gz",
+          "size": 494,
+          "sha256": "28f15e03469771ab22df12e997b320a8cb9085616060e08ff84ea6b9ba4a5f6d"
+        },
+        "x86_64-macos": {
+          "file": "lyric-9.0.0-dev.20261031-osx-x64.tar.gz",
+          "size": 494,
+          "sha256": "3ab20d2ce8386a430907a8d368d5ce84e235d7e38d72f124453885383e419a93"
+        }
+      }
+    }
+  ]
+}

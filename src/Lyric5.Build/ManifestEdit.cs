@@ -5,7 +5,7 @@ namespace Lyric5.Build;
 
 /// <summary>
 /// <c>lyric add</c> and <c>lyric remove</c>: one line of
-/// <c>[dependencies]</c> written or taken out as text — every other line of the manifest, its
+/// <c>[dependencies]</c> — or, for a source tree, of <c>[native.vendor]</c> — written or taken out as text — every other line of the manifest, its
 /// comments, its order and its line ends stay as they are. A dependency written otherwise — a
 /// table of its own, dotted keys — is the person's to edit, not this.
 /// </summary>
@@ -14,18 +14,19 @@ public static partial class ManifestEdit
     /// <summary><paramref name="text"/> with <c>name = value</c> in <c>[dependencies]</c>: the line
     /// that names it replaced, else a new line after the table's last, else a new table at the end.</summary>
     /// <exception cref="InvalidOperationException">The dependency is written in another form.</exception>
-    public static string Add(string text, string name, string value)
+    /// <param name="section">The table: <c>dependencies</c>, or <c>native.vendor</c> for a source tree.</param>
+    public static string Add(string text, string name, string value, string section = "dependencies")
     {
         var (lines, newline) = Split(text);
         var entry = $"{name} = {value}";
-        if (Table(lines) is not { } table)
+        if (Table(lines, section) is not { } table)
         {
-            Refuse(lines, name);
+            Refuse(lines, name, section);
             while (lines.Count > 0 && lines[^1].Trim().Length == 0) lines.RemoveAt(lines.Count - 1);
-            lines.AddRange(["", "[dependencies]", entry]);
+            lines.AddRange(["", $"[{section}]", entry]);
             return Join(lines, newline);
         }
-        Refuse(lines, name);
+        Refuse(lines, name, section);
         if (Line(lines, table, name) is { } at) lines[at] = entry;
         else
         {
@@ -40,11 +41,11 @@ public static partial class ManifestEdit
     /// <summary><paramref name="text"/> without the line of <c>name</c> in <c>[dependencies]</c>;
     /// <c>null</c> where there is none.</summary>
     /// <exception cref="InvalidOperationException">The dependency is written in another form.</exception>
-    public static string? Remove(string text, string name)
+    public static string? Remove(string text, string name, string section = "dependencies")
     {
         var (lines, newline) = Split(text);
-        Refuse(lines, name);
-        if (Table(lines) is not { } table || Line(lines, table, name) is not { } at) return null;
+        Refuse(lines, name, section);
+        if (Table(lines, section) is not { } table || Line(lines, table, name) is not { } at) return null;
         lines.RemoveAt(at);
         return Join(lines, newline);
     }
@@ -56,8 +57,8 @@ public static partial class ManifestEdit
     public static string? SetTag(string text, string name, string tag)
     {
         var (lines, newline) = Split(text);
-        Refuse(lines, name);
-        if (Table(lines) is not { } table || Line(lines, table, name) is not { } at) return null;
+        Refuse(lines, name, "dependencies");
+        if (Table(lines, "dependencies") is not { } table || Line(lines, table, name) is not { } at) return null;
         var value = TagValue().Match(lines[at]).Groups["value"];
         if (!value.Success) return null;
         lines[at] = lines[at][..value.Index] + Quote(tag) + lines[at][(value.Index + value.Length)..];
@@ -69,10 +70,11 @@ public static partial class ManifestEdit
 
     private readonly record struct Span(int Header, int End);
 
-    /// <summary>The <c>[dependencies]</c> table: its header's line and the line after its last.</summary>
-    private static Span? Table(List<string> lines)
+    /// <summary>The table <paramref name="section"/>: its header's line and the line after its last.</summary>
+    private static Span? Table(List<string> lines, string section)
     {
-        var header = lines.FindIndex(l => DependenciesHeader().IsMatch(l));
+        var pattern = new Regex($@"^\s*\[\s*{Dotted(section)}\s*\]\s*(#.*)?$");
+        var header = lines.FindIndex(pattern.IsMatch);
         if (header < 0) return null;
         var end = lines.FindIndex(header + 1, l => AnyHeader().IsMatch(l));
         return new Span(header, end < 0 ? lines.Count : end);
@@ -90,17 +92,21 @@ public static partial class ManifestEdit
     }
 
     /// <summary>A dependency written as a table of its own, or with dotted keys, is not one line.</summary>
-    private static void Refuse(List<string> lines, string name)
+    private static void Refuse(List<string> lines, string name, string section)
     {
+        var tableOf = new Regex($@"^\s*\[\s*{Dotted(section)}\s*\.\s*(?<key>[A-Za-z0-9_-]+|""[^""]*""|'[^']*')\s*\]");
         foreach (var line in lines)
         {
-            var header = TableOf().Match(line);
+            var header = tableOf.Match(line);
             var dotted = DottedEntry().Match(line);
             if ((header.Success && Unquote(header.Groups["key"].Value) == name)
                 || (dotted.Success && Unquote(dotted.Groups["key"].Value) == name))
                 throw new InvalidOperationException($"'{name}' is written as a table in lyric.toml, not as one line: edit it by hand");
         }
     }
+
+    /// <summary>A table's dotted name as a pattern: blanks allowed around each dot.</summary>
+    private static string Dotted(string section) => string.Join(@"\s*\.\s*", section.Split('.').Select(Regex.Escape));
 
     private static string Unquote(string key) => key.Length >= 2 && key[0] is '"' or '\'' ? key[1..^1] : key;
 
@@ -120,9 +126,6 @@ public static partial class ManifestEdit
         return text.ToString();
     }
 
-    [GeneratedRegex(@"^\s*\[\s*dependencies\s*\]\s*(#.*)?$")]
-    private static partial Regex DependenciesHeader();
-
     /// <summary>The <c>tag = "…"</c> of an inline table, its string as written.</summary>
     [GeneratedRegex(@"\btag\s*=\s*(?<value>""(?:[^""\\]|\\.)*"")")]
     private static partial Regex TagValue();
@@ -132,9 +135,6 @@ public static partial class ManifestEdit
 
     [GeneratedRegex(@"^\s*(?<key>[A-Za-z0-9_-]+|""[^""]*""|'[^']*')\s*=")]
     private static partial Regex Entry();
-
-    [GeneratedRegex(@"^\s*\[\s*dependencies\s*\.\s*(?<key>[A-Za-z0-9_-]+|""[^""]*""|'[^']*')\s*\]")]
-    private static partial Regex TableOf();
 
     [GeneratedRegex(@"^\s*(?<key>[A-Za-z0-9_-]+|""[^""]*""|'[^']*')\s*\.\s*[A-Za-z0-9_""'-]+\s*=")]
     private static partial Regex DottedEntry();

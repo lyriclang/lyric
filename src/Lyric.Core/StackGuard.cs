@@ -67,6 +67,10 @@ public static class CompilerPosition
         _at = at;
     }
 
+    /// <summary>The front end is done: what fails after it — the C compiler, the link — is at no
+    /// declaration, and says none.</summary>
+    public static void End() => _phase = null;
+
     /// <summary>"checking 'total' at src/main.lyr:5:1" — or <c>null</c> before the first
     /// declaration, or where the place cannot be read back.</summary>
     public static string? Describe()

@@ -5,9 +5,16 @@ using System.Text.RegularExpressions;
 namespace Lyric5.Build;
 
 /// <summary>A revision of a repository the build read: the commit it was and
-/// the hash of its package content.</summary>
-/// <param name="Version">The package's own version, from its manifest — for a person reading the lock.</param>
-public sealed record Locked(string Name, string Version, GitSource Git, string Commit, string Hash);
+/// the hash of its package content — or, a source tree's, of every file of the commit.</summary>
+/// <param name="Version">The package's own version, from its manifest — for a person reading the lock;
+/// empty for a source tree, which has none.</param>
+/// <param name="Of">For a source tree of <c>[native.vendor]</c>, the package whose tree it is —
+/// <c>kind = "native"</c> in the lock; <c>null</c> for a package.</param>
+public sealed record Locked(string Name, string Version, GitSource Git, string Commit, string Hash, string? Of = null)
+{
+    /// <summary>Whether this is a source tree's revision rather than a package's.</summary>
+    public bool IsTree => Of is not null;
+}
 
 /// <summary>
 /// <c>lyric.lock</c> beside the root manifest: every revision of a git
@@ -48,7 +55,15 @@ public static partial class LockFile
                 ? text
                 : throw new ManifestException("LYR-PKG0002", file, package.Line, 1, $"a locked package needs a string '{key}'");
             var name = Field("name");
-            var packageVersion = Field("version");
+            string? of = null;
+            if (package.TryGet("kind", out var kind))
+            {
+                if (kind is not "native")
+                    throw new ManifestException("LYR-PKG0002", file, package.Line, 1,
+                        $"'{name}' is locked as another kind than \"native\", a source tree's, the one there is");
+                of = Field("of");
+            }
+            var packageVersion = of is null ? Field("version") : "";
             // a lock an earlier toolchain wrote may hold a URL as the manifest spelled it
             var url = GitSource.Normalize(Field("git"));
             var revisions = new[] { "tag", "branch", "rev" }.Where(package.Contains).ToList();
@@ -61,7 +76,7 @@ public static partial class LockFile
             var hash = Field("hash");
             if (!CommitPattern().IsMatch(commit) || !HashPattern().IsMatch(hash))
                 throw new ManifestException("LYR-PKG0002", file, package.Line, 1, $"'{name}' is locked to no commit or no hash");
-            entries.Add(new Locked(name, packageVersion, git, commit, hash));
+            entries.Add(new Locked(name, packageVersion, git, commit, hash, of));
         }
         return entries;
     }
@@ -70,14 +85,16 @@ public static partial class LockFile
     public static string Text(IEnumerable<Locked> entries)
     {
         var text = new StringBuilder();
-        text.Append("# Written by lyric: each revision of a git repository the build reads,\n");
-        text.Append("# the commit it is and the hash of its package content. Check it in with lyric.toml.\n");
+        text.Append("# Written by lyric: each revision of a git repository the build reads — a package's,\n");
+        text.Append("# or a source tree's (kind = \"native\") —, the commit it is and the hash of its content.\n");
+        text.Append("# Check it in with lyric.toml.\n");
         text.Append("version = 1\n");
         foreach (var entry in Sorted(entries))
         {
             text.Append("\n[[package]]\n");
             text.Append($"name = {Quote(entry.Name)}\n");
-            text.Append($"version = {Quote(entry.Version)}\n");
+            if (entry.Of is { } of) text.Append($"kind = \"native\"\nof = {Quote(of)}\n");
+            else text.Append($"version = {Quote(entry.Version)}\n");
             text.Append($"git = {Quote(entry.Git.Url)}\n");
             var key = entry.Git.Kind switch { GitRefKind.Tag => "tag", GitRefKind.Branch => "branch", GitRefKind.Rev => "rev", _ => null };
             if (key is not null) text.Append($"{key} = {Quote(entry.Git.Ref!)}\n");
@@ -96,7 +113,7 @@ public static partial class LockFile
         var held = File.Exists(file) ? Read(file) : [];
         if (Sorted(held).SequenceEqual(Sorted(entries))) return;
         var why = Sorted(held).Except(entries).FirstOrDefault() is { } stale
-            ? $"it holds '{stale.Name}' ({stale.Git}) at {stale.Commit[..12]}, which the graph does not read so"
+            ? $"it holds {(stale.Of is { } of ? $"the source tree '{stale.Name}' of '{of}'" : $"'{stale.Name}'")} ({stale.Git}) at {stale.Commit[..12]}, which the graph does not read so"
             : File.Exists(file) ? "it lacks a revision the graph reads" : "there is none, and the program reads from git";
         throw new ManifestException("LYR-PKG0011", file, 1, 1,
             $"{FileName} is not what the manifests read: {why} — --locked takes the lock as it is; a build without it writes the lock");
@@ -115,7 +132,9 @@ public static partial class LockFile
     }
 
     public static IEnumerable<Locked> Sorted(IEnumerable<Locked> entries) =>
-        entries.OrderBy(e => e.Name, StringComparer.Ordinal)
+        entries.OrderBy(e => e.Of is not null)
+            .ThenBy(e => e.Of, StringComparer.Ordinal)
+            .ThenBy(e => e.Name, StringComparer.Ordinal)
             .ThenBy(e => e.Git.Url, StringComparer.Ordinal)
             .ThenBy(e => e.Git.Kind)
             .ThenBy(e => e.Git.Ref, StringComparer.Ordinal);

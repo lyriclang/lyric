@@ -132,7 +132,7 @@ public class LockTests
         var dir = App($"geo = {{ git = \"{repo.Url}\", tag = \"v1.0.0\" }}\n");
         var (exit, _, error) = Run("update", "geom", "-C", dir);
         Assert.Equal(2, exit);
-        Assert.Contains("error[LYR-CLI0003]: no package 'geom' is read from git here: geo", error);
+        Assert.Contains("error[LYR-CLI0003]: no package or source tree 'geom' is read from git here: geo", error);
 
         var plain = Package(("lyric.toml", Manifest("app")), ("src/main.lyr", "fn main(): void {\n}\n"));
         var (none, output, _) = Run("update", "-C", plain);

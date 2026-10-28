@@ -66,7 +66,7 @@ Zeilen**, Meilensteine M0–M18.
 | **M13a fmt, doc, api** | E5/E7: Formatter mit Trivia (Kommentare, Klammern), Semantik-Erhalt-Test, `lyric doc` (Site aus `///`, über `Lyric5.Doc` aus M12c; die std unter `/dev/std/`, ihre `# Examples` als Doc-Tests), `///`-Doc-Tests, `lyric api` + `--diff` | Repo hält `lyric fmt --check`; Doc-Site der std | M |
 | **M13b LSP, DAP, Clients** | E1–E4, E8: `lyric lsp` mit modulgranularer Wiederverwendung, Code Actions, Tests im Editor; `lyric dap` über lldb-dap + `lyric.lldbinit` (Summaries, Panik-Breakpoint, Tasks-Scope); `tree-sitter-lyric`; VS Code/JetBrains-Clients auf 5 | Editor: Hover/Completion/Rename/Fix, Test-CodeLens; Debugger hält an Panik mit Lyric-Werten; Windows-lldb-Risiko gemessen | XL |
 | **M14 FFI und Einbettung** | W4/W5 nutzerseitig: `extern "C"` vollständig, `@Layout`, `Ptr`/`CStr`/`unsafe`, `ffi.Callback`/`GcHandle`, fremde Threads (X7), `@Export` + Header, `lyric build --lib`, `LyrConfig`/`LyrStatus`/`lyr_step` (H1–H6), `ffi.Library` | `examples/ffi` (C-Bibliothek gebunden), `embedded-host` in C gegen `lib<app>.a`; Spec `13-abi` | L |
-| **M14b C-Bibliotheken** | 11 „Review 2026-10-28“ (E1–E13, N1–N8): `[native]` mit `archives`, `defines`, `frameworks`, `pkgConfig`, Tabellen je Tripel; `[native.vendor]` (Git, URL mit Hash, lazy, im Lock); Bindungen aus dem Header (`bindings`, `lyric bindgen`); `std.build` neu (`Target`, `cLibrary`, `link*`, `cEnv`); `--lib` bündelt Archive; `LNK`-Diagnosen — Plan im Nachtrag 2026-10-28 | `examples/native-prebuilt` (vorgebautes Archiv, CoreFoundation auf macOS), `examples/raylib` aus dem Quelltext mit erzeugten Bindungen | L |
+| **M14b C-Bibliotheken** | 11 „Review 2026-10-28“ (E1–E13, E3′, N1–N8): `[native]` mit `archives`, `dylibs` (neben das Binary), `defines`, `frameworks`, `pkgConfig`, Tabellen je Tripel; `[native.vendor]` (Git, URL mit Hash, lazy, im Lock); Bindungen aus dem Header (`bindings`, `lyric bindgen`); `std.build` neu (`Target`, `cLibrary`, `link*`, `cEnv`); `--lib` bündelt Archive; `LNK`-Diagnosen — Plan im Nachtrag 2026-10-28 | `examples/native-prebuilt` (vorgebautes Archiv, CoreFoundation auf macOS), `examples/raylib` aus dem Quelltext mit erzeugten Bindungen | L |
 | **M15 Distribution** | W9: Archive Tier 1, minisign, `lyric toolchain install/list/default/update`, Go-1.21-Re-exec nach `[package] toolchain`, `lyric toolchain install zig`, `dev`/`stable`-Kanäle, Website-Mirror auf dem VPS des Maintainers (14 C9: härten, `dl.lyric.oil1i.de`, Upload im Release-Job) | `lyric toolchain install dev` auf drei OS; Release-Pipeline probeweise `5.0.0-dev` | M |
 
 ### Phase 4 — Abschluss
@@ -1446,21 +1446,32 @@ ist der Stand nach M14 S7 (#596), gemessen vor dem Plan:
 | Slice | Inhalt | Artefakt |
 |---|---|---|
 | **L1** Entwurf und Spec | 07, 11, dieser Plan; Spec 15 §5/§6/§8, 13 §4, 16 §1 | die Regeln als Text |
-| **L2** der Kern des nativen Teils | P1, P2 ohne `--lib`: `archives`, `defines`, Tripel-Tabellen, `lyric.h` (E9), Header der Abhängigkeiten (N8), Reihenfolge und Inhaltsschlüssel (E12) | `NativeTests`: ein Archiv, im Test gebaut, auf dem Wirt gelaufen und auf alle Tier-1-Tripel cross gelinkt; `ReproducibilityTests` mit Archiv; Ablehnungen als Konformanzfälle |
+| **L2a** SDKs über das Skript | E3′c, E3′d, der Kopierteil von E3′b: lyriclang/lyric#585 und lyric-spec#365 auf main gezogen — `linkSearch`, `besideBinary`, `rerunIfEnvChanged`, `$ORIGIN`/`@executable_path`, kein Suchpfad im Binary, zigs `libX.dll.a`; `LYR-BLD0004` → `LYR-BLD0006`; das Book-Kapitel „C libraries“ entsteht | die drei Tests aus #585 (geteilte Bibliothek außerhalb des Pakets, Umgebungsvariable, Namenskonflikt); der Katalogfall von `BLD0006` |
+| **L2b** der Kern des nativen Teils | P1, P2 ohne `--lib`: `archives`, `dylibs` (E3′a/b, mit der Prüfung des Mach-O-Namens), `defines`, Tripel-Tabellen, `lyric.h` (E9), Header der Abhängigkeiten (N8), Reihenfolge und Inhaltsschlüssel (E12); Suchpfade und „eigenes Verzeichnis zuerst“ aus L2a gehen im `LinkPlan` auf | `NativeTests`: ein Archiv und eine geteilte Bibliothek, im Test gebaut, auf dem Wirt gelaufen und auf alle Tier-1-Tripel cross gelinkt; `ReproducibilityTests` mit Archiv; Ablehnungen als Konformanzfälle |
 | **L3** Quellbäume | P3: Git, dann URL mit Hash; Lock; lazy; `lyric add --vendor` (N5) | ein Paket baut einen Baum aus einem lokalen Git-Repository und einer URL eines lokalen Servers; Hash-Fehler, `--offline`, `--locked` |
 | **L4** Bindungen | P4: der Generator, das Modul je Ziel, `lyric bindgen` | Header mit Struct, Enum, Typedef, Funktionszeiger, Variadik, Konstanten → aufrufbares Modul; das Übersprungene aufgelistet; je Tier-1-Tripel erzeugt |
 | **L5** `std.build`, Frameworks, `pkgConfig` | P5, E4, N3; der macOS-Messlauf zuerst (zig + Framework auf dem Wirt) | ein Skript baut eine `cLibrary` und linkt ein Framework; `pkgConfig` auf Linux; cross abgelehnt |
-| **L6** `--lib` | P2 für Bibliotheken (E11) | ein C-Programm linkt `lib<name>.a` mit gebündeltem Archiv und der genannten Zeile |
+| **L6** `--lib` | P2 für Bibliotheken (E11, E3′e) | ein C-Programm linkt `lib<name>.a` mit gebündeltem Archiv und der genannten Zeile; die `dylibs` liegen daneben |
 | **L7** `LNK`-Diagnosen | P6, `lyric build -v` | undefiniertes Symbol → die `extern`-Zeile; fehlende Bibliothek → die Manifestzeile; doppeltes Symbol → die Pakete |
 | **L8** Beispiele und Abschluss | `examples/native-prebuilt` (Archive je Tripel mit Quelle und Skript zum Neuerzeugen, die CI prüft die Bytes; CoreFoundation auf macOS), `examples/raylib` (gebaut, nicht gefahren: die Runner haben kein Display); STATUS, CHANGELOG, Bericht, die Uhr von E7 | die Zeile oben, im vollen Plattformlauf |
 
-Nach Aufwand: groß L4; mittel L2, L3, L5; klein L1, L6, L7, L8. Zusammen **L**. Die Reihenfolge folgt den
+Nach Aufwand: groß L4; mittel L2b, L3, L5; klein L1, L2a, L6, L7, L8. Zusammen **L**. Die Reihenfolge folgt den
 Abhängigkeiten: der Kern (L2) trägt alles; Quellbäume (L3) vor den Bindungen (L4), die ihre Header lesen; die
 Skript-API (L5) nach beiden, weil `vendorDir` und `cLibrary` sie nennen; `--lib` (L6) und die Diagnosen (L7)
 lesen den fertigen Link-Plan. **L2 beginnt nach dem Merge von M14 S8** — beide ändern `Pipeline` und `CBuild`.
+L2a zuerst, weil #585 fertig und getestet ist und L2b seinen `LinkPlan` darauf baut.
+
+**Doku je Slice** (Maintainer, 2026-10-28: „alle diese Änderungen müssen auch in die Erklärungen und in das
+Book“): jeder Slice zieht im selben PR nach, was ein Benutzer davon sieht — das Book-Kapitel
+`docs/book/c-libraries.md` (entsteht in L2a, wächst je Slice, L8 schließt es), die Erklärung (`explanation`,
+`wrong`/`right`) jedes neuen Codes in `diagnostics.toml`, die Doc-Kommentare von `std.build` und die
+Manifest-Beschreibung von `lyric new`/`lyric metadata`, wo sie Schlüssel nennen. Der 4.x-Guide (`docs/guide`)
+bleibt unberührt.
 
 **Plattformen**: L2, L5, L6 und L8 fahren den vollen Plattformlauf vor dem Merge; macOS ist die Stelle mit dem
-Risiko (Frameworks über den Mach-O-Linker von zig, ungeprüft), Windows die mit der ABI-Frage (E3: nur mingw).
+Risiko (Frameworks über den Mach-O-Linker von zig, ungeprüft; der Laufpfad `@executable_path`), Windows die mit
+der ABI-Frage (E3: nur mingw). L2a fährt ihn ebenfalls: der Mach-O-Laufpfad und die `.dylib`-Suche aus #585
+liefen nie auf macOS.
 
 **Reflexion**: Die Vorbilder liegen an zwei Enden. Cargo lässt fast alles das Build-Skript tun (`build.rs`,
 `cc`, `pkg-config`, `bindgen` als Crates) — mächtig, aber jede C-Bibliothek ist ein kleines Programm, und die
@@ -1474,8 +1485,51 @@ Generator (L4) bildet nur ab, was die Typtabelle schon trägt; was sie nicht tr�
 eine zweite Tabelle zu bekommen.
 
 **Nicht in M14b**: ein Sysroot je Tripel (E5, Uhr M15); Objective-C-Quellen (N7, Uhr M15); freie Linker-Flags
-(E7, Uhr: Abschluss von M14b); mitgebrachte dynamische Bibliotheken (E3, verworfen für 5.0); ein C-Paketindex
+(E7, Uhr: Abschluss von M14b); ein C-Paketindex
 und ein eingebauter CMake-Lauf (verworfen für 5.0).
+
+### Nachtrag 2026-10-28 — L3: wo ein Quellbaum aufgelöst wird
+
+P3 sagt „wie eine Git-Abhängigkeit“ und „lazy nach Ziel“; beides zusammen hat eine Stelle, die der Plan offen
+ließ: der Graph wird ohne Ziel gelesen (`Project.Resolve` — von `build`, `check`, `metadata`, dem Editor), das
+Ziel kennt erst der Bau. Gemessen am Code und entschieden:
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| L3-1 | **Aufgelöst im Bau, je Ziel**: der Graph trägt die Bäume ungelesen; erst der native Teil eines Baus (`Pipeline.Native`) fragt nach `@name`, und nur nach denen, die eine Tabelle für sein Ziel nennt. `check`, `metadata` und der Editor holen nichts | im Graphen auflösen (holt raylibs Windows-Baum auf Linux — gegen N1) |
+| L3-2 | **Der Lock** hält einen Git-Baum als `[[package]]` mit `kind = "native"`, `of = "<paket>"` (ein Baum gehört seinem Paket, N1), ohne `version`. Der Bau trägt ein, was er aufgelöst hat; das Lesen des Graphen behält, was ein Manifest des Graphen noch so nennt, und lässt den Rest fallen. Unter `--locked` lehnt der Bau einen gebrauchten, nicht gehaltenen Baum ab, der Graph einen gehaltenen, nicht mehr genannten — beide `PKG0011` | ein eigener `[[tree]]`-Abschnitt (zweite Form für dasselbe: Commit und Hash einer Revision); jeden Baum beim Lesen des Graphen sperren (nicht lazy) |
+| L3-3 | **`lyric update`** liest die Bäume, die der Lock hält, neu (ein Zweig an seine Spitze, ein Tag an seinen Commit), genannt oder alle; ein ungehaltener bleibt lazy. Ein Tag eines Baums wird nicht angehoben — ein Baum hat keine Version, an der eine Linie hinge | alle genannten Bäume holen (bricht lazy) |
+| L3-4 | **URLs**: `https://`, `http://` und `file://` — der Hash macht den Weg gleichgültig, und ein lokaler Server oder eine Datei sind die Fälle der Tests und des Spiegels. Die Form erkennt der Bau **an den Bytes** (gzip-tar oder zip), nicht am Namen: GitHubs Archiv-URLs tragen keine Endung. Geladen in den Benutzer-Cache als `vendor/<sha256>`, entpackt einmal daneben; nicht im Lock — der Hash im Manifest ist die Sperre | nur `https` (Tests bräuchten ein Zertifikat, und der Hash prüft ohnehin) |
+| L3-5 | **`.tar.xz` nicht in 5.0** (N1 nannte es): .NET hat keinen xz-Decoder, und ein eigener LZMA2 wären einige hundert Zeilen im Werkzeug für eine Form, die GitHub-Archive nicht liefern; ein xz-Baum kommt über Git. Entschieden, keine Tür | den `tar` des Systems aufrufen (eine Abhängigkeit von der Maschine, die P6 meidet) |
+| L3-6 | **`@name/`** gilt in `sources`, `include`, `archives` und `dylibs` (die Spec nannte `dylibs` nicht, E3′ schon) — und in `bindings` mit L4. Eine Datei eines Baums ist der Inhaltsregel nicht unterworfen (sie ist kein Paketinhalt); sie muss da sein | — |
+| L3-7 | **`lyric add <name> --vendor --git … [--tag\|--branch\|--rev …] \| --url …`** schreibt eine Zeile in `[native.vendor]`, wie `add` eine in `[dependencies]`: bei `--git` nach einem Abruf, der zeigt, dass die Revision da ist (kein Lock — den schreibt der Bau, der den Baum braucht); bei `--url` nach dem Laden, mit dem Hash | den Baum gleich sperren (der Lock wüchse um Bäume, die kein Ziel braucht) |
+
+Die Tests: `VendorTests` mit einem lokalen Git-Repository und einem lokalen HTTP-Server (`HttpListener`) — gzip-tar
+und zip, das oberste Verzeichnis, der fehlende und der falsche Hash, `--offline`, `--locked`, ein Baum nur für
+ein anderes Ziel bleibt ungeholt, `lyric update` bewegt einen Zweig, `add --vendor`; die Ablehnungen des Manifests
+als Konformanzfälle, ein Git-Baum über die `repos/` der Suite.
+
+### Nachtrag 2026-10-28 — L4: der Generator, gemessen
+
+Gemessen an zig 0.16 mit einem Header aus Struct, anonymem Struct mit `typedef`, undurchsichtigem Struct, Enum mit
+`1 << 3`, Funktionszeiger-`typedef`, Variadik, Union, Bitfeld, `static inline`, Variable und vier `#define`s:
+`zig cc -target <t> -Xclang -ast-dump=json -fsyntax-only` schreibt den AST (Exit 1 mit „FileNotFound“ danach,
+wie 11 sagt); jede Deklaration trägt ihren C-Typ als Text (`qualType`), ein Enum-Wert steht ausgerechnet im
+`ConstantExpr`, `variadic`, `isBitfield`, `storageClass` und `inline` stehen am Knoten; die Datei eines Orts nur,
+wo sie wechselt. **Makros fehlen im AST** — sie kommen aus `-E -dM`. Entschieden:
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| L4-1 | **Erzeugt, wo die Skripte laufen** (`BuildScripts.Run`, das jeder Bau, `check`, `test`, `bench`, `--emit` vorher ruft), je Ziel nach `out/cache/bindings/<tripel>/<paket>/`, geladen wie `gen/` über eine Wurzel je Paket; neu nur, wo sich ein gelesener Header, `include`, `defines`, Ziel oder Werkzeug änderte (ein Schlüssel mit den Hashes jeder gelesenen Datei). Der Editor und `doc` lesen, was der letzte Bau für den Wirt schrieb | eine eigene Stufe je Verb (sieben Aufrufstellen) |
+| L4-2 | **`check` liest die Bäume, die seine Bindungen brauchen** — ein Modul, das `game.rl` importiert, wird sonst nicht geprüft. 15 §5 Regel 15 („`check` liest keinen“) wird darum enger: keinen außer für eine Bindung | Bindungen in `check` auslassen (der Importfehler wäre falsch) |
+| L4-3 | **Ein Zeiger in einem Feld** ist `Ptr<T>`, `CStr` oder der Funktionszeigertyp, nicht optional — 13 §3 Regel 4 nimmt in Feldern kein `?` (offener Punkt 289); C's `null` dort ist Sache des Programms. Als Parameter und Ergebnis `?Ptr<T>`/`?CStr` wie die Spec sagt | das Feld oder den Struct auslassen (raylib verlöre die Hälfte) |
+| L4-4 | **Mehrdimensionale Arrays** in Feldern werden flach: `float m[4][4]` → `float32[16]` — dasselbe Layout, und 13 §3 Regel 4 nimmt kein Array von Arrays | auslassen |
+| L4-5 | **Konstanten** sind `pub let`: ein Enum-Wert vom Ganzzahltyp seines Enums, ein ganzzahliges `#define` vom Typ, den C dem Literal gibt — `int32`, wo es passt (gemessen: als `int` ging `GeoAdd(GEO_MAX, 1)` nicht, `int` weitet nicht zu `int32`; `int32` weitet zu `int`) —, ein String-`#define` als `string`. Ein leeres `#define` (Include-Wächter) wird übergangen, ein anderes ohne Ganzzahl oder String aufgelistet | `const` (gibt es nicht) |
+| L4-6 | **Nur zig cc oder clang** schreibt den AST; mit gcc lehnt der Bau ab (`BLD0005`) und nennt `LYRIC_CC` | einen eigenen C-Parser |
+| L4-7 | **Kein Lint** schaut in das Modul (nicht nur `naming` und `dead-code`): es ist geschrieben, nicht verfasst — die Datei zählt wie eine fremde | `@Allow` an jeder Deklaration (`useless-allow` schlüge an) |
+| L4-9 | **Ein `string` geht auch in `?CStr`** (13 §3 Regel 3 erweitert): `const char *` ist als Parameter `?CStr`, und ohne die Regel ginge `InitWindow(800, 450, "Titel")` nicht — gemessen am ersten Modul. Ein String ist nie null, die Erweiterung verliert nichts | `const char *` als `CStr` (dann ginge `null` nicht, wo C es nimmt) |
+| L4-10 | **Namen der eingebauten Typen** bekommen ein `_` wie Lyrics Wörter: ein C-`typedef int string;` war `LYR-RES0011` im erzeugten Modul (gemessen) | — |
+| L4-8 | **`lyric bindgen <header> [--target <tripel>]`**: im Paket mit dessen `include` und `defines` für das Ziel, ein `@name/`-Pfad aus dessen Bäumen; außerhalb mit keinen | Optionen für `-I`/`-D` (eine zweite Stelle für das, was das Manifest sagt) |
 
 ## Nachtrag 2026-10-28 — der Plan für M15
 
@@ -1560,3 +1614,75 @@ sie geht, gegen einen lokalen Server, damit das Warten auf den Maintainer nichts
 **Nicht in M15**: Installer-Pakete je OS und Distributionspakete (Tür); ein Sysroot je Tripel (11 E5 — in S8
 bestätigt oder geplant, nicht gebaut); `lyric publish` und eine Paket-Registry (Türen, 07); Fortschritt beim Bau
 (Tür, P9); Tier 2 als Archiv der Toolchain; die Umbenennung `lyric5` → `lyric` (M18, 285 dort).
+
+**S3, beim Bauen entschieden** (2026-10-28):
+
+- **`bin` ist ein Link auf das Verzeichnis der Standardversion** — ein Symlink, unter Windows eine Junction —, nicht
+  der Link auf das Binary und unter Windows seine Kopie (P4). Das Binary findet `stdlib5/` und die Laufzeit neben
+  sich (`AppContext.BaseDirectory`); eine Kopie in `bin/` fände sie nicht, und ein Link auf das Verzeichnis ersetzt
+  beim Wechsel der Standardversion nie eine laufende `.exe`. Eine Junction braucht weder Recht noch Entwicklermodus.
+- **Ein eigener Mirror bringt seinen Schlüssel mit**: `LYRIC_MIRROR` ersetzt beide Quellen, `LYRIC_MIRROR_KEY` den
+  Schlüssel, gegen den geprüft wird (wie Gos `GOSUMDB` mit Name und Schlüssel); der Schlüssel allein wird
+  abgelehnt. Bis S6 trägt das Binary keinen Schlüssel — installiert wird dann nur von einem solchen Mirror, und
+  so prüfen die Tests gegen den lokalen Server.
+- **Auf GitHub wird nur zurückgefallen, wo der Mirror nicht antwortet**; eine Signatur oder ein Hash, die nicht
+  halten, sind ein Fehler, kein Umweg. Das Layout des Mirrors: `<base>/<kanal>.json` und die Archive unter
+  `<base>/<kanal>/` (S7 lädt so hoch).
+- Die Codes: `LYR-CLI0023` (nicht zu haben), `LYR-CLI0024` (nicht, was der Index sagt), `LYR-CLI0025` (die
+  installierten Toolchains lehnen die Änderung ab); alle Exit 2. `toolchain default` ohne Version sagt die
+  Standardversion. Die Prüfung auf `com.apple.quarantine` läuft im Test auf macOS.
+
+**S4, beim Bauen entschieden** (2026-10-28):
+
+- **Gelesen wird nur das Paket, in dem der Befehl läuft** (das um `-C` oder das Arbeitsverzeichnis), nicht der Graph:
+  den Graphen aufzulösen hieße vor dem Wechsel git zu fragen. Der Pin einer Abhängigkeit bleibt die Prüfung des
+  Baus (`LYR-PKG0009`), wie Go die `toolchain`-Zeile nur des Hauptmoduls liest.
+- **Ohne Terminal kein eigener Fehler vor dem Verb**: das Verb läuft und lehnt das Paket ab (`LYR-PKG0009`); die
+  Meldung nennt jetzt `lyric5 toolchain install stable`. So bleiben Verben, die kein Paket brauchen (`version`), auch
+  in einem gepinnten Paket benutzbar. Nie gewechselt wird bei `toolchain`, `help`, `explain`, `completions`, `new`,
+  `init`; das Angebot am Terminal nimmt nur den stabilen Kanal und nicht bei `version`.
+- **Weitergereicht wird die Befehlszeile, wie sie kam** — die globalen Optionen vor dem Verb eingeschlossen; unter
+  Unix mit `execve` und einer eigenen Umgebung (die verwaltete Umgebung von .NET erreicht `environ` nicht), unter
+  Windows als Kind, dessen Ctrl+C der Elternprozess wartend übergeht.
+- **Die Tests laufen im Testprozess**: ein Modulinitialisierer setzt `LYRIC_HOME` auf ein leeres Verzeichnis und
+  nimmt `LYRIC_TOOLCHAIN*` weg, sonst ersetzte ein `execve` den Testhost, wo `~/.lyric` etwas Passendes hält. Der
+  Wechsel selbst ist ein Prozesstest gegen einen Stellvertreter, den `zig cc` baut.
+- **Gemessen** (NativeAOT, Linux, warm, das Beste aus 5 × 20): der Stellvertreter allein 2,1 ms, `lyric5 version`
+  ohne Pin 21,2 ms, mit Pin an den Stellvertreter gereicht 20,9 ms — der Wechsel kostet einen `lyric5`-Start,
+  rund 19 ms, unter C9s 50 ms über dem Programmstart.
+
+**S5, beim Bauen entschieden** (2026-10-28):
+
+- **zig kommt über zigs Community-Mirrors**, wie zig es von einem Werkzeug verlangt: Name, Größe und SHA-256 aus
+  zigs `index.json`, die Mirrors aus `community-mirrors.txt` daneben, gemischt, jede Anfrage mit `?source=lyric`, die
+  Download-Seite zuletzt. Geprüft mit zigs minisign-Schlüssel (im Binary, wie ihn die Download-Seite nennt) und gegen
+  die Datei, die der trusted comment nennt — sonst reichte ein Mirror ein älteres signiertes Archiv unter dem Namen
+  eines neueren. Ein Mirror, dessen Archiv nicht hält, wird **übergangen**, anders als beim eigenen Mirror (S3):
+  zigs Mirrors sind Dritte, die Signatur ist zigs. Die Liste wird nicht zwischengespeichert (zig bittet um einen
+  Tag) — installiert wird einmal. `LYRIC_ZIG_MIRROR` mit `LYRIC_ZIG_MIRROR_KEY` ersetzt die Seite, wie
+  `LYRIC_MIRROR` (S3); so prüfen die Tests gegen einen lokalen Server.
+- **Ein eigener `.xz`-Leser** (`Xz` in `Lyric5.Toolchain`): .NET liest kein xz, und zigs Archive für Linux und macOS
+  gibt es nur so; das `tar` des Systems bräuchte `xz` daneben, das nicht jede Maschine hat. LZMA2 nach Pavlovs
+  Spezifikation, die Prüfsummen CRC32, CRC64 und SHA-256, Index und Fußzeile gegen die Blöcke; **nur der Filter
+  LZMA2** — zigs Archiv von 0.16.0 ist ein Block mit 64 MiB Wörterbuch und CRC64 (an seinen ersten Bytes
+  nachgesehen); BCJ und die anderen Filter werden abgelehnt. Gemessen an 320 MB aus `xz -9` (ein Block): 7,3 s
+  gegen 2,3 s für `xz -d`, dieselben Bytes — für eine einmalige Installation genug.
+- **`lyric env`** nennt `zig` getrennt vom C-Compiler, beide mit der Herkunft `installed` (unter dem Zuhause) oder
+  `PATH`, und jede Lint-Stufe als `lint.<name>` mit `command line`, `lyric.toml` oder `default`, dazu
+  `lint.warnDeps`; `env` nimmt dafür `-A`, `-W`, `-D` und `--warn-deps` — Punkt 248 ist zu.
+- Die Suche nach dem C-Compiler: `LYRIC_CC` > das installierte zig **der gepinnten Version** > `zig`, `clang`, `gcc`
+  auf dem PATH. Ein zig anderer Version unter `~/.lyric/zig/` zählt nicht. Nicht gebaut: `toolchain remove zig`
+  und eine andere als die gepinnte Version (Tür).
+
+**S8, beim Bauen entschieden** (2026-10-28): S8 ist dreigeteilt — S8a (250, 251), S8b (295), S8c (286, N7, E5, 252),
+je ein PR.
+
+- **250 — der ICE-Bericht**: `LYR-ICE0001` schreibt neben Meldung und Trace `lyric5-ice-<zeit>-<pid>.txt` unter
+  `out/` des Pakets, in dem der Befehl lief (sonst des Arbeitsverzeichnisses, sonst ins Temp-Verzeichnis), mit
+  Version, Befehl wie gegeben, Verzeichnis, Maschine, Stelle, Ausnahme und Trace, und nennt ihn
+  (`= note: a report to attach is in …`), wie rustc `rustc-ice-*.txt`. Die Form JSON (16 §4) bleibt, wie sie ist.
+- **251 — das Zeitlimit**: jeder Lauf des C-Compilers, des Archivers und des Linkers in `CBuild` hat ein Limit
+  (fünf Minuten, `CBuild.Limit`); wer es überschreitet, wird angehalten und ist `LYR-BLD0001` (Exit 2) mit Schritt,
+  Limit und Befehl — die Umgebung, kein ICE, auch im parallelen Übersetzen. Nach dem Frontend vergisst
+  `CompilerPosition` die Stelle (`End`), so dass ein Fehler auf der C-Seite keine veraltete „while lowering …“-Zeile
+  mehr trägt.

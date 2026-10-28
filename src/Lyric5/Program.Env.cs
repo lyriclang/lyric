@@ -1,4 +1,6 @@
 using System.Text.Json;
+using LintSettings = Lyric.Core.LintSettings;
+using DiagnosticCatalog = Lyric.Core.DiagnosticCatalog;
 using Lyric5.Build;
 using Lyric5.Toolchain;
 
@@ -18,7 +20,7 @@ public static partial class Program
     /// variable over the manifest over the default. It takes the options that change one —
     /// <c>--profile</c>, the fields, <c>--target</c> — so that what it says is what that build reads.
     /// </summary>
-    private static int Env(string[] args)
+    private static int Env(string[] args, LintArgs lints)
     {
         if (Verbs.Read(Verbs.Find("env")!, args, Unknown, out var unread) is not { } parsed) return unread;
         if (parsed.Words.Count > 0 || parsed.Rest is not null)
@@ -49,8 +51,15 @@ public static partial class Program
             new("manifest", manifest?.File ?? "(none: a file is a package of its own)", manifest is null ? "default" : "lyric.toml"),
         };
 
+        // the C compiler, and zig apart from it: the one installed under the home, else the PATH's
         var cc = Environment.GetEnvironmentVariable("LYRIC_CC");
-        settings.Add(new("cc", CCompiler.Locate()?.ToString() ?? "none found", cc is { Length: > 0 } ? "LYRIC_CC" : "default"));
+        var home = LyricHome.Root;
+        var compiler = CCompiler.Locate(cc, home);
+        var installed = CCompiler.InstalledZig(home);
+        string Where(CCompiler found) => installed is not null && found.Path == installed.Path ? "installed" : "PATH";
+        settings.Add(new("cc", compiler?.ToString() ?? "none found", cc is { Length: > 0 } ? "LYRIC_CC" : compiler is null ? "default" : Where(compiler)));
+        var zig = installed ?? CCompiler.Locate(CCompilerKind.Zig);
+        settings.Add(new("zig", zig?.ToString() ?? $"none found (lyric5 toolchain install zig installs {LyricHome.ZigVersion})", zig is null ? "default" : Where(zig)));
         var cache = Environment.GetEnvironmentVariable("LYRIC_CACHE");
         settings.Add(new("cache", UserCache.Root, cache is { Length: > 0 } ? "LYRIC_CACHE" : "default"));
 
@@ -86,6 +95,18 @@ public static partial class Program
             return Unknown($"unknown target '{values["--target"]}': {string.Join(", ", Target.Tier1.Select(t => t.Triple))}");
         }
         settings.Add(new("target", target.Triple, values.ContainsKey("--target") ? "command line" : "default"));
+
+        // each lint at the level a build of the package gives it: -A/-W/-D over [lints] over its own
+        var manifestLints = manifest?.Lints ?? [];
+        var levels = new LintSettings(lints.Rules, manifestLints);
+        foreach (var (lintName, lint) in DiagnosticCatalog.Lints.OrderBy(l => l.Key, StringComparer.Ordinal))
+        {
+            var origin = new LintSettings(lints.Rules, []).LevelOf(lint).Origin is not null ? "command line"
+                : new LintSettings([], manifestLints).LevelOf(lint).Origin is not null ? "lyric.toml"
+                : "default";
+            settings.Add(new($"lint.{lintName}", levels.LevelOf(lint).Level.ToString().ToLowerInvariant(), origin));
+        }
+        settings.Add(new("lint.warnDeps", lints.WarnDeps ? "true" : "false", lints.WarnDeps ? "command line" : "default"));
 
         // the variables of the family that are set, those read above among them
         foreach (System.Collections.DictionaryEntry variable in Environment.GetEnvironmentVariables())

@@ -19,6 +19,13 @@ public sealed record Target(string Triple, string Arch, TargetOs Os)
         Parse("x86_64-macos"),
     ];
 
+    /// <summary>The targets that build and are not tested: Tier 2.</summary>
+    public static readonly IReadOnlyList<Target> Tier2 =
+    [
+        Parse("x86_64-linux-musl"),
+        Parse("aarch64-windows-gnu"),
+    ];
+
     public static Target Parse(string triple)
     {
         var parts = triple.Split('-');
@@ -37,12 +44,14 @@ public sealed record Target(string Triple, string Arch, TargetOs Os)
         return new Target(triple, parts[0], os);
     }
 
-    /// <summary>The machine this process runs on, as a triple.</summary>
+    /// <summary>The machine this process runs on, as a triple. The process's architecture, not the
+    /// operating system's: an x86_64 toolchain under Rosetta or Windows' emulation builds for
+    /// x86_64, the target its archive carries the runtime for.</summary>
     public static Target Host
     {
         get
         {
-            var arch = RuntimeInformation.OSArchitecture switch
+            var arch = RuntimeInformation.ProcessArchitecture switch
             {
                 Architecture.X64 => "x86_64",
                 Architecture.Arm64 => "aarch64",

@@ -7,7 +7,7 @@ C into one native binary, so besides the toolchain you need a C compiler.
 
 Lyric 5 is in development; nothing is released yet. Every change to `main` is built into the `dev`
 prerelease on GitHub: <https://github.com/lyriclang/lyric/releases/tag/dev>. Take the archive for
-your system — Linux (x64 or ARM64), macOS (ARM64) or Windows (x64) — and unpack it where you keep
+your system — Linux (x64 or ARM64), macOS (ARM64 or x64) or Windows (x64) — and unpack it where you keep
 tools:
 
 ```sh
@@ -20,8 +20,10 @@ The archive holds the command `lyric5`, the standard library and the runtime's C
 first release the command is called `lyric5`; this Book writes `lyric`, and every `lyric` here is
 `lyric5` for now.
 
-The C compiler is `zig`, version 0.16.0, from <https://ziglang.org/download/>, on your `PATH`;
-clang or gcc work too. `lyric5 --version` says which one it found:
+The C compiler is `zig`, version 0.16.0. `lyric5 toolchain install zig` fetches it from zig's
+mirrors, checks zig's signature and puts it under `~/.lyric`, where `lyric` looks before your
+`PATH`; a zig, clang or gcc on the `PATH` works too, and `LYRIC_CC` names one over both.
+`lyric5 --version` says which one it found:
 
 ```text
 $ lyric5 --version
@@ -30,8 +32,41 @@ lyric 5.0.0-dev.20261023+6d7bd38
   c compiler  zig 0.16.0 (/usr/bin/zig)
 ```
 
-The first build of a program also builds the runtime for your system, once; it takes a little
-longer than the ones after it.
+The runtime comes prebuilt for your system. A build with another C compiler than zig 0.16.0, for another
+target, or with another collector or a sanitizer builds it from its source first, once; that build
+takes a little longer than the ones after it.
+
+## Several toolchains
+
+`lyric toolchain` keeps toolchains side by side under `~/.lyric` (`LYRIC_HOME` puts them elsewhere)
+and checks each before it is in place: the channel's list is signed, and every archive is checked
+against it. `~/.lyric/bin` on your `PATH` runs the default:
+
+```sh
+lyric toolchain install stable     # or dev, or a version such as 5.0.0
+lyric toolchain list               # the installed ones; --available, what the channels offer
+lyric toolchain default 5.0.0
+lyric toolchain update             # the newest of the default's channel, beside it
+```
+
+A package can name the least toolchain it needs, in `lyric.toml`:
+
+```toml
+[package]
+name = "hello"
+version = "0.1.0"
+toolchain = "5.1"
+```
+
+A command in that package then runs with an installed toolchain that is 5.1 or later — the default
+where it is — whichever one you started; at a terminal, one is offered for installing where none
+is. `LYRIC_TOOLCHAIN=local` runs the one you started, and `LYRIC_TOOLCHAIN=5.1.0` a version.
+
+The channels are published from the first signed release on; until then `lyric toolchain` installs
+only from a mirror of your own, which `LYRIC_MIRROR` names with its key in `LYRIC_MIRROR_KEY`.
+
+`lyric env` says what a build here reads and where each value comes from — the C compiler and zig
+(`installed` or `PATH`), the profile, and each lint's level with who set it (`-D`, `[lints]`).
 
 ## A package
 

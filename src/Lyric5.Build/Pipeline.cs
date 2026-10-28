@@ -93,6 +93,7 @@ public static class Pipeline
             PackageDependencies = project.DeclaredDependencies,
             PackageTestRoots = project.TestRoot is { } tests ? new Dictionary<string, string> { [project.Name] = tests } : null,
             PackageGenRoots = GenRoots(project),
+            PackageBindingRoots = Bindings.Roots(project, target),
             Optimize = profile is { Opt: >= 2 },
             // 'comptime' computes as the binary would, each site within the root
             // manifest's budget
@@ -245,6 +246,8 @@ public static class Pipeline
             // a library's code, the runtime's too, as a library's must be (LinkageOf)
             var profile = project.Library is { } kind ? request.Profile with { Linkage = LinkageOf(kind, request.Target) } : request.Profile;
             var archive = RuntimeArchive.For(request.Compiler, request.Target, profile, request.ToolchainVersion);
+            // what fails from here on is the C side's, at no declaration of the program
+            Lyric.Core.CompilerPosition.End();
             var build = new CBuild(request.Compiler, request.Target, profile, project.CacheDir);
             var runtimeRoot = RuntimeArchive.SourceRoot()!;
             // The program's units carry what the profile asks of the program alone (fast-math), and
@@ -252,11 +255,24 @@ public static class Pipeline
             var paths = PathMaps(project, runtimeRoot);
             var units = sources.Select(path => new CUnit(path, [], [RuntimeLayout.IncludeDir(runtimeRoot)],
                 ExtraFlags: [.. request.Profile.ProgramFlags, .. paths])).ToList();
-            var (native, libraries) = Native(project, request.Target, paths);
+            NativeLink? read;
+            try { read = Native(project, request.Target, paths, RuntimeLayout.IncludeDir(runtimeRoot), directives, error); }
+            catch (ManifestException refused)
+            {
+                // a source tree that cannot be read, or is not what its hash or the lock says
+                Say.Manifest(error, refused);
+                return (refused.Exit, null);
+            }
+            if (read is not { } native) return (1, null);
+            var libraries = native.Libraries;
             foreach (var library in directives.Libraries)
                 if (!libraries.Contains(library)) libraries.Add(library);
             var scripts = directives.Sources.Select(unit => unit with { ExtraFlags = [.. unit.ExtraFlags ?? [], .. paths] }).ToList();
-            var objects = build.Compile([.. units, .. native, .. scripts]);
+            var objects = build.Compile([.. units, .. native.Units, .. scripts]);
+            var linkPaths = new LinkPaths(directives.SearchDirs, OwnDirFirst: native.Beside.Count > 0);
+            // The packages' archives and shared libraries after the objects that call them, by their
+            // paths; the runtime after them all, which their C may call through lyric.h.
+            string[] prebuilt = [.. native.Archives, .. native.Dylibs.Select(d => d.Linked)];
             if (project.Library is { } libraryKind)
             {
                 // The archive holds the runtime too: a C program links one file and the libraries the
@@ -268,19 +284,25 @@ public static class Pipeline
                     var runtime = RuntimeArchive.Objects(request.Compiler, request.Target, profile, request.ToolchainVersion);
                     File.Copy(build.Archive([.. objects, .. runtime], Path.Combine(project.CacheDir, "lib", $"lib{project.Name}.a")), file, overwrite: true);
                 }
-                else build.LinkShared([.. objects, archive], file, libraries);
+                else build.LinkShared([.. objects, .. prebuilt, archive], file, libraries, linkPaths);
                 File.Copy(header, project.HeaderFile(request.Profile, request.Target), overwrite: true);
+                // what the library needs when it runs lies beside it, as beside a program
+                PutBeside(native.Beside, file);
                 return (0, file);
             }
             var executable = project.Executable(request.Profile, request.Target);
-            string[] inputs = [.. objects, archive];
+            string[] inputs = [.. objects, .. prebuilt, archive];
             var record = Path.Combine(project.CacheDir, $"{project.BinaryName}-{Key(executable)}.link");
-            if (!UpToDate(executable, record, inputs, libraries))
+            // a prebuilt file is held by its bytes: one replaced under the same time is a new link
+            var prebuiltFiles = native.Archives.Concat(native.Dylibs.SelectMany(d => d.ImportLibrary is null ? [d.File] : new[] { d.File, d.ImportLibrary }));
+            var lines = LinkLines(inputs, libraries, linkPaths, prebuiltFiles);
+            if (!UpToDate(executable, record, inputs, lines))
             {
-                build.LinkExecutable(inputs, executable, libraries);
-                File.WriteAllText(record, LinkLines(inputs, libraries));
+                build.LinkExecutable(inputs, executable, libraries, linkPaths);
+                File.WriteAllText(record, lines);
             }
             if (File.Exists(names)) File.Copy(names, NamesOf(executable), overwrite: true);
+            PutBeside(native.Beside, executable);
             return (0, executable);
         }
         catch (CBuildException failure)
@@ -301,22 +323,134 @@ public static class Pipeline
         _ => ["-fPIC", "-fvisibility=hidden", "-DLYRIC_BUILDING_SHARED"],
     };
 
-    /// <summary>The native parts of the program's packages for the target: their C
-    /// sources, each with its package's include directories, and their libraries, each once.</summary>
-    private static (List<CUnit> Units, List<string> Libraries) Native(Project project, Target target, IReadOnlyList<string> paths)
+    /// <summary>What the native parts of the program's packages bring for one target: the C units,
+    /// the archives and shared libraries by their full paths, the libraries by name, each once where it
+    /// first stands, and the files that go beside the binary — the shared libraries' and the build
+    /// scripts'.</summary>
+    private sealed record NativeLink(
+        List<CUnit> Units, List<string> Archives, List<Dylib> Dylibs, List<string> Libraries, List<string> Beside);
+
+    /// <summary>
+    /// The native parts of the program's packages for the target (spec 15 §5), in link order: the
+    /// packages before the packages they depend on, the root's first (<see cref="LinkOrder"/>). A
+    /// package's sources see its <c>include</c>, <c>&lt;lyric.h&gt;</c>, and the <c>include</c> of each
+    /// package it declares — not of those that one depends on — and get its <c>defines</c>. A path
+    /// <c>@name/…</c> lies in the package's source tree <c>name</c>, read here, where the target
+    /// needs it, and only here (spec 15 §5.3).
+    /// <c>null</c> after reporting: a prebuilt file that is not there or not the package's, two
+    /// files of one name beside the binary, a Mach-O library the binary would not find beside it.
+    /// </summary>
+    /// <exception cref="ManifestException">A source tree cannot be read, or is not what its hash or the lock says.</exception>
+    private static NativeLink? Native(Project project, Target target, IReadOnlyList<string> paths, string runtimeInclude,
+        ScriptDirectives directives, TextWriter error)
     {
-        var units = new List<CUnit>();
-        var libraries = new List<string>();
-        if (project.Graph is not { } graph) return (units, libraries);
-        foreach (var manifest in graph.Packages.Values.OrderBy(m => m.Name, StringComparer.Ordinal))
+        var link = new NativeLink([], [], [], [], []);
+        if (project.Graph is { } graph)
         {
-            var part = manifest.NativeOn(target.Os);
-            var include = part.Include.Select(directory => Path.Combine(manifest.Root, directory)).ToList();
-            units.AddRange(part.SourceFiles(manifest.Root).Select(file => new CUnit(file, [], include, ExtraFlags: paths)));
-            foreach (var library in part.Libs)
-                if (!libraries.Contains(library)) libraries.Add(library);
+            string Tree(Manifest manifest, string name) => graph.Trees is { } trees
+                ? trees.Directory(manifest, name)
+                : throw new InvalidOperationException("a graph read without its lock has no source trees");
+            string Full(Manifest manifest, string path) => NativePart.TreePath(path) is { } tree
+                ? Path.Combine(Tree(manifest, tree.Name), tree.Within)
+                : Path.Combine(manifest.Root, path);
+            foreach (var manifest in LinkOrder(graph))
+            {
+                var part = manifest.NativeFor(target);
+                List<string> include = [.. part.Include.Select(directory => Full(manifest, directory)), runtimeInclude];
+                foreach (var dependency in manifest.Dependencies.Select(d => d.Name).Distinct().Order(StringComparer.Ordinal))
+                    if (graph.Packages.TryGetValue(dependency, out var declared))
+                        include.AddRange(declared.NativeFor(target).Include.Select(directory => Full(declared, directory)));
+                link.Units.AddRange(part.SourceFiles(manifest.Root, name => Tree(manifest, name))
+                    .Select(file => new CUnit(file, part.Defines, include, ExtraFlags: paths)));
+                foreach (var archive in part.Archives)
+                {
+                    if (Prebuilt(manifest, archive, Full(manifest, archive), "archives", error) is not { } full) return null;
+                    if (!link.Archives.Contains(full)) link.Archives.Add(full);
+                }
+                foreach (var dylib in part.Dylibs)
+                {
+                    if (Prebuilt(manifest, dylib.File, Full(manifest, dylib.File), "dylibs", error) is not { } file) return null;
+                    string? import = null;
+                    if (dylib.ImportLibrary is { } lib && (import = Prebuilt(manifest, lib, Full(manifest, lib), "dylibs", error)) is null) return null;
+                    if (target.Os == TargetOs.MacOs && MachO.InstallName(file) is { } name && !name.StartsWith("@rpath/", StringComparison.Ordinal))
+                    {
+                        Say.Error(error, "LYR-BLD0006",
+                            $"{manifest.Name}'s '{dylib.File}' names itself '{name}', so a binary would not find it beside itself — "
+                            + $"give it the install name '@rpath/{Path.GetFileName(file)}' (install_name_tool -id @rpath/{Path.GetFileName(file)} {dylib.File}, or link it with -Wl,-install_name,@rpath/{Path.GetFileName(file)})");
+                        return null;
+                    }
+                    if (target.Os == TargetOs.Linux && Elf.HasSoname(file) == false)
+                    {
+                        Say.Error(error, "LYR-BLD0006",
+                            $"{manifest.Name}'s '{dylib.File}' has no soname, so a binary would record the path it was linked from and "
+                            + $"not find it beside itself — give it one (patchelf --set-soname {Path.GetFileName(file)} {dylib.File}, or link it with -Wl,-soname,{Path.GetFileName(file)})");
+                        return null;
+                    }
+                    var full = new Dylib(file, import);
+                    if (!link.Dylibs.Contains(full)) link.Dylibs.Add(full);
+                }
+                foreach (var library in part.Libs)
+                    if (!link.Libraries.Contains(library)) link.Libraries.Add(library);
+            }
+            // a tree lies in the user's cache: its sources are named by their package and tree, as
+            // the packages' are by their names, wherever the cache is
+            if (graph.Trees?.Read.ToList() is { Count: > 0 } read)
+            {
+                string[] maps = [.. read.Select(t => $"-ffile-prefix-map={Path.TrimEndingDirectorySeparator(t.Directory)}={t.Package}/@{t.Name}")];
+                for (var i = 0; i < link.Units.Count; i++)
+                    link.Units[i] = link.Units[i] with { ExtraFlags = [.. link.Units[i].ExtraFlags ?? [], .. maps] };
+            }
         }
-        return (units, libraries);
+        // what lies beside the binary: the shared libraries, then what the scripts put there
+        var beside = link.Dylibs.Select(d => (d.File, Whose: "[native] dylibs"))
+            .Concat(directives.Beside.Select(file => (File: file, Whose: "build.besideBinary"))).ToList();
+        foreach (var clash in beside.GroupBy(b => Path.GetFileName(b.File), BuildScripts.FileNames).Where(g => g.Count() > 1))
+        {
+            Say.Error(error, "LYR-BLD0006",
+                $"two files named '{clash.Key}' would lie beside the binary: {string.Join(" and ", clash.Select(b => $"'{b.File}' ({b.Whose})"))}");
+            return null;
+        }
+        link.Beside.AddRange(beside.Select(b => b.File).Distinct());
+        return link;
+    }
+
+    /// <summary>A prebuilt file a manifest names, by its full path; <c>null</c> after reporting where
+    /// it is not there, or not part of the package's content — what the package is when it is
+    /// read from git, and what the lock holds the bytes of (spec 15 §5 rule 7). A tree's file is no
+    /// part of the content: it has only to be there.</summary>
+    private static string? Prebuilt(Manifest manifest, string path, string place, string key, TextWriter error)
+    {
+        if (NativePart.TreePath(path) is null && !PackageContent.Holds(manifest, path))
+        {
+            Say.Error(error, "LYR-PKG0002",
+                $"{manifest.Name}'s '{path}' in '{key}' is not part of the package's content: put it under native/, or name it in [package] include");
+            return null;
+        }
+        var full = Path.GetFullPath(place);
+        if (File.Exists(full)) return full;
+        Say.Error(error, "LYR-PKG0002", $"{manifest.Name}'s manifest names '{path}' in '{key}', and there is no such file");
+        return null;
+    }
+
+    /// <summary>The packages in link order: each before the packages it depends on, the root first —
+    /// a single-pass linker then finds every symbol after the code that asks for it. Of two that do
+    /// not depend on each other, the one with the lesser name first.</summary>
+    internal static IReadOnlyList<Manifest> LinkOrder(PackageGraph graph)
+    {
+        var done = new HashSet<string>(StringComparer.Ordinal);
+        var after = new List<Manifest>();
+        void Visit(Manifest manifest)
+        {
+            if (!done.Add(manifest.Name)) return;
+            // the greater names first: the order is reversed below
+            foreach (var name in manifest.Dependencies.Select(d => d.Name).OrderDescending(StringComparer.Ordinal))
+                if (graph.Packages.TryGetValue(name, out var dependency)) Visit(dependency);
+            after.Add(manifest);
+        }
+        Visit(graph.Root);
+        foreach (var manifest in graph.Packages.Values.OrderByDescending(m => m.Name, StringComparer.Ordinal)) Visit(manifest);
+        after.Reverse();
+        return after;
     }
 
     /// <summary>
@@ -449,6 +583,7 @@ public static class Pipeline
         {
             StdlibRoot = StdlibRoot, PackageRoots = library.Graph.SourceRoots,
             PackageDependencies = library.Graph.Declared,
+            PackageBindingRoots = Bindings.Roots(Path.Combine(manifest.Root, "out", "cache"), library.Graph, null),
             LintLevels = LintLevelsOf(levels, manifest.Name, profile), RootPackage = manifest.Name,
             WarnDeps = (lints ?? LintArgs.None).WarnDeps,
         };
@@ -501,6 +636,7 @@ public static class Pipeline
         {
             StdlibRoot = StdlibRoot, PackageRoots = graph.SourceRoots,
             PackageDependencies = graph.Declared,
+            PackageBindingRoots = Bindings.Roots(Path.Combine(manifest.Root, "out", "cache"), graph, null),
             LintLevels = LintLevelsOf(levels, manifest.Name, null), RootPackage = manifest.Name,
             WarnDeps = (lints ?? LintArgs.None).WarnDeps,
         });
@@ -553,16 +689,40 @@ public static class Pipeline
     /// content-keyed and cached, so a build that goes back to inputs built earlier — the other
     /// collector's archive, a profile field and back — finds every one older than the
     /// binary the other inputs made.</summary>
-    private static bool UpToDate(string executable, string record, IReadOnlyList<string> inputs, IReadOnlyList<string> libraries)
+    private static bool UpToDate(string executable, string record, IReadOnlyList<string> inputs, string lines)
     {
         if (!File.Exists(executable)) return false;
-        if (!File.Exists(record) || File.ReadAllText(record) != LinkLines(inputs, libraries)) return false;
+        if (!File.Exists(record) || File.ReadAllText(record) != lines) return false;
         var linked = File.GetLastWriteTimeUtc(executable);
         return inputs.All(input => File.GetLastWriteTimeUtc(input) <= linked);
     }
 
-    private static string LinkLines(IEnumerable<string> inputs, IEnumerable<string> libraries) =>
-        string.Join("\n", inputs.Concat(libraries.Select(library => "-l" + library))) + "\n";
+    /// <summary>The link a binary was made by, a line each: its inputs, where it searched, the
+    /// libraries by name — and the SHA-256 of each file in <paramref name="held"/>, the prebuilt
+    /// ones a package brings, which nothing names by their content otherwise (spec 15 §5 rule 12).</summary>
+    private static string LinkLines(IEnumerable<string> inputs, IEnumerable<string> libraries, LinkPaths paths,
+        IEnumerable<string>? held = null) =>
+        string.Join("\n", inputs
+            .Concat(paths.SearchDirs.Select(dir => "-L" + dir))
+            .Concat(libraries.Select(library => "-l" + library))
+            .Concat(paths.OwnDirFirst ? ["own-dir-first"] : [])
+            .Concat((held ?? []).Select(file => $"sha256 {System.Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file)))} {file}"))) + "\n";
+
+    /// <summary>The files the build scripts put beside the binary, copied into its directory under
+    /// their own names — each only where what lies there is not already the same bytes, so an
+    /// up-to-date build touches nothing.</summary>
+    private static void PutBeside(IReadOnlyList<string> files, string executable)
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(executable))!;
+        foreach (var file in files)
+        {
+            var target = Path.Combine(dir, Path.GetFileName(file));
+            if (File.Exists(target) && new FileInfo(target).Length == new FileInfo(file).Length
+                && File.ReadAllBytes(target).AsSpan().SequenceEqual(File.ReadAllBytes(file)))
+                continue;
+            File.Copy(file, target, overwrite: true);
+        }
+    }
 
     internal static string Key(params string[] parts)
     {
