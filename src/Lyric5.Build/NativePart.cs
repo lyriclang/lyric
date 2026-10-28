@@ -28,6 +28,11 @@ public sealed record VendorTree(string Name, GitSource? Git, string? Url, string
     public string Describe() => Git?.ToString() ?? Url!;
 }
 
+/// <summary>A module of the package made from a C header (spec 15 §5.4): <c>{ header = "…", module = "rl" }</c>.</summary>
+/// <param name="Header">A path of the package or of a source tree.</param>
+/// <param name="Module">The module's path within the package, its segments joined by dots.</param>
+public sealed record Binding(string Header, string Module);
+
 /// <summary>
 /// The native part of a package: C sources compiled with the program
 /// under its profile, the directories their includes are found in, their definitions, and what the
@@ -41,15 +46,17 @@ public sealed record VendorTree(string Name, GitSource? Git, string? Url, string
 /// <param name="Archives">Prebuilt static libraries, paths of the package, linked by their path.</param>
 /// <param name="Dylibs">Prebuilt shared libraries, linked by their path and put beside the binary.</param>
 /// <param name="Defines">The sources' preprocessor definitions, <c>NAME</c> or <c>NAME=value</c>.</param>
+/// <param name="Bindings">The modules made from its headers.</param>
 public sealed partial record NativePart(
     IReadOnlyList<string> Sources,
     IReadOnlyList<string> Include,
     IReadOnlyList<string> Libs,
     IReadOnlyList<string> Archives,
     IReadOnlyList<Dylib> Dylibs,
-    IReadOnlyList<string> Defines)
+    IReadOnlyList<string> Defines,
+    IReadOnlyList<Binding> Bindings)
 {
-    public static readonly NativePart None = new([], [], [], [], [], []);
+    public static readonly NativePart None = new([], [], [], [], [], [], []);
 
     private static readonly Dictionary<string, TargetOs> Systems = new(StringComparer.Ordinal)
     {
@@ -65,7 +72,8 @@ public sealed partial record NativePart(
     /// <summary>This part with <paramref name="more"/> on top.</summary>
     public NativePart With(NativePart more) =>
         new([.. Sources, .. more.Sources], [.. Include, .. more.Include], [.. Libs, .. more.Libs],
-            [.. Archives, .. more.Archives], [.. Dylibs, .. more.Dylibs], [.. Defines, .. more.Defines]);
+            [.. Archives, .. more.Archives], [.. Dylibs, .. more.Dylibs], [.. Defines, .. more.Defines],
+            [.. Bindings, .. more.Bindings]);
 
     /// <summary><c>[native]</c>, its tables per operating system and per triple, and its source
     /// trees, checked: a path <c>@name/…</c> names a tree <c>[native.vendor]</c> holds.</summary>
@@ -110,7 +118,8 @@ public sealed partial record NativePart(
     /// <summary>Every path this part names, with its key — the patterns of <c>sources</c> among them.</summary>
     public IEnumerable<(string Key, string Path)> Paths() =>
         Sources.Select(s => ("sources", s)).Concat(Include.Select(i => ("include", i))).Concat(Archives.Select(a => ("archives", a)))
-            .Concat(Dylibs.SelectMany(d => d.ImportLibrary is null ? [d.File] : new[] { d.File, d.ImportLibrary }).Select(d => ("dylibs", d)));
+            .Concat(Dylibs.SelectMany(d => d.ImportLibrary is null ? [d.File] : new[] { d.File, d.ImportLibrary }).Select(d => ("dylibs", d)))
+            .Concat(Bindings.Select(b => ("bindings", b.Header)));
 
     /// <summary>A path of a source tree, <c>@name/rest</c>: the tree's name and the path within it —
     /// empty for the tree's root; <c>null</c> for a path of the package.</summary>
@@ -178,7 +187,7 @@ public sealed partial record NativePart(
     {
         foreach (var key in table.Keys)
         {
-            if (key is "sources" or "include" or "libs" or "archives" or "defines") continue;
+            if (key is "sources" or "include" or "libs" or "archives" or "defines" or "bindings") continue;
             if (key == "dylibs" && os is not null) continue;
             if (os is null && (Systems.ContainsKey(key) || Triples.ContainsKey(key))) continue;
             if (os is null && table.TryGet(key, out var value) && value is TomlTable) continue; // refused by Read, with its name
@@ -206,7 +215,33 @@ public sealed partial record NativePart(
             Strings("archives", ArchiveRefusal, "paths of the package's static libraries"),
             os is { } system ? ReadDylibs(table, where, file, system) : [],
             Strings("defines", d => DefinePattern().IsMatch(d) ? null : "is no definition: NAME or NAME=value, NAME a C identifier",
-                "definitions"));
+                "definitions"),
+            ReadBindings(table, where, file));
+    }
+
+    /// <summary><c>bindings = [{ header = "…", module = "rl" }]</c>: a header of the package or of a
+    /// tree, and a module path of segments as a package's modules have.</summary>
+    private static List<Binding> ReadBindings(TomlTable table, string where, string file)
+    {
+        if (!table.TryGet("bindings", out var value)) return [];
+        const string form = "tables { header = \"native/x.h\", module = \"x\" }";
+        if (value is not TomlArray list)
+            throw new ManifestException("LYR-PKG0002", file, table.Line, 1, $"'bindings' of [{where}] is an array of {form}");
+        var bindings = new List<Binding>();
+        foreach (var entry in list)
+        {
+            if (entry is not TomlTable pair || pair.Keys.Any(k => k is not ("header" or "module"))
+                || !pair.TryGet("header", out var header) || header is not string headerPath
+                || !pair.TryGet("module", out var module) || module is not string modulePath)
+                throw new ManifestException("LYR-PKG0002", file, table.Line, 1, $"an entry of 'bindings' in [{where}] is not one of {form}");
+            if (!IsPath(headerPath))
+                throw new ManifestException("LYR-PKG0002", file, table.Line, 1, $"'{headerPath}' in 'bindings' of [{where}] is no path of the package or a tree's");
+            if (!ModulePathPattern().IsMatch(modulePath))
+                throw new ManifestException("LYR-PKG0002", file, table.Line, 1,
+                    $"'{modulePath}' in 'bindings' of [{where}] is no module path: segments of a lowercase letter, then letters, digits and '_', joined by '.'");
+            bindings.Add(new Binding(headerPath, modulePath));
+        }
+        return bindings;
     }
 
     /// <summary>Why an entry of <c>archives</c> is refused, or <c>null</c>: a path of the package,
@@ -292,6 +327,9 @@ public sealed partial record NativePart(
 
     [GeneratedRegex("^[a-z][A-Za-z0-9_-]*$")]
     private static partial Regex TreeNamePattern();
+
+    [GeneratedRegex(@"^[a-z][A-Za-z0-9_]*(\.[a-z][A-Za-z0-9_]*)*$")]
+    private static partial Regex ModulePathPattern();
 
     [GeneratedRegex("^(https?|file)://.+", RegexOptions.IgnoreCase)]
     private static partial Regex TreeUrlPattern();

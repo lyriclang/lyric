@@ -93,6 +93,7 @@ public static class Pipeline
             PackageDependencies = project.DeclaredDependencies,
             PackageTestRoots = project.TestRoot is { } tests ? new Dictionary<string, string> { [project.Name] = tests } : null,
             PackageGenRoots = GenRoots(project),
+            PackageBindingRoots = Bindings.Roots(project, target),
             Optimize = profile is { Opt: >= 2 },
             // 'comptime' computes as the binary would, each site within the root
             // manifest's budget
@@ -580,6 +581,7 @@ public static class Pipeline
         {
             StdlibRoot = StdlibRoot, PackageRoots = library.Graph.SourceRoots,
             PackageDependencies = library.Graph.Declared,
+            PackageBindingRoots = Bindings.Roots(Path.Combine(manifest.Root, "out", "cache"), library.Graph, null),
             LintLevels = LintLevelsOf(levels, manifest.Name, profile), RootPackage = manifest.Name,
             WarnDeps = (lints ?? LintArgs.None).WarnDeps,
         };
@@ -632,6 +634,7 @@ public static class Pipeline
         {
             StdlibRoot = StdlibRoot, PackageRoots = graph.SourceRoots,
             PackageDependencies = graph.Declared,
+            PackageBindingRoots = Bindings.Roots(Path.Combine(manifest.Root, "out", "cache"), graph, null),
             LintLevels = LintLevelsOf(levels, manifest.Name, null), RootPackage = manifest.Name,
             WarnDeps = (lints ?? LintArgs.None).WarnDeps,
         });

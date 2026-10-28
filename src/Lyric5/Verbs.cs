@@ -98,6 +98,8 @@ internal static class Verbs
              Dir, Offline]),
         new("remove", "<name>", "take the dependency, or with --vendor the source tree, out of lyric.toml",
             [new("--vendor", null, "a source tree of [native.vendor], not a package"), Dir, Offline]),
+        new("bindgen", "<header>", "write the module a C header makes to standard output, with the package's include and defines",
+            [Target, Dir, Offline]),
         new("clean", "", "remove the package's out/", [Dir]),
         new("metadata", "", "the package as JSON: its graph, programs, profiles, targets",
             [Dir, Offline, new("--json", null, "the one form there is")]),
