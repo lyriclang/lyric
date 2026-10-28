@@ -1385,6 +1385,35 @@ native Script-VM steht); `lyr_gc_stats` für Stellschrauben (Tür, 01).
 
 *Nachtrag 2026-10-28:* `lyric bindgen` ist mit M14b entschieden (11 „Review 2026-10-28“ N2) und dort geplant.
 
+### Nachtrag 2026-10-28 — der Abschluss von M14
+
+Die Zeile hält: `examples/ffi` bindet seine C-Bibliothek und lädt sein Plugin, `examples/embedded-host` ist ein
+C-Programm gegen `libtally.a` und gegen die DLL, beide im vollen Plattformlauf; Spec 13 hat §2–§6. Was anders kam als
+geplant:
+
+- **Geschnitten**: S4 in a (Typ, Trampoline, Park, Panik), b (`Callback`, userdata) und c (`stash`, K4); S5 in a
+  (`GcHandle`) und b (fremde Threads); S6 in a/b/c nach Modulen, weil die Senkung die Helfer von string, core und
+  task beim Namen ruft.
+- **P2**: der Funktionszeiger-Typ kam mit S4, seiner ersten Nutzung, nicht mit S1 (offener Punkt 291).
+- **P4**: die Form von `Callback` hat der Maintainer gewählt — der C-Typ ausgeschrieben,
+  `Callback<extern "C" fn(Ptr<void>, int) -> void>.new(…)`, statt eines aus der Closure abgeleiteten.
+- **P5**: `Callback.new(closure, thread: …)` ist nicht gebaut; der Besitzer ist der Thread, der `new` ruft
+  (offener Punkt 297).
+- **P6**: 28 Zeilen bleiben, je dokumentiert — mehr als „die Makros“: die Starter, `schedulerRuns`, die
+  StringView-Helfer, die der Header `static inline` hält.
+- **P7**: `--lib` und `--lib --shared` statt `--lib=static|shared`; `lyr_init` antwortet `LyrStatus`.
+- **P8**: eine Panik ist `LYR_PANIC` nur in einem werfenden Export, in einem anderen endet der Prozess (offener
+  Punkt 298, entschieden); ein Export, den Lyric durch C erreicht, läuft im laufenden Task, eine Panik dort endet
+  den Prozess, auch unter einem äußeren Export (299, entschieden; K4).
+- **P9**: wie geplant; Linux linkt `-ldl`. `symbol<F>` senkt auf die Adresse — der Wert eines C-Funktionszeigers ist
+  ein `uint`, `?F` also `?uint`, nichts wandelt.
+- **Gefunden**: der Plattformlauf fand in S5b ein Rennen im ersten Zug des Schedulers; der Formatter-Beweis lief
+  an einem `extern "C" { … }`-Block im Kreis (die Rückreferenz `ExternSpec.Block`), sobald ein Beispiel einen hatte.
+- **Zu entscheiden, je „entscheiden oder Tür“**: 287 (Werte an `@Layout`-Enums), 288 (ein Enum als Feld), 289
+  (`?Ptr`/`?CStr` als Feld, die Nische), 292 (ein Lint für ein `unsafe` ohne Speicheroperation), 293 (`asPtr()`
+  hält das Array nicht), 297 (der Besitzer-Thread eines `Callback`). **Nächster Schritt: M14b, dann M15, sein Plan
+  hier zuerst.**
+
 ## Nachtrag 2026-10-28 — der Plan für M14b
 
 M14b nach 11 „Review 2026-10-28“ (E1–E13, N1–N8) und 07 „Review 2026-10-28“: **C-Bibliotheken einbinden, so
