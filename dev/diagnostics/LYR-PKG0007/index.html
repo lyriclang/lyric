@@ -36,12 +36,12 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
 <h1>LYR-PKG0007</h1>
-<p class="code-title">a git dependency cannot be read</p>
+<p class="code-title">a git dependency or a source tree cannot be read</p>
 <p class="meta">error · <a href="../../spec/15-project/">spec 15-project</a></p>
-<p>Reported when a dependency's repository cannot be cloned or fetched, when <code>git</code> is not on the PATH, or when under <code>--offline</code> the user's cache does not hold the revision. The exit code is 2: the environment failed, not the manifest.</p>
+<p>Reported when the repository of a dependency or of a source tree cannot be cloned or fetched, when a source tree's URL cannot be loaded, when <code>git</code> is not on the PATH, or when under <code>--offline</code> the user's cache does not hold the revision or the file. The exit code is 2: the environment failed, not the manifest.</p>
 <h2 id="explanation">Explanation</h2>
-<p>Packages from git are read through the user's cache (<code>~/.cache/lyric/git</code> on Linux): fetched when the cache lacks the revision, read from it otherwise. When git cannot reach the repository, or is not installed, or <code>--offline</code> forbids the fetch the build needs, there is no package to read.</p>
-<p>The message quotes git's own first line. Check the URL and the network, install git, or build once without <code>--offline</code> to fill the cache.</p>
+<p>Packages from git are read through the user's cache (<code>~/.cache/lyric/git</code> on Linux): fetched when the cache lacks the revision, read from it otherwise. The source trees of <code>[native.vendor]</code> are read the same way — a tree from git like a package, a tree from a URL as a file kept under its hash (<code>~/.cache/lyric/vendor</code>) — and only by a build whose target needs them. When git cannot reach the repository, or is not installed, or the URL does not answer, or <code>--offline</code> forbids the fetch the build needs, there is nothing to read.</p>
+<p>The message quotes git's, or the server's, own first line. Check the URL and the network, install git, or build once without <code>--offline</code> to fill the cache.</p>
 <h2 id="example">Example</h2>
 <pre><code>$ lyric5 build
 error[LYR-PKG0007]: 'geo' cannot be read from file:///nowhere/geo: fatal: '/nowhere/geo' does not appear to be a git repository

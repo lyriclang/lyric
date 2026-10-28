@@ -196,11 +196,15 @@ there is.</p>
 names it, or after the table's last, or in a table it begins at the end. Every other line of
 the manifest stays as it was. The graph is then read with the dependency
 (<a href="../../spec/15-project/">15 §2</a>); a graph that refuses it leaves the manifest as it was, and the
-refusal is the graph's.</p>
+refusal is the graph's. With <strong><code>--vendor</code></strong> the line names a source tree and goes into
+<code>[native.vendor]</code> instead (<a href="../../spec/15-project/#53-source-trees">15 §5.3</a>): <code>--git &lt;url&gt;</code> and a
+revision as above, read once to show the revision is there — the lock gets it when a build
+needs it —, or <strong><code>--url &lt;url&gt;</code></strong>, the file loaded and its SHA-256 written as the line's
+<code>hash</code>. <code>--path</code> names no tree, and <code>--url</code> goes with <code>--vendor</code> alone (<code>LYR-CLI0003</code>).</p>
 </li>
 <li><p><strong><code>lyric remove &lt;name&gt;</code></strong> takes the dependency's line out of <code>[dependencies]</code>, and the graph —
-the lock with it (<a href="../../spec/15-project/">15 §3</a>) — is read again. A name the table does not hold is
-refused (<code>LYR-CLI0003</code>).</p>
+the lock with it (<a href="../../spec/15-project/">15 §3</a>) — is read again; with <code>--vendor</code>, the tree's line
+out of <code>[native.vendor]</code>. A name the table does not hold is refused (<code>LYR-CLI0003</code>).</p>
 </li>
 <li><p>A dependency written otherwise than as one line — a table of its own, dotted keys — is the
 person's to edit: <code>add</code> and <code>remove</code> refuse it (<code>LYR-CLI0008</code>). Both take <code>-C</code> and
@@ -420,14 +424,14 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <tr>
 <td><code>add</code></td>
 <td><code>&lt;name&gt;</code></td>
-<td><code>--path &lt;dir&gt;</code>, <code>--git &lt;url&gt;</code>, <code>--tag &lt;tag&gt;</code>, <code>--branch &lt;branch&gt;</code>, <code>--rev &lt;commit&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code></td>
+<td><code>--path &lt;dir&gt;</code>, <code>--git &lt;url&gt;</code>, <code>--tag &lt;tag&gt;</code>, <code>--branch &lt;branch&gt;</code>, <code>--rev &lt;commit&gt;</code>, <code>--vendor</code>, <code>--url &lt;url&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code></td>
 <td>—</td>
 <td>—</td>
 </tr>
 <tr>
 <td><code>remove</code></td>
 <td><code>&lt;name&gt;</code></td>
-<td><code>-C &lt;dir&gt;</code>, <code>--offline</code></td>
+<td><code>--vendor</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code></td>
 <td>—</td>
 <td>—</td>
 </tr>

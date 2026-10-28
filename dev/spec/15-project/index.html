@@ -99,7 +99,7 @@ is refused (<code>LYR-PKG0002</code>).</li>
 <p>The packages a package imports from (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V7</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases that hold their dependencies in
 their own directories, and the git repositories they read as their versions
-(<a href="https://github.com/lyriclang/lyric-spec/blob/2be33c415ab3c321b177715ef135ac4114dcb123/conformance/README.md">the suite's README</a>); the toolchain's own tests
+(<a href="https://github.com/lyriclang/lyric-spec/blob/38ea610e6fcfa76dc7222b442a30c3e44eb4a00e/conformance/README.md">the suite's README</a>); the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>: <code>DependencyTests</code>, <code>GitDependencyTests</code>, <code>PackageContentTests</code>).</p>
 <ol>
 <li><code>[dependencies]</code> names them, each where it is read from: a directory,
@@ -165,9 +165,9 @@ graph read — the versions chosen and the ones read on the way —, each with i
 and version, its repository and revision, the <strong>commit</strong> it was, and the <strong>hash</strong> of its
 package content (§2): SHA-256 over one line per file — the file's SHA-256 in hexadecimal, two
 spaces, its path with <code>/</code> between directories —, the lines sorted by path; written <code>h1:</code> and
-base64. The toolchain writes the lock — only when what it holds changes, and none for a
-program that reads nothing from git —, and it is checked in with the manifest. A
-dependency's lock is not read.</li>
+base64 — and the source trees from git a build read (§5 rule 15). The toolchain writes the
+lock — only when what it holds changes, and none for a program that reads nothing from git —,
+and it is checked in with the manifest. A dependency's lock is not read.</li>
 <li>A build reads a revision the lock holds <strong>at the commit the lock holds</strong>: a branch stays where
 it was locked, and a tag moved in the repository too. Content that is not what the lock holds
 is refused, as is a locked commit the repository does not have (<code>LYR-PKG0008</code>). What the lock
@@ -230,8 +230,8 @@ memory is not.</li>
 <p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code> and <code>conformance/cases/15-project/</code>, package cases
 that call their native part or whose manifest a rule refuses; the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>, <code>NativeTests</code>, <code>VendorTests</code>, <code>BindingsTests</code>).</p>
-<p><em>(Rules 9–11, the findings <code>LYR-LNK…</code> of rule 12, rules 13–21, and what rules 7 and 8 say of a
-source tree are written ahead of their implementation, milestone M14b of the Lyric 5 plan — the
+<p><em>(Rules 9–11, the findings <code>LYR-LNK…</code> of rule 12, rules 17–21, and <code>bindings</code> in rule 14 are
+written ahead of their implementation, milestone M14b of the Lyric 5 plan — the
 decisions of <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11, review 2026-10-28</a>;
 each comes with its cases.)</em></p>
 <h3 id="51-sources">5.1 Sources</h3>
@@ -303,27 +303,47 @@ where an archive's or a shared library's bytes changed, not only its time.</li>
 </ol>
 <h3 id="53-source-trees">5.3 Source trees</h3>
 <ol start="13">
-<li><strong><code>[native.vendor]</code></strong> names <strong>source trees</strong>: C that the package does not hold and that is no
+<li><p><strong><code>[native.vendor]</code></strong> names <strong>source trees</strong>: C that the package does not hold and that is no
 package — no manifest, no modules. <code>raylib = { git = &quot;https://…&quot;, tag = &quot;5.5&quot; }</code> is a revision
 of a repository, read as §2 rule 2 reads one (<code>branch</code>, <code>rev</code>, or none), cached and locked as
-§2 rule 3 and §3 have it; <code>sqlite = { url = &quot;https://…/sqlite.zip&quot;, hash = &quot;sha256:…&quot; }</code> is a
-file loaded over <code>https</code>, a <code>.tar.gz</code>, <code>.tar.xz</code> or <code>.zip</code>, whose SHA-256 — 64 hexadecimal
-digits — is its <code>hash</code>, unpacked with a single top directory left out. A name is a lowercase
-letter, then letters, digits, <code>_</code> and <code>-</code>; another key or form is refused (<code>LYR-PKG0002</code>).</li>
-<li>A path of the native part — in <code>sources</code>, <code>include</code>, <code>archives</code> and <code>bindings</code> — that begins
-with <strong><code>@name/</code></strong> lies in the tree <code>name</code>; a name <code>[native.vendor]</code> does not hold is refused
-(<code>LYR-PKG0002</code>). A tree is the package's own: another package's <code>@name</code> is another tree, and
-two packages that compile one tree define its symbols twice (rule 12).</li>
-<li>A tree is read <strong>only where a build needs it</strong>: where a table that holds for the build's target
-names it. What it reads is fetched into the user's cache — a URL's file once by its hash —,
-under <code>--offline</code> not at all (<code>LYR-PKG0007</code>). A URL without <code>hash</code> is refused, the message giving
-the hash of what it loaded (<code>LYR-PKG0002</code>); a file whose hash is another, or a revision whose
-content is not what the lock holds, is refused (<code>LYR-PKG0008</code>); a revision the repository does
-not have (<code>LYR-PKG0006</code>); one that cannot be reached is the environment's (<code>LYR-PKG0007</code>, exit
-2). The lock holds a git tree as it holds a package read from git (§3 rule 1), its content's
-hash over every file of the tree; <code>lyric update</code> and <code>--locked</code> read it as they read those.</li>
-<li>A tree runs nothing: it is compiled, as the package's sources are, and no trust is asked for it
-(§8 rule 6). What an archive does, its bytes say; the lock holds them.</li>
+§2 rule 3 and §3 have it, its content every file of the commit; <code>sqlite = { url = &quot;https://…/sqlite.zip&quot;, hash = &quot;sha256:…&quot; }</code> is a file loaded from <code>https://</code>, <code>http://</code> or
+<code>file://</code> — its <code>hash</code> is its SHA-256, 64 hexadecimal digits, and makes the way it came
+irrelevant —, a tar compressed with gzip or a zip, told by its bytes, not its name, and
+unpacked with a single top directory left out. A name is a lowercase letter, then letters,
+digits, <code>_</code> and <code>-</code>; another key or form is refused (<code>LYR-PKG0002</code>). <em>(A tar compressed with xz
+is no tree in 5.0; such a tree comes from git.)</em></p>
+</li>
+<li><p>A path of the native part — in <code>sources</code>, <code>include</code>, <code>archives</code>, <code>dylibs</code> and <code>bindings</code> — that
+begins with <strong><code>@name/</code></strong> lies in the tree <code>name</code>; a name <code>[native.vendor]</code> does not hold is
+refused (<code>LYR-PKG0002</code>). A tree's file is no part of the package's content (§2 rule 4) and is
+not refused for it; one that is not there is refused when the build needs it (<code>LYR-PKG0002</code>).
+A tree is the package's own: another package's <code>@name</code> is another tree, and two packages that
+compile one tree define its symbols twice (rule 12).</p>
+</li>
+<li><p>A tree is read <strong>only where a build needs it</strong>: where a table that holds for the build's target
+names it. <code>lyric check</code>, <code>lyric metadata</code> and the editor read none. What a build reads is
+fetched into the user's cache — a URL's file once by its hash, unpacked once —, under
+<code>--offline</code> not at all (<code>LYR-PKG0007</code>). A URL without <code>hash</code> is refused, the message giving the
+hash of what it loaded (<code>LYR-PKG0002</code>); a file whose hash is another is refused, the message
+giving both (<code>LYR-PKG0008</code>), as is a revision whose content is not what the lock holds; a
+revision the repository does not have (<code>LYR-PKG0006</code>); a repository or a URL that cannot be
+reached is the environment's (<code>LYR-PKG0007</code>, exit 2).</p>
+<p>The lock (§3) holds a <strong>git tree</strong> a build read as it holds a package read from git — its
+repository, revision, commit and the hash of its content —, written <code>kind = &quot;native&quot;</code>, with
+<code>of</code>, the name of the package whose tree it is, and no <code>version</code>; a URL's tree is held by its
+<code>hash</code> in the manifest, not in the lock. A build adds the trees it resolved; reading the graph
+keeps the trees a manifest of the graph still names so and drops the rest — a tree no build
+has needed is not held. Under <code>--locked</code> a build that needs a tree the lock does not hold is
+refused (<code>LYR-PKG0011</code>), as §3 rule 4 refuses a revision. <strong><code>lyric update</code></strong> reads the trees
+the lock holds anew — those it names, or every one —, a branch at its head and a moved tag at
+its commit; a tree's tag is not raised, as a tree has no version.</p>
+</li>
+<li><p>A tree runs nothing: it is compiled, as the package's sources are, and no trust is asked for it
+(§8 rule 6). What an archive does, its bytes say; the lock holds them.</p>
+</li>
+<li><p>A tree runs nothing: it is compiled, as the package's sources are, and no trust is asked for it
+(§8 rule 6). What an archive does, its bytes say; the lock holds them.</p>
+</li>
 </ol>
 <h3 id="54-bindings">5.4 Bindings</h3>
 <ol start="17">
@@ -388,7 +408,7 @@ so the two still pair.</li>
 its sources are: the lock holds their bytes, and an archive comes into the binary as it was
 built — what it carries of the machine that built it is its own. A library linked by name,
 through <code>pkgConfig</code> or from a directory a build script names (§8 rule 3.1) is the machine's:
-the same bytes need the same system libraries. <em>(Source trees are written ahead of M14b.)</em></li>
+the same bytes need the same system libraries.</li>
 </ol>
 <h2 id="7-tests">7. Tests</h2>
 <p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V4</a>)</p>

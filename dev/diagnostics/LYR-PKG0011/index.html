@@ -38,7 +38,7 @@
 <h1>LYR-PKG0011</h1>
 <p class="code-title">`--locked` and a lock that does not match</p>
 <p class="meta">error · <a href="../../spec/15-project/">spec 15-project</a></p>
-<p>Reported under <code>--locked</code> when <code>lyric.lock</code> lacks a revision the graph reads from git, holds one it does not read, or is missing although the program reads from git. Nothing is fetched or written.</p>
+<p>Reported under <code>--locked</code> when <code>lyric.lock</code> lacks a revision the graph reads from git or a source tree from git the build needs, holds one it does not read, or is missing although the program reads from git. Nothing is fetched or written.</p>
 <h2 id="explanation">Explanation</h2>
 <p><code>--locked</code> takes the lock as it is: a build in CI should be built from exactly what was checked in, and a lock that would change is an error rather than a silent update. Without <code>--locked</code>, the build writes the lock to match the manifests.</p>
 <p>Build once without <code>--locked</code> (or run <code>lyric5 update</code>) and check the new <code>lyric.lock</code> in with <code>lyric.toml</code>.</p>

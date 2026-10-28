@@ -38,10 +38,11 @@
 <h1>LYR-PKG0002</h1>
 <p class="code-title">a manifest or lock field that is missing or malformed</p>
 <p class="meta">error · <a href="../../spec/15-project/">spec 15-project</a></p>
-<p>Reported when <code>lyric.toml</code> or <code>lyric.lock</code> parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a <code>[[bin]]</code> entry, a profile, <code>[native]</code>, <code>[trust]</code>, <code>[lints]</code>, a toolchain pin, a locked revision — and a prebuilt file <code>[native]</code> names that is not part of the package or not there, when the build needs it.</p>
+<p>Reported when <code>lyric.toml</code> or <code>lyric.lock</code> parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a <code>[[bin]]</code> entry, a profile, <code>[native]</code>, <code>[trust]</code>, <code>[lints]</code>, a toolchain pin, a locked revision, a source tree of <code>[native.vendor]</code> or an <code>@name/</code> path that names none — and a prebuilt file <code>[native]</code> names that is not part of the package or not there, or a URL's tree without its <code>hash</code>, when the build needs it.</p>
 <h2 id="explanation">Explanation</h2>
 <p>Every key of a manifest has a type and a form: <code>name</code> is a lowercase identifier, <code>version</code> a semantic version <code>MAJOR.MINOR.PATCH</code>, a dependency <code>{ path = &quot;…&quot; }</code> or <code>{ git = &quot;…&quot;, tag = &quot;…&quot; }</code>, a <code>[[bin]]</code> entry a <code>.lyr</code> file under <code>src/</code>. A value of another type or form is refused rather than guessed at, so a manifest means one thing to every toolchain that reads it.</p>
 <p>The message names the field and the form it takes. Write the field in that form.</p>
+<p>A source tree loaded from a URL is pinned by its <code>hash</code>, the SHA-256 of the file: a URL without one is refused once the build has loaded it, and the message gives the hash to write — <code>lyric add &lt;name&gt; --vendor --url &lt;url&gt;</code> writes the line with it.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="com">//- lyric.toml</span>
 [package]

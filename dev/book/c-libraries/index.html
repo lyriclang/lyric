@@ -29,8 +29,8 @@
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
 <h1>C libraries</h1>
 <p>Lyric compiles through C, and C is the one language it talks to directly. This chapter shows how a
-package calls C, brings C of its own, and links a C library — from the system, or from an SDK that
-lies somewhere on your machine. A complete package that does all of it is
+package calls C, brings C of its own, compiles a C library from its source, and links one — prebuilt,
+from the system, or from an SDK that lies somewhere on your machine. A complete package that does all of it is
 <a href="https://github.com/lyriclang/lyric/blob/main/examples/ffi"><code>examples/ffi</code></a>.</p>
 <h2 id="calling-c">Calling C</h2>
 <p>A C function is declared with <code>extern &quot;C&quot;</code> and called like any other. The C library is always
@@ -95,6 +95,39 @@ refused with <code>LYR-BLD0006</code>, and the message says how to rename it.</p
 <p>A prebuilt file has to be part of the package — under <code>native/</code>, or named in <code>[package] include</code> —
 because that is what the package is when someone else gets it from git, and what the lock holds
 the bytes of. When you replace one, the next build links again, even if the file kept its time.</p>
+<h2 id="c-from-its-source">C from its source</h2>
+<p>Most C libraries are easiest to build from their own source, with the program. You don't copy the
+source into your package: <code>[native.vendor]</code> names it as a <strong>source tree</strong>, and the native part's
+paths reach into it with <code>@name/</code>:</p>
+<pre><code class="language-toml">[native.vendor]
+raylib = { git = "https://github.com/raysan5/raylib", tag = "5.5" }
+
+[native]
+sources = ["@raylib/src/rcore.c", "@raylib/src/rshapes.c", "@raylib/src/utils.c"]
+include = ["@raylib/src"]
+defines = ["PLATFORM_DESKTOP"]</code></pre>
+<p>A tree from git names its revision as a dependency does — <code>tag</code>, <code>branch</code>, <code>rev</code>, or none for the
+default branch. It is no package: it needs no <code>lyric.toml</code>, and every file of the revision is part
+of it. The build fetches it into your user cache, once for every project, and <code>lyric.lock</code> holds
+the commit and a hash of its content with <code>kind = &quot;native&quot;</code>; check the lock in, and every build reads
+the same C. <code>lyric update raylib</code> moves the tree to its branch's head or its tag's new commit, as
+it does a package.</p>
+<p>A tree can also be a release file — a <code>.tar.gz</code> or a <code>.zip</code> — at a URL, pinned by its SHA-256:</p>
+<pre><code class="language-toml">[native.vendor]
+sqlite = { url = "https://www.sqlite.org/2024/sqlite-amalgamation-3460000.zip", hash = "sha256:…" }</code></pre>
+<p>The build loads the file once, checks its hash, and unpacks it, leaving out the single top directory
+most release files have. You don't compute the hash yourself: <code>lyric add</code> loads the file and writes
+the line with it,</p>
+<pre><code class="language-sh">lyric add sqlite --vendor --url https://www.sqlite.org/2024/sqlite-amalgamation-3460000.zip
+lyric add raylib --vendor --git https://github.com/raysan5/raylib --tag 5.5</code></pre>
+<p>and a URL written without its hash is refused, the message giving the hash of what it loaded. A
+<code>.tar.xz</code> is not unpacked; take such a library from git.</p>
+<p>A tree is read only when a build needs it: one named only in <code>[native.windows]</code> is never fetched
+by a build for Linux. <code>--offline</code> reads the cache alone, and <code>--locked</code> refuses a tree the lock
+does not hold. Compiling a tree runs nothing of it — there is no script in it to trust.</p>
+<p>A tree belongs to the package that names it. If two packages of a program compile the same C, its
+symbols are defined twice and the link fails — share a C library by wrapping it in one package
+that the others depend on.</p>
 <h2 id="libraries-of-the-system">Libraries of the system</h2>
 <p><code>libs</code> links libraries by name — <code>&quot;m&quot;</code> is <code>-lm</code>. What a build needs only on one system goes into a
 table for that system:</p>

@@ -2406,7 +2406,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/15-project/">15-project</a></td>
 <td>a manifest or lock field that is missing or malformed</td>
-<td>Reported when <code>lyric.toml</code> or <code>lyric.lock</code> parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a <code>[[bin]]</code> entry, a profile, <code>[native]</code>, <code>[trust]</code>, <code>[lints]</code>, a toolchain pin, a locked revision — and a prebuilt file <code>[native]</code> names that is not part of the package or not there, when the build needs it.</td>
+<td>Reported when <code>lyric.toml</code> or <code>lyric.lock</code> parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a <code>[[bin]]</code> entry, a profile, <code>[native]</code>, <code>[trust]</code>, <code>[lints]</code>, a toolchain pin, a locked revision, a source tree of <code>[native.vendor]</code> or an <code>@name/</code> path that names none — and a prebuilt file <code>[native]</code> names that is not part of the package or not there, or a URL's tree without its <code>hash</code>, when the build needs it.</td>
 </tr>
 <tr>
 <td>LYR-PKG0003</td>
@@ -2440,15 +2440,15 @@ code is no longer reported, and its number is not given again.</p>
 <td>LYR-PKG0007</td>
 <td>E</td>
 <td><a href="../../spec/15-project/">15-project</a></td>
-<td>a git dependency cannot be read</td>
-<td>Reported when a dependency's repository cannot be cloned or fetched, when <code>git</code> is not on the PATH, or when under <code>--offline</code> the user's cache does not hold the revision. The exit code is 2: the environment failed, not the manifest.</td>
+<td>a git dependency or a source tree cannot be read</td>
+<td>Reported when the repository of a dependency or of a source tree cannot be cloned or fetched, when a source tree's URL cannot be loaded, when <code>git</code> is not on the PATH, or when under <code>--offline</code> the user's cache does not hold the revision or the file. The exit code is 2: the environment failed, not the manifest.</td>
 </tr>
 <tr>
 <td>LYR-PKG0008</td>
 <td>E</td>
 <td><a href="../../spec/15-project/">15-project</a></td>
-<td>the lock disagrees with the repository</td>
-<td>Reported when <code>lyric.lock</code> holds a commit the dependency's repository does not have, or when the package content at the locked commit is not what the lock's hash says.</td>
+<td>the lock or a hash disagrees with what was read</td>
+<td>Reported when <code>lyric.lock</code> holds a commit the repository of a dependency or a source tree does not have, when the content at the locked commit is not what the lock's hash says, or when the file a source tree's URL loads is not the one its <code>hash</code> names.</td>
 </tr>
 <tr>
 <td>LYR-PKG0009</td>
@@ -2469,7 +2469,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/15-project/">15-project</a></td>
 <td><code>--locked</code> and a lock that does not match</td>
-<td>Reported under <code>--locked</code> when <code>lyric.lock</code> lacks a revision the graph reads from git, holds one it does not read, or is missing although the program reads from git. Nothing is fetched or written.</td>
+<td>Reported under <code>--locked</code> when <code>lyric.lock</code> lacks a revision the graph reads from git or a source tree from git the build needs, holds one it does not read, or is missing although the program reads from git. Nothing is fetched or written.</td>
 </tr>
 <tr>
 <td>LYR-PKG0012</td>

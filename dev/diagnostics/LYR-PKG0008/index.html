@@ -36,12 +36,13 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
 <h1>LYR-PKG0008</h1>
-<p class="code-title">the lock disagrees with the repository</p>
+<p class="code-title">the lock or a hash disagrees with what was read</p>
 <p class="meta">error · <a href="../../spec/15-project/">spec 15-project</a></p>
-<p>Reported when <code>lyric.lock</code> holds a commit the dependency's repository does not have, or when the package content at the locked commit is not what the lock's hash says.</p>
+<p>Reported when <code>lyric.lock</code> holds a commit the repository of a dependency or a source tree does not have, when the content at the locked commit is not what the lock's hash says, or when the file a source tree's URL loads is not the one its <code>hash</code> names.</p>
 <h2 id="explanation">Explanation</h2>
 <p><code>lyric.lock</code> records, for each revision read from git, the commit it was and a hash of the package content. A build reads that commit and checks the hash, so the program is built from the same sources everywhere. A commit that has gone — a force-push — or content that differs means the lock no longer describes what the repository holds.</p>
 <p>Resolve the dependency anew with <code>lyric5 update &lt;name&gt;</code>, which writes the lock from what the repository holds now, and check what changed.</p>
+<p>A source tree from a URL carries its hash in the manifest: when the server sends another file, the message gives both hashes. A release that was replaced is a new file — check it, then write its hash.</p>
 <h2 id="example">Example</h2>
 <pre><code>$ lyric5 build
 error[LYR-PKG0008]: lyric.lock holds commit 1234567890ab of https://example.org/geo for 'geo', which the repository does not have — 'lyric update geo' resolves it anew
