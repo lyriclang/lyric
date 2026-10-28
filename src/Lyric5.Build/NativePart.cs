@@ -14,6 +14,20 @@ public sealed record Dylib(string File, string? ImportLibrary)
     public string Linked => ImportLibrary ?? File;
 }
 
+/// <summary>A source tree of <c>[native.vendor]</c>: C the package does not hold and that is no
+/// package — a revision of a repository, or a file at a URL pinned by its hash. The native part's
+/// paths name it <c>@name/…</c>.</summary>
+/// <param name="Git">The repository and its revision; <c>null</c> for a URL's tree.</param>
+/// <param name="Url">The file's URL; <c>null</c> for a tree from git.</param>
+/// <param name="Hash">The file's SHA-256, in lowercase hexadecimal; <c>null</c> where the manifest
+/// gives none — refused once the build has loaded the file and can name it.</param>
+/// <param name="Line">The line it is written on, for what is refused about it.</param>
+public sealed record VendorTree(string Name, GitSource? Git, string? Url, string? Hash, int Line)
+{
+    /// <summary>Where the tree is read from, as a message says it.</summary>
+    public string Describe() => Git?.ToString() ?? Url!;
+}
+
 /// <summary>
 /// The native part of a package: C sources compiled with the program
 /// under its profile, the directories their includes are found in, their definitions, and what the
@@ -53,29 +67,104 @@ public sealed partial record NativePart(
         new([.. Sources, .. more.Sources], [.. Include, .. more.Include], [.. Libs, .. more.Libs],
             [.. Archives, .. more.Archives], [.. Dylibs, .. more.Dylibs], [.. Defines, .. more.Defines]);
 
-    /// <summary><c>[native]</c> and its tables per operating system and per triple, checked.</summary>
-    /// <exception cref="ManifestException">A key, a table, a pattern, a path, a definition or a
-    /// library name is refused.</exception>
+    /// <summary><c>[native]</c>, its tables per operating system and per triple, and its source
+    /// trees, checked: a path <c>@name/…</c> names a tree <c>[native.vendor]</c> holds.</summary>
+    /// <exception cref="ManifestException">A key, a table, a pattern, a path, a definition, a
+    /// library name or a tree is refused.</exception>
     public static (NativePart Common, IReadOnlyDictionary<TargetOs, NativePart> PerSystem,
-        IReadOnlyDictionary<string, NativePart> PerTriple) Read(TomlTable document, string file)
+        IReadOnlyDictionary<string, NativePart> PerTriple, IReadOnlyList<VendorTree> Vendor) Read(TomlTable document, string file)
     {
         var perSystem = new Dictionary<TargetOs, NativePart>();
         var perTriple = new Dictionary<string, NativePart>(StringComparer.Ordinal);
-        if (!document.TryGet("native", out var found)) return (None, perSystem, perTriple);
+        if (!document.TryGet("native", out var found)) return (None, perSystem, perTriple, []);
         if (found is not TomlTable native)
             throw new ManifestException("LYR-PKG0002", file, 1, 1, "[native] is a table: [native] sources = [\"native/*.c\"]");
+        List<VendorTree> vendor = [];
         foreach (var key in native.Keys)
         {
             if (Systems.TryGetValue(key, out var os))
                 perSystem[os] = Part(Table(native, key, file), $"native.{key}", file, os);
             else if (Triples.TryGetValue(key, out var target))
                 perTriple[key] = Part(Table(native, key, file), $"native.{key}", file, target.Os);
+            else if (key == "vendor")
+                vendor = ReadVendor(Table(native, key, file), file);
             else if (native.TryGet(key, out var value) && value is TomlTable)
                 throw new ManifestException("LYR-PKG0003", file, native.Line, 1,
                     $"[native.{key}] names no operating system and no target: linux, windows, macos, or one of "
-                    + string.Join(", ", Triples.Keys));
+                    + string.Join(", ", Triples.Keys) + " — and [native.vendor] the source trees");
         }
-        return (Part(native, "native", file, null), perSystem, perTriple);
+        var common = Part(native, "native", file, null);
+        var trees = vendor.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
+        var tables = perSystem.Select(p => (Where: $"native.{Systems.First(s => s.Value == p.Key).Key}", Part: p.Value))
+            .Concat(perTriple.Select(p => (Where: $"native.{p.Key}", Part: p.Value)))
+            .Prepend((Where: "native", Part: common));
+        foreach (var (where, part) in tables)
+            foreach (var (key, path) in part.Paths())
+                if (TreePath(path) is { } tree && !trees.Contains(tree.Name))
+                    throw new ManifestException("LYR-PKG0002", file, native.Line, 1,
+                        $"'{path}' in '{key}' of [{where}] names the source tree '{tree.Name}', which [native.vendor] does not hold"
+                        + (trees.Count > 0 ? $": {string.Join(", ", trees.Order(StringComparer.Ordinal))}" : ""));
+        return (common, perSystem, perTriple, vendor);
+    }
+
+    /// <summary>Every path this part names, with its key — the patterns of <c>sources</c> among them.</summary>
+    public IEnumerable<(string Key, string Path)> Paths() =>
+        Sources.Select(s => ("sources", s)).Concat(Include.Select(i => ("include", i))).Concat(Archives.Select(a => ("archives", a)))
+            .Concat(Dylibs.SelectMany(d => d.ImportLibrary is null ? [d.File] : new[] { d.File, d.ImportLibrary }).Select(d => ("dylibs", d)));
+
+    /// <summary>A path of a source tree, <c>@name/rest</c>: the tree's name and the path within it —
+    /// empty for the tree's root; <c>null</c> for a path of the package.</summary>
+    public static (string Name, string Within)? TreePath(string path)
+    {
+        if (!path.StartsWith('@')) return null;
+        var slash = path.IndexOf('/');
+        return slash < 0 ? (path[1..], "") : (path[1..slash], path[(slash + 1)..]);
+    }
+
+    /// <summary><c>name = { git = "…", tag | branch | rev = "…" }</c> or <c>name = { url = "…",
+    /// hash = "sha256:…" }</c>.</summary>
+    private static List<VendorTree> ReadVendor(TomlTable table, string file)
+    {
+        var trees = new List<VendorTree>();
+        foreach (var name in table.Keys)
+        {
+            table.TryGet(name, out var value);
+            var line = value is TomlTable at ? at.Line : table.Line;
+            if (!TreeNamePattern().IsMatch(name))
+                throw new ManifestException("LYR-PKG0002", file, line, 1,
+                    $"'{name}' is no name of a source tree: a lowercase letter, then letters, digits, '_' and '-'");
+            if (value is not TomlTable spec || spec.Keys.Any(k => !spec.TryGet(k, out var v) || v is not string))
+                throw new ManifestException("LYR-PKG0002", file, line, 1,
+                    $"the source tree '{name}' is written {name} = {{ git = \"…\", tag = \"…\" }} or {name} = {{ url = \"…\", hash = \"sha256:…\" }}");
+            if (spec.TryGet("git", out var repository))
+            {
+                if (spec.Keys.FirstOrDefault(k => k is not ("git" or "tag" or "branch" or "rev")) is { } other)
+                    throw new ManifestException("LYR-PKG0002", file, line, 1,
+                        $"'{other}' is no key of the source tree '{name}', which is read from git: git, and tag, branch or rev");
+                var revisions = new[] { "tag", "branch", "rev" }.Where(spec.Contains).ToList();
+                trees.Add(new VendorTree(name, Manifest.GitForm(name, (string)repository, spec, revisions, file, line), null, null, line));
+                continue;
+            }
+            if (!spec.TryGet("url", out var given))
+                throw new ManifestException("LYR-PKG0002", file, line, 1,
+                    $"the source tree '{name}' needs a repository or a URL: {name} = {{ git = \"…\" }} or {name} = {{ url = \"…\", hash = \"sha256:…\" }}");
+            if (spec.Keys.FirstOrDefault(k => k is not ("url" or "hash")) is { } extra)
+                throw new ManifestException("LYR-PKG0002", file, line, 1,
+                    $"'{extra}' is no key of the source tree '{name}', which is loaded from a URL: url and hash");
+            var url = (string)given;
+            if (!TreeUrlPattern().IsMatch(url))
+                throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{url}' is no URL a tree is loaded from: https://, http:// or file://");
+            string? hash = null;
+            if (spec.TryGet("hash", out var pinned))
+            {
+                var match = TreeHashPattern().Match((string)pinned);
+                if (!match.Success)
+                    throw new ManifestException("LYR-PKG0002", file, line, 1, $"'{pinned}' is no hash of a file: sha256: and 64 hexadecimal digits");
+                hash = match.Groups["hex"].Value.ToLowerInvariant();
+            }
+            trees.Add(new VendorTree(name, null, url, hash, line));
+        }
+        return trees;
     }
 
     private static TomlTable Table(TomlTable native, string key, string file) =>
@@ -109,9 +198,10 @@ public sealed partial record NativePart(
             return items;
         }
         return new NativePart(
-            Strings("sources", s => PackageContent.IsPattern(s) ? null : "is no pattern of the package's files", "patterns of the package's files"),
-            Strings("include", d => PackageContent.IsPattern(d) && d.IndexOfAny(['*', '?']) < 0 ? null : "is no directory of the package",
-                "directories of the package"),
+            Strings("sources", s => Within(s, PackageContent.IsPattern) ? null : "is no pattern of the package's files or a tree's",
+                "patterns of the package's files"),
+            Strings("include", d => Within(d, rest => PackageContent.IsPattern(rest) && rest.IndexOfAny(['*', '?']) < 0, root: true)
+                ? null : "is no directory of the package or a tree's", "directories of the package"),
             Strings("libs", l => LibraryPattern().IsMatch(l) ? null : "is no library name", "library names"),
             Strings("archives", ArchiveRefusal, "paths of the package's static libraries"),
             os is { } system ? ReadDylibs(table, where, file, system) : [],
@@ -159,27 +249,55 @@ public sealed partial record NativePart(
         return dylibs;
     }
 
-    /// <summary>A path a manifest names one file by: a pattern of the package without wildcards.</summary>
-    private static bool IsPath(string path) => PackageContent.IsPattern(path) && path.IndexOfAny(['*', '?']) < 0 && !path.EndsWith('/');
+    /// <summary>A path a manifest names one file by: a pattern of the package or of a tree without
+    /// wildcards.</summary>
+    private static bool IsPath(string path) =>
+        Within(path, rest => PackageContent.IsPattern(rest) && rest.IndexOfAny(['*', '?']) < 0 && !rest.EndsWith('/'));
+
+    /// <summary>Whether <paramref name="path"/> is of the form <paramref name="form"/> — in the
+    /// package, or after <c>@name/</c> in a tree, whose root itself a <paramref name="root"/> path
+    /// may name.</summary>
+    private static bool Within(string path, Func<string, bool> form, bool root = false) => TreePath(path) is { } tree
+        ? TreeNamePattern().IsMatch(tree.Name) && (root && tree.Within.Length == 0 || form(tree.Within))
+        : form(path);
 
     private static bool IsShared(string path) =>
         SoPattern().IsMatch(path) || path.EndsWith(".dylib", StringComparison.OrdinalIgnoreCase)
         || path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>The C sources this part names under <paramref name="root"/>, sorted.</summary>
-    public IReadOnlyList<string> SourceFiles(string root)
+    /// <summary>The C sources this part names: the package's under <paramref name="root"/>, sorted,
+    /// then each tree's, in the order the trees are first named, under the directory
+    /// <paramref name="tree"/> gives for it.</summary>
+    public IReadOnlyList<string> SourceFiles(string root, Func<string, string> tree)
     {
-        if (Sources.Count == 0 || !Directory.Exists(root)) return [];
+        var own = Sources.Where(s => TreePath(s) is null).ToList();
+        var files = Matching(root, own, skipOut: true).ToList();
+        foreach (var name in Sources.Select(s => TreePath(s)?.Name).OfType<string>().Distinct())
+            files.AddRange(Matching(tree(name), [.. Sources.Select(TreePath).Where(t => t?.Name == name).Select(t => t!.Value.Within)], skipOut: false));
+        return files;
+    }
+
+    private static IEnumerable<string> Matching(string root, IReadOnlyList<string> patterns, bool skipOut)
+    {
+        if (patterns.Count == 0 || !Directory.Exists(root)) return [];
         return Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
             .Select(file => (Relative: Path.GetRelativePath(root, file).Replace('\\', '/'), Full: file))
-            .Where(file => !file.Relative.StartsWith("out/", StringComparison.Ordinal) && PackageContent.Matches(Sources, file.Relative))
+            .Where(file => !(skipOut && file.Relative.StartsWith("out/", StringComparison.Ordinal)) && PackageContent.Matches(patterns, file.Relative))
             .OrderBy(file => file.Relative, StringComparer.Ordinal)
-            .Select(file => file.Full)
-            .ToList();
+            .Select(file => file.Full);
     }
 
     [GeneratedRegex("^[A-Za-z0-9_][A-Za-z0-9_.+-]*$")]
     private static partial Regex LibraryPattern();
+
+    [GeneratedRegex("^[a-z][A-Za-z0-9_-]*$")]
+    private static partial Regex TreeNamePattern();
+
+    [GeneratedRegex("^(https?|file)://.+", RegexOptions.IgnoreCase)]
+    private static partial Regex TreeUrlPattern();
+
+    [GeneratedRegex("^sha256:(?<hex>[0-9A-Fa-f]{64})$")]
+    private static partial Regex TreeHashPattern();
 
     [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]*(=.*)?$", RegexOptions.Singleline)]
     private static partial Regex DefinePattern();

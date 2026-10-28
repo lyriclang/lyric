@@ -106,6 +106,9 @@ public static partial class Program
     /// the dependency written into <c>[dependencies]</c> as one line, every other line as it
     /// was, and the graph read with it — a graph that refuses the dependency leaves the manifest as
     /// it was. The path is written relative to the manifest.
+    /// With <c>--vendor</c>, a source tree into <c>[native.vendor]</c> (spec 14 §2 rule 3):
+    /// <c>--git</c>, its revision read once to show it is there — the lock gets it from the build
+    /// that needs it —, or <c>--url</c>, the file loaded and written with its hash.
     /// </summary>
     private static int Add(string[] args)
     {
@@ -114,8 +117,11 @@ public static partial class Program
         var values = parsed.Values;
         var name = parsed.Words.Count == 1 ? parsed.Words[0] : null;
         var offline = parsed.Flags.Contains("--offline");
+        var vendor = parsed.Flags.Contains("--vendor");
         if (name is null) return Unknown("'add' needs the dependency's name: lyric5 add geo --path ../geo");
         var revisions = new[] { "--tag", "--branch", "--rev" }.Where(values.ContainsKey).ToList();
+        if (vendor) return AddTree(name, values, revisions, offline);
+        if (values.ContainsKey("--url")) return Unknown("'--url' names the file of a source tree: it goes with --vendor");
         if (values.ContainsKey("--path") == values.ContainsKey("--git"))
             return Unknown("'add' reads a dependency from a directory or from a repository: --path or --git, one of them");
         if (revisions.Count > 0 && !values.ContainsKey("--git")) return Unknown($"'{revisions[0]}' names a revision of a repository: it goes with --git");
@@ -143,6 +149,46 @@ public static partial class Program
         return EditDependencies(file, offline, text => ManifestEdit.Add(text, name, value), $"added {name} = {value}");
     }
 
+    /// <summary><c>lyric add &lt;name&gt; --vendor --git &lt;url&gt; [--tag|--branch|--rev &lt;r&gt;] | --url &lt;url&gt;</c>.</summary>
+    private static int AddTree(string name, IReadOnlyDictionary<string, string> values, List<string> revisions, bool offline)
+    {
+        if (values.ContainsKey("--path")) return Unknown("a source tree is read from a repository or a URL, not a directory: --git or --url");
+        if (values.ContainsKey("--git") == values.ContainsKey("--url"))
+            return Unknown("'add --vendor' reads a source tree from a repository or from a URL: --git or --url, one of them");
+        if (revisions.Count > 0 && !values.ContainsKey("--git")) return Unknown($"'{revisions[0]}' names a revision of a repository: it goes with --git");
+        if (revisions.Count > 1) return Unknown($"'{revisions[0]}' and '{revisions[1]}': a tree reads one revision");
+        var start = Path.GetFullPath(values.GetValueOrDefault("-C") ?? Directory.GetCurrentDirectory());
+        if (Project.FindManifest(start) is not { } file)
+        {
+            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above");
+            return 2;
+        }
+        string value;
+        if (values.TryGetValue("--url", out var url))
+        {
+            string hash;
+            try { hash = SourceTrees.Hash(url, offline, file); }
+            catch (ManifestException failed)
+            {
+                Say.Manifest(Console.Error, failed);
+                return failed.Exit;
+            }
+            value = $"{{ url = {ManifestEdit.Quote(url)}, hash = {ManifestEdit.Quote("sha256:" + hash)} }}";
+        }
+        else
+        {
+            var revision = revisions.Count == 0 ? "" : $", {revisions[0][2..]} = {ManifestEdit.Quote(values[revisions[0]])}";
+            value = $"{{ git = {ManifestEdit.Quote(values["--git"])}{revision} }}";
+        }
+        return EditDependencies(file, offline, text => ManifestEdit.Add(text, name, value, "native.vendor"), $"added {name} = {value} to [native.vendor]",
+            check: manifest =>
+            {
+                // the revision is there: read once, as a build would, the lock left to the build
+                if (manifest.Vendor.First(t => t.Name == name) is { Git: { } git } tree)
+                    GitCache.ForUser(offline).Checkout(new Dependency(name, null, git, tree.Line), manifest.File, tree: true);
+            });
+    }
+
     /// <summary><c>lyric explain &lt;code&gt;</c>: the catalog's entry — what the
     /// code means, why, what to do, a wrong and a right program, and the code's page on the website
     /// for this toolchain's version. A code is read as a reader may write
@@ -163,7 +209,8 @@ public static partial class Program
     }
 
     /// <summary><c>lyric remove &lt;name&gt;</c>: the dependency's line taken out of
-    /// <c>[dependencies]</c>, and the graph — the lock with it — read again.</summary>
+    /// <c>[dependencies]</c> — with <c>--vendor</c>, the tree's out of <c>[native.vendor]</c> —, and
+    /// the graph — the lock with it — read again.</summary>
     private static int Remove(string[] args)
     {
         if (Verbs.Read(Verbs.Find("remove")!, args, Unknown, out var refused) is not { } parsed) return refused;
@@ -181,15 +228,16 @@ public static partial class Program
             Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above");
             return 2;
         }
+        var vendor = options.Flags.Contains("--vendor");
         return EditDependencies(file, options.Flags.Contains("--offline"),
-            text => ManifestEdit.Remove(text, name)
-                    ?? throw new ArgumentException($"no dependency '{name}' in {file}"),
+            text => (vendor ? ManifestEdit.Remove(text, name, "native.vendor") : ManifestEdit.Remove(text, name))
+                    ?? throw new ArgumentException(vendor ? $"no source tree '{name}' in [native.vendor] of {file}" : $"no dependency '{name}' in {file}"),
             $"removed {name}");
     }
 
-    /// <summary>The manifest edited, then read with its graph; what refuses the edit puts the
-    /// manifest back as it was.</summary>
-    private static int EditDependencies(string file, bool offline, Func<string, string> edit, string done)
+    /// <summary>The manifest edited, then read with its graph — and <paramref name="check"/>ed —;
+    /// what refuses the edit puts the manifest back as it was.</summary>
+    private static int EditDependencies(string file, bool offline, Func<string, string> edit, string done, Action<Manifest>? check = null)
     {
         var before = File.ReadAllText(file);
         string after;
@@ -203,8 +251,10 @@ public static partial class Program
         File.WriteAllText(file, after);
         try
         {
-            var graph = Project.Resolve(Manifest.Read(file), offline);
+            var manifest = Manifest.Read(file);
+            var graph = Project.Resolve(manifest, offline);
             ToolchainCheck.Check(graph, DisplayVersion());
+            check?.Invoke(manifest);
         }
         catch (ManifestException refused)
         {

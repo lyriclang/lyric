@@ -209,13 +209,15 @@ public sealed record Project(string Source, string Name, string Module, string R
     /// <summary>The graph of <paramref name="manifest"/>'s program, read at the commits its
     /// <c>lyric.lock</c> holds; the lock is written afterwards with what the graph read —
     /// or, <paramref name="locked"/>, taken as it is and not written; not <paramref name="write"/>,
-    /// left as it is.</summary>
+    /// left as it is. The source trees are read later, by the build that needs them
+    /// (<see cref="PackageGraph.Trees"/>); the lock keeps those a manifest of the graph still names so.</summary>
     /// <exception cref="ManifestException">The graph, or the lock, is refused.</exception>
     public static PackageGraph Resolve(Manifest manifest, bool offline, Func<string, bool>? refresh = null,
         Func<Locked, bool>? keep = null, bool locked = false, bool write = true)
     {
         var lockFile = LockFile.For(manifest);
-        var held = LockFile.Read(lockFile).Where(keep ?? (_ => true)).ToList();
+        var all = LockFile.Read(lockFile).Where(keep ?? (_ => true)).ToList();
+        var held = all.Where(l => !l.IsTree).ToList();
         var git = GitCache.ForUser(offline, refresh);
         var graph = PackageGraph.Resolve(manifest, git, held, frozen: locked);
         // Each build script with dependencies of its own: a graph of its own, read
@@ -224,10 +226,18 @@ public sealed record Project(string Source, string Name, string Module, string R
         foreach (var package in graph.Packages.Values.OrderBy(p => p.Name, StringComparer.Ordinal))
             if (package.BuildScript is not null && package.BuildDependencies.Count > 0)
                 scripts[package.Name] = PackageGraph.Resolve(package.ScriptRoot(manifest), git, held, frozen: locked);
-        var entries = LockFile.Sorted(graph.Locked.Concat(scripts.Values.SelectMany(s => s.Locked)).Distinct()).ToList();
+        var owners = scripts.Values.Prepend(graph).SelectMany(g => g.Packages.Values).GroupBy(p => p.Name)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        var trees = all.Where(l => l.IsTree && owners.TryGetValue(l.Of!, out var owner)
+                                   && owner.Vendor.Any(t => t.Name == l.Name && t.Git == l.Git)).ToList();
+        var entries = LockFile.Sorted(graph.Locked.Concat(scripts.Values.SelectMany(s => s.Locked)).Distinct().Concat(trees)).ToList();
         if (locked) LockFile.RefuseChange(lockFile, entries);
         else if (write) LockFile.Write(lockFile, entries);
-        return graph with { Scripts = scripts };
+        return graph with
+        {
+            Scripts = scripts,
+            Trees = new SourceTrees(lockFile, git, Lyric5.Toolchain.UserCache.Root, offline, frozen: locked, write, trees),
+        };
     }
 
     /// <summary>The module path of a file under a package's <c>src/</c>, or <c>null</c>
