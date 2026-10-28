@@ -1571,3 +1571,20 @@ sie geht, gegen einen lokalen Server, damit das Warten auf den Maintainer nichts
 **Nicht in M15**: Installer-Pakete je OS und Distributionspakete (Tür); ein Sysroot je Tripel (11 E5 — in S8
 bestätigt oder geplant, nicht gebaut); `lyric publish` und eine Paket-Registry (Türen, 07); Fortschritt beim Bau
 (Tür, P9); Tier 2 als Archiv der Toolchain; die Umbenennung `lyric5` → `lyric` (M18, 285 dort).
+
+**S3, beim Bauen entschieden** (2026-10-28):
+
+- **`bin` ist ein Link auf das Verzeichnis der Standardversion** — ein Symlink, unter Windows eine Junction —, nicht
+  der Link auf das Binary und unter Windows seine Kopie (P4). Das Binary findet `stdlib5/` und die Laufzeit neben
+  sich (`AppContext.BaseDirectory`); eine Kopie in `bin/` fände sie nicht, und ein Link auf das Verzeichnis ersetzt
+  beim Wechsel der Standardversion nie eine laufende `.exe`. Eine Junction braucht weder Recht noch Entwicklermodus.
+- **Ein eigener Mirror bringt seinen Schlüssel mit**: `LYRIC_MIRROR` ersetzt beide Quellen, `LYRIC_MIRROR_KEY` den
+  Schlüssel, gegen den geprüft wird (wie Gos `GOSUMDB` mit Name und Schlüssel); der Schlüssel allein wird
+  abgelehnt. Bis S6 trägt das Binary keinen Schlüssel — installiert wird dann nur von einem solchen Mirror, und
+  so prüfen die Tests gegen den lokalen Server.
+- **Auf GitHub wird nur zurückgefallen, wo der Mirror nicht antwortet**; eine Signatur oder ein Hash, die nicht
+  halten, sind ein Fehler, kein Umweg. Das Layout des Mirrors: `<base>/<kanal>.json` und die Archive unter
+  `<base>/<kanal>/` (S7 lädt so hoch).
+- Die Codes: `LYR-CLI0023` (nicht zu haben), `LYR-CLI0024` (nicht, was der Index sagt), `LYR-CLI0025` (die
+  installierten Toolchains lehnen die Änderung ab); alle Exit 2. `toolchain default` ohne Version sagt die
+  Standardversion. Die Prüfung auf `com.apple.quarantine` läuft im Test auf macOS.

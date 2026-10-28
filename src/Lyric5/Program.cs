@@ -65,6 +65,7 @@ public static partial class Program
             "remove" => Remove(rest),
             "clean" => Clean(rest),
             "metadata" => Metadata(rest),
+            "toolchain" => Toolchain(rest),
             "explain" => Explain(rest),
             "version" => Verbs.Read(verb, rest, Unknown, out var unread) is { Words.Count: 0, Rest: null } ? Version()
                 : unread != 0 ? unread : Unknown("'version' takes no words"),
