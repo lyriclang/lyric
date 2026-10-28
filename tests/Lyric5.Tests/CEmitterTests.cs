@@ -342,12 +342,12 @@ public class CEmitterTests
         // The module's unit defines the descriptors and the entry, and holds no instance body;
         // an instance's unit holds its function, declares what it calls, and defines no descriptor.
         Assert.Contains("int main(int argc, char **argv)", units[0].Text);
-        Assert.DoesNotContain("lyr_app_main_ident_int__4edcf690(int64_t l0_x) {", units[0].Text);
+        Assert.DoesNotContain("lyr_app_main_ident_int__4edcf690(int64_t x) {", units[0].Text);
         // … and the same name IS a definition in its own unit: the line above cannot pass for a
         // name nothing carries.
-        Assert.Contains("lyr_app_main_ident_int__4edcf690(int64_t l0_x) {", units.Single(u => u.Instance == "app.main.ident<int>").Text);
+        Assert.Contains("lyr_app_main_ident_int__4edcf690(int64_t x) {", units.Single(u => u.Instance == "app.main.ident<int>").Text);
         var twice = units.Single(u => u.Instance == "app.main.twice<int>").Text;
-        Assert.Contains("int64_t lyr_app_main_twice_int__d2afcb46(lyr_fn_i64_to_i64 l0_f, int64_t l1_x) {", twice);
+        Assert.Contains("int64_t lyr_app_main_twice_int__d2afcb46(lyr_fn_i64_to_i64 f, int64_t x) {", twice);
         Assert.DoesNotContain("const LyrDesc lyr_desc", twice.Replace("extern const LyrDesc", ""));
         Assert.DoesNotContain("int main(", twice);
     }

@@ -1704,3 +1704,13 @@ je ein PR.
   Limit und Befehl — die Umgebung, kein ICE, auch im parallelen Übersetzen. Nach dem Frontend vergisst
   `CompilerPosition` die Stelle (`End`), so dass ein Fehler auf der C-Seite keine veraltete „while lowering …“-Zeile
   mehr trägt.
+- **295 — Lyrics Namen im C** (S8b): ein Feld heißt im C wie im Programm (`x`, nicht `f_x`), ein Lokal ebenso
+  (`total`, nicht `l3_total`), wo C den Namen tragen kann — ein ASCII-Bezeichner, kein Schlüsselwort von C11 oder C23,
+  kein kleingeschriebenes Makro der Standard-Header (`errno`, `stdin`, `bool` …) oder eines GNU-Modus (`linux`), keine
+  Funktion, die das erzeugte C ohne Präfix ruft (`fmod`, `main`), nicht der Implementierung vorbehalten (führender
+  Unterstrich, `…_t`), nicht in Makroform (nur Großbuchstaben) und nicht in einer Form, die der Emitter für seine
+  eigenen Namen hält (`lyr_`, `Lyr`, `LYR_`, `t3`, `f_…`, `l2_…`) — so treffen ein schlichter und ein gemangelter Name
+  nie zusammen. Ein Lokal muss zudem in seiner C-Funktion einmalig sein (alle stehen oben in ihr), ein Feld neben dem
+  `header` einer Klasse nicht `header` heißen. Sonst bleibt es bei `f_…` und `l<id>_…`; synthetische Lokale
+  (`$fstring` …) und Tupelfelder (`f_0`) bleiben so. `lyric_lldb.py` bleibt (es nimmt `f_` weiter ab); die
+  Goldens sind neu, Verhalten und Layout gleich.

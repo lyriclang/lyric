@@ -81,7 +81,7 @@ public class DriverTests
         var (exit, output, err) = Run("build", Program_("fib.lyr"), "--emit", "c");
         Assert.True(exit == 0, err);
         // External linkage: an instance's unit may call it.
-        Assert.Contains("\nint64_t lyr_fib_fib(int64_t l0_n)", output);
+        Assert.Contains("\nint64_t lyr_fib_fib(int64_t n)", output);
         // The module bindings first — std.core's float constants are every program's.
         Assert.Contains("int main(int argc, char **argv) { return lyr_run_main(argc, argv, lyr_entry); }", output);
         Assert.Contains("return lyr_fib_main(); }", output);

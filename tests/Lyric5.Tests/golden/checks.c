@@ -4,15 +4,15 @@
 #include <math.h>
 
 /* prototypes */
-int64_t lyr_app_main_add(int64_t l0_a, int64_t l1_b);
-int64_t lyr_app_main_div(int64_t l0_a, int64_t l1_b);
-int64_t lyr_app_main_rem(int64_t l0_a, int64_t l1_b);
-int64_t lyr_app_main_neg(int64_t l0_a);
+int64_t lyr_app_main_add(int64_t a, int64_t b);
+int64_t lyr_app_main_div(int64_t a, int64_t b);
+int64_t lyr_app_main_rem(int64_t a, int64_t b);
+int64_t lyr_app_main_neg(int64_t a);
 LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 
 #line 2 "programs/checks.lyr"
-int64_t lyr_app_main_add(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_app_main_add(int64_t a, int64_t b) {
 #line 2
     int64_t t0 = 0;
 #line 2
@@ -21,9 +21,9 @@ int64_t lyr_app_main_add(int64_t l0_a, int64_t l1_b) {
     int64_t t2 = 0;
 bb0:;
 #line 2
-    t0 = l0_a;
+    t0 = a;
 #line 2
-    t1 = l1_b;
+    t1 = b;
 #line 2
     t2 = LYR_CHECKED_ADD(t0, t1);
 #line 2
@@ -31,7 +31,7 @@ bb0:;
 }
 
 #line 3 "programs/checks.lyr"
-int64_t lyr_app_main_div(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_app_main_div(int64_t a, int64_t b) {
 #line 3
     int64_t t0 = 0;
 #line 3
@@ -40,9 +40,9 @@ int64_t lyr_app_main_div(int64_t l0_a, int64_t l1_b) {
     int64_t t2 = 0;
 bb0:;
 #line 3
-    t0 = l0_a;
+    t0 = a;
 #line 3
-    t1 = l1_b;
+    t1 = b;
 #line 3
     t2 = LYR_CHECKED_DIV(t0, t1);
 #line 3
@@ -50,7 +50,7 @@ bb0:;
 }
 
 #line 4 "programs/checks.lyr"
-int64_t lyr_app_main_rem(int64_t l0_a, int64_t l1_b) {
+int64_t lyr_app_main_rem(int64_t a, int64_t b) {
 #line 4
     int64_t t0 = 0;
 #line 4
@@ -59,9 +59,9 @@ int64_t lyr_app_main_rem(int64_t l0_a, int64_t l1_b) {
     int64_t t2 = 0;
 bb0:;
 #line 4
-    t0 = l0_a;
+    t0 = a;
 #line 4
-    t1 = l1_b;
+    t1 = b;
 #line 4
     t2 = LYR_CHECKED_REM(t0, t1);
 #line 4
@@ -69,14 +69,14 @@ bb0:;
 }
 
 #line 5 "programs/checks.lyr"
-int64_t lyr_app_main_neg(int64_t l0_a) {
+int64_t lyr_app_main_neg(int64_t a) {
 #line 5
     int64_t t0 = 0;
 #line 5
     int64_t t1 = 0;
 bb0:;
 #line 5
-    t0 = l0_a;
+    t0 = a;
 #line 5
     t1 = LYR_CHECKED_SUB((int64_t)0, t0);
 #line 5
@@ -88,9 +88,9 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
 #line 8
     LYR_STACK_CHECK();
 #line 8
-    int64_t l0_v = 0;
+    int64_t v = 0;
 #line 8
-    int64_t l1_bits = 0;
+    int64_t bits = 0;
 #line 8
     int64_t t0 = 0;
 #line 8
@@ -165,9 +165,9 @@ bb0:;
 #line 8
     t2 = lyr_app_main_add(t0, t1);
 #line 8
-    l0_v = t2;
+    v = t2;
 #line 9
-    t3 = l0_v;
+    t3 = v;
 #line 9
     t4 = (int64_t)INT64_C(10);
 #line 9
@@ -177,9 +177,9 @@ bb0:;
 #line 9
     t7 = lyr_app_main_div(t5, t6);
 #line 9
-    l0_v = t7;
+    v = t7;
 #line 10
-    t8 = l0_v;
+    t8 = v;
 #line 10
     t9 = (int64_t)INT64_C(100);
 #line 10
@@ -189,9 +189,9 @@ bb0:;
 #line 10
     t12 = lyr_app_main_rem(t10, t11);
 #line 10
-    l0_v = t12;
+    v = t12;
 #line 11
-    t13 = l0_v;
+    t13 = v;
 #line 11
     t14 = lyr_app_main_neg(t13);
 #line 11
@@ -209,13 +209,13 @@ bb1:;
     return t18;
 bb2:;
 #line 12
-    t19 = l0_v;
+    t19 = v;
 #line 12
     t20 = (int64_t)INT64_C(240);
 #line 12
     t21 = (int64_t)(t19 & t20);
 #line 12
-    t22 = l0_v;
+    t22 = v;
 #line 12
     t23 = (int64_t)INT64_C(255);
 #line 12
@@ -227,9 +227,9 @@ bb2:;
 #line 12
     t27 = (int64_t)(t21 | t26);
 #line 12
-    l1_bits = t27;
+    bits = t27;
 #line 13
-    t28 = l1_bits;
+    t28 = bits;
 #line 13
     t29 = (int64_t)INT64_C(37);
 #line 13
@@ -243,7 +243,7 @@ bb3:;
     return t31;
 bb4:;
 #line 14
-    t32 = l0_v;
+    t32 = v;
 #line 14
     return t32;
 }
