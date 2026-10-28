@@ -7,7 +7,9 @@ namespace Lyric5.Build;
 /// <c>liblyr.a</c> for a target and profile, built from the runtime's C source into the user's
 /// cache once per toolchain version, target and profile, and reused by every project (
 /// Zig builds its libc the same way). The source is found above the running toolchain: in the
-/// repository during development, in the archive's own directory once a release ships it.
+/// repository during development, in the archive's own directory once a release ships it. A
+/// toolchain's archive also carries the runtime prebuilt for its own target, which stands for a
+/// build made the same way (<see cref="Prebuilt"/>).
 /// </summary>
 public static class RuntimeArchive
 {
@@ -33,6 +35,7 @@ public static class RuntimeArchive
     {
         var root = SourceRoot()
             ?? throw new CBuildException("this toolchain carries no runtime source (runtime/include/lyr not found above it)");
+        if (Prebuilt(root, compiler, target, profile) is { } prebuilt) return prebuilt;
         var cache = CacheDir(toolchainVersion);
         // The flags, not the name alone: '--lto' on 'release' is another archive than 'release'.
         var key = $"{toolchainVersion}|{compiler.Identity}|{target.Triple}|{profile.Name}|{string.Join(' ', profile.Codegen)}|{SourceStamp(root)}";
@@ -49,6 +52,36 @@ public static class RuntimeArchive
         MarkUsed(cache);
         // The memo may outlive the archive (a cleaned cache): then build again.
         return File.Exists(archive) ? archive : Build();
+    }
+
+    /// <summary>The file beside a prebuilt archive that says how it was built.</summary>
+    public const string PrebuiltKeyFile = "liblyr.key";
+
+    /// <summary>What a prebuilt archive must have been built with to stand for a build: the
+    /// compiler's kind and version — not its path, which was the packaging machine's —, the target,
+    /// the profile and its flags.</summary>
+    public static string PrebuiltKey(CCompiler compiler, Target target, BuildProfile profile) =>
+        $"{compiler.Kind}|{compiler.Version}|{target.Triple}|{profile.Name}|{string.Join(' ', profile.Codegen)}";
+
+    /// <summary><c>runtime/lib/&lt;triple&gt;/&lt;profile&gt;/</c> under the toolchain's root, where its
+    /// archive carries the runtime prebuilt.</summary>
+    public static string PrebuiltDir(string root, Target target, BuildProfile profile) =>
+        Path.Combine(root, "runtime", "lib", target.Triple, profile.Name);
+
+    /// <summary>The prebuilt archive under <paramref name="root"/> when its key is this build's;
+    /// <c>null</c> where there is none, or it was built another way — another compiler version, a
+    /// profile with other flags, the other collector —, and the build makes its own.</summary>
+    public static string? Prebuilt(string root, CCompiler compiler, Target target, BuildProfile profile)
+    {
+        var dir = PrebuiltDir(root, target, profile);
+        var archive = Path.Combine(dir, "liblyr.a");
+        var keyFile = Path.Combine(dir, PrebuiltKeyFile);
+        try
+        {
+            if (!File.Exists(archive) || !File.Exists(keyFile)) return null;
+            return File.ReadAllText(keyFile).Trim() == PrebuiltKey(compiler, target, profile) ? archive : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
     }
 
     /// <summary>The runtime's objects themselves, which a static library carries inside its own

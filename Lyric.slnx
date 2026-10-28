@@ -21,6 +21,7 @@
     <Project Path="tests/Lyric.Tests.Lsp/Lyric.Tests.Lsp.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/Package/Package.csproj" />
     <Project Path="tools/Site/Site.csproj" />
   </Folder>
 </Solution>
