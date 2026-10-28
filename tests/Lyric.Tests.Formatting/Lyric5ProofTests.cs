@@ -127,6 +127,11 @@ public class Lyric5ProofTests
                 return;
             case Span:
                 return;
+            case ExternBlock block:
+                // what a block's functions share: they are the module's declarations already, and
+                // each points back here
+                sb.Append("ExternBlock(Visibility=").Append(block.Visibility).Append(" Members=").Append(block.Members.Count).Append(')');
+                return;
             case TryReach reach:
                 // the region a 'try' covers, as tokens: the text's offsets move with its layout
                 sb.Append("TryReach(").Append(Covered(starts, reach.From, reach.End)).Append(')');

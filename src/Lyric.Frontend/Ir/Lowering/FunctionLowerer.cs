@@ -2682,6 +2682,8 @@ internal sealed class FunctionLowerer
         TypeTestExpr typeTest => LowerTypeTest(typeTest),
         // std.ffi's 'Callback<C>.new(closure)': the closure behind a root, C's function to it
         CallExpr e when _types.CallbackUserdataOf(e) is { } userdata => LowerCallbackNew(e, userdata),
+        // std.ffi's 'lib.symbol<F>(name)': the symbol's address, which a C function's value is
+        CallExpr e when _types.IsLibrarySymbol(e) => LowerLibrarySymbol(e),
         CallExpr e => LowerCall(e),
         IfExpr e => LowerIfExpr(e),
         BlockExpr e => LowerBlockExpr(e),
@@ -8713,6 +8715,20 @@ internal sealed class FunctionLowerer
         _b.Emit(new StoreField(made, callbackType.Type, new FieldId(Field("userdata")), handle, expr.Span));
         _b.Emit(new StoreField(made, callbackType.Type, new FieldId(Field("root")), root, expr.Span));
         return made;
+    }
+
+    /// <summary><c>lib.symbol&lt;F&gt;(name)</c>: the library's <c>address(name)</c>, a <c>?uint</c> —
+    /// what a <c>?F</c> of a C function's type is.</summary>
+    private TempId LowerLibrarySymbol(CallExpr expr)
+    {
+        if (FfiType("Library", expr.Span).Members.LookupLocal("address") is not FunctionSymbol address
+            || !TryResolveFunction(address, out var target) || expr.Callee is not MemberExpr member)
+            throw Bug($"std.ffi's Library.address was not lowered, for {expr.Span}");
+        var library = LowerExpr(member.Target);
+        var name = LowerExpr(expr.Arguments[0]);
+        var dest = _slots.NewTemp(LowerType(_types.TypeOf(expr), expr.Span));
+        _b.Emit(new Call(dest, target, [library, name], expr.Span));
+        return dest;
     }
 
     /// <summary>A call through a C function's pointer: as a call of an <c>extern "C"</c>

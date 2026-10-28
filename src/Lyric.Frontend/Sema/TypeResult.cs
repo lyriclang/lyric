@@ -108,6 +108,13 @@ public sealed class TypeResult
     public int? CallbackUserdataOf(CallExpr call) => _callbackUserdata.TryGetValue(call, out var at) ? at : null;
     internal void SetCallbackUserdata(CallExpr call, int at) => _callbackUserdata[call] = at;
 
+    /// <summary><c>std.ffi</c>'s <c>lib.symbol&lt;F&gt;(name)</c> with <c>F</c> a C function's type:
+    /// the lowering reads the symbol's address, which a value of <c>F</c> is.</summary>
+    private readonly HashSet<CallExpr> _librarySymbols = new(ReferenceEqualityComparer.Instance);
+
+    public bool IsLibrarySymbol(CallExpr call) => _librarySymbols.Contains(call);
+    internal void SetLibrarySymbol(CallExpr call) => _librarySymbols.Add(call);
+
     /// <summary>The parameter whose argument's text <paramref name="parameter"/> takes, or
     /// <c>null</c> where no <c>@callerExpr</c> sits on it.</summary>
     public string? CallerExprOf(Param parameter) => _callerExpr.GetValueOrDefault(parameter);

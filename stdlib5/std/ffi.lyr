@@ -29,6 +29,7 @@
 //! ```
 import std.core { Utf8Error, dataAddress, sliceAddress };
 import std.task { stashForeign, takeForeign };
+import std.io { IoError };
 
 /// A pointer to a `T` in memory C manages, never null: `T *` where a C function takes or returns
 /// one.
@@ -228,6 +229,67 @@ fn rootedObject<T>(root: uint): T {
     unreachable("std.ffi's rootedObject is the compiler's");
 }
 
+/// A shared library loaded while the program runs — a `.so`, `.dylib` or `.dll` — and the C
+/// functions in it, found by their names.
+///
+/// `let lib = try Library.open("libm.so.6");`, then
+/// `lib.symbol<extern "C" fn(float) -> float>("cos")` is the function `cos` as a value C's type
+/// says, `null` where the library has no such symbol. The type is the program's word: the loader
+/// knows a name, not a signature. A function of the library is called while the library is open;
+/// [Library.close] gives it back.
+pub class Library :: [Closeable] {
+    handle: uint,
+    var closed: bool = false,
+
+    /// Loads the library at `path`; a name without a directory goes where the system's loader
+    /// looks.
+    ///
+    /// # Errors
+    /// Throws [IoError] with the path and the loader's words where it cannot load it.
+    pub static fn open(path: string): Library throws IoError {
+        let handle = lyr_ffi_library_open(path);
+        if (handle == 0) {
+            throw IoError {
+                kind = .NotFound,
+                path = path,
+                detail = lyr_ffi_library_error(),
+                inner = null,
+            };
+        }
+        return Library { handle = handle };
+    }
+
+    /// Returns the C function `name` of the library as a value of `F`, a C function's type
+    /// (`extern "C" fn(…) -> …`); `null` where the library has no such symbol. The compiler reads
+    /// the address; this body never runs.
+    ///
+    /// # Panics
+    /// Where the library was closed.
+    pub fn symbol<F>(_name: string): ?F {
+        unreachable("std.ffi's Library.symbol is the compiler's");
+    }
+
+    /// The address of the symbol `name`, null where there is none: what [Library.symbol] is.
+    fn address(name: string): ?uint {
+        if (this.closed) {
+            panic(f"the symbol '{name}' of a library closed already");
+        }
+        let at = lyr_ffi_library_symbol(this.handle, name);
+        return if (at == 0) null else at;
+    }
+
+    /// Gives the library back to the system; its functions are not called again. A second close
+    /// does nothing.
+    pub fn close(): void {
+        // through the reference: 'Closeable.close' is not a 'mut fn'
+        let me = this;
+        if (!me.closed) {
+            me.closed = true;
+            lyr_ffi_library_close(me.handle);
+        }
+    }
+}
+
 /// A C string: the address of bytes a NUL ends, `const char *` at a C function's boundary.
 ///
 /// It is borrowed: the bytes are C's, and they are valid as long as C says. [CStr.toString]
@@ -268,5 +330,9 @@ extern "C" fn lyr_ffi_cstr_string(address: uint): string;
 extern "C" fn lyr_ffi_string_address(s: string): uint;
 extern "C" fn lyr_ffi_alloc(count: int, size: uint): uint;
 extern "C" fn lyr_ffi_free(address: uint): void;
+extern "C" fn lyr_ffi_library_open(path: string): uint;
+extern "C" fn lyr_ffi_library_error(): string;
+extern "C" fn lyr_ffi_library_symbol(handle: uint, name: string): uint;
+extern "C" fn lyr_ffi_library_close(handle: uint): void;
 extern "C" fn lyr_ffi_closure_release(root: uint): void;
 extern "C" fn lyr_ffi_callback_release(root: uint): void;

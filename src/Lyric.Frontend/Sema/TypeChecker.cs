@@ -3434,6 +3434,21 @@ public sealed class TypeChecker
         return new FnType([.. parameters.Where((_, i) => i != at)], cFunction.Return);
     }
 
+    /// <summary><c>lib.symbol&lt;F&gt;(name)</c> of <c>std.ffi</c>'s <c>Library</c>: <c>F</c> is a C
+    /// function's type, which the address of the symbol is a value of.</summary>
+    private void CheckLibrarySymbol(FnType fn, FunctionDecl? decl, CallExpr call)
+    {
+        if (decl is null || _comp.FindModule(["std", "ffi"])?.Members.LookupLocal("Library") is not TypeSymbol library
+            || !ReferenceEquals(library.Members.LookupLocal("symbol")?.Declaration, decl)
+            || fn.Return is not Optional { Inner: var f } || f.IsError || MentionsTypeParam(f))
+            return;
+        if (f is FnType { IsC: true })
+            _result.SetLibrarySymbol(call);
+        else
+            _de.Report("LYR-SEM0099", Severity.Error, call.Span,
+                $"a library's symbol is a C function, 'extern \"C\" fn(…)', not '{TypeFacts.Display(f)}'");
+    }
+
     /// <summary>
     /// <c>std.ffi</c>'s memory operations — a pointer's <c>read</c>, <c>write</c>,
     /// <c>offset</c> and <c>cast</c>, <c>alloc</c> and <c>free</c> — the closed list of what holds
@@ -8060,6 +8075,7 @@ public sealed class TypeChecker
 
         CheckCallArgs(call, substituted, args, argTypes, decl);
         CheckUnsafeCall(call, substituted, decl);
+        CheckLibrarySymbol(substituted, decl, call);
 
         // What this call may throw, in its instance's terms: the exception analysis
         // asks whether it is marked and covered. 'task.await()' throws what the task's type says
