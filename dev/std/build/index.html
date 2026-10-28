@@ -25,7 +25,10 @@
 <li><a href="../../std/build/#fn.outDir">outDir()</a></li>
 <li><a href="../../std/build/#fn.genDir">genDir()</a></li>
 <li><a href="../../std/build/#fn.rerunIfChanged">rerunIfChanged()</a></li>
+<li><a href="../../std/build/#fn.rerunIfEnvChanged">rerunIfEnvChanged()</a></li>
 <li><a href="../../std/build/#fn.linkLib">linkLib()</a></li>
+<li><a href="../../std/build/#fn.linkSearch">linkSearch()</a></li>
+<li><a href="../../std/build/#fn.besideBinary">besideBinary()</a></li>
 <li><a href="../../std/build/#fn.cFlags">cFlags()</a></li>
 <li><a href="../../std/build/#fn.compileC">compileC()</a></li>
 <li><a href="../../std/build/#fn.warn">warn()</a></li>
@@ -35,10 +38,10 @@
 <h1>std.build</h1>
 <p>The build script's view of its build.</p>
 <p>A package's <code>build.lyr</code> is an ordinary program that <code>lyric5</code> runs before it compiles the
-package: it does things — writes modules into <code>gen/</code>, names C to compile and libraries to
-link — and defines nothing. What it asks of the toolchain goes back as directives, a line
-each, into the file the toolchain names; what the build is comes from the environment the
-toolchain sets.</p>
+package: it does things — writes modules into <code>gen/</code>, names C to compile, libraries to link
+and where to find them, and files to put beside the program — and defines nothing. What it
+asks of the toolchain goes back as directives, a line each, into the file the toolchain names;
+what the build is comes from the environment the toolchain sets.</p>
 <h4 id="panics">Panics</h4>
 <p>Every function of this module panics outside a build script, where the toolchain's
 environment is not set, and where a directive cannot be written.</p>
@@ -49,6 +52,20 @@ environment is not set, and where a directive cannot be written.</p>
 build.compileC(<span class="str">"native/fast.c"</span>);
 build.linkLib(<span class="str">"m"</span>);
 build.rerunIfChanged(<span class="str">"native/fast.c"</span>);</code></pre>
+<p>A library from an SDK outside the package — SDL3 on Windows, its directory in <code>SDL3_DIR</code> —
+is linked from where the SDK lies, and its DLL goes beside the program:</p>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.build;
+<span class="kw">import</span> std.os;
+
+build.rerunIfEnvChanged(<span class="str">"SDL3_DIR"</span>);
+<span class="kw">if</span> (<span class="kw">let</span> sdk = os.env(<span class="str">"SDL3_DIR"</span>)) {
+    build.linkSearch(<span class="str">f"</span>{sdk}<span class="str">/x86_64-w64-mingw32/lib</span><span class="str">"</span>);
+    build.linkLib(<span class="str">"SDL3"</span>);
+    build.besideBinary(<span class="str">f"</span>{sdk}<span class="str">/x86_64-w64-mingw32/bin/SDL3.dll</span><span class="str">"</span>);
+} <span class="kw">else</span> {
+    build.warn(<span class="str">"set SDL3_DIR to the SDL3 SDK"</span>);
+}</code></pre>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.target">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> target(): <span class="ty">string</span></code></pre>
@@ -75,9 +92,34 @@ build.rerunIfChanged(<span class="str">"native/fast.c"</span>);</code></pre>
 <p>The paths are relative to the package's root. While none of them changes, the toolchain keeps
 what the last run left. A script that names no file runs again where it changed itself.</p>
 </section>
+<section class="member" id="fn.rerunIfEnvChanged">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> rerunIfEnvChanged(names: <span class="ty">string</span>...): <span class="ty">void</span></code></pre>
+<p>Asks the toolchain to run the script again when one of these environment variables has another
+value than in the script's last run, or is set where it was not, or not where it was.</p>
+<p>A script that reads where a library lies from the environment names the variable here: else
+a changed value keeps what the last run asked.</p>
+</section>
 <section class="member" id="fn.linkLib">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> linkLib(name: <span class="ty">string</span>): <span class="ty">void</span></code></pre>
 <p>Links the C library <code>name</code> into the program: <code>linkLib(&quot;m&quot;)</code> is <code>-lm</code>.</p>
+</section>
+<section class="member" id="fn.linkSearch">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> linkSearch(dir: <span class="ty">string</span>): <span class="ty">void</span></code></pre>
+<p>Adds a directory the link searches for the libraries of <a href="../../std/build/#fn.linkLib">linkLib</a> and of <code>[native]</code>, before the
+linker's own: <code>linkSearch(&quot;C:/Libs/SDL3/x86_64-w64-mingw32/lib&quot;)</code> is <code>-L</code> with it.</p>
+<p>The path is relative to the package's root, or absolute. The directory is never written into
+the binary: a shared library found there is found again when the program starts where the
+system looks, or beside the program — name it with <a href="../../std/build/#fn.besideBinary">besideBinary</a>. For a Windows target a
+MinGW SDK's import library <code>libX.dll.a</code> is found as well.</p>
+</section>
+<section class="member" id="fn.besideBinary">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> besideBinary(paths: <span class="ty">string</span>...): <span class="ty">void</span></code></pre>
+<p>Puts files beside every binary the build makes of the program — of <code>build</code>, <code>run</code>, <code>test</code> and
+<code>bench</code>, and a library <code>--lib</code> makes — when it has linked it: a shared library the program
+loads when it starts, most of all. Such a binary searches its own directory for shared
+libraries first. A file is copied only where the bytes beside the binary differ.</p>
+<p>The paths are relative to the package's root, or absolute. A file that is not there when the
+script has ended, and two files of one name, stop the build (<code>LYR-BLD0006</code>).</p>
 </section>
 <section class="member" id="fn.cFlags">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cFlags(flags: <span class="ty">string</span>...): <span class="ty">void</span></code></pre>
@@ -103,7 +145,10 @@ what the last run left. A script that names no file runs again where it changed 
 <li class="level-3"><a href="#fn.outDir">outDir</a></li>
 <li class="level-3"><a href="#fn.genDir">genDir</a></li>
 <li class="level-3"><a href="#fn.rerunIfChanged">rerunIfChanged</a></li>
+<li class="level-3"><a href="#fn.rerunIfEnvChanged">rerunIfEnvChanged</a></li>
 <li class="level-3"><a href="#fn.linkLib">linkLib</a></li>
+<li class="level-3"><a href="#fn.linkSearch">linkSearch</a></li>
+<li class="level-3"><a href="#fn.besideBinary">besideBinary</a></li>
 <li class="level-3"><a href="#fn.cFlags">cFlags</a></li>
 <li class="level-3"><a href="#fn.compileC">compileC</a></li>
 <li class="level-3"><a href="#fn.warn">warn</a></li>

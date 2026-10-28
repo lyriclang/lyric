@@ -2514,6 +2514,13 @@ code is no longer reported, and its number is not given again.</p>
 <td>a warning a build script reported</td>
 <td>Reported when a package's <code>build.lyr</code> calls <code>std.build.warn</code>: the build shows the script's message as a warning, prefixed with the package's name.</td>
 </tr>
+<tr>
+<td>LYR-BLD0006</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a file the build puts beside the binary is not there, shares its name, or would not be found there</td>
+<td>Reported when a package's <code>build.lyr</code> names a file with <code>std.build.besideBinary</code> that is not there when the script has ended, when two such files — or <code>dylibs</code> of the native part — have one name, or when a Mach-O library of <code>dylibs</code> has an install name that does not begin with <code>@rpath/</code>. Nothing is built; the exit code is 1.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a10-cli--the-command-line">A.10 CLI — The command line</h2>

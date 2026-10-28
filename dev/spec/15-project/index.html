@@ -99,7 +99,7 @@ is refused (<code>LYR-PKG0002</code>).</li>
 <p>The packages a package imports from (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V7</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases that hold their dependencies in
 their own directories, and the git repositories they read as their versions
-(<a href="https://github.com/lyriclang/lyric-spec/blob/bf71efab0192e4be1302f9c86d846ccde7f4a26d/conformance/README.md">the suite's README</a>); the toolchain's own tests
+(<a href="https://github.com/lyriclang/lyric-spec/blob/f5b0937febee9103b93a1a684eae34b6e38fffe9/conformance/README.md">the suite's README</a>); the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>: <code>DependencyTests</code>, <code>GitDependencyTests</code>, <code>PackageContentTests</code>).</p>
 <ol>
 <li><code>[dependencies]</code> names them, each where it is read from: a directory,
@@ -264,11 +264,20 @@ of the package's content (§2) or of a source tree (§5.3): each is linked <stro
 searched for. A file outside the content is refused (<code>LYR-PKG0002</code>). An archive is built for one
 target, so it stands in the table of its triple (rule 4) as a rule. On Windows an archive is
 promised to link where it was built for the GNU ABI — by MinGW or zig cc —, not by MSVC.</li>
-<li>A package brings <strong>no shared library</strong> of its own — no <code>.so</code>, <code>.dylib</code> or <code>.dll</code>
-(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 B5</a>);
-one named in <code>archives</code> is refused (<code>LYR-PKG0002</code>). A shared library of the system is linked by
-name (<code>libs</code>), one the program finds at run time is <code>std.ffi</code>'s <code>Library</code>
-(<a href="../../spec/13-abi/">13 §5</a>).</li>
+<li><strong><code>dylibs</code></strong> are shared libraries the package brings, prebuilt — files of the package's content
+or of a source tree, linked <strong>by their path</strong>. A shared library is built for one target, so
+<code>dylibs</code> is a key of the operating systems' and the triples' tables only (<code>LYR-PKG0003</code> in
+<code>[native]</code>): on Linux and macOS each entry is the path of a <code>.so</code> or a <code>.dylib</code>
+(<code>&quot;native/linux/libfoo.so&quot;</code>); on Windows <code>{ dll = &quot;native/win/foo.dll&quot;, lib = &quot;native/win/libfoo.dll.a&quot; }</code>, the DLL and its import library, for the GNU ABI as rule 7 has it.
+Another form, a file outside the content, or a shared library named in <code>archives</code> is refused
+(<code>LYR-PKG0002</code>). The build puts each beside every binary it makes of the program, as §8 rule 3.2
+puts a file there, and with the same rules: the binary searches its own directory first, no
+directory of the machine is written into it, and two files of one name stop the build. A
+Mach-O library whose install name does not begin with <code>@rpath/</code> would not be found there; it
+is refused (<code>LYR-BLD0006</code>, exit 1), the message saying how to rename it. A shared library of
+the system is linked by name (<code>libs</code>); one the program finds while it runs is <code>std.ffi</code>'s
+<code>Library</code> (<a href="../../spec/13-abi/">13 §5</a>). <em>(Rule 8 replaces, the same day, a rule that refused every
+shared library of a package — <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07, E3′</a>.)</em></li>
 <li><strong><code>frameworks = [&quot;Cocoa&quot;]</code></strong> are macOS frameworks, linked as <code>-framework Cocoa</code>: a key of
 <code>[native.macos]</code> and of the macOS triples' tables only (<code>LYR-PKG0003</code> elsewhere).</li>
 <li><strong><code>pkgConfig = [&quot;sdl2&quot;]</code></strong> names libraries of the system as <code>pkg-config</code> knows them: a build for
@@ -282,12 +291,12 @@ compiler a build for Windows links Windows' system libraries from any host; a bu
 links a library of the system beside libc only on a Linux host, and one for macOS a framework
 only on a macOS host.)</em></li>
 <li>The link takes, in this order: the program's objects and the native parts' — the packages
-<strong>before the packages they depend on</strong>, the root's first —, their <code>archives</code> in that order, the
+<strong>before the packages they depend on</strong>, the root's first —, their <code>archives</code> and <code>dylibs</code> in that order, the
 libraries by name and from <code>pkgConfig</code>, then the frameworks; each archive, library and framework
 once, where it first stands. A symbol two packages define fails the link (<code>LYR-LNK0003</code>), and
 so does one nothing defines (<code>LYR-LNK0001</code>) or a library the linker does not find
 (<code>LYR-LNK0002</code>) — each exit 2, as the link is (<a href="../../spec/14-cli/">14 §1.3</a>). A binary is linked anew
-where an archive's bytes changed, not only its time.</li>
+where an archive's or a shared library's bytes changed, not only its time.</li>
 </ol>
 <h3 id="53-source-trees">5.3 Source trees</h3>
 <ol start="13">
@@ -372,10 +381,11 @@ it.</li>
 Windows binary's PDB, a macOS binary's <code>.dSYM</code> — gathered on a macOS host, where <code>dsymutil</code> is.
 The binary names it by a hash of its own bytes — a PE image's PDB GUID, a Mach-O image's UUID —,
 so the two still pair.</li>
-<li>A package's <strong>archives</strong> and <strong>source trees</strong> (§5.2, §5.3) are inputs as its sources are: the
-lock holds their bytes, and an archive comes into the binary as it was built — what it carries
-of the machine that built it is its own. A library linked by name or through <code>pkgConfig</code> is the
-machine's: the same bytes need the same system libraries. <em>(Written ahead of M14b.)</em></li>
+<li>A package's <strong>archives</strong>, <strong>shared libraries</strong> and <strong>source trees</strong> (§5.2, §5.3) are inputs as
+its sources are: the lock holds their bytes, and an archive comes into the binary as it was
+built — what it carries of the machine that built it is its own. A library linked by name,
+through <code>pkgConfig</code> or from a directory a build script names (§8 rule 3.1) is the machine's:
+the same bytes need the same system libraries. <em>(Written ahead of M14b.)</em></li>
 </ol>
 <h2 id="7-tests">7. Tests</h2>
 <p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V4</a>)</p>
@@ -392,8 +402,9 @@ package's content (§2) leaves it out.</li>
 <p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W3 BS1–BS6</a>; M8b S13.)</p>
 <ol>
 <li>A package's <strong><code>build.lyr</code></strong>, at its root, is a program that runs before the package compiles.
-It does things — writes modules into <code>gen/</code>, names C to compile and libraries to link — and
-defines nothing: what the package is, the manifest says (§1).</li>
+It does things — writes modules into <code>gen/</code>, names C to compile, libraries to link and where
+to find them, and files to put beside the program — and defines nothing: what the package is,
+the manifest says (§1).</li>
 <li>It is <strong>a program of its own</strong>: its module is <code>build</code>, a file <code>build/x.lyr</code> beside it the
 module <code>build.x</code>, and it imports from <code>std</code> and from the packages of the manifest's
 <strong><code>[build-dependencies]</code></strong>, a graph of its own (§2), read at the commits the same lock holds and
@@ -401,9 +412,27 @@ held in it beside the program's (§3). Nothing of it is compiled into the packag
 package's program sees none of its dependencies; <code>build</code> names no package of that graph. It runs
 on the host, with the package's root as its working directory, whatever the build's target.</li>
 <li><strong><code>std.build</code></strong> is its view of the build: <code>target()</code> and <code>profile()</code>, the build's; <code>outDir()</code>,
-the package's <code>out/</code>; <code>genDir()</code>; <code>rerunIfChanged(paths…)</code>, <code>linkLib(name)</code>,
-<code>cFlags(flags…)</code>, <code>compileC(sources…)</code> — paths from the package's root —, and <code>warn(message)</code>,
+the package's <code>out/</code>; <code>genDir()</code>; <code>rerunIfChanged(paths…)</code>, <code>rerunIfEnvChanged(names…)</code>,
+<code>linkLib(name)</code>, <code>linkSearch(dir)</code>, <code>cFlags(flags…)</code>, <code>compileC(sources…)</code>,
+<code>besideBinary(paths…)</code> — paths from the package's root, or absolute —, and <code>warn(message)</code>,
 which the build shows (<code>LYR-BLD0003</code>). Outside a build script they panic.
+<ol>
+<li><strong><code>linkSearch(dir)</code></strong> names a directory the link searches for the libraries of <code>linkLib</code>
+and of <code>[native]</code>'s <code>libs</code> (§5), before the linker's own and in the order named — the
+scripts of dependencies by their names, the root's last. For a Windows target a library <code>X</code>
+is found as <code>X.dll</code>, <code>X.lib</code>, <code>libX.a</code>, or as the import library <code>libX.dll.a</code> or <code>X.dll.a</code> a
+MinGW toolchain makes. <strong>No directory the link searched is written into the binary</strong>: a
+shared library is found when the program starts where the system looks, or beside it (rule
+3.2). A directory that is not there is no error: the link that does not find a library says
+where it searched.</li>
+<li><strong><code>besideBinary(paths…)</code></strong> names files the program needs beside it when it runs — a shared
+library above all. After each link the build copies them, under their own names, into the
+directory of every binary it makes of the program — of <code>build</code> and <code>run</code>, of <code>test</code> and
+<code>bench</code> (<a href="../../spec/14-cli/">14 §3</a>), of a library <code>--lib</code> makes, not of a build script —, and such
+a binary searches its own directory for shared libraries first: an ELF binary by the run path
+<code>$ORIGIN</code>, a Mach-O binary by <code>@executable_path</code>; a Windows binary does so by itself. A file
+that is not there when the script has ended, and two files of one name — counting the
+<code>dylibs</code> of §5 rule 8 —, stop the build (<code>LYR-BLD0006</code>, exit 1).
 <em>(Written ahead of M14b, replacing <code>cFlags</code> and <code>compileC</code> when it lands:)</em> <code>target()</code> is a
 <strong><code>Target</code></strong> — its <code>triple</code>, its <code>os</code> (<code>Os.linux</code>, <code>Os.windows</code>, <code>Os.macos</code>), its <code>arch</code>
 (<code>Arch.x86_64</code>, <code>Arch.aarch64</code>) and whether it <code>isHost</code> —; <code>vendorDir(name)</code> is the directory of
@@ -415,12 +444,17 @@ the package's or a tree's (<code>@name/…</code>). <code>linkLib(name)</code>, 
 <code>linkFramework(name)</code> and <code>pkgConfig(name)</code> are §5.2's keys, with their rules; <code>cEnv()</code> is the
 environment — <code>CC</code>, <code>AR</code>, <code>CFLAGS</code> — under which another build system compiles C for the target
 with the toolchain's C compiler.</li>
+</ol>
+</li>
 <li><strong><code>gen/</code></strong>, which the toolchain makes before the script runs, is a module space of the
 package: <code>gen/schema.lyr</code> in <code>app</code> is <code>app.gen.schema</code>, as <code>tests/</code> is §7's. It is no part of
 the package's content (§2).</li>
 <li><strong>When it runs</strong>: before the compile, where the script changed — <code>build.lyr</code>, <code>build/</code>, its
-dependencies, the toolchain, the target, the profile —, where a file it named with <code>rerunIfChanged</code> changed, or
-where <code>gen/</code> is not as it left it; else what its last run asked stands. A script that does not
+dependencies, the toolchain, the target, the profile —, where a file it named with
+<code>rerunIfChanged</code> changed, where an environment variable it named with <code>rerunIfEnvChanged</code> has
+another value than in its last run — set where it was not, or not where it was —, or where
+<code>gen/</code> is not as it left it; else what its last run asked stands. What the script's state holds
+of a variable is a hash of its value, not the value. A script that does not
 compile, that ends with an exit other than 0, or that does not end within 10 minutes, stops the
 build (<code>LYR-BLD0002</code>), with what it wrote — exit 1, as a program refused (<a href="../../spec/14-cli/">14 §1.3</a>):
 the package's code failed, not the environment.</li>

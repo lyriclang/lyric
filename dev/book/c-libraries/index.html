@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>C libraries — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">C libraries</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a class="current" href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>C libraries</h1>
+<p>Lyric compiles through C, and C is the one language it talks to directly. This chapter shows how a
+package calls C, brings C of its own, and links a C library — from the system, or from an SDK that
+lies somewhere on your machine. A complete package that does all of it is
+<a href="https://github.com/lyriclang/lyric/blob/main/examples/ffi"><code>examples/ffi</code></a>.</p>
+<h2 id="calling-c">Calling C</h2>
+<p>A C function is declared with <code>extern &quot;C&quot;</code> and called like any other. The C library is always
+there, so a program can call <code>abs</code> right away:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> abs(n: <span class="ty">int32</span>): <span class="ty">int32</span>;
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(<span class="str">f"</span>{abs(-<span class="num">7</span>)}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>7</code></pre>
+<p>The declaration has to say what C says: C's <code>int</code> is 32 bits, so the parameter is an <code>int32</code>, not
+Lyric's 64-bit <code>int</code>. The compiler checks that every type of an <code>extern &quot;C&quot;</code> function can cross into
+C — integers by their width, <code>float</code>, <code>bool</code>, <code>Ptr&lt;T&gt;</code>, <code>CStr</code>, structs marked <code>@Layout(C)</code> — and
+refuses the others. <code>std.ffi</code> has the types for pointers, C strings and callbacks.</p>
+<h2 id="c-in-the-package">C in the package</h2>
+<p>C sources of your own go into the package and are named in the manifest's <code>[native]</code> section:</p>
+<pre><code class="language-toml">[native]
+sources = ["native/*.c"]
+include = ["native/include"]</code></pre>
+<p>The build compiles them with the program, under its profile, and links them in; an <code>extern &quot;C&quot;</code>
+declaration in any module of the package calls them. A dependency's native part comes along with
+the dependency.</p>
+<h2 id="libraries-of-the-system">Libraries of the system</h2>
+<p><code>libs</code> links libraries by name — <code>&quot;m&quot;</code> is <code>-lm</code>. What a build needs only on one system goes into a
+table for that system:</p>
+<pre><code class="language-toml">[native.linux]
+libs = ["X11"]
+
+[native.windows]
+libs = ["gdi32", "winmm"]</code></pre>
+<p><code>[native.linux]</code>, <code>[native.windows]</code> and <code>[native.macos]</code> add to <code>[native]</code> for a build for that
+system. A build for Windows links Windows' system libraries from any machine; a library of a Linux
+system is found only when you build on Linux.</p>
+<h2 id="a-library-from-an-sdk">A library from an SDK</h2>
+<p>Many libraries come as an SDK you unpack somewhere: SDL3 for Windows, say, with the import library
+<code>libSDL3.dll.a</code> under <code>lib/</code> and <code>SDL3.dll</code> under <code>bin/</code>. Where that lies differs from machine to
+machine, so the manifest cannot name it. A <strong>build script</strong> can: <code>build.lyr</code> at the package's root
+is a program that runs before the package compiles, and <code>std.build</code> is how it talks to the build.</p>
+<pre><code class="language-text">// build.lyr
+import std.build;
+import std.os;
+
+fn main(): void {
+    build.rerunIfEnvChanged("SDL3_DIR");
+    if (let sdk = os.env("SDL3_DIR")) {
+        build.linkSearch(f"{sdk}/x86_64-w64-mingw32/lib");
+        build.linkLib("SDL3");
+        build.besideBinary(f"{sdk}/x86_64-w64-mingw32/bin/SDL3.dll");
+    } else {
+        build.warn("set SDL3_DIR to the SDL3 SDK");
+    }
+}</code></pre>
+<ul>
+<li><strong><code>linkSearch(dir)</code></strong> tells the link where to look for the libraries of <code>linkLib</code> and of <code>libs</code>,
+before the linker's own directories. For Windows it finds a MinGW SDK's <code>libX.dll.a</code> too. The
+directory is never written into the program: the binary does not depend on where the build found
+the library.</li>
+<li><strong><code>besideBinary(paths…)</code></strong> copies files into the directory of every binary the build makes — of
+<code>lyric build</code> and <code>lyric run</code>, of <code>lyric test</code> and <code>lyric bench</code>. A binary looks for shared
+libraries in its own directory first, so the program starts from wherever you copy it, as long as
+<code>SDL3.dll</code> comes along. A file that is not there, or two files with one name, stop the build with
+<code>LYR-BLD0006</code> — <code>lyric explain LYR-BLD0006</code> says more.</li>
+<li><strong><code>rerunIfEnvChanged(names…)</code></strong> runs the script again when <code>SDL3_DIR</code> changes. A script runs only
+when something it depends on changed; without this line, a new value would keep what the last run
+asked.</li>
+</ul>
+<p>The root package's build script always runs. A dependency's runs only where your manifest trusts
+it, under <code>[trust] build-scripts = [&quot;name&quot;]</code>: a build script is a program, and you decide whose
+programs run on your machine.</p>
+<h2 id="loading-a-library-while-the-program-runs">Loading a library while the program runs</h2>
+<p>A library the program picks while it runs — a plugin — is not linked at all: <code>std.ffi</code>'s <code>Library</code>
+opens it by its path and looks up its functions by name. <a href="https://github.com/lyriclang/lyric/blob/main/examples/ffi"><code>examples/ffi</code></a> shows
+both, a library linked into the program and one loaded while it runs.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/diagnostics/">← What the compiler tells you</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>
