@@ -75,7 +75,7 @@ public class ExportTests
         #include "geo.h"
 
         int main(void) {
-            if (lyr_init(NULL) != 0) return 10;
+            if (lyr_init(NULL) != LYR_OK) return 10;
             printf("add %lld\n", (long long)geo_add(40, 2));
             printf("area %.1f %.1f\n", geo_area(geo_Shape_Square, 3.0), geo_area(geo_Shape_Circle, 1.0));
             geo_Point a = { 1.0, 2.0 }, b = { 3.0, 6.0 };
@@ -101,7 +101,7 @@ public class ExportTests
     private static string Geo(string host = HostC) =>
         Package(("lyric.toml", GeoManifest), ("src/lib.lyr", GeoLyric), ("host.c", host));
 
-    private static string OutOf(string dir) => Path.Combine(dir, "out", "debug", Target.Host.Triple);
+    internal static string OutOf(string dir) => Path.Combine(dir, "out", "debug", Target.Host.Triple);
 
     [Fact]
     public void A_C_program_links_the_library_and_calls_its_exports()
@@ -111,7 +111,7 @@ public class ExportTests
         Assert.True(exit == 0, error);
         var o = OutOf(dir);
         var header = File.ReadAllText(Path.Combine(o, "geo.h"));
-        Assert.Contains("LYRIC_API int lyr_init(const LyrConfig *config);", header);
+        Assert.Contains("LYRIC_API LyrStatus lyr_init(const LyrConfig *config);", header);
         Assert.Contains("typedef struct geo_Point {\n    double x;\n    double y;\n} geo_Point;", header);
         Assert.Contains("typedef uint8_t geo_Shape;\nenum { geo_Shape_Square = 0, geo_Shape_Circle = 1 };", header);
         Assert.Contains("LYRIC_API geo_Point geo_mid(geo_Point a, geo_Point b);", header);
@@ -219,7 +219,7 @@ public class ExportTests
 
     /// <summary>What a C program links beside the archive: the system's libraries the runtime calls
     /// — and on Linux the unwinder its backtraces need, which zig cc does not link by itself.</summary>
-    private static string[] SystemLibraries() => Target.Host.Os switch
+    internal static string[] SystemLibraries() => Target.Host.Os switch
     {
         TargetOs.Windows => ["-lshell32", "-lws2_32"],
         TargetOs.MacOs => [],
@@ -235,7 +235,7 @@ public class ExportTests
 
     /// <summary>The C program of the package, built beside the library — where Windows finds a
     /// DLL — and run.</summary>
-    private static ProcessRunner.Result BuildHost(string dir, string[] link)
+    internal static ProcessRunner.Result BuildHost(string dir, string[] link)
     {
         var zig = CCompiler.Locate(CCompilerKind.Zig) ?? throw new InvalidOperationException("zig is required to build a C program");
         var o = OutOf(dir);

@@ -21,7 +21,7 @@ public class ExampleTests
     private static string Examples([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "programs", "three_packages"));
 
-    private static void Copy(string from, string to)
+    internal static void Copy(string from, string to)
     {
         foreach (var file in Directory.EnumerateFiles(from, "*", SearchOption.AllDirectories))
         {

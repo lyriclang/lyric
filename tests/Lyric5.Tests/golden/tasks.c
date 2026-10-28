@@ -482,6 +482,9 @@ extern int64_t lyr_c_lyr_console_put(int64_t, uint64_t, int64_t) __asm__(LYR_C_S
 extern void lyr_c_lyr_console_gone(void) __asm__(LYR_C_SYMBOL("lyr_console_gone"));
 extern lyr_ty_std_task_Scheduler * lyr_c_lyr_task_scheduler(void) __asm__(LYR_C_SYMBOL("lyr_task_scheduler"));
 extern void lyr_c_lyr_task_set_scheduler(lyr_ty_std_task_Scheduler *) __asm__(LYR_C_SYMBOL("lyr_task_set_scheduler"));
+extern LyrStr * lyr_c_lyr_task_panic_code(LyrCoro *) __asm__(LYR_C_SYMBOL("lyr_task_panic_code"));
+extern void lyr_c_lyr_ffi_drain(void) __asm__(LYR_C_SYMBOL("lyr_ffi_drain"));
+extern bool lyr_c_lyr_task_wait(int64_t) __asm__(LYR_C_SYMBOL("lyr_task_wait"));
 extern int64_t lyr_c_lyr_task_take(uint64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_task_take"));
 extern void lyr_c_lyr_coro_park(void) __asm__(LYR_C_SYMBOL("lyr_coro_park"));
 extern void lyr_c_lyr_task_repanic(LyrStr *, LyrStr *, LyrStr *) __asm__(LYR_C_SYMBOL("lyr_task_repanic"));
@@ -489,11 +492,8 @@ extern void lyr_c_lyr_panic_deadlock(void) __asm__(LYR_C_SYMBOL("lyr_panic_deadl
 extern void lyr_c_lyr_task_spin(void) __asm__(LYR_C_SYMBOL("lyr_task_spin"));
 extern int64_t lyr_c_lyr_task_poller(void) __asm__(LYR_C_SYMBOL("lyr_task_poller"));
 extern void lyr_c_lyr_task_wake(int64_t) __asm__(LYR_C_SYMBOL("lyr_task_wake"));
-extern LyrStr * lyr_c_lyr_task_panic_code(LyrCoro *) __asm__(LYR_C_SYMBOL("lyr_task_panic_code"));
 extern LyrStr * lyr_c_lyr_task_panic_message(LyrCoro *) __asm__(LYR_C_SYMBOL("lyr_task_panic_message"));
 extern LyrStr * lyr_c_lyr_task_panic_trace(LyrCoro *) __asm__(LYR_C_SYMBOL("lyr_task_panic_trace"));
-extern void lyr_c_lyr_ffi_drain(void) __asm__(LYR_C_SYMBOL("lyr_ffi_drain"));
-extern bool lyr_c_lyr_task_wait(int64_t) __asm__(LYR_C_SYMBOL("lyr_task_wait"));
 extern int64_t lyr_c_lyr_task_resume(LyrCoro *) __asm__(LYR_C_SYMBOL("lyr_task_resume"));
 extern int64_t lyr_c_lyr_ffi_callbacks_alive(void) __asm__(LYR_C_SYMBOL("lyr_ffi_callbacks_alive"));
 extern int64_t lyr_c_lyr_console_flush(int64_t) __asm__(LYR_C_SYMBOL("lyr_console_flush"));
@@ -641,14 +641,14 @@ lyr_ty_std_task_Task_int__80e7f155 * lyr_std_thread_Pool_spawn_int__never__f1cbb
 int64_t lyr_std_task_Task_int__awaitThrough_329c560e(lyr_ty_std_task_Task_int__80e7f155 *l0_this, LyrErr **lyr_err);
 void lyr_std_task_spawnDetached__lambda17__b04d81cb(void *lyr_env, LyrErr **lyr_err);
 lyr_ty_std_task_Channel_void__be27c1cc * lyr_std_task_Channel_void__new_a3483870(int64_t l0_capacity);
-void lyr_std_thread_Worker_start__lambda20__6c1d318d(void *lyr_env, LyrErr **lyr_err);
+void lyr_std_thread_Worker_start__lambda21__6a1aefd0(void *lyr_env, LyrErr **lyr_err);
 void lyr__globals__9ee5f9b5(void);
 LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *l0_this);
 lyr_ty_std_task_Task_int__80e7f155 * lyr_std_task_launchOn_int__never__edb6a202(lyr_ty_std_task_Scheduler *l0_s, lyr_fn_to_i64 l1_body, lyr_opt_fn_to_void l2_ended);
-void lyr_std_thread_Pool_spawn_int__never___lambda21__93c6ebe6(void *lyr_env, LyrErr **lyr_err);
+void lyr_std_thread_Pool_spawn_int__never___lambda22__15ce7451(void *lyr_env, LyrErr **lyr_err);
 void lyr_std_task_WaitQueue_void__remove_00bbabf7(lyr_ty_std_task_WaitQueue_void__203987a7 *l0_this, lyr_ty_std_task_Waiting_void__01584d38 *l1_w);
-void lyr_std_task_launchOn_int__never___lambda23__655e65da(void *lyr_env, LyrErr **lyr_err);
-void lyr_std_task_launchOn_int__never___lambda24__676fb221(void *lyr_env, lyr_ty_std_task_PanicInfo *l1_info, LyrErr **lyr_err);
+void lyr_std_task_launchOn_int__never___lambda24__676fb221(void *lyr_env, LyrErr **lyr_err);
+void lyr_std_task_launchOn_int__never___lambda25__e56ca6e4(void *lyr_env, lyr_ty_std_task_PanicInfo *l1_info, LyrErr **lyr_err);
 lyr_ty_std_task_Waiting_void__01584d38 * lyr_std_task_WaitQueue_void__take_ff6ae908(lyr_ty_std_task_WaitQueue_void__203987a7 *l0_this);
 void lyr_std_task_Channel_void__close_8df29e02(lyr_ty_std_task_Channel_void__be27c1cc *l0_this);
 void lyr_std_task_Task_int__finish_1db712ce(lyr_ty_std_task_Task_int__80e7f155 *l0_this);
@@ -10033,7 +10033,7 @@ bb0:;
 #line _
     LYR_WRITE_BARRIER(t6, &t6->f_w, t5);
 #line _
-    t7 = (lyr_fn_to_void){ lyr_std_thread_Worker_start__lambda20__6c1d318d, t6 };
+    t7 = (lyr_fn_to_void){ lyr_std_thread_Worker_start__lambda21__6a1aefd0, t6 };
 #line _
     LYR_THREAD_START(t7);
 #line _
@@ -10699,7 +10699,7 @@ bb6:;
 }
 
 #line _ "stdlib5/std/thread.lyr"
-void lyr_std_thread_Worker_start__lambda20__6c1d318d(void *lyr_env, LyrErr **lyr_err) {
+void lyr_std_thread_Worker_start__lambda21__6a1aefd0(void *lyr_env, LyrErr **lyr_err) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -13313,8 +13313,8 @@ extern const LyrDesc lyr_desc_arr_i64;
 lyr_ty_std_task_Scheduler * lyr_std_task_here(void);
 void lyr_std_task_Scheduler_post(lyr_ty_std_task_Scheduler *l0_this, lyr_ty_std_task_Context *l1_c);
 lyr_ty_std_task_Task_int__80e7f155 * lyr_std_task_launchOn_int__never__edb6a202(lyr_ty_std_task_Scheduler *l0_s, lyr_fn_to_i64 l1_body, lyr_opt_fn_to_void l2_ended);
-void lyr_std_task_launchOn_int__never___lambda23__655e65da(void *lyr_env, LyrErr **lyr_err);
-void lyr_std_task_launchOn_int__never___lambda24__676fb221(void *lyr_env, lyr_ty_std_task_PanicInfo *l1_info, LyrErr **lyr_err);
+void lyr_std_task_launchOn_int__never___lambda24__676fb221(void *lyr_env, LyrErr **lyr_err);
+void lyr_std_task_launchOn_int__never___lambda25__e56ca6e4(void *lyr_env, lyr_ty_std_task_PanicInfo *l1_info, LyrErr **lyr_err);
 void lyr_std_task_Task_int__finish_1db712ce(lyr_ty_std_task_Task_int__80e7f155 *l0_this);
 void lyr_std_task_Task_int__panicked_ba7ea2a8(lyr_ty_std_task_Task_int__80e7f155 *l0_this, lyr_ty_std_task_PanicInfo *l1_info);
 
@@ -13520,7 +13520,7 @@ bb0:;
 #line _
     LYR_WRITE_BARRIER_VALUE(t14, &t14->f_ended, *t13);
 #line _
-    t15 = (lyr_fn_to_void){ lyr_std_task_launchOn_int__never___lambda23__655e65da, t14 };
+    t15 = (lyr_fn_to_void){ lyr_std_task_launchOn_int__never___lambda24__676fb221, t14 };
 #line _
     l4_run = t15;
 #line _
@@ -13656,7 +13656,7 @@ bb0:;
 #line _
     LYR_WRITE_BARRIER_VALUE(t50, &t50->f_ended, *t49);
 #line _
-    t51 = (lyr_fn_ref18_std_task_PanicInfo_to_void){ lyr_std_task_launchOn_int__never___lambda24__676fb221, t50 };
+    t51 = (lyr_fn_ref18_std_task_PanicInfo_to_void){ lyr_std_task_launchOn_int__never___lambda25__e56ca6e4, t50 };
 #line _
     t52_s = (lyr_opt_fn_ref18_std_task_PanicInfo_to_void){ .value = t51, .has = 1 }; t52 = &t52_s;
 #line _
@@ -13682,7 +13682,7 @@ bb0:;
 }
 
 #line _ "stdlib5/std/task.lyr"
-void lyr_std_task_launchOn_int__never___lambda23__655e65da(void *lyr_env, LyrErr **lyr_err) {
+void lyr_std_task_launchOn_int__never___lambda24__676fb221(void *lyr_env, LyrErr **lyr_err) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -13776,7 +13776,7 @@ bb5:;
 }
 
 #line _ "stdlib5/std/task.lyr"
-void lyr_std_task_launchOn_int__never___lambda24__676fb221(void *lyr_env, lyr_ty_std_task_PanicInfo *l1_info, LyrErr **lyr_err) {
+void lyr_std_task_launchOn_int__never___lambda25__e56ca6e4(void *lyr_env, lyr_ty_std_task_PanicInfo *l1_info, LyrErr **lyr_err) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -14213,7 +14213,7 @@ void lyr_std_task_SpinLock_release(lyr_ty_std_task_SpinLock *l0_this);
 lyr_ty_std_thread_Worker * lyr_std_thread_Pool_pick(lyr_ty_std_thread_Pool *l0_this);
 lyr_ty_std_task_Task_int__80e7f155 * lyr_std_thread_Pool_spawn_int__never__f1cbb194(lyr_ty_std_thread_Pool *l0_this, lyr_fn_to_i64 l1_body);
 lyr_ty_std_task_Task_int__80e7f155 * lyr_std_task_launchOn_int__never__edb6a202(lyr_ty_std_task_Scheduler *l0_s, lyr_fn_to_i64 l1_body, lyr_opt_fn_to_void l2_ended);
-void lyr_std_thread_Pool_spawn_int__never___lambda21__93c6ebe6(void *lyr_env, LyrErr **lyr_err);
+void lyr_std_thread_Pool_spawn_int__never___lambda22__15ce7451(void *lyr_env, LyrErr **lyr_err);
 
 #line _ "stdlib5/std/thread.lyr"
 lyr_ty_std_task_Task_int__80e7f155 * lyr_std_thread_Pool_spawn_int__never__f1cbb194(lyr_ty_std_thread_Pool *l0_this, lyr_fn_to_i64 l1_body) {
@@ -14329,7 +14329,7 @@ bb2:;
 #line _
     LYR_WRITE_BARRIER(t19, &t19->f_w, t18);
 #line _
-    t20 = (lyr_fn_to_void){ lyr_std_thread_Pool_spawn_int__never___lambda21__93c6ebe6, t19 };
+    t20 = (lyr_fn_to_void){ lyr_std_thread_Pool_spawn_int__never___lambda22__15ce7451, t19 };
 #line _
     t21_s = (lyr_opt_fn_to_void){ .value = t20, .has = 1 }; t21 = &t21_s;
 #line _
@@ -14339,7 +14339,7 @@ bb2:;
 }
 
 #line _ "stdlib5/std/thread.lyr"
-void lyr_std_thread_Pool_spawn_int__never___lambda21__93c6ebe6(void *lyr_env, LyrErr **lyr_err) {
+void lyr_std_thread_Pool_spawn_int__never___lambda22__15ce7451(void *lyr_env, LyrErr **lyr_err) {
 #line _
     LYR_STACK_CHECK();
 #line _

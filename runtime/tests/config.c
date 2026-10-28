@@ -19,8 +19,8 @@ static void capture(const char *bytes, size_t len, void *context) {
 
 int main(int argc, char **argv) {
     LyrConfig config = { .argc = argc, .argv = argv, .stdout_write = capture, .write_context = captured };
-    CHECK(lyr_init(&config) == 0);
-    CHECK(lyr_init(&config) == -1);
+    CHECK(lyr_init(&config) == LYR_OK);
+    CHECK(lyr_init(&config) == LYR_ERROR);
 
     lyr_println(lyr_str_from_cstr("to the host"));
     CHECK(captured_len == strlen("to the host\n"));

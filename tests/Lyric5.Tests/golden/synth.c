@@ -501,7 +501,7 @@ LyrArr * lyr_std_core_cloneArray_int__c18945da(LyrArr *l0_xs);
 lyr_opt_i64 lyr_std_core_cloneOptional_int__eb36f321(lyr_opt_i64 l0_o);
 LyrStr * lyr_std_core__extend__string_clone_b1ede3e7(LyrStr *l0_this);
 void lyr_std_core__default__Hasher_std_hash_FixedHasher_writeInt_d4f17b6b(lyr_ty_std_hash_FixedHasher *l0_this, int64_t l1_v);
-int64_t lyr_std_core_cloneArray_int___lambda15__5355ad0d(void *lyr_env, int64_t l1_i, LyrErr **lyr_err);
+int64_t lyr_std_core_cloneArray_int___lambda16__d14e24a2(void *lyr_env, int64_t l1_i, LyrErr **lyr_err);
 LyrStr * lyr_std_core_debugArray_int__cdf07f0c(LyrArr *l0_xs);
 LyrStr * lyr_std_core_debugOptional_int__dfcf44e3(lyr_opt_i64 l0_o);
 LyrStr * lyr_app_main__extend__Inner_debug_73e9e85e(lyr_ty_app_main_Inner *l0_this);
@@ -15841,7 +15841,7 @@ extern const LyrDesc lyr_desc_arr_i64;
 LyrArr * lyr_std_core_arrayOf_int__never__ee22aa54(int64_t l0_n, lyr_fn_i64_to_i64 l1_f);
 int64_t lyr_std_core__extend__int_clone_535f4ead(int64_t l0_this);
 LyrArr * lyr_std_core_cloneArray_int__c18945da(LyrArr *l0_xs);
-int64_t lyr_std_core_cloneArray_int___lambda15__5355ad0d(void *lyr_env, int64_t l1_i, LyrErr **lyr_err);
+int64_t lyr_std_core_cloneArray_int___lambda16__d14e24a2(void *lyr_env, int64_t l1_i, LyrErr **lyr_err);
 
 #line _ "stdlib5/std/core.lyr"
 LyrArr * lyr_std_core_cloneArray_int__c18945da(LyrArr *l0_xs) {
@@ -15871,7 +15871,7 @@ bb0:;
 #line _
     LYR_WRITE_BARRIER(t3, &t3->f_xs, t2);
 #line _
-    t4 = (lyr_fn_i64_to_i64){ lyr_std_core_cloneArray_int___lambda15__5355ad0d, t3 };
+    t4 = (lyr_fn_i64_to_i64){ lyr_std_core_cloneArray_int___lambda16__d14e24a2, t3 };
 #line _
     t5 = lyr_std_core_arrayOf_int__never__ee22aa54(t1, t4);
 #line _
@@ -15879,7 +15879,7 @@ bb0:;
 }
 
 #line _ "stdlib5/std/core.lyr"
-int64_t lyr_std_core_cloneArray_int___lambda15__5355ad0d(void *lyr_env, int64_t l1_i, LyrErr **lyr_err) {
+int64_t lyr_std_core_cloneArray_int___lambda16__d14e24a2(void *lyr_env, int64_t l1_i, LyrErr **lyr_err) {
 #line _
     LYR_STACK_CHECK();
 #line _

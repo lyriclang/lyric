@@ -20,8 +20,8 @@ void lyr_gc_set_heap_limit(size_t bytes);
 static int started;
 static LyrConfig config;
 
-int lyr_init(const LyrConfig *given) {
-    if (started) return -1;
+LyrStatus lyr_init(const LyrConfig *given) {
+    if (started) return LYR_ERROR;
     if (given) config = *given;
     lyr_gc_init();
     if (config.heap_limit) lyr_gc_set_heap_limit(config.heap_limit);
@@ -38,7 +38,7 @@ int lyr_init(const LyrConfig *given) {
     SetConsoleOutputCP(CP_UTF8);
 #endif
     started = 1;
-    return 0;
+    return LYR_OK;
 }
 
 void lyr_shutdown(void) {

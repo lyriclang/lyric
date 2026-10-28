@@ -1,0 +1,4 @@
+[package]
+name = "tally"
+version = "0.1.0"
+description = "A Lyric library a C program embeds: exports as tasks, the host's pump, errors and panics as a status (design/v5/spec/13 M14 S8)"
