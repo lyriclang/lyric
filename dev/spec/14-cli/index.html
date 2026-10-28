@@ -680,45 +680,70 @@ lldb-dap reads it is reported, not gated.</li>
 <p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>ToolchainCommandTests</code>, against
 a mirror served on the machine): a conformance case fetches nothing.</p>
 <ol>
-<li><strong>The home.</strong> Toolchains are installed side by side under <code>~/.lyric</code> — or the directory
+<li><p><strong>The home.</strong> Toolchains are installed side by side under <code>~/.lyric</code> — or the directory
 <strong><code>LYRIC_HOME</code></strong> names: <code>toolchains/&lt;version&gt;/</code> holds each as its archive unpacked it,
 <code>config.toml</code> names the default (<code>default = &quot;&lt;version&gt;&quot;</code>, the one key it takes), and <code>bin</code> is a
 link to the default's directory — a symbolic link, on Windows a junction —, so that <code>bin</code> on the
-<code>PATH</code> runs the default. A directory an install has not finished is no toolchain.</li>
-<li><strong><code>lyric toolchain install &lt;version|dev|stable&gt;</code></strong> installs a toolchain for this machine's
+<code>PATH</code> runs the default. A directory an install has not finished is no toolchain.</p>
+</li>
+<li><p><strong><code>lyric toolchain install &lt;version|dev|stable&gt;</code></strong> installs a toolchain for this machine's
 target. <code>dev</code> and <code>stable</code> name the newest version of their channel; a version is one its
 channel lists, written with its build part (<code>+…</code>) or without. A development build's version
 (<code>-dev.…</code>) is the <code>dev</code> channel's, every other the <code>stable</code> channel's. The first toolchain
-installed becomes the default. A version installed already is said and fetched no further.</li>
-<li><strong>What an install trusts.</strong> The channel's index is fetched with its signature and checked with
+installed becomes the default. A version installed already is said and fetched no further.</p>
+</li>
+<li><p><strong>What an install trusts.</strong> The channel's index is fetched with its signature and checked with
 the key the toolchain carries; the archive is fetched no further than the size the index gives
 and checked against its SHA-256; it is unpacked beside the toolchains and checked against its
 own <code>toolchain.json</code> — its version, its target and every file; only then is it moved into
 place. A difference anywhere installs nothing (<code>LYR-CLI0024</code>), and a run cut short leaves
-nothing a later one counts as installed.</li>
-<li><strong>Where from.</strong> The index and the archives come from the mirror, and from GitHub's releases
+nothing a later one counts as installed.</p>
+</li>
+<li><p><strong>Where from.</strong> The index and the archives come from the mirror, and from GitHub's releases
 where the mirror cannot be reached; a signature or a hash that does not hold is never routed
 around. <strong><code>LYRIC_MIRROR</code></strong> names another mirror in place of both, and <strong><code>LYRIC_MIRROR_KEY</code></strong>
 the key its signatures are checked with — set without a mirror, it is refused. A toolchain
-that carries no key installs only from such a mirror.</li>
-<li><strong><code>lyric toolchain list</code></strong> names the installed toolchains, the newest first, the default
+that carries no key installs only from such a mirror.</p>
+</li>
+<li><p><strong><code>lyric toolchain list</code></strong> names the installed toolchains, the newest first, the default
 marked; with <strong><code>--available</code></strong>, the versions both channels offer, with their dates, those
 installed marked. A channel that cannot be fetched is said, and is an error only where neither
-can.</li>
-<li><strong><code>lyric toolchain default [&lt;version&gt;]</code></strong> says the default, or makes the installed version the
+can.</p>
+</li>
+<li><p><strong><code>lyric toolchain default [&lt;version&gt;]</code></strong> says the default, or makes the installed version the
 default: <code>config.toml</code> written, <code>bin</code> pointed at it. A <code>bin</code> that is no link is refused, and
-left as it is.</li>
-<li><strong><code>lyric toolchain remove &lt;version&gt;</code></strong> removes an installed toolchain; not the default, nor the
-toolchain the command runs from (<code>LYR-CLI0025</code>).</li>
-<li><strong><code>lyric toolchain update</code></strong> installs the newest version of the default's channel beside the
+left as it is.</p>
+</li>
+<li><p><strong><code>lyric toolchain remove &lt;version&gt;</code></strong> removes an installed toolchain; not the default, nor the
+toolchain the command runs from (<code>LYR-CLI0025</code>).</p>
+</li>
+<li><p><strong><code>lyric toolchain update</code></strong> installs the newest version of the default's channel beside the
 default and makes it the default; the old one stays until it is removed. Where the default is
-the newest, it is said.</li>
-<li>While an archive is fetched, its progress is drawn on the standard error where that is a
-terminal, and nowhere else.</li>
-<li>Every refusal is the environment's, exit 2: an action or a version missing, an unknown action,
+the newest, it is said.</p>
+</li>
+<li><p>While an archive is fetched, its progress is drawn on the standard error where that is a
+terminal, and nowhere else.</p>
+</li>
+<li><p>Every refusal is the environment's, exit 2: an action or a version missing, an unknown action,
 <code>--available</code> beside another action (§1.3); a toolchain that cannot be fetched
 (<code>LYR-CLI0023</code>); one that is not what its index says (<code>LYR-CLI0024</code>); a change the installed
-toolchains refuse (<code>LYR-CLI0025</code>).</li>
+toolchains refuse (<code>LYR-CLI0025</code>).</p>
+</li>
+<li><p><strong>Which toolchain runs a command.</strong> Before a verb runs, the toolchain it should run with is
+decided: <strong><code>LYRIC_TOOLCHAIN</code></strong> — <code>local</code> for the toolchain that was started, or an installed
+version, written with its build part or without (one not installed is refused,
+<code>LYR-CLI0025</code>) — over the <code>toolchain</code> the package the command runs in asks for
+(<a href="../../spec/15-project/">15 §1</a> rule 6), a least version. The toolchain that was started runs the
+command where it is what is asked for; else the default, where it is; else the newest
+installed that is. Another toolchain is <strong>handed the command</strong> as it was given — on Unix in
+place of the process, on Windows as a child whose exit is the command's — with
+<strong><code>LYRIC_TOOLCHAIN_FROM</code></strong> set, and a command that carries it is never handed on again. Where
+no installed toolchain is what the package asks for, a terminal is offered the least stable
+version that is, installed on a yes; elsewhere the verb runs and refuses the package
+(<code>LYR-PKG0009</code>). <code>toolchain</code>, <code>help</code>, <code>explain</code>, <code>completions</code>, <code>new</code> and <code>init</code> are never
+handed on, and only the package the command runs in is read — a dependency's pin is the
+build's to check.</p>
+</li>
 </ol>
 <h3 id="131-the-archive-the-index-and-the-signature-informative">13.1 The archive, the index and the signature <em>(informative)</em></h3>
 <ul>

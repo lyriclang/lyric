@@ -2709,7 +2709,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/14-cli/">14-cli</a></td>
 <td>the installed toolchains refuse the change</td>
-<td><code>lyric toolchain default</code> or <code>remove</code> names a version that is not installed, <code>remove</code> names the default or the toolchain that runs the command, <code>update</code> finds no default, or <code>config.toml</code> under <code>LYRIC_HOME</code> is not one the toolchain reads. The exit code is 2.</td>
+<td><code>lyric toolchain default</code> or <code>remove</code>, or <code>LYRIC_TOOLCHAIN</code>, names a version that is not installed, <code>remove</code> names the default or the toolchain that runs the command, <code>update</code> finds no default, an installed toolchain a command is handed to cannot be run, or <code>config.toml</code> under <code>LYRIC_HOME</code> is not one the toolchain reads. The exit code is 2.</td>
 </tr>
 </tbody>
 </table>

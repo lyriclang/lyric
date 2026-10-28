@@ -50,6 +50,24 @@ lyric 5.0.0-dev.20261023+6d7bd38
 <p>The runtime comes prebuilt for your system. A build with another C compiler than zig 0.16.0, for another
 target, or with another collector or a sanitizer builds it from its source first, once; that build
 takes a little longer than the ones after it.</p>
+<h2 id="several-toolchains">Several toolchains</h2>
+<p><code>lyric toolchain</code> keeps toolchains side by side under <code>~/.lyric</code> (<code>LYRIC_HOME</code> puts them elsewhere)
+and checks each before it is in place: the channel's list is signed, and every archive is checked
+against it. <code>~/.lyric/bin</code> on your <code>PATH</code> runs the default:</p>
+<pre><code class="language-sh">lyric toolchain install stable     # or dev, or a version such as 5.0.0
+lyric toolchain list               # the installed ones; --available, what the channels offer
+lyric toolchain default 5.0.0
+lyric toolchain update             # the newest of the default's channel, beside it</code></pre>
+<p>A package can name the least toolchain it needs, in <code>lyric.toml</code>:</p>
+<pre><code class="language-toml">[package]
+name = "hello"
+version = "0.1.0"
+toolchain = "5.1"</code></pre>
+<p>A command in that package then runs with an installed toolchain that is 5.1 or later — the default
+where it is — whichever one you started; at a terminal, one is offered for installing where none
+is. <code>LYRIC_TOOLCHAIN=local</code> runs the one you started, and <code>LYRIC_TOOLCHAIN=5.1.0</code> a version.</p>
+<p>The channels are published from the first signed release on; until then <code>lyric toolchain</code> installs
+only from a mirror of your own, which <code>LYRIC_MIRROR</code> names with its key in <code>LYRIC_MIRROR_KEY</code>.</p>
 <h2 id="a-package">A package</h2>
 <p>A program lives in a <strong>package</strong>: a directory with a manifest, <code>lyric.toml</code>, and its source under
 <code>src/</code>. <code>lyric new</code> makes one:</p>
