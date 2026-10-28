@@ -325,7 +325,7 @@ public class VendorTests
     /// <summary>A server on the loopback answering every request with one file, counting them.</summary>
     private sealed class FileServer : IDisposable
     {
-        private readonly HttpListener _listener = new();
+        private HttpListener _listener;
         private readonly byte[] _bytes;
         private readonly HttpStatusCode _status;
         private int _requests;
@@ -334,14 +334,24 @@ public class VendorTests
         {
             _bytes = bytes;
             _status = status;
-            var port = FreePort();
-            Url = $"http://127.0.0.1:{port}/archive/v1";
-            _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
-            _listener.Start();
+            // a free port can be taken between asking for it and binding it: ask again
+            for (var attempt = 1; ; attempt++)
+            {
+                var port = FreePort();
+                _listener = new HttpListener();
+                _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+                try
+                {
+                    _listener.Start();
+                    Url = $"http://127.0.0.1:{port}/archive/v1";
+                    break;
+                }
+                catch (HttpListenerException) when (attempt < 5) { _listener.Close(); }
+            }
             _ = Serve();
         }
 
-        public string Url { get; }
+        public string Url { get; } = "";
 
         public int Requests => Volatile.Read(ref _requests);
 
@@ -366,11 +376,13 @@ public class VendorTests
             return ((IPEndPoint)probe.LocalEndpoint).Port;
         }
 
+        /// <summary><c>Close</c> alone: after <c>Stop</c>, the managed listener on Linux binds the
+        /// port again to remove its prefix, and that can fail (seen in CI: address already in use).</summary>
         public void Dispose()
         {
             if (!_listener.IsListening) return;
-            _listener.Stop();
-            _listener.Close();
+            try { _listener.Close(); }
+            catch (HttpListenerException) { }
         }
     }
 }
