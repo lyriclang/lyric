@@ -33,7 +33,7 @@ C into one native binary, so besides the toolchain you need a C compiler.</p>
 <h2 id="installing">Installing</h2>
 <p>Lyric 5 is in development; nothing is released yet. Every change to <code>main</code> is built into the <code>dev</code>
 prerelease on GitHub: <a href="https://github.com/lyriclang/lyric/releases/tag/dev">https://github.com/lyriclang/lyric/releases/tag/dev</a>. Take the archive for
-your system — Linux (x64 or ARM64), macOS (ARM64) or Windows (x64) — and unpack it where you keep
+your system — Linux (x64 or ARM64), macOS (ARM64 or x64) or Windows (x64) — and unpack it where you keep
 tools:</p>
 <pre><code class="language-sh">mkdir -p ~/.local/lyric
 tar -xzf lyric-5.0.0-dev.*-linux-x64.tar.gz -C ~/.local/lyric
@@ -47,8 +47,9 @@ clang or gcc work too. <code>lyric5 --version</code> says which one it found:</p
 lyric 5.0.0-dev.20261023+6d7bd38
   edition     5
   c compiler  zig 0.16.0 (/usr/bin/zig)</code></pre>
-<p>The first build of a program also builds the runtime for your system, once; it takes a little
-longer than the ones after it.</p>
+<p>The runtime comes prebuilt for your system. A build with another C compiler than zig 0.16.0, for another
+target, or with another collector or a sanitizer builds it from its source first, once; that build
+takes a little longer than the ones after it.</p>
 <h2 id="a-package">A package</h2>
 <p>A program lives in a <strong>package</strong>: a directory with a manifest, <code>lyric.toml</code>, and its source under
 <code>src/</code>. <code>lyric new</code> makes one:</p>

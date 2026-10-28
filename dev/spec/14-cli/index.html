@@ -446,6 +446,13 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <td>—</td>
 </tr>
 <tr>
+<td><code>toolchain</code></td>
+<td><code>&lt;install|list|default|remove|update&gt; [&lt;version&gt;]</code></td>
+<td><code>--available</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>explain</code></td>
 <td><code>&lt;code&gt;</code></td>
 <td>—</td>
@@ -663,6 +670,68 @@ lldb-dap reads it is reported, not gated.</li>
 <li>A <code>launch</code> with a <strong><code>test</code></strong> debugs the package's tests whose names hold it: the program
 <code>lyric test --no-run -f &lt;test&gt;</code> builds (§3), run in the package's directory as <code>test</code> runs it.</li>
 </ol>
+<h2 id="13-toolchain">13. <code>toolchain</code></h2>
+<p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 T1–T8</a>,
+<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/14-website.md">14 C9</a>)</p>
+<p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>ToolchainCommandTests</code>, against
+a mirror served on the machine): a conformance case fetches nothing.</p>
+<ol>
+<li><strong>The home.</strong> Toolchains are installed side by side under <code>~/.lyric</code> — or the directory
+<strong><code>LYRIC_HOME</code></strong> names: <code>toolchains/&lt;version&gt;/</code> holds each as its archive unpacked it,
+<code>config.toml</code> names the default (<code>default = &quot;&lt;version&gt;&quot;</code>, the one key it takes), and <code>bin</code> is a
+link to the default's directory — a symbolic link, on Windows a junction —, so that <code>bin</code> on the
+<code>PATH</code> runs the default. A directory an install has not finished is no toolchain.</li>
+<li><strong><code>lyric toolchain install &lt;version|dev|stable&gt;</code></strong> installs a toolchain for this machine's
+target. <code>dev</code> and <code>stable</code> name the newest version of their channel; a version is one its
+channel lists, written with its build part (<code>+…</code>) or without. A development build's version
+(<code>-dev.…</code>) is the <code>dev</code> channel's, every other the <code>stable</code> channel's. The first toolchain
+installed becomes the default. A version installed already is said and fetched no further.</li>
+<li><strong>What an install trusts.</strong> The channel's index is fetched with its signature and checked with
+the key the toolchain carries; the archive is fetched no further than the size the index gives
+and checked against its SHA-256; it is unpacked beside the toolchains and checked against its
+own <code>toolchain.json</code> — its version, its target and every file; only then is it moved into
+place. A difference anywhere installs nothing (<code>LYR-CLI0024</code>), and a run cut short leaves
+nothing a later one counts as installed.</li>
+<li><strong>Where from.</strong> The index and the archives come from the mirror, and from GitHub's releases
+where the mirror cannot be reached; a signature or a hash that does not hold is never routed
+around. <strong><code>LYRIC_MIRROR</code></strong> names another mirror in place of both, and <strong><code>LYRIC_MIRROR_KEY</code></strong>
+the key its signatures are checked with — set without a mirror, it is refused. A toolchain
+that carries no key installs only from such a mirror.</li>
+<li><strong><code>lyric toolchain list</code></strong> names the installed toolchains, the newest first, the default
+marked; with <strong><code>--available</code></strong>, the versions both channels offer, with their dates, those
+installed marked. A channel that cannot be fetched is said, and is an error only where neither
+can.</li>
+<li><strong><code>lyric toolchain default [&lt;version&gt;]</code></strong> says the default, or makes the installed version the
+default: <code>config.toml</code> written, <code>bin</code> pointed at it. A <code>bin</code> that is no link is refused, and
+left as it is.</li>
+<li><strong><code>lyric toolchain remove &lt;version&gt;</code></strong> removes an installed toolchain; not the default, nor the
+toolchain the command runs from (<code>LYR-CLI0025</code>).</li>
+<li><strong><code>lyric toolchain update</code></strong> installs the newest version of the default's channel beside the
+default and makes it the default; the old one stays until it is removed. Where the default is
+the newest, it is said.</li>
+<li>While an archive is fetched, its progress is drawn on the standard error where that is a
+terminal, and nowhere else.</li>
+<li>Every refusal is the environment's, exit 2: an action or a version missing, an unknown action,
+<code>--available</code> beside another action (§1.3); a toolchain that cannot be fetched
+(<code>LYR-CLI0023</code>); one that is not what its index says (<code>LYR-CLI0024</code>); a change the installed
+toolchains refuse (<code>LYR-CLI0025</code>).</li>
+</ol>
+<h3 id="131-the-archive-the-index-and-the-signature-informative">13.1 The archive, the index and the signature <em>(informative)</em></h3>
+<ul>
+<li><strong>The archive</strong> of a toolchain is one per Tier 1 target: <code>.zip</code> for Windows, <code>.tar.gz</code> for the
+others, holding the binary, <code>stdlib5/</code>, the runtime as C source and prebuilt for the archive's
+target, <code>lldb/</code>, <code>LICENSE</code> and the notices, and <strong><code>toolchain.json</code></strong> —
+<code>{&quot;version&quot;, &quot;triple&quot;, &quot;files&quot;: [{&quot;path&quot;, &quot;size&quot;, &quot;sha256&quot;}, …]}</code>, every other file with its
+size and SHA-256.</li>
+<li><strong>The index</strong> of a channel is <code>dev.json</code> or <code>stable.json</code>:
+<code>{&quot;channel&quot;, &quot;versions&quot;: [{&quot;version&quot;, &quot;date&quot;, &quot;archives&quot;: {&quot;&lt;triple&gt;&quot;: {&quot;file&quot;, &quot;size&quot;, &quot;sha256&quot;}}}]}</code>.
+On a mirror it lies at <code>&lt;base&gt;/&lt;channel&gt;.json</code>, its archives under <code>&lt;base&gt;/&lt;channel&gt;/</code>; on GitHub
+the release <code>dev</code> carries the development build with <code>dev.json</code>, the release <code>channels</code> carries
+<code>stable.json</code>, and each stable version has its release <code>v&lt;version&gt;</code>.</li>
+<li><strong>The signature</strong> is minisign's, beside the file as <code>&lt;file&gt;.minisig</code>: Ed25519 over the file's
+BLAKE2b-512 hash, and over that signature with its trusted comment; minisign's legacy form,
+which signs the file itself, is refused.</li>
+</ul>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -683,6 +752,8 @@ lldb-dap reads it is reported, not gated.</li>
 <li class="level-2"><a href="#10-api">10. api</a></li>
 <li class="level-2"><a href="#11-lsp">11. lsp</a></li>
 <li class="level-2"><a href="#12-dap">12. dap</a></li>
+<li class="level-2"><a href="#13-toolchain">13. toolchain</a></li>
+<li class="level-3"><a href="#131-the-archive-the-index-and-the-signature-informative">13.1 The archive, the index and the signature (informative)</a></li>
 </ul>
 </aside>
 </div>

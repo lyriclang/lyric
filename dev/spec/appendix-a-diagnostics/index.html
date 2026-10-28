@@ -2690,6 +2690,27 @@ code is no longer reported, and its number is not given again.</p>
 <td>the revision <code>lyric api --diff</code> names cannot be read</td>
 <td><code>lyric api --diff &lt;rev&gt;</code> runs in no git repository, names a revision git does not know, or the revision holds no <code>lyric.toml</code> where the package is. The exit code is 2.</td>
 </tr>
+<tr>
+<td>LYR-CLI0023</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a toolchain cannot be fetched</td>
+<td><code>lyric toolchain</code> reaches neither the mirror nor GitHub, the channel has no such version or no archive for this machine, or there is no key to check a signature with. The exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-CLI0024</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a toolchain fetched is not what its index says</td>
+<td>A channel's index does not carry a signature the toolchain's key made, or an archive's size, SHA-256 or <code>toolchain.json</code> differs from what the index and the archive itself list. Nothing is installed; the exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-CLI0025</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>the installed toolchains refuse the change</td>
+<td><code>lyric toolchain default</code> or <code>remove</code> names a version that is not installed, <code>remove</code> names the default or the toolchain that runs the command, <code>update</code> finds no default, or <code>config.toml</code> under <code>LYRIC_HOME</code> is not one the toolchain reads. The exit code is 2.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a11-ir--the-lowering">A.11 IR — The lowering</h2>

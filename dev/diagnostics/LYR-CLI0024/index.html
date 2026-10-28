@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYR-CLI0024 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">CLI</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../diagnostics/">All codes</a></li>
+<li><a href="../../diagnostics/LYR-CLI0001/">LYR-CLI0001</a></li>
+<li><a href="../../diagnostics/LYR-CLI0002/">LYR-CLI0002</a></li>
+<li><a href="../../diagnostics/LYR-CLI0003/">LYR-CLI0003</a></li>
+<li><a href="../../diagnostics/LYR-CLI0004/">LYR-CLI0004</a></li>
+<li><a href="../../diagnostics/LYR-CLI0005/">LYR-CLI0005</a></li>
+<li><a href="../../diagnostics/LYR-CLI0006/">LYR-CLI0006</a></li>
+<li><a href="../../diagnostics/LYR-CLI0007/">LYR-CLI0007</a></li>
+<li><a href="../../diagnostics/LYR-CLI0008/">LYR-CLI0008</a></li>
+<li><a href="../../diagnostics/LYR-CLI0009/">LYR-CLI0009</a></li>
+<li><a href="../../diagnostics/LYR-CLI0010/">LYR-CLI0010</a></li>
+<li><a href="../../diagnostics/LYR-CLI0011/">LYR-CLI0011</a></li>
+<li><a href="../../diagnostics/LYR-CLI0012/">LYR-CLI0012</a></li>
+<li><a href="../../diagnostics/LYR-CLI0013/">LYR-CLI0013</a></li>
+<li><a href="../../diagnostics/LYR-CLI0014/">LYR-CLI0014</a></li>
+<li><a href="../../diagnostics/LYR-CLI0015/">LYR-CLI0015</a></li>
+<li><a href="../../diagnostics/LYR-CLI0016/">LYR-CLI0016</a></li>
+<li><a href="../../diagnostics/LYR-CLI0017/">LYR-CLI0017</a></li>
+<li><a href="../../diagnostics/LYR-CLI0018/">LYR-CLI0018</a></li>
+<li><a href="../../diagnostics/LYR-CLI0019/">LYR-CLI0019</a></li>
+<li><a href="../../diagnostics/LYR-CLI0020/">LYR-CLI0020</a></li>
+<li><a href="../../diagnostics/LYR-CLI0021/">LYR-CLI0021</a></li>
+<li><a href="../../diagnostics/LYR-CLI0022/">LYR-CLI0022</a></li>
+<li><a href="../../diagnostics/LYR-CLI0023/">LYR-CLI0023</a></li>
+<li><a class="current" href="../../diagnostics/LYR-CLI0024/">LYR-CLI0024</a></li>
+<li><a href="../../diagnostics/LYR-CLI0025/">LYR-CLI0025</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
+<h1>LYR-CLI0024</h1>
+<p class="code-title">a toolchain fetched is not what its index says</p>
+<p class="meta">error · <a href="../../spec/14-cli/">spec 14-cli</a></p>
+<p>A channel's index does not carry a signature the toolchain's key made, or an archive's size, SHA-256 or <code>toolchain.json</code> differs from what the index and the archive itself list. Nothing is installed; the exit code is 2.</p>
+<h2 id="explanation">Explanation</h2>
+<p>An install trusts the signature, not the server: the index is signed with the project's key, and it gives each archive's size and SHA-256; the archive lists every file it holds in <code>toolchain.json</code>. A difference anywhere stops the install before the toolchain is in place, and the mirror is not routed around — a mirror that serves a forged index is not one to fall back from quietly.</p>
+<p>Try again later or from GitHub (<code>LYRIC_MIRROR</code> unset); if it persists, the mirror is broken or tampered with.</p>
+<h2 id="example">Example</h2>
+<pre><code>$ lyric5 toolchain install dev
+error[LYR-CLI0024]: lyric-5.0.0-dev.20261028-linux-x64.tar.gz has the SHA-256 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08, and its index gives 4e4c294b331f7a2099a379bec34b9f9fc03dc46ab465d998f4d683da53487e6d
+  = help: nothing was installed</code></pre>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#explanation">Explanation</a></li>
+<li class="level-2"><a href="#example">Example</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>
