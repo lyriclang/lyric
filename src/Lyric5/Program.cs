@@ -63,6 +63,7 @@ public static partial class Program
             "update" => Update(rest),
             "add" => Add(rest),
             "remove" => Remove(rest),
+            "bindgen" => BindgenVerb(rest),
             "clean" => Clean(rest),
             "metadata" => Metadata(rest),
             "toolchain" => Toolchain(rest),

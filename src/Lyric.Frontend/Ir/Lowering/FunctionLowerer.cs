@@ -8513,10 +8513,14 @@ internal sealed class FunctionLowerer
                 args.Add(passed);
                 continue;
             }
-            // a string handed to a C function's 'CStr': its bytes, for the call
+            // a string handed to a C function's 'CStr': its bytes, for the call — a '?CStr' takes
+            // them as the 'CStr' they are
             if (_types.IsCStrArgument(arguments[i]))
             {
-                args.Add(StringAsCStr(arguments[i], import.ParamTypes[args.Count], span));
+                var parameter = import.ParamTypes[args.Count];
+                var cstrType = parameter is IrOptionalType optional ? optional.Inner : parameter;
+                var cstr = StringAsCStr(arguments[i], cstrType, span);
+                args.Add(parameter is IrOptionalType ? Coerce(cstr, cstrType, parameter, span) : cstr);
                 continue;
             }
             if (shape?.Params[i + offset] is not { Struct: { } structType } flat)

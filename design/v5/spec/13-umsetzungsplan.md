@@ -1509,6 +1509,26 @@ und zip, das oberste Verzeichnis, der fehlende und der falsche Hash, `--offline`
 ein anderes Ziel bleibt ungeholt, `lyric update` bewegt einen Zweig, `add --vendor`; die Ablehnungen des Manifests
 als Konformanzfälle, ein Git-Baum über die `repos/` der Suite.
 
+### Nachtrag 2026-10-28 — L4: der Generator, gemessen
+
+Gemessen an zig 0.16 mit einem Header aus Struct, anonymem Struct mit `typedef`, undurchsichtigem Struct, Enum mit
+`1 << 3`, Funktionszeiger-`typedef`, Variadik, Union, Bitfeld, `static inline`, Variable und vier `#define`s:
+`zig cc -target <t> -Xclang -ast-dump=json -fsyntax-only` schreibt den AST (Exit 1 mit „FileNotFound“ danach,
+wie 11 sagt); jede Deklaration trägt ihren C-Typ als Text (`qualType`), ein Enum-Wert steht ausgerechnet im
+`ConstantExpr`, `variadic`, `isBitfield`, `storageClass` und `inline` stehen am Knoten; die Datei eines Orts nur,
+wo sie wechselt. **Makros fehlen im AST** — sie kommen aus `-E -dM`. Entschieden:
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| L4-1 | **Erzeugt, wo die Skripte laufen** (`BuildScripts.Run`, das jeder Bau, `check`, `test`, `bench`, `--emit` vorher ruft), je Ziel nach `out/cache/bindings/<tripel>/<paket>/`, geladen wie `gen/` über eine Wurzel je Paket; neu nur, wo sich ein gelesener Header, `include`, `defines`, Ziel oder Werkzeug änderte (ein Schlüssel mit den Hashes jeder gelesenen Datei). Der Editor und `doc` lesen, was der letzte Bau für den Wirt schrieb | eine eigene Stufe je Verb (sieben Aufrufstellen) |
+| L4-2 | **`check` liest die Bäume, die seine Bindungen brauchen** — ein Modul, das `game.rl` importiert, wird sonst nicht geprüft. 15 §5 Regel 15 („`check` liest keinen“) wird darum enger: keinen außer für eine Bindung | Bindungen in `check` auslassen (der Importfehler wäre falsch) |
+| L4-3 | **Ein Zeiger in einem Feld** ist `Ptr<T>`, `CStr` oder der Funktionszeigertyp, nicht optional — 13 §3 Regel 4 nimmt in Feldern kein `?` (offener Punkt 289); C's `null` dort ist Sache des Programms. Als Parameter und Ergebnis `?Ptr<T>`/`?CStr` wie die Spec sagt | das Feld oder den Struct auslassen (raylib verlöre die Hälfte) |
+| L4-4 | **Mehrdimensionale Arrays** in Feldern werden flach: `float m[4][4]` → `float32[16]` — dasselbe Layout, und 13 §3 Regel 4 nimmt kein Array von Arrays | auslassen |
+| L4-5 | **Konstanten** sind `pub let`: ein Enum-Wert vom Ganzzahltyp seines Enums, ein ganzzahliges `#define` als `int` (ein `uint` über `int`s Bereich), ein String-`#define` als `string`. Ein leeres `#define` (Include-Wächter) wird übergangen, ein anderes ohne Ganzzahl oder String aufgelistet | `const` (gibt es nicht) |
+| L4-6 | **Nur zig cc oder clang** schreibt den AST; mit gcc lehnt der Bau ab (`BLD0005`) und nennt `LYRIC_CC` | einen eigenen C-Parser |
+| L4-7 | **Kein Lint** schaut in das Modul (nicht nur `naming` und `dead-code`): es ist geschrieben, nicht verfasst — die Datei zählt wie eine fremde | `@Allow` an jeder Deklaration (`useless-allow` schlüge an) |
+| L4-8 | **`lyric bindgen <header> [--target <tripel>]`**: im Paket mit dessen `include` und `defines` für das Ziel, ein `@name/`-Pfad aus dessen Bäumen; außerhalb mit keinen | Optionen für `-I`/`-D` (eine zweite Stelle für das, was das Manifest sagt) |
+
 ## Nachtrag 2026-10-28 — der Plan für M15
 
 M15 nach seiner Zeile oben, 11 W9 (T1–T8), 11 C4/C9/C10, 14 C9 und den Uhren, die auf M15 zeigen: **Distribution** —

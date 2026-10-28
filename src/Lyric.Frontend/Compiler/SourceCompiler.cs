@@ -203,7 +203,8 @@ public static class SourceCompiler
                 timings.Verification);
         // the lints' levels (16 §5), once every warning is in
         if (compilation.Lyric5Modules)
-            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps);
+            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
+                Written(options, sources));
         return new CompileResult(sources, diagnostics, ir, model)
             { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive };
     }
@@ -366,6 +367,15 @@ public static class SourceCompiler
     /// precedence rule would let a file at '&lt;program&gt;/std/io/console.lyr' shadow the standard
     /// library silently, and silently is the part that makes it a trap.</para>
     /// </summary>
+    /// <summary>Whether a file is one the toolchain wrote from a header: no lint looks at it.</summary>
+    private static Func<FileId, bool>? Written(CompilerOptions options, SourceManager sources)
+    {
+        if (options.PackageBindingRoots is not { Count: > 0 } roots) return null;
+        var prefixes = roots.Values.Select(r => Path.TrimEndingDirectorySeparator(Path.GetFullPath(r)) + Path.DirectorySeparatorChar).ToList();
+        return file => sources.GetPath(file) is { Length: > 0 } path
+                       && prefixes.Any(p => Path.GetFullPath(path).StartsWith(p, StringComparison.Ordinal));
+    }
+
     private static Func<string[], LoadedModule?> BuildModuleLoader(
         SourceManager sources, DiagnosticEngine diagnostics, CompilerOptions options,
         string fallbackSourceRoot)
@@ -413,12 +423,24 @@ public static class SourceCompiler
                 Load: StdlibLoader.ForProject(entry.Value, sources, diagnostics, options.SourceOverlay)),
             StringComparer.Ordinal);
 
+        // A package's bindings: 'app.rl' is rl.lyr there, what the build made of a header.
+        var bound = options.PackageBindingRoots?.ToDictionary(
+            entry => entry.Key,
+            entry => (Root: entry.Value,
+                Load: StdlibLoader.ForProject(entry.Value, sources, diagnostics, options.SourceOverlay)),
+            StringComparer.Ordinal);
+
         var loader = (string[] modulePath) =>
         {
             if (modulePath is ["std", ..]) return fromStdlib(modulePath);
 
             if (packages is not null)
             {
+                // the build refuses a module that lies under src/, gen/ or tests/ too (RES0016)
+                if (modulePath is [var binder, _, ..] && bound is not null
+                    && bound.TryGetValue(binder, out var bindingRoot) && NamedExactly(bindingRoot.Root, modulePath[1..])
+                    && File.Exists(Path.Combine([bindingRoot.Root, .. modulePath[1..^1], modulePath[^1] + ".lyr"])))
+                    return bindingRoot.Load(modulePath[1..]);
                 // 'lyric test' refuses a module that lies under both before it compiles (RES0015).
                 if (modulePath is [var owner, "tests", _, ..] && tests is not null
                     && tests.TryGetValue(owner, out var testRoot) && NamedExactly(testRoot.Root, modulePath[2..])
@@ -485,7 +507,8 @@ public static class SourceCompiler
         CompilerOptions options, SourceManager sources, SemanticModel model, EmbedReader embed, ComptimeTable? comptime)
     {
         if (compilation.Lyric5Modules)
-            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps);
+            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
+                Written(options, sources));
         return new CompileResult(sources, diagnostics, null, model)
             { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive };
     }
@@ -588,7 +611,8 @@ public static class SourceCompiler
         times.Mark(PhaseClock.Lower);
         if (ir is null) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
         if (compilation.Lyric5Modules)
-            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps);
+            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
+                Written(options, sources));
         times.Mark(PhaseClock.Lint);
 
         return new CompileResult(sources, diagnostics, ir, model)
@@ -823,6 +847,12 @@ public sealed record CompilerOptions
     /// <c>app.gen.schema</c>.
     /// </summary>
     public IReadOnlyDictionary<string, string>? PackageGenRoots { get; init; }
+
+    /// <summary>
+    /// A package's modules made from C headers (spec 15 §5.4), by the package's name: the
+    /// directory that holds them — <c>rl.lyr</c> there is <c>app.rl</c>. No lint looks at them.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? PackageBindingRoots { get; init; }
 
     /// <summary>
     /// Text to use instead of what lies on disk, by absolute file path. A module found at one of

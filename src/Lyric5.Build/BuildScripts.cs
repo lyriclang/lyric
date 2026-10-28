@@ -36,8 +36,19 @@ public sealed record ScriptDirectives(IReadOnlyList<CUnit> Sources, IReadOnlyLis
 public static class BuildScripts
 {
     /// <summary>The directives of every script of the program's packages — dependencies first, by
-    /// name, the root's last —, or the exit code of a build that stops here, reported.</summary>
+    /// name, the root's last —, or the exit code of a build that stops here, reported. Then the
+    /// packages' bindings for the target, which a script's <c>gen/</c> may feed: what runs before the
+    /// compiler, run where everything that compiles runs it.</summary>
     public static (int Exit, ScriptDirectives? Directives) Run(Project project, Target target, BuildProfile profile,
+        CCompiler compiler, string version, TextWriter error)
+    {
+        var (exit, directives) = RunScripts(project, target, profile, compiler, version, error);
+        if (directives is null) return (exit, null);
+        var bound = Bindings.Make(project, target, compiler, version, error);
+        return bound == 0 ? (exit, directives) : (bound, null);
+    }
+
+    private static (int Exit, ScriptDirectives? Directives) RunScripts(Project project, Target target, BuildProfile profile,
         CCompiler compiler, string version, TextWriter error)
     {
         if (project.Graph is not { } graph) return (0, ScriptDirectives.None);
