@@ -48,7 +48,7 @@ implementation. Source of the decisions:
 <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 Runtime</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 Tooling and interop W4/W5</a>.</p>
 </blockquote>
 <h2 id="scope">Scope</h2>
-<p>The C ABI as the one foreign boundary: the type table, <code>@Layout(C)</code>, pointers, callbacks, exports, and the embedding API (<code>lyr_init</code>, exports as tasks, <code>LyrStatus</code>). Replaces the 4.x bytecode chapter.</p>
+<p>The C ABI as the one foreign boundary: the type table, <code>@Layout(C)</code>, pointers, callbacks, exports, the embedding API (<code>lyr_init</code>, exports as tasks, <code>LyrStatus</code>), and libraries loaded while a program runs. Replaces the 4.x bytecode chapter.</p>
 <h2 id="1-the-runtime-contract-stage-0">1. The runtime contract, stage 0</h2>
 <p>What compiled code and the runtime agree on, whatever collector sits behind the runtime. The
 collector is staged (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 L1</a>):
@@ -641,6 +641,29 @@ export runs in the task that runs, as a Lyric function C calls through its point
 rule 9): its C frames are counted, it may park, and a panic in it ends the process with its
 report. Calls nest as deep as the stack lets them, without a count of their own.</li>
 </ol>
+<h2 id="6-loading-a-library">6. Loading a library</h2>
+<p>A shared library a program loads while it runs, and the C functions in it found by their names
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 H7</a>).
+A library of Lyric's own loaded this way — a second runtime in the process — is not covered.</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code>; that a program loads a library built apart and calls
+what it finds — <code>examples/ffi</code> —, in the toolchain's own tests (<code>tests/Lyric5.Tests</code>,
+<code>ExampleTests</code>).</p>
+<ol>
+<li><strong><code>std.ffi.Library.open(path)</code></strong> loads the shared library at <code>path</code> — a <code>.so</code>, <code>.dylib</code> or
+<code>.dll</code> —, as the system's loader does (<code>dlopen</code>, <code>LoadLibraryW</code>); a name without a directory goes
+where the loader looks. Where the loader refuses it, <code>open</code> throws <code>std.io</code>'s <code>IoError</code> of kind
+<code>NotFound</code>, with the path, and the loader's words as its detail.</li>
+<li><strong><code>lib.symbol&lt;F&gt;(name)</code></strong> is the symbol <code>name</code> of the library as a value of <code>F</code>, which is a C
+function's type, <code>extern &quot;C&quot; fn(…) -&gt; …</code> — any other type is refused (<code>LYR-SEM0099</code>) —, and
+<code>null</code> where the library has no such symbol. The value is called as any C function's pointer
+(§3 rule 9). The type is the program's word: the loader knows a name, not a signature, and
+nothing checks the one against the other.</li>
+<li>A <code>Library</code> is <code>Closeable</code> (<a href="../../spec/12-stdlib/">12</a>): <strong><code>close()</code></strong> gives it back to the system, and
+a second close does nothing. A function found in it is not called after the close; <code>symbol</code> on a
+closed library panics.</li>
+<li>A program that loads a library links the system's loader with it: on Linux <code>-ldl</code>, where the C
+library keeps <code>dlopen</code> apart.</li>
+</ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -658,6 +681,7 @@ report. Calls nest as deep as the stack lets them, without a count of their own.
 <li class="level-2"><a href="#3-the-type-table-stage-2">3. The type table, stage 2</a></li>
 <li class="level-2"><a href="#4-exports-and-libraries">4. Exports and libraries</a></li>
 <li class="level-2"><a href="#5-embedding">5. Embedding</a></li>
+<li class="level-2"><a href="#6-loading-a-library">6. Loading a library</a></li>
 </ul>
 </aside>
 </div>

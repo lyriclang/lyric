@@ -23,6 +23,7 @@
 <li><a href="../../std/ffi/Ptr/">Ptr</a></li>
 <li><a href="../../std/ffi/Callback/">Callback</a></li>
 <li><a href="../../std/ffi/GcHandle/">GcHandle</a></li>
+<li><a href="../../std/ffi/Library/">Library</a></li>
 <li><a href="../../std/ffi/CStr/">CStr</a></li>
 <li><a href="../../std/ffi/#fn.stash">stash()</a></li>
 <li><a href="../../std/ffi/#fn.takeStashed">takeStashed()</a></li>
@@ -56,6 +57,7 @@ function is not unsafe, and neither is <a href="../../std/ffi/Ptr/">Ptr</a> of a
 <div class="listed"><a href="../../std/ffi/Ptr/">Ptr</a> <span class="kind">struct</span> <span class="summary">— A pointer to a <code>T</code> in memory C manages, never null: <code>T *</code> where a C function takes or returns one.</span></div>
 <div class="listed"><a href="../../std/ffi/Callback/">Callback</a> <span class="kind">class</span> <span class="summary">— A Lyric closure C calls, with its state: C's <code>void *userdata</code> beside a function pointer.</span></div>
 <div class="listed"><a href="../../std/ffi/GcHandle/">GcHandle</a> <span class="kind">class</span> <span class="summary">— An object of a class held for C: the collector keeps it while the handle does, and <a href="../../std/ffi/GcHandle/#method.asPtr">GcHandle.asPtr</a> is the <code>void *</code> C keeps and hands back — the userdata of a C API that holds a Lyric object across its calls.</span></div>
+<div class="listed"><a href="../../std/ffi/Library/">Library</a> <span class="kind">class</span> <span class="summary">— A shared library loaded while the program runs — a <code>.so</code>, <code>.dylib</code> or <code>.dll</code> — and the C functions in it, found by their names.</span></div>
 <div class="listed"><a href="../../std/ffi/CStr/">CStr</a> <span class="kind">struct</span> <span class="summary">— A C string: the address of bytes a NUL ends, <code>const char *</code> at a C function's boundary.</span></div>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.stash">
