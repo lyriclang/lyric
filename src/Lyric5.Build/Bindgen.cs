@@ -36,6 +36,9 @@ public static partial class Bindgen
         "import", "as", "pub", "internal", "private", "static", "struct", "class", "enum", "interface", "extend", "fn", "mut",
         "let", "var", "if", "else", "while", "do", "for", "in", "is", "match", "break", "continue", "return", "yield", "defer",
         "try", "catch", "throw", "true", "false", "null", "this", "comptime", "inline", "quote", "macro",
+        // and the builtin types' names, which no declaration takes (03 §1.1)
+        "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64", "float", "float32", "float64",
+        "bool", "char", "string", "void",
     ];
 
     /// <summary>The module of <paramref name="header"/> for <paramref name="target"/>, its includes found
