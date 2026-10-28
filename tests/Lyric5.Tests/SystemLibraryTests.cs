@@ -119,16 +119,18 @@ public class SystemLibraryTests
         Assert.Contains($"error[LYR-BLD0004]: app links pkgdemo through pkg-config, which knows the libraries of this host, and the build is for {other.Triple}", error);
     }
 
-    /// <summary>A framework comes from the macOS SDK: a build for macOS from another host is refused.</summary>
+    /// <summary>A framework comes from the macOS SDK, which zig finds for the Mac it runs on alone: a
+    /// build for macOS from another host is refused, and from a Mac for the other Mac.</summary>
     [CrossTargetFact]
-    public void A_framework_needs_a_macOS_host()
+    public void A_framework_needs_the_build_for_the_host()
     {
-        if (OperatingSystem.IsMacOS()) return;
         var dir = PackageFixture.Package(("lyric.toml", AppManifest + "\n[native.macos]\nframeworks = [\"CoreFoundation\"]\n"),
             ("src/main.lyr", "fn main(): void {\n}\n"));
-        var (exit, _, error) = Run("build", "-C", dir, "--target", "aarch64-macos");
+        var other = Target.Tier1.First(t => t.Os == TargetOs.MacOs && !t.IsHost);
+        var (exit, _, error) = Run("build", "-C", dir, "--target", other.Triple);
         Assert.Equal(2, exit);
-        Assert.Contains("error[LYR-BLD0004]: app links the framework CoreFoundation, from the macOS SDK, and this host is not macOS", error);
+        Assert.Contains("error[LYR-BLD0004]: app links the framework CoreFoundation, from the macOS SDK, "
+                        + (OperatingSystem.IsMacOS() ? "which the C compiler finds for this Mac's own target only" : "and this host is not macOS"), error);
         // a build for the host does not need it
         Assert.Equal(0, Run("build", "-C", dir).Exit);
     }

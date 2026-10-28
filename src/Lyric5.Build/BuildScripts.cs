@@ -61,6 +61,17 @@ public static class BuildScripts
     {
         var (exit, directives) = RunScripts(project, target, profile, compiler, version, error);
         if (directives is null) return (exit, null);
+        // what only the host has is refused here, before anything compiles — check and --emit too
+        if (project.Graph is { } graph)
+            foreach (var manifest in graph.Packages.Values.OrderBy(m => m.Name, StringComparer.Ordinal))
+            {
+                try { Pipeline.SystemLibraries(manifest, manifest.NativeFor(target).With(directives.PartOf(manifest.Name)), target); }
+                catch (Pipeline.NativeRefusal refused)
+                {
+                    Say.Error(error, refused.Code, refused.Message);
+                    return (refused.Exit, null);
+                }
+            }
         var bound = Bindings.Make(project, target, compiler, version, error);
         return bound == 0 ? (exit, directives) : (bound, null);
     }

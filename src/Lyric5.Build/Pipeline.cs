@@ -340,7 +340,7 @@ public static class Pipeline
 
     /// <summary>A native part the build cannot link for its target — a framework or a library of
     /// pkg-config where the host is not the target's system —, or pkg-config that does not answer.</summary>
-    private sealed class NativeRefusal(string code, string message, int exit) : Exception(message)
+    internal sealed class NativeRefusal(string code, string message, int exit) : Exception(message)
     {
         public string Code { get; } = code;
         public int Exit { get; } = exit;
@@ -451,14 +451,17 @@ public static class Pipeline
     /// What a native part takes from the machine (spec 15 §5 rules 9–11): its <c>pkgConfig</c> names
     /// asked of pkg-config on the host, and whether its frameworks can be had — both are the host's,
     /// so a build for another system that needs one is refused before it compiles (<c>LYR-BLD0004</c>,
-    /// exit 2). A framework needs a macOS host; pkg-config, the target to be the host.
+    /// exit 2). Both need the target to be the host: zig finds the SDK's frameworks for the Mac it runs
+    /// on, and with a target named — even this Mac's own — not at all (measured with zig 0.16).
     /// </summary>
-    private static PkgConfigAnswer SystemLibraries(Manifest manifest, NativePart part, Target target)
+    internal static PkgConfigAnswer SystemLibraries(Manifest manifest, NativePart part, Target target)
     {
-        if (part.Frameworks.Count > 0 && target.Os == TargetOs.MacOs && !OperatingSystem.IsMacOS())
+        if (part.Frameworks.Count > 0 && target.Os == TargetOs.MacOs && !target.IsHost)
             throw new NativeRefusal("LYR-BLD0004",
                 $"{manifest.Name} links the framework{(part.Frameworks.Count > 1 ? "s" : "")} {string.Join(", ", part.Frameworks)}, from the macOS SDK, "
-                + $"and this host is not macOS — build for {target.Triple} on a Mac", 2);
+                + (OperatingSystem.IsMacOS()
+                    ? $"which the C compiler finds for this Mac's own target only — build for {target.Triple} on such a Mac"
+                    : $"and this host is not macOS — build for {target.Triple} on a Mac"), 2);
         if (part.PkgConfig.Count == 0) return PkgConfigAnswer.None;
         if (!target.IsHost)
             throw new NativeRefusal("LYR-BLD0004",
