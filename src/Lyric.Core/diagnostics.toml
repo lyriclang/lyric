@@ -2862,11 +2862,13 @@ fn main(): void {
 title = "a manifest or lock field that is missing or malformed"
 severity = "error"
 area = "15-project"
-summary = "Reported when `lyric.toml` or `lyric.lock` parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a `[[bin]]` entry, a profile, `[native]`, `[trust]`, `[lints]`, a toolchain pin, a locked revision — and a prebuilt file `[native]` names that is not part of the package or not there, when the build needs it."
+summary = "Reported when `lyric.toml` or `lyric.lock` parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a `[[bin]]` entry, a profile, `[native]`, `[trust]`, `[lints]`, a toolchain pin, a locked revision, a source tree of `[native.vendor]` or an `@name/` path that names none — and a prebuilt file `[native]` names that is not part of the package or not there, or a URL's tree without its `hash`, when the build needs it."
 explanation = '''
 Every key of a manifest has a type and a form: `name` is a lowercase identifier, `version` a semantic version `MAJOR.MINOR.PATCH`, a dependency `{ path = "…" }` or `{ git = "…", tag = "…" }`, a `[[bin]]` entry a `.lyr` file under `src/`. A value of another type or form is refused rather than guessed at, so a manifest means one thing to every toolchain that reads it.
 
 The message names the field and the form it takes. Write the field in that form.
+
+A source tree loaded from a URL is pinned by its `hash`, the SHA-256 of the file: a URL without one is refused once the build has loaded it, and the message gives the hash to write — `lyric add <name> --vendor --url <url>` writes the line with it.
 '''
 wrong = '''
 //- lyric.toml
@@ -3094,14 +3096,14 @@ error[LYR-PKG0006]: https://example.org/geo has no tag 'v2.0.0' for 'geo'
 '''
 
 [LYR-PKG0007]
-title = "a git dependency cannot be read"
+title = "a git dependency or a source tree cannot be read"
 severity = "error"
 area = "15-project"
-summary = "Reported when a dependency's repository cannot be cloned or fetched, when `git` is not on the PATH, or when under `--offline` the user's cache does not hold the revision. The exit code is 2: the environment failed, not the manifest."
+summary = "Reported when the repository of a dependency or of a source tree cannot be cloned or fetched, when a source tree's URL cannot be loaded, when `git` is not on the PATH, or when under `--offline` the user's cache does not hold the revision or the file. The exit code is 2: the environment failed, not the manifest."
 explanation = '''
-Packages from git are read through the user's cache (`~/.cache/lyric/git` on Linux): fetched when the cache lacks the revision, read from it otherwise. When git cannot reach the repository, or is not installed, or `--offline` forbids the fetch the build needs, there is no package to read.
+Packages from git are read through the user's cache (`~/.cache/lyric/git` on Linux): fetched when the cache lacks the revision, read from it otherwise. The source trees of `[native.vendor]` are read the same way — a tree from git like a package, a tree from a URL as a file kept under its hash (`~/.cache/lyric/vendor`) — and only by a build whose target needs them. When git cannot reach the repository, or is not installed, or the URL does not answer, or `--offline` forbids the fetch the build needs, there is nothing to read.
 
-The message quotes git's own first line. Check the URL and the network, install git, or build once without `--offline` to fill the cache.
+The message quotes git's, or the server's, own first line. Check the URL and the network, install git, or build once without `--offline` to fill the cache.
 '''
 example = '''
 $ lyric5 build
@@ -3113,14 +3115,16 @@ error[LYR-PKG0007]: 'geo' is read from https://example.org/geo at tag 'v1.0.0', 
 '''
 
 [LYR-PKG0008]
-title = "the lock disagrees with the repository"
+title = "the lock or a hash disagrees with what was read"
 severity = "error"
 area = "15-project"
-summary = "Reported when `lyric.lock` holds a commit the dependency's repository does not have, or when the package content at the locked commit is not what the lock's hash says."
+summary = "Reported when `lyric.lock` holds a commit the repository of a dependency or a source tree does not have, when the content at the locked commit is not what the lock's hash says, or when the file a source tree's URL loads is not the one its `hash` names."
 explanation = '''
 `lyric.lock` records, for each revision read from git, the commit it was and a hash of the package content. A build reads that commit and checks the hash, so the program is built from the same sources everywhere. A commit that has gone — a force-push — or content that differs means the lock no longer describes what the repository holds.
 
 Resolve the dependency anew with `lyric5 update <name>`, which writes the lock from what the repository holds now, and check what changed.
+
+A source tree from a URL carries its hash in the manifest: when the server sends another file, the message gives both hashes. A release that was replaced is a new file — check it, then write its hash.
 '''
 example = '''
 $ lyric5 build
@@ -3226,7 +3230,7 @@ fn main(): void {
 title = "`--locked` and a lock that does not match"
 severity = "error"
 area = "15-project"
-summary = "Reported under `--locked` when `lyric.lock` lacks a revision the graph reads from git, holds one it does not read, or is missing although the program reads from git. Nothing is fetched or written."
+summary = "Reported under `--locked` when `lyric.lock` lacks a revision the graph reads from git or a source tree from git the build needs, holds one it does not read, or is missing although the program reads from git. Nothing is fetched or written."
 explanation = '''
 `--locked` takes the lock as it is: a build in CI should be built from exactly what was checked in, and a lock that would change is an error rather than a silent update. Without `--locked`, the build writes the lock to match the manifests.
 

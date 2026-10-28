@@ -252,8 +252,15 @@ public static class Pipeline
             var paths = PathMaps(project, runtimeRoot);
             var units = sources.Select(path => new CUnit(path, [], [RuntimeLayout.IncludeDir(runtimeRoot)],
                 ExtraFlags: [.. request.Profile.ProgramFlags, .. paths])).ToList();
-            if (Native(project, request.Target, paths, RuntimeLayout.IncludeDir(runtimeRoot), directives, error) is not { } native)
-                return (1, null);
+            NativeLink? read;
+            try { read = Native(project, request.Target, paths, RuntimeLayout.IncludeDir(runtimeRoot), directives, error); }
+            catch (ManifestException refused)
+            {
+                // a source tree that cannot be read, or is not what its hash or the lock says
+                Say.Manifest(error, refused);
+                return (refused.Exit, null);
+            }
+            if (read is not { } native) return (1, null);
             var libraries = native.Libraries;
             foreach (var library in directives.Libraries)
                 if (!libraries.Contains(library)) libraries.Add(library);
@@ -324,34 +331,44 @@ public static class Pipeline
     /// The native parts of the program's packages for the target (spec 15 §5), in link order: the
     /// packages before the packages they depend on, the root's first (<see cref="LinkOrder"/>). A
     /// package's sources see its <c>include</c>, <c>&lt;lyric.h&gt;</c>, and the <c>include</c> of each
-    /// package it declares — not of those that one depends on — and get its <c>defines</c>.
+    /// package it declares — not of those that one depends on — and get its <c>defines</c>. A path
+    /// <c>@name/…</c> lies in the package's source tree <c>name</c>, read here, where the target
+    /// needs it, and only here (spec 15 §5.3).
     /// <c>null</c> after reporting: a prebuilt file that is not there or not the package's, two
     /// files of one name beside the binary, a Mach-O library the binary would not find beside it.
     /// </summary>
+    /// <exception cref="ManifestException">A source tree cannot be read, or is not what its hash or the lock says.</exception>
     private static NativeLink? Native(Project project, Target target, IReadOnlyList<string> paths, string runtimeInclude,
         ScriptDirectives directives, TextWriter error)
     {
         var link = new NativeLink([], [], [], [], []);
         if (project.Graph is { } graph)
         {
+            string Tree(Manifest manifest, string name) => graph.Trees is { } trees
+                ? trees.Directory(manifest, name)
+                : throw new InvalidOperationException("a graph read without its lock has no source trees");
+            string Full(Manifest manifest, string path) => NativePart.TreePath(path) is { } tree
+                ? Path.Combine(Tree(manifest, tree.Name), tree.Within)
+                : Path.Combine(manifest.Root, path);
             foreach (var manifest in LinkOrder(graph))
             {
                 var part = manifest.NativeFor(target);
-                List<string> include = [.. part.Include.Select(directory => Path.Combine(manifest.Root, directory)), runtimeInclude];
+                List<string> include = [.. part.Include.Select(directory => Full(manifest, directory)), runtimeInclude];
                 foreach (var dependency in manifest.Dependencies.Select(d => d.Name).Distinct().Order(StringComparer.Ordinal))
                     if (graph.Packages.TryGetValue(dependency, out var declared))
-                        include.AddRange(declared.NativeFor(target).Include.Select(directory => Path.Combine(declared.Root, directory)));
-                link.Units.AddRange(part.SourceFiles(manifest.Root).Select(file => new CUnit(file, part.Defines, include, ExtraFlags: paths)));
+                        include.AddRange(declared.NativeFor(target).Include.Select(directory => Full(declared, directory)));
+                link.Units.AddRange(part.SourceFiles(manifest.Root, name => Tree(manifest, name))
+                    .Select(file => new CUnit(file, part.Defines, include, ExtraFlags: paths)));
                 foreach (var archive in part.Archives)
                 {
-                    if (Prebuilt(manifest, archive, "archives", error) is not { } full) return null;
+                    if (Prebuilt(manifest, archive, Full(manifest, archive), "archives", error) is not { } full) return null;
                     if (!link.Archives.Contains(full)) link.Archives.Add(full);
                 }
                 foreach (var dylib in part.Dylibs)
                 {
-                    if (Prebuilt(manifest, dylib.File, "dylibs", error) is not { } file) return null;
+                    if (Prebuilt(manifest, dylib.File, Full(manifest, dylib.File), "dylibs", error) is not { } file) return null;
                     string? import = null;
-                    if (dylib.ImportLibrary is { } lib && (import = Prebuilt(manifest, lib, "dylibs", error)) is null) return null;
+                    if (dylib.ImportLibrary is { } lib && (import = Prebuilt(manifest, lib, Full(manifest, lib), "dylibs", error)) is null) return null;
                     if (target.Os == TargetOs.MacOs && MachO.InstallName(file) is { } name && !name.StartsWith("@rpath/", StringComparison.Ordinal))
                     {
                         Say.Error(error, "LYR-BLD0006",
@@ -372,6 +389,14 @@ public static class Pipeline
                 foreach (var library in part.Libs)
                     if (!link.Libraries.Contains(library)) link.Libraries.Add(library);
             }
+            // a tree lies in the user's cache: its sources are named by their package and tree, as
+            // the packages' are by their names, wherever the cache is
+            if (graph.Trees?.Read.ToList() is { Count: > 0 } read)
+            {
+                string[] maps = [.. read.Select(t => $"-ffile-prefix-map={Path.TrimEndingDirectorySeparator(t.Directory)}={t.Package}/@{t.Name}")];
+                for (var i = 0; i < link.Units.Count; i++)
+                    link.Units[i] = link.Units[i] with { ExtraFlags = [.. link.Units[i].ExtraFlags ?? [], .. maps] };
+            }
         }
         // what lies beside the binary: the shared libraries, then what the scripts put there
         var beside = link.Dylibs.Select(d => (d.File, Whose: "[native] dylibs"))
@@ -388,16 +413,17 @@ public static class Pipeline
 
     /// <summary>A prebuilt file a manifest names, by its full path; <c>null</c> after reporting where
     /// it is not there, or not part of the package's content — what the package is when it is
-    /// read from git, and what the lock holds the bytes of (spec 15 §5 rule 7).</summary>
-    private static string? Prebuilt(Manifest manifest, string path, string key, TextWriter error)
+    /// read from git, and what the lock holds the bytes of (spec 15 §5 rule 7). A tree's file is no
+    /// part of the content: it has only to be there.</summary>
+    private static string? Prebuilt(Manifest manifest, string path, string place, string key, TextWriter error)
     {
-        if (!PackageContent.Holds(manifest, path))
+        if (NativePart.TreePath(path) is null && !PackageContent.Holds(manifest, path))
         {
             Say.Error(error, "LYR-PKG0002",
                 $"{manifest.Name}'s '{path}' in '{key}' is not part of the package's content: put it under native/, or name it in [package] include");
             return null;
         }
-        var full = Path.GetFullPath(Path.Combine(manifest.Root, path));
+        var full = Path.GetFullPath(place);
         if (File.Exists(full)) return full;
         Say.Error(error, "LYR-PKG0002", $"{manifest.Name}'s manifest names '{path}' in '{key}', and there is no such file");
         return null;

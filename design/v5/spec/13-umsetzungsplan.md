@@ -1488,6 +1488,27 @@ eine zweite Tabelle zu bekommen.
 (E7, Uhr: Abschluss von M14b); ein C-Paketindex
 und ein eingebauter CMake-Lauf (verworfen für 5.0).
 
+### Nachtrag 2026-10-28 — L3: wo ein Quellbaum aufgelöst wird
+
+P3 sagt „wie eine Git-Abhängigkeit“ und „lazy nach Ziel“; beides zusammen hat eine Stelle, die der Plan offen
+ließ: der Graph wird ohne Ziel gelesen (`Project.Resolve` — von `build`, `check`, `metadata`, dem Editor), das
+Ziel kennt erst der Bau. Gemessen am Code und entschieden:
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| L3-1 | **Aufgelöst im Bau, je Ziel**: der Graph trägt die Bäume ungelesen; erst der native Teil eines Baus (`Pipeline.Native`) fragt nach `@name`, und nur nach denen, die eine Tabelle für sein Ziel nennt. `check`, `metadata` und der Editor holen nichts | im Graphen auflösen (holt raylibs Windows-Baum auf Linux — gegen N1) |
+| L3-2 | **Der Lock** hält einen Git-Baum als `[[package]]` mit `kind = "native"`, `of = "<paket>"` (ein Baum gehört seinem Paket, N1), ohne `version`. Der Bau trägt ein, was er aufgelöst hat; das Lesen des Graphen behält, was ein Manifest des Graphen noch so nennt, und lässt den Rest fallen. Unter `--locked` lehnt der Bau einen gebrauchten, nicht gehaltenen Baum ab, der Graph einen gehaltenen, nicht mehr genannten — beide `PKG0011` | ein eigener `[[tree]]`-Abschnitt (zweite Form für dasselbe: Commit und Hash einer Revision); jeden Baum beim Lesen des Graphen sperren (nicht lazy) |
+| L3-3 | **`lyric update`** liest die Bäume, die der Lock hält, neu (ein Zweig an seine Spitze, ein Tag an seinen Commit), genannt oder alle; ein ungehaltener bleibt lazy. Ein Tag eines Baums wird nicht angehoben — ein Baum hat keine Version, an der eine Linie hinge | alle genannten Bäume holen (bricht lazy) |
+| L3-4 | **URLs**: `https://`, `http://` und `file://` — der Hash macht den Weg gleichgültig, und ein lokaler Server oder eine Datei sind die Fälle der Tests und des Spiegels. Die Form erkennt der Bau **an den Bytes** (gzip-tar oder zip), nicht am Namen: GitHubs Archiv-URLs tragen keine Endung. Geladen in den Benutzer-Cache als `vendor/<sha256>`, entpackt einmal daneben; nicht im Lock — der Hash im Manifest ist die Sperre | nur `https` (Tests bräuchten ein Zertifikat, und der Hash prüft ohnehin) |
+| L3-5 | **`.tar.xz` nicht in 5.0** (N1 nannte es): .NET hat keinen xz-Decoder, und ein eigener LZMA2 wären einige hundert Zeilen im Werkzeug für eine Form, die GitHub-Archive nicht liefern; ein xz-Baum kommt über Git. Entschieden, keine Tür | den `tar` des Systems aufrufen (eine Abhängigkeit von der Maschine, die P6 meidet) |
+| L3-6 | **`@name/`** gilt in `sources`, `include`, `archives` und `dylibs` (die Spec nannte `dylibs` nicht, E3′ schon) — und in `bindings` mit L4. Eine Datei eines Baums ist der Inhaltsregel nicht unterworfen (sie ist kein Paketinhalt); sie muss da sein | — |
+| L3-7 | **`lyric add <name> --vendor --git … [--tag\|--branch\|--rev …] \| --url …`** schreibt eine Zeile in `[native.vendor]`, wie `add` eine in `[dependencies]`: bei `--git` nach einem Abruf, der zeigt, dass die Revision da ist (kein Lock — den schreibt der Bau, der den Baum braucht); bei `--url` nach dem Laden, mit dem Hash | den Baum gleich sperren (der Lock wüchse um Bäume, die kein Ziel braucht) |
+
+Die Tests: `VendorTests` mit einem lokalen Git-Repository und einem lokalen HTTP-Server (`HttpListener`) — gzip-tar
+und zip, das oberste Verzeichnis, der fehlende und der falsche Hash, `--offline`, `--locked`, ein Baum nur für
+ein anderes Ziel bleibt ungeholt, `lyric update` bewegt einen Zweig, `add --vendor`; die Ablehnungen des Manifests
+als Konformanzfälle, ein Git-Baum über die `repos/` der Suite.
+
 ## Nachtrag 2026-10-28 — der Plan für M15
 
 M15 nach seiner Zeile oben, 11 W9 (T1–T8), 11 C4/C9/C10, 14 C9 und den Uhren, die auf M15 zeigen: **Distribution** —
