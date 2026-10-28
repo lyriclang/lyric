@@ -236,6 +236,32 @@ libs = ["gdi32", "winmm"]
 system. A build for Windows links Windows' system libraries from any machine; a library of a Linux
 system is found only when you build on Linux.
 
+A library installed on the machine often knows best how it is linked, and tells `pkg-config`.
+`pkgConfig` asks it:
+
+```toml
+[native.linux]
+pkgConfig = ["sdl2", "zlib"]
+```
+
+The build runs `pkg-config --cflags --libs sdl2 zlib`; the include directories and definitions it
+answers go to your package's C sources (and to its bindings), the libraries and flags to the link.
+`PKG_CONFIG` names another `pkg-config`. Its answer is about this machine, so it holds for a build
+for this machine only: a build for another target stops with `LYR-BLD0004`.
+
+On macOS, system libraries come as **frameworks**:
+
+```toml
+[native.macos]
+frameworks = ["Cocoa", "IOKit", "CoreVideo"]
+```
+
+Each is linked as `-framework Cocoa`. A framework is part of the macOS SDK, which only a Mac has,
+and the C compiler finds it for the Mac it runs on: a build for macOS from Linux or Windows — or
+for an Intel Mac from an Apple-silicon one — stops with `LYR-BLD0004`; build it on the Mac it is
+for. `frameworks`
+belongs in `[native.macos]` or a macOS triple's table; anywhere else it is refused.
+
 ## A library from an SDK
 
 Many libraries come as an SDK you unpack somewhere: SDL3 for Windows, say, with the import library
@@ -276,6 +302,46 @@ fn main(): void {
 The root package's build script always runs. A dependency's runs only where your manifest trusts
 it, under `[trust] build-scripts = ["name"]`: a build script is a program, and you decide whose
 programs run on your machine.
+
+## C a build script compiles
+
+The manifest says what is always so. A build script decides what depends on the build — the target,
+the profile, the environment. `build.target()` tells it what the build is for:
+
+```text
+// build.lyr
+import std.build;
+
+fn main(): void {
+    let target = build.target();
+    let lua = build.cLibrary("lua").sources("@lua/src/*.c").include("@lua/src").flags("-O2");
+    if (target.os == .Windows) {
+        lua.define("LUA_USE_WINDOWS");
+    } else {
+        lua.define("LUA_USE_POSIX");
+    }
+    lua.compile();
+    if (target.os == .MacOS) {
+        build.linkFramework("Accelerate");
+    }
+}
+```
+
+**`cLibrary(name)`** is a C library the script compiles with the program. Its `define`s and
+`flags` are its own — your package's other C does not see them, so a flag one library needs does
+not change another. Its sources see their own `include` first, then what the package's sources see.
+Its paths are your package's or a source tree's, as in the manifest.
+
+`target()` holds the `triple`, the `os` and `arch` as `Platform` and `Arch` name them, and whether
+the build `isHost`. The script also has the manifest's keys as calls — `linkLib`, `linkArchive`,
+`linkFramework`, `pkgConfig` —, for what it decides while it runs.
+
+Some libraries are built by their own build system — CMake, a `configure` script. **`cEnv()`**
+gives the environment they compile C under with Lyric's C compiler, for the build's target: `CC`,
+`AR` and `CFLAGS`, to hand to a `std.process.Command`. Run the library's build into `outDir()`,
+then link what it made with `linkArchive`. **`vendorDir("name")`** is where a source tree lies —
+the tree is fetched when the script first asks, and the script runs again from its start, so ask
+before doing anything you would not do twice.
 
 ## Loading a library while the program runs
 

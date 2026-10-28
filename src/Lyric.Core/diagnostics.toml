@@ -96,6 +96,43 @@ fn main(): void {
 }
 '''
 
+[LYR-BLD0004]
+title = "a library of the machine cannot be had for this build"
+severity = "error"
+area = "15-project"
+summary = "Reported when a package's native part, or its build script, names a library of the system through `pkgConfig` and pkg-config is not there, does not know the name, or the build is for another target than the host — or names a macOS framework for a build for macOS on a host that is not macOS. Nothing is built; the exit code is 2: the machine lacks what the package asks of it."
+explanation = '''
+Most of what a package links it brings itself — its sources, a source tree, an archive — and those build for every target from any machine. Two things belong to the machine instead. `pkgConfig = ["sdl2"]` asks the host's `pkg-config` where SDL2 lies and how to link it: that answer is about this machine's libraries, so it holds for a build for this machine only. `frameworks = ["Cocoa"]` links frameworks of the macOS SDK, which only a Mac has.
+
+So a build for another target that needs one stops before anything compiles, and the message names the package and the key. Build on the machine the program is for, or bring the library with the package — as `archives` built for each target, or as a source tree compiled with the program (`[native.vendor]`).
+
+Where pkg-config itself is missing, install it (`pkgconf` on most systems) or set `PKG_CONFIG` to its path; a name it does not know is a library the machine lacks — install its development package.
+'''
+wrong = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+pkgConfig = ["no-such-library-of-this-machine"]
+//- src/main.lyr
+fn main(): void {
+}
+'''
+right = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+libs = ["m"]
+//- src/main.lyr
+fn main(): void {
+}
+'''
+
 [LYR-BLD0005]
 title = "a module cannot be made from a C header"
 severity = "error"

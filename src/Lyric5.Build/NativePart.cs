@@ -47,6 +47,8 @@ public sealed record Binding(string Header, string Module);
 /// <param name="Dylibs">Prebuilt shared libraries, linked by their path and put beside the binary.</param>
 /// <param name="Defines">The sources' preprocessor definitions, <c>NAME</c> or <c>NAME=value</c>.</param>
 /// <param name="Bindings">The modules made from its headers.</param>
+/// <param name="Frameworks">macOS frameworks, linked as <c>-framework &lt;name&gt;</c>.</param>
+/// <param name="PkgConfig">Libraries of the system as <c>pkg-config</c> knows them.</param>
 public sealed partial record NativePart(
     IReadOnlyList<string> Sources,
     IReadOnlyList<string> Include,
@@ -54,9 +56,11 @@ public sealed partial record NativePart(
     IReadOnlyList<string> Archives,
     IReadOnlyList<Dylib> Dylibs,
     IReadOnlyList<string> Defines,
-    IReadOnlyList<Binding> Bindings)
+    IReadOnlyList<Binding> Bindings,
+    IReadOnlyList<string> Frameworks,
+    IReadOnlyList<string> PkgConfig)
 {
-    public static readonly NativePart None = new([], [], [], [], [], [], []);
+    public static readonly NativePart None = new([], [], [], [], [], [], [], [], []);
 
     private static readonly Dictionary<string, TargetOs> Systems = new(StringComparer.Ordinal)
     {
@@ -73,7 +77,7 @@ public sealed partial record NativePart(
     public NativePart With(NativePart more) =>
         new([.. Sources, .. more.Sources], [.. Include, .. more.Include], [.. Libs, .. more.Libs],
             [.. Archives, .. more.Archives], [.. Dylibs, .. more.Dylibs], [.. Defines, .. more.Defines],
-            [.. Bindings, .. more.Bindings]);
+            [.. Bindings, .. more.Bindings], [.. Frameworks, .. more.Frameworks], [.. PkgConfig, .. more.PkgConfig]);
 
     /// <summary><c>[native]</c>, its tables per operating system and per triple, and its source
     /// trees, checked: a path <c>@name/…</c> names a tree <c>[native.vendor]</c> holds.</summary>
@@ -120,6 +124,17 @@ public sealed partial record NativePart(
         Sources.Select(s => ("sources", s)).Concat(Include.Select(i => ("include", i))).Concat(Archives.Select(a => ("archives", a)))
             .Concat(Dylibs.SelectMany(d => d.ImportLibrary is null ? [d.File] : new[] { d.File, d.ImportLibrary }).Select(d => ("dylibs", d)))
             .Concat(Bindings.Select(b => ("bindings", b.Header)));
+
+    /// <summary>Why a path a build script names — of an archive, a C library's source or include
+    /// directory — is refused, or <c>null</c>: it is one of the package, or of a tree its
+    /// <c>[native.vendor]</c> holds, as the manifest's are.</summary>
+    public static string? ScriptPathRefusal(Manifest manifest, string path)
+    {
+        if (!Within(path, PackageContent.IsPattern, root: true)) return "is no path of the package or a tree's";
+        if (TreePath(path) is { } tree && manifest.Vendor.All(t => t.Name != tree.Name))
+            return $"names the source tree '{tree.Name}', which [native.vendor] does not hold";
+        return null;
+    }
 
     /// <summary>A path of a source tree, <c>@name/rest</c>: the tree's name and the path within it —
     /// empty for the tree's root; <c>null</c> for a path of the package.</summary>
@@ -187,13 +202,17 @@ public sealed partial record NativePart(
     {
         foreach (var key in table.Keys)
         {
-            if (key is "sources" or "include" or "libs" or "archives" or "defines" or "bindings") continue;
+            if (key is "sources" or "include" or "libs" or "archives" or "defines" or "bindings" or "pkgConfig") continue;
             if (key == "dylibs" && os is not null) continue;
+            if (key == "frameworks" && os == TargetOs.MacOs) continue;
             if (os is null && (Systems.ContainsKey(key) || Triples.ContainsKey(key))) continue;
             if (os is null && table.TryGet(key, out var value) && value is TomlTable) continue; // refused by Read, with its name
-            throw new ManifestException("LYR-PKG0003", file, table.Line, 1, key == "dylibs"
-                ? $"[{where}] has no key 'dylibs': a shared library is built for one target — name it in [native.linux], [native.windows], [native.macos] or a triple's table"
-                : $"[{where}] has no key '{key}'");
+            throw new ManifestException("LYR-PKG0003", file, table.Line, 1, key switch
+            {
+                "dylibs" => $"[{where}] has no key 'dylibs': a shared library is built for one target — name it in [native.linux], [native.windows], [native.macos] or a triple's table",
+                "frameworks" => $"[{where}] has no key 'frameworks': a framework is macOS's — name it in [native.macos] or a macOS triple's table",
+                _ => $"[{where}] has no key '{key}'",
+            });
         }
         List<string> Strings(string key, Func<string, string?> refusal, string many)
         {
@@ -216,7 +235,9 @@ public sealed partial record NativePart(
             os is { } system ? ReadDylibs(table, where, file, system) : [],
             Strings("defines", d => DefinePattern().IsMatch(d) ? null : "is no definition: NAME or NAME=value, NAME a C identifier",
                 "definitions"),
-            ReadBindings(table, where, file));
+            ReadBindings(table, where, file),
+            Strings("frameworks", f => FrameworkPattern().IsMatch(f) ? null : "is no framework name", "framework names"),
+            Strings("pkgConfig", n => PkgConfigPattern().IsMatch(n) ? null : "is no name pkg-config knows a library by", "pkg-config names"));
     }
 
     /// <summary><c>bindings = [{ header = "…", module = "rl" }]</c>: a header of the package or of a
@@ -327,6 +348,12 @@ public sealed partial record NativePart(
 
     [GeneratedRegex("^[a-z][A-Za-z0-9_-]*$")]
     private static partial Regex TreeNamePattern();
+
+    [GeneratedRegex("^[A-Za-z0-9_][A-Za-z0-9_.+-]*$")]
+    private static partial Regex FrameworkPattern();
+
+    [GeneratedRegex("^[A-Za-z0-9_][A-Za-z0-9_.+-]*$")]
+    private static partial Regex PkgConfigPattern();
 
     [GeneratedRegex(@"^[a-z][A-Za-z0-9_]*(\.[a-z][A-Za-z0-9_]*)*$")]
     private static partial Regex ModulePathPattern();

@@ -114,14 +114,13 @@ public class BuildScriptTests
     }
 
     [Fact]
-    public void A_scripts_C_is_compiled_with_its_flags_and_linked()
+    public void A_scripts_C_library_is_compiled_with_its_definitions_and_linked()
     {
         const string script = """
             import std.build;
 
             fn main(): void {
-                build.cFlags("-DTWICE=2");
-                build.compileC("native/twice.c");
+                build.cLibrary("twice").sources("native/*.c").define("TWICE", "2").compile();
             }
             """;
         const string twice = "#include <stdint.h>\nint64_t twice_of(int64_t n) { return n * TWICE; }\n";

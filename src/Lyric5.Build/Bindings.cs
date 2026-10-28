@@ -116,10 +116,17 @@ public static class Bindings
             : Path.Combine(manifest.Root, path);
 
     /// <summary>What the header is compiled with: the package's <c>include</c> and the <c>include</c>
-    /// of each package it declares, as its sources see them (spec 15 §5 rule 6).</summary>
+    /// of each package it declares, as its sources see them (spec 15 §5 rule 6) — and, for the host,
+    /// the include directories pkg-config gives for its <c>pkgConfig</c>, where it answers (the build
+    /// refuses later what it does not).</summary>
     public static List<string> Include(PackageGraph graph, Manifest manifest, Target target)
     {
         List<string> include = [.. manifest.NativeFor(target).Include.Select(d => Full(graph, manifest, d))];
+        if (manifest.NativeFor(target).PkgConfig is { Count: > 0 } names && target.IsHost)
+        {
+            try { include.AddRange(PkgConfig.Query(names).Include); }
+            catch (PkgConfigException) { }
+        }
         foreach (var dependency in manifest.Dependencies.Select(d => d.Name).Distinct().Order(StringComparer.Ordinal))
             if (graph.Packages.TryGetValue(dependency, out var declared))
                 include.AddRange(declared.NativeFor(target).Include.Select(d => Full(graph, declared, d)));

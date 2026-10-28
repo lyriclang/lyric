@@ -1531,6 +1531,24 @@ wo sie wechselt. **Makros fehlen im AST** — sie kommen aus `-E -dM`. Entschied
 | L4-10 | **Namen der eingebauten Typen** bekommen ein `_` wie Lyrics Wörter: ein C-`typedef int string;` war `LYR-RES0011` im erzeugten Modul (gemessen) | — |
 | L4-8 | **`lyric bindgen <header> [--target <tripel>]`**: im Paket mit dessen `include` und `defines` für das Ziel, ein `@name/`-Pfad aus dessen Bäumen; außerhalb mit keinen | Optionen für `-I`/`-D` (eine zweite Stelle für das, was das Manifest sagt) |
 
+### Nachtrag 2026-10-28 — L5: gemessen auf dem Mac, entschieden
+
+**Gemessen** (macOS-Runner, Xcode 26.6, zig 0.16, aarch64): `zig cc -framework CoreFoundation main.c` ohne Ziel
+linkt und läuft; mit `-target aarch64-macos` — dem eigenen Ziel — und mit `-target x86_64-macos` findet zig das
+Framework nicht („searched paths: none“), auch nicht mit `--sysroot` auf das SDK, das `xcrun` nennt. zig sucht die
+Frameworks des SDK nur für den Mac, auf dem es läuft, und nur, wo es kein Ziel genannt bekommt. **pkg-config**
+(pkgconf 3.0.7, Linux): `--cflags --libs` schreibt eine Zeile, Exit 1 mit „Package 'x' not found“ auf stderr.
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| L5-1 | **Ein Framework nur im Bau für den Wirt**: von Linux und Windows wie geplant abgelehnt, und auch vom Mac für den anderen Mac (`BLD0004`). Die Tür bleibt E5 (Sysroot je Tripel, Uhr M15) | `-F` auf das SDK von Hand (ungemessen; E5 entscheidet es mit dem Sysroot) |
+| L5-2 | **`target()` ist ein `BuildTarget`** mit `os: Platform` und `arch: Arch` aus dem Prelude, nicht mit eigenen `Os`/`Arch` (L1 schrieb `Os.linux`): ein Mechanismus je Begriff; `BuildTarget` statt `Target`, weil der Name im Prelude schon steht | ein zweites Enum-Paar in `std.build` |
+| L5-3 | **`vendorDir` per Neustart**: fehlt der Baum, schreibt das Skript `vendor-dir` und endet mit 75; der Bau liest den Baum und startet das Skript neu, mit `LYRIC_BUILD_VENDOR_<NAME>`. Lazy wie L3, ohne Rückkanal | jeden Baum vor jedem Skript lesen (bricht lazy); ein Rückkanal zum Skript |
+| L5-4 | **`cEnv()`**: `CC` und `AR` sind kleine Skripte neben dem Build-Skript, die zig mit `cc -target <tripel> -fno-sanitize=undefined` und `ar` rufen — ein Programm, das die Argumente eines C-Compilers nimmt, wie CMake und configure es wollen; `CFLAGS` die Optimierung des Profils. **Gemessen**: ohne `-fno-sanitize=undefined` braucht ein bei `-O0` übersetztes Objekt UBSans Laufzeit, die der Link nicht bringt | `CC="zig cc -target …"` als Zeichenkette (CMake nimmt keinen Befehl mit Argumenten) |
+| L5-5 | **Ein Archiv eines Skripts** (`linkArchive`) ist der Inhaltsregel nicht unterworfen: es liegt, wo das Skript es baute — unter `out/` oder absolut | es unter `native/` verlangen (dann schriebe das Skript in den Quellbaum) |
+| L5-6 | **pkg-config sortiert**: `-I`/`-D` an die C-Quellen und die Bindungen des Pakets, `-L`/`-l` wie `libs` (zig bekommt die Bibliothek über ihren Pfad, kein Lauf-Pfad im Binary), `-framework` wie `frameworks`, der Rest an den Link; `PKG_CONFIG` nennt ein anderes. Die Antwort ist je Programm und Namen einmal gefragt | den Rest roh an den Compiler (`-L` schriebe zig als Lauf-Pfad ins Binary) |
+| L5-7 | **`compileC` und `cFlags` entfallen** (N4): eine C-Bibliothek trägt ihre Flags; der Test aus M8b S13 ist auf `cLibrary` umgestellt | beide als Kurzform behalten (zwei Wege) |
+
 ## Nachtrag 2026-10-28 — der Plan für M15
 
 M15 nach seiner Zeile oben, 11 W9 (T1–T8), 11 C4/C9/C10, 14 C9 und den Uhren, die auf M15 zeigen: **Distribution** —

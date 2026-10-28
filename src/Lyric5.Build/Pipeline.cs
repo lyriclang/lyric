@@ -263,13 +263,17 @@ public static class Pipeline
                 Say.Manifest(error, refused);
                 return (refused.Exit, null);
             }
+            catch (NativeRefusal refused)
+            {
+                // what only the host has, asked for another target; pkg-config missing or not knowing a name
+                Say.Error(error, refused.Code, refused.Message);
+                return (refused.Exit, null);
+            }
             if (read is not { } native) return (1, null);
             var libraries = native.Libraries;
-            foreach (var library in directives.Libraries)
-                if (!libraries.Contains(library)) libraries.Add(library);
-            var scripts = directives.Sources.Select(unit => unit with { ExtraFlags = [.. unit.ExtraFlags ?? [], .. paths] }).ToList();
-            var objects = build.Compile([.. units, .. native.Units, .. scripts]);
-            var linkPaths = new LinkPaths(directives.SearchDirs, OwnDirFirst: native.Beside.Count > 0);
+            var objects = build.Compile([.. units, .. native.Units]);
+            var linkPaths = new LinkPaths([.. directives.SearchDirs, .. native.SearchDirs], OwnDirFirst: native.Beside.Count > 0,
+                Args: native.Args, Frameworks: native.Frameworks);
             // The packages' archives and shared libraries after the objects that call them, by their
             // paths; the runtime after them all, which their C may call through lyric.h.
             string[] prebuilt = [.. native.Archives, .. native.Dylibs.Select(d => d.Linked)];
@@ -328,7 +332,21 @@ public static class Pipeline
     /// first stands, and the files that go beside the binary — the shared libraries' and the build
     /// scripts'.</summary>
     private sealed record NativeLink(
-        List<CUnit> Units, List<string> Archives, List<Dylib> Dylibs, List<string> Libraries, List<string> Beside);
+        List<CUnit> Units, List<string> Archives, List<Dylib> Dylibs, List<string> Libraries, List<string> Beside)
+    {
+        /// <summary>What pkg-config gave the link: the directories it searches, and the flags that are no library.</summary>
+        public List<string> SearchDirs { get; } = [];
+        public List<string> Args { get; } = [];
+        public List<string> Frameworks { get; } = [];
+    }
+
+    /// <summary>A native part the build cannot link for its target — a framework or a library of
+    /// pkg-config where the host is not the target's system —, or pkg-config that does not answer.</summary>
+    internal sealed class NativeRefusal(string code, string message, int exit) : Exception(message)
+    {
+        public string Code { get; } = code;
+        public int Exit { get; } = exit;
+    }
 
     /// <summary>
     /// The native parts of the program's packages for the target (spec 15 §5), in link order: the
@@ -355,13 +373,30 @@ public static class Pipeline
                 : Path.Combine(manifest.Root, path);
             foreach (var manifest in LinkOrder(graph))
             {
-                var part = manifest.NativeFor(target);
-                List<string> include = [.. part.Include.Select(directory => Full(manifest, directory)), runtimeInclude];
+                // the manifest's part, and what the package's script adds to it (spec 15 §8 rule 3)
+                var part = manifest.NativeFor(target).With(directives.PartOf(manifest.Name));
+                var system = SystemLibraries(manifest, part, target);
+                List<string> include = [.. part.Include.Select(directory => Full(manifest, directory)), .. system.Include, runtimeInclude];
                 foreach (var dependency in manifest.Dependencies.Select(d => d.Name).Distinct().Order(StringComparer.Ordinal))
                     if (graph.Packages.TryGetValue(dependency, out var declared))
                         include.AddRange(declared.NativeFor(target).Include.Select(directory => Full(declared, directory)));
+                List<string> defines = [.. part.Defines, .. system.Defines];
                 link.Units.AddRange(part.SourceFiles(manifest.Root, name => Tree(manifest, name))
-                    .Select(file => new CUnit(file, part.Defines, include, ExtraFlags: paths)));
+                    .Select(file => new CUnit(file, defines, include, ExtraFlags: paths)));
+                // a script's C library: its own include first, its own definitions and flags alone
+                foreach (var library in directives.LibrariesOf(manifest.Name))
+                {
+                    var sources = (NativePart.None with { Sources = library.Sources }).SourceFiles(manifest.Root, name => Tree(manifest, name));
+                    List<string> own = [.. library.Include.Select(directory => Full(manifest, directory)), .. include];
+                    link.Units.AddRange(sources.Select(file => new CUnit(file, [.. defines, .. library.Defines], own,
+                        ExtraFlags: [.. paths, .. library.Flags])));
+                }
+                foreach (var dir in system.SearchDirs)
+                    if (!link.SearchDirs.Contains(dir)) link.SearchDirs.Add(dir);
+                foreach (var arg in system.Args)
+                    if (!link.Args.Contains(arg)) link.Args.Add(arg);
+                foreach (var framework in part.Frameworks.Concat(system.Frameworks))
+                    if (!link.Frameworks.Contains(framework)) link.Frameworks.Add(framework);
                 foreach (var archive in part.Archives)
                 {
                     if (Prebuilt(manifest, archive, Full(manifest, archive), "archives", error) is not { } full) return null;
@@ -389,7 +424,7 @@ public static class Pipeline
                     var full = new Dylib(file, import);
                     if (!link.Dylibs.Contains(full)) link.Dylibs.Add(full);
                 }
-                foreach (var library in part.Libs)
+                foreach (var library in part.Libs.Concat(system.Libraries))
                     if (!link.Libraries.Contains(library)) link.Libraries.Add(library);
             }
             // a tree lies in the user's cache: its sources are named by their package and tree, as
@@ -414,13 +449,41 @@ public static class Pipeline
         return link;
     }
 
+    /// <summary>
+    /// What a native part takes from the machine (spec 15 §5 rules 9–11): its <c>pkgConfig</c> names
+    /// asked of pkg-config on the host, and whether its frameworks can be had — both are the host's,
+    /// so a build for another system that needs one is refused before it compiles (<c>LYR-BLD0004</c>,
+    /// exit 2). Both need the target to be the host: zig finds the SDK's frameworks for the Mac it runs
+    /// on, and with a target named — even this Mac's own — not at all (measured with zig 0.16).
+    /// </summary>
+    internal static PkgConfigAnswer SystemLibraries(Manifest manifest, NativePart part, Target target)
+    {
+        if (part.Frameworks.Count > 0 && target.Os == TargetOs.MacOs && !target.IsHost)
+            throw new NativeRefusal("LYR-BLD0004",
+                $"{manifest.Name} links the framework{(part.Frameworks.Count > 1 ? "s" : "")} {string.Join(", ", part.Frameworks)}, from the macOS SDK, "
+                + (OperatingSystem.IsMacOS()
+                    ? $"which the C compiler finds for this Mac's own target only — build for {target.Triple} on such a Mac"
+                    : $"and this host is not macOS — build for {target.Triple} on a Mac"), 2);
+        if (part.PkgConfig.Count == 0) return PkgConfigAnswer.None;
+        if (!target.IsHost)
+            throw new NativeRefusal("LYR-BLD0004",
+                $"{manifest.Name} links {string.Join(", ", part.PkgConfig)} through pkg-config, which knows the libraries of this host, "
+                + $"and the build is for {target.Triple} — build it on that system, or bring the library in 'archives'", 2);
+        try { return PkgConfig.Query(part.PkgConfig); }
+        catch (PkgConfigException failed)
+        {
+            throw new NativeRefusal("LYR-BLD0004", $"{manifest.Name}'s pkgConfig: {failed.Message}", 2);
+        }
+    }
+
     /// <summary>A prebuilt file a manifest names, by its full path; <c>null</c> after reporting where
     /// it is not there, or not part of the package's content — what the package is when it is
     /// read from git, and what the lock holds the bytes of (spec 15 §5 rule 7). A tree's file is no
     /// part of the content: it has only to be there.</summary>
     private static string? Prebuilt(Manifest manifest, string path, string place, string key, TextWriter error)
     {
-        if (NativePart.TreePath(path) is null && !PackageContent.Holds(manifest, path))
+        // a tree's file, and an archive a build script made (by its full path), is no part of the content
+        if (NativePart.TreePath(path) is null && !Path.IsPathRooted(path) && !PackageContent.Holds(manifest, path))
         {
             Say.Error(error, "LYR-PKG0002",
                 $"{manifest.Name}'s '{path}' in '{key}' is not part of the package's content: put it under native/, or name it in [package] include");
@@ -705,6 +768,8 @@ public static class Pipeline
         string.Join("\n", inputs
             .Concat(paths.SearchDirs.Select(dir => "-L" + dir))
             .Concat(libraries.Select(library => "-l" + library))
+            .Concat(paths.Args ?? [])
+            .Concat((paths.Frameworks ?? []).Select(framework => "-framework " + framework))
             .Concat(paths.OwnDirFirst ? ["own-dir-first"] : [])
             .Concat((held ?? []).Select(file => $"sha256 {System.Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file)))} {file}"))) + "\n";
 

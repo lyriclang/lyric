@@ -17,8 +17,11 @@ public sealed record CUnit(
 public sealed class CBuildException(string message) : Exception(message);
 
 /// <summary>Where a link finds libraries beyond the linker's own directories, and whether the
-/// binary searches its own directory for shared libraries first — where files lie beside it.</summary>
-public sealed record LinkPaths(IReadOnlyList<string> SearchDirs, bool OwnDirFirst)
+/// binary searches its own directory for shared libraries first — where files lie beside it. With
+/// them, what the link takes after the libraries by name: the flags <c>pkg-config</c> gave that are
+/// no directory and no library, and the macOS frameworks.</summary>
+public sealed record LinkPaths(IReadOnlyList<string> SearchDirs, bool OwnDirFirst,
+    IReadOnlyList<string>? Args = null, IReadOnlyList<string>? Frameworks = null)
 {
     public static readonly LinkPaths None = new([], false);
 }
@@ -280,6 +283,8 @@ public sealed class CBuild
         if (Compiler.Kind != CCompilerKind.Zig || Target.Os == TargetOs.Windows)
             foreach (var dir in paths.SearchDirs) arguments.Add("-L" + dir);
         foreach (var library in libraries ?? []) arguments.Add(Found(library, paths.SearchDirs) ?? "-l" + library);
+        arguments.AddRange(paths.Args ?? []);
+        foreach (var framework in paths.Frameworks ?? []) arguments.AddRange(["-framework", framework]);
         // Windows' loader looks beside the image first by itself; ELF and Mach-O are told to
         if (paths.OwnDirFirst && Target.Os == TargetOs.Linux) arguments.Add("-Wl,-rpath,$ORIGIN");
         if (paths.OwnDirFirst && Target.Os == TargetOs.MacOs) arguments.Add("-Wl,-rpath,@executable_path");
