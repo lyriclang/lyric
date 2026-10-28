@@ -1673,3 +1673,16 @@ bestätigt oder geplant, nicht gebaut); `lyric publish` und eine Paket-Registry 
 - Die Suche nach dem C-Compiler: `LYRIC_CC` > das installierte zig **der gepinnten Version** > `zig`, `clang`, `gcc`
   auf dem PATH. Ein zig anderer Version unter `~/.lyric/zig/` zählt nicht. Nicht gebaut: `toolchain remove zig`
   und eine andere als die gepinnte Version (Tür).
+
+**S8, beim Bauen entschieden** (2026-10-28): S8 ist dreigeteilt — S8a (250, 251), S8b (295), S8c (286, N7, E5, 252),
+je ein PR.
+
+- **250 — der ICE-Bericht**: `LYR-ICE0001` schreibt neben Meldung und Trace `lyric5-ice-<zeit>-<pid>.txt` unter
+  `out/` des Pakets, in dem der Befehl lief (sonst des Arbeitsverzeichnisses, sonst ins Temp-Verzeichnis), mit
+  Version, Befehl wie gegeben, Verzeichnis, Maschine, Stelle, Ausnahme und Trace, und nennt ihn
+  (`= note: a report to attach is in …`), wie rustc `rustc-ice-*.txt`. Die Form JSON (16 §4) bleibt, wie sie ist.
+- **251 — das Zeitlimit**: jeder Lauf des C-Compilers, des Archivers und des Linkers in `CBuild` hat ein Limit
+  (fünf Minuten, `CBuild.Limit`); wer es überschreitet, wird angehalten und ist `LYR-BLD0001` (Exit 2) mit Schritt,
+  Limit und Befehl — die Umgebung, kein ICE, auch im parallelen Übersetzen. Nach dem Frontend vergisst
+  `CompilerPosition` die Stelle (`End`), so dass ein Fehler auf der C-Seite keine veraltete „while lowering …“-Zeile
+  mehr trägt.

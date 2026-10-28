@@ -14,9 +14,9 @@ public static partial class Program
 {
     public static int Main(string[] args)
     {
+        var given = args;
         try
         {
-            var given = args;
             if (TakeRenderOptions(ref args, out var lints) is { } refused) return refused;
             if (args.Length == 0) return Usage(Console.Out, 0);
             if (Switch(args, given) is { } handedOn) return handedOn;
@@ -27,7 +27,7 @@ public static partial class Program
         }
         catch (Exception crash)
         {
-            return Crashed(crash);
+            return Crashed(crash, given);
         }
     }
 
@@ -93,26 +93,28 @@ public static partial class Program
         return 0;
     }
 
-    /// <summary>The toolchain's own failure: not the program's fault, and worth a report.</summary>
-    private static int Crashed(Exception crash)
+    /// <summary>The toolchain's own failure: not the program's fault, and worth a report — said with
+    /// its trace, and written to a file beside it (<see cref="IceReport"/>).</summary>
+    private static int Crashed(Exception crash, string[] command)
     {
+        var message = $"the toolchain failed: {crash.GetType().Name}: {crash.Message}";
+        var place = Lyric.Core.CompilerPosition.Describe();
+        var trace = crash is Lyric.Core.CompilerDepthException ? Head(crash.StackTrace, 24) : crash.StackTrace;
+        var style = Lyric.Core.Rendering.RenderStyle.Current;
+        var report = IceReport.Write(style.BaseDirectory ?? Directory.GetCurrentDirectory(), DisplayVersion(), command, message, place, trace);
+        if (style.Events is { } events)
         {
-            var message = $"the toolchain failed: {crash.GetType().Name}: {crash.Message}";
-            var place = Lyric.Core.CompilerPosition.Describe();
-            var trace = crash is Lyric.Core.CompilerDepthException ? Head(crash.StackTrace, 24) : crash.StackTrace;
-            if (Lyric.Core.Rendering.RenderStyle.Current.Events is { } events)
-            {
-                // the JSON form (16 §4) says it as an event of its own, and closes the stream
-                events.Ice("LYR-ICE0001", message, place, trace);
-                events.Summary();
-                return 101;
-            }
-            Console.Error.WriteLine($"error[LYR-ICE0001]: {message}");
-            if (place is not null) Console.Error.WriteLine($"  while {place}");
-            Console.Error.WriteLine("  = help: this is a bug in lyric5 — please report it with the program that triggered it");
-            Console.Error.WriteLine(trace);
+            // the JSON form (16 §4) says it as an event of its own, and closes the stream
+            events.Ice("LYR-ICE0001", message, place, trace);
+            events.Summary();
             return 101;
         }
+        Console.Error.WriteLine($"error[LYR-ICE0001]: {message}");
+        if (place is not null) Console.Error.WriteLine($"  while {place}");
+        Console.Error.WriteLine("  = help: this is a bug in lyric5 — please report it with the program that triggered it");
+        if (report is not null) Console.Error.WriteLine($"  = note: a report to attach is in {report}");
+        Console.Error.WriteLine(trace);
+        return 101;
     }
 
     /// <summary>
