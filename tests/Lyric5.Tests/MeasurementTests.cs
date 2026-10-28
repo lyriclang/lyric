@@ -50,7 +50,7 @@ public class MeasurementTests
         var savedErr = Console.Error;
         Console.SetOut(TextWriter.Null);
         Console.SetError(TextWriter.Null);
-        try { return Program.Main(args); }
+        try { return Program.Drive(args); }
         finally { Console.SetOut(savedOut); Console.SetError(savedErr); }
     }
 

@@ -99,7 +99,7 @@ internal static class PackageFixture
         Console.SetError(error);
         try
         {
-            var exit = Program.Main(args);
+            var exit = Program.Drive(args);
             return (exit, output.ToString().Replace("\r\n", "\n"), error.ToString().Replace("\r\n", "\n"));
         }
         finally

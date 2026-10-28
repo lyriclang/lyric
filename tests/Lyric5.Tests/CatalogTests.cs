@@ -1,4 +1,6 @@
 using Lyric.Core;
+using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
 using Lyric5.Build;
 using Lyric5.Toolchain;
@@ -231,5 +233,43 @@ public partial class CatalogTests
         var (refused, _, error) = RunRaw("explain", "LYR-XYZ9999");
         Assert.Equal(2, refused);
         Assert.Contains("error[LYR-CLI0003]: no code or lint 'LYR-XYZ9999' in the catalog", error);
+    }
+
+    /// <summary>
+    /// What the binary writes into a pipe is UTF-8, both streams: an editor reads it so. On Windows a
+    /// redirected stream left in the console's code page — the entry's '·' as 0xFA under 850, which
+    /// an editor shows as a replacement character.
+    /// </summary>
+    [Fact]
+    public void Explain_writes_utf8_into_a_pipe()
+    {
+        var (exit, output, error) = Binary("explain", "LYR-CLI0003");
+        Assert.Equal(0, exit);
+        Assert.Contains("error · 14-cli", Encoding.UTF8.GetString(output));
+        Assert.Empty(error);
+
+        var (refused, _, said) = Binary("explain", "LYR-É");
+        Assert.Equal(2, refused);
+        Assert.Contains("no code or lint 'LYR-É' in the catalog", Encoding.UTF8.GetString(said));
+    }
+
+    /// <summary>The binary under test as a process of its own — <c>lyric5.dll</c> beside this test,
+    /// through the host that runs it —, its streams as the bytes it wrote.</summary>
+    private static (int Exit, byte[] Out, byte[] Err) Binary(params string[] args)
+    {
+        var start = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
+        {
+            RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false,
+        };
+        start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "lyric5.dll"));
+        foreach (var arg in args) start.ArgumentList.Add(arg);
+        using var process = Process.Start(start)!;
+        using var output = new MemoryStream();
+        using var error = new MemoryStream();
+        var reading = process.StandardError.BaseStream.CopyToAsync(error);
+        process.StandardOutput.BaseStream.CopyTo(output);
+        reading.Wait();
+        Assert.True(process.WaitForExit(60_000), "the binary did not end");
+        return (process.ExitCode, output.ToArray(), error.ToArray());
     }
 }
