@@ -31,10 +31,11 @@
 <h1>LYR-BLD0001</h1>
 <p class="code-title">the C compiler or the linker failed</p>
 <p class="meta">error · <a href="../../spec/14-cli/">spec 14-cli</a></p>
-<p>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails. The message carries the command and what the C compiler wrote; the exit code is 2.</p>
+<p>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails, or does not finish within five minutes and is stopped. The message carries the command and what the C compiler wrote, or the limit; the exit code is 2.</p>
 <h2 id="explanation">Explanation</h2>
 <p><code>lyric5</code> translates the program to C and hands it to a C compiler (<code>zig cc</code>, clang or gcc) together with the runtime and the C sources the packages name in <code>[native]</code> or through their build scripts. When that step fails, the build stops with this error and the compiler's own output.</p>
 <p>The Lyric program itself was accepted; what failed is C. Look at the quoted output: most often a package's own C source does not compile, a library named with <code>link-lib</code> or in <code>[native]</code> is missing, or the profile needs clang (<code>asan</code>, <code>tsan</code>) and another compiler was found. A failure in C the toolchain generated is a defect of the toolchain and worth a report.</p>
+<p>A step that does not finish within five minutes is stopped and said with the limit: a machine under heavy load, or a unit too large for the C compiler. Building again on a quieter machine, or splitting a very large native source, gets past it.</p>
 <h2 id="example">Example</h2>
 <pre><code>$ cat lyric.toml
 [package]

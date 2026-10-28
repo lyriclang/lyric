@@ -2505,7 +2505,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/14-cli/">14-cli</a></td>
 <td>the C compiler or the linker failed</td>
-<td>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails. The message carries the command and what the C compiler wrote; the exit code is 2.</td>
+<td>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails, or does not finish within five minutes and is stopped. The message carries the command and what the C compiler wrote, or the limit; the exit code is 2.</td>
 </tr>
 <tr>
 <td>LYR-BLD0002</td>
@@ -2767,7 +2767,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
 <td>the toolchain crashed</td>
-<td><code>lyric5</code> met an exception it did not expect. It prints the exception, where it was in the program if it knows, and its own stack trace, and exits with 101.</td>
+<td><code>lyric5</code> met an exception it did not expect. It prints the exception, where it was in the program if it knows, and its own stack trace, writes the same with the version, the command and the machine to a report under <code>out/</code> (<code>lyric5-ice-&lt;time&gt;-&lt;pid&gt;.txt</code>), and exits with 101.</td>
 </tr>
 <tr>
 <td>LYR-ICE0002</td>

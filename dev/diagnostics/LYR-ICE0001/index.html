@@ -28,10 +28,10 @@
 <h1>LYR-ICE0001</h1>
 <p class="code-title">the toolchain crashed</p>
 <p class="meta">error · <a href="../../spec/16-diagnostics/">spec 16-diagnostics</a></p>
-<p><code>lyric5</code> met an exception it did not expect. It prints the exception, where it was in the program if it knows, and its own stack trace, and exits with 101.</p>
+<p><code>lyric5</code> met an exception it did not expect. It prints the exception, where it was in the program if it knows, and its own stack trace, writes the same with the version, the command and the machine to a report under <code>out/</code> (<code>lyric5-ice-&lt;time&gt;-&lt;pid&gt;.txt</code>), and exits with 101.</p>
 <h2 id="explanation">Explanation</h2>
 <p>This is a bug in the toolchain, not in the program. The program may be right or wrong; either way the compiler should have answered with a diagnostic.</p>
-<p>Report it with the program that triggered it and the full output. Until it is fixed, changing the construct named in the <code>while …</code> line usually avoids it.</p>
+<p>Report it with the program that triggered it and the report the message names — it holds the version, the command, the machine, the place and the trace. Until it is fixed, changing the construct named in the <code>while …</code> line usually avoids it.</p>
 <h2 id="example">Example</h2>
 <pre><code>$ cat src/facade.lyr
 import app.util { helper };
@@ -43,6 +43,7 @@ $ lyric5 build
 error[LYR-ICE0001]: the toolchain failed: InternalCompilationException: ir: type not lowerable in current version: &lt;error&gt;
   while lowering 'app.main.main' at src/main.lyr:3:1
   = help: this is a bug in lyric5 — please report it with the program that triggered it
+  = note: a report to attach is in /home/ada/app/out/lyric5-ice-20261028-171500-4242.txt
    at …
 $ echo $?
 101</code></pre>

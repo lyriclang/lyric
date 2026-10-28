@@ -150,11 +150,11 @@ once. The lock is the operating system's on an open file; it ends with its proce
 </tr>
 <tr>
 <td>2</td>
-<td>the command line or the environment: unknown verb, option or value, a missing file, no package to build, a program to run among several unnamed, no C compiler, a git repository that cannot be reached, a toolchain below what a package asks for</td>
+<td>the command line or the environment: unknown verb, option or value, a missing file, no package to build, a program to run among several unnamed, no C compiler, a C compiler that fails or does not finish within its limit (<code>LYR-BLD0001</code>), a git repository that cannot be reached, a toolchain below what a package asks for</td>
 </tr>
 <tr>
 <td>101</td>
-<td>the toolchain itself failed (<code>LYR-ICE0001</code>)</td>
+<td>the toolchain itself failed (<code>LYR-ICE0001</code>): said with its trace, and written with the version, the command and the machine to a report under <code>out/</code> — of the package the command ran in, else of the working directory — which the message names</td>
 </tr>
 <tr>
 <td>the program's</td>
