@@ -144,7 +144,9 @@ public class BindingsTests
     [Fact]
     public void No_lint_looks_at_the_module()
     {
-        var dir = Geo("fn main(): void {\n}\n");
+        // the module is compiled where it is imported: C's SHAPE_DOT would be named wrong, and Box
+        // hides the prelude's
+        var dir = Geo("import app.geo { GeoAdd };\n\nfn main(): void {\n    let _sum = GeoAdd(1, 2);\n}\n");
         var (exit, _, error) = Run("build", "-C", dir);
         Assert.True(exit == 0, error);
         Assert.DoesNotContain("geo.lyr", error);
