@@ -20,6 +20,8 @@
 <div class="sidebar-bar"><span class="where">std.build</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
 <ul class="sidebar-box" id="sidebar-box">
 <li><a class="current" href="../../std/build/">std.build</a></li>
+<li><a href="../../std/build/BuildTarget/">BuildTarget</a></li>
+<li><a href="../../std/build/CLibrary/">CLibrary</a></li>
 <li><a href="../../std/build/#fn.target">target()</a></li>
 <li><a href="../../std/build/#fn.profile">profile()</a></li>
 <li><a href="../../std/build/#fn.outDir">outDir()</a></li>
@@ -29,8 +31,12 @@
 <li><a href="../../std/build/#fn.linkLib">linkLib()</a></li>
 <li><a href="../../std/build/#fn.linkSearch">linkSearch()</a></li>
 <li><a href="../../std/build/#fn.besideBinary">besideBinary()</a></li>
-<li><a href="../../std/build/#fn.cFlags">cFlags()</a></li>
-<li><a href="../../std/build/#fn.compileC">compileC()</a></li>
+<li><a href="../../std/build/#fn.linkArchive">linkArchive()</a></li>
+<li><a href="../../std/build/#fn.linkFramework">linkFramework()</a></li>
+<li><a href="../../std/build/#fn.pkgConfig">pkgConfig()</a></li>
+<li><a href="../../std/build/#fn.vendorDir">vendorDir()</a></li>
+<li><a href="../../std/build/#fn.cLibrary">cLibrary()</a></li>
+<li><a href="../../std/build/#fn.cEnv">cEnv()</a></li>
 <li><a href="../../std/build/#fn.warn">warn()</a></li>
 </ul>
 </nav>
@@ -49,8 +55,11 @@ environment is not set, and where a directive cannot be written.</p>
 <p class="snippet-note no-run">Compiles; not run here</p>
 <pre><code class="language-lyric"><span class="kw">import</span> std.build;
 
-build.compileC(<span class="str">"native/fast.c"</span>);
+build.cLibrary(<span class="str">"fast"</span>).sources(<span class="str">"native/fast.c"</span>).define(<span class="str">"LEVEL"</span>, <span class="str">"2"</span>).flags(<span class="str">"-O3"</span>).compile();
 build.linkLib(<span class="str">"m"</span>);
+<span class="kw">if</span> (build.target().os == .<span class="ty">MacOS</span>) {
+    build.linkFramework(<span class="str">"Accelerate"</span>);
+}
 build.rerunIfChanged(<span class="str">"native/fast.c"</span>);</code></pre>
 <p>A library from an SDK outside the package — SDL3 on Windows, its directory in <code>SDL3_DIR</code> —
 is linked from where the SDK lies, and its DLL goes beside the program:</p>
@@ -66,11 +75,14 @@ build.rerunIfEnvChanged(<span class="str">"SDL3_DIR"</span>);
 } <span class="kw">else</span> {
     build.warn(<span class="str">"set SDL3_DIR to the SDL3 SDK"</span>);
 }</code></pre>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/build/BuildTarget/">BuildTarget</a> <span class="kind">struct</span> <span class="summary">— What a package is built for: its triple, such as <code>x86_64-linux-gnu</code>, its system and its machine as the prelude names them, and whether it is the machine the script runs on.</span></div>
+<div class="listed"><a href="../../std/build/CLibrary/">CLibrary</a> <span class="kind">class</span> <span class="summary">— A C library a build script compiles with the program (see <a href="../../std/build/#fn.cLibrary">cLibrary</a>).</span></div>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.target">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> target(): <span class="ty">string</span></code></pre>
-<p>Returns the target triple the package is built for, such as <code>x86_64-linux-gnu</code>.</p>
-<p>The script itself runs on the host.</p>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> target(): <span class="ty">BuildTarget</span></code></pre>
+<p>Returns the target the package is built for: <code>build.target().os == .Windows</code>.</p>
+<p>The script itself runs on the host; <code>isHost</code> says whether the build is for it too.</p>
 </section>
 <section class="member" id="fn.profile">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> profile(): <span class="ty">string</span></code></pre>
@@ -121,15 +133,41 @@ libraries first. A file is copied only where the bytes beside the binary differ.
 <p>The paths are relative to the package's root, or absolute. A file that is not there when the
 script has ended, and two files of one name, stop the build (<code>LYR-BLD0006</code>).</p>
 </section>
-<section class="member" id="fn.cFlags">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cFlags(flags: <span class="ty">string</span>...): <span class="ty">void</span></code></pre>
-<p>Adds flags for the C sources this script names with <a href="../../std/build/#fn.compileC">compileC</a>:
-<code>cFlags(&quot;-DLEVEL=2&quot;, &quot;-Iinclude&quot;)</code>.</p>
+<section class="member" id="fn.linkArchive">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> linkArchive(path: <span class="ty">string</span>): <span class="ty">void</span></code></pre>
+<p>Links a prebuilt static library by its path, as <code>[native]</code>'s <code>archives</code> does: a path of the
+package, or of a source tree (<code>@name/…</code>).</p>
 </section>
-<section class="member" id="fn.compileC">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> compileC(sources: <span class="ty">string</span>...): <span class="ty">void</span></code></pre>
-<p>Compiles C sources with the program and links them into it.</p>
-<p>The paths are relative to the package's root.</p>
+<section class="member" id="fn.linkFramework">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> linkFramework(name: <span class="ty">string</span>): <span class="ty">void</span></code></pre>
+<p>Links the macOS framework <code>name</code>, as <code>[native.macos]</code>'s <code>frameworks</code> does: <code>-framework Cocoa</code>.</p>
+<p>A framework comes from the macOS SDK: a build for macOS from another system stops (<code>LYR-BLD0004</code>).</p>
+</section>
+<section class="member" id="fn.pkgConfig">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> pkgConfig(name: <span class="ty">string</span>): <span class="ty">void</span></code></pre>
+<p>Links a library of the system as <code>pkg-config</code> knows it, as <code>[native]</code>'s <code>pkgConfig</code> does: its
+include directories and definitions go to the package's C sources, the rest to the link.</p>
+<p>The system is the host's: a build for another target stops (<code>LYR-BLD0004</code>).</p>
+</section>
+<section class="member" id="fn.vendorDir">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> vendorDir(name: <span class="ty">string</span>): <span class="ty">string</span></code></pre>
+<p>Returns the directory of the package's source tree <code>name</code> (<code>[native.vendor]</code>), fetched where it
+is not yet.</p>
+<p>The tree is read when the script asks for it: the script stops, the build fetches the tree, and
+the script runs again from its start with the tree there — so a script that asks for a tree
+asks before it does anything it would not do twice.</p>
+</section>
+<section class="member" id="fn.cLibrary">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cLibrary(name: <span class="ty">string</span>): <span class="ty">CLibrary</span></code></pre>
+<p>Returns a C library this script compiles with the program: its sources, its include
+directories, its definitions and its own flags, added by <a href="../../std/build/CLibrary/#method.compile">CLibrary.compile</a>.</p>
+<p><code>build.cLibrary(&quot;lua&quot;).sources(&quot;@lua/src/*.c&quot;).include(&quot;@lua/src&quot;).define(&quot;LUA_USE_POSIX&quot;).compile();</code></p>
+</section>
+<section class="member" id="fn.cEnv">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cEnv(): (<span class="ty">string</span>, <span class="ty">string</span>)[]</code></pre>
+<p>Returns the environment under which another build system — CMake, a configure script, make —
+compiles C for the build's target with the toolchain's C compiler: <code>CC</code>, <code>AR</code> and <code>CFLAGS</code>, to
+hand to a <code>std.process.Command</code> as its <code>env</code>.</p>
 </section>
 <section class="member" id="fn.warn">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> warn(message: <span class="ty">string</span>): <span class="ty">void</span></code></pre>
@@ -139,6 +177,7 @@ script has ended, and two files of one name, stop the build (<code>LYR-BLD0006</
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
 <ul>
+<li class="level-2"><a href="#types">Types</a></li>
 <li class="level-2"><a href="#functions">Functions</a></li>
 <li class="level-3"><a href="#fn.target">target</a></li>
 <li class="level-3"><a href="#fn.profile">profile</a></li>
@@ -149,8 +188,12 @@ script has ended, and two files of one name, stop the build (<code>LYR-BLD0006</
 <li class="level-3"><a href="#fn.linkLib">linkLib</a></li>
 <li class="level-3"><a href="#fn.linkSearch">linkSearch</a></li>
 <li class="level-3"><a href="#fn.besideBinary">besideBinary</a></li>
-<li class="level-3"><a href="#fn.cFlags">cFlags</a></li>
-<li class="level-3"><a href="#fn.compileC">compileC</a></li>
+<li class="level-3"><a href="#fn.linkArchive">linkArchive</a></li>
+<li class="level-3"><a href="#fn.linkFramework">linkFramework</a></li>
+<li class="level-3"><a href="#fn.pkgConfig">pkgConfig</a></li>
+<li class="level-3"><a href="#fn.vendorDir">vendorDir</a></li>
+<li class="level-3"><a href="#fn.cLibrary">cLibrary</a></li>
+<li class="level-3"><a href="#fn.cEnv">cEnv</a></li>
 <li class="level-3"><a href="#fn.warn">warn</a></li>
 </ul>
 </aside>

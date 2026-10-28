@@ -2522,6 +2522,13 @@ code is no longer reported, and its number is not given again.</p>
 <td>Reported when a package's <code>build.lyr</code> calls <code>std.build.warn</code>: the build shows the script's message as a warning, prefixed with the package's name.</td>
 </tr>
 <tr>
+<td>LYR-BLD0004</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a library of the machine cannot be had for this build</td>
+<td>Reported when a package's native part, or its build script, names a library of the system through <code>pkgConfig</code> and pkg-config is not there, does not know the name, or the build is for another target than the host — or names a macOS framework for a build for macOS on a host that is not macOS. Nothing is built; the exit code is 2: the machine lacks what the package asks of it.</td>
+</tr>
+<tr>
 <td>LYR-BLD0005</td>
 <td>E</td>
 <td><a href="../../spec/15-project/">15-project</a></td>

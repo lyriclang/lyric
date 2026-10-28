@@ -187,6 +187,22 @@ libs = ["gdi32", "winmm"]</code></pre>
 <p><code>[native.linux]</code>, <code>[native.windows]</code> and <code>[native.macos]</code> add to <code>[native]</code> for a build for that
 system. A build for Windows links Windows' system libraries from any machine; a library of a Linux
 system is found only when you build on Linux.</p>
+<p>A library installed on the machine often knows best how it is linked, and tells <code>pkg-config</code>.
+<code>pkgConfig</code> asks it:</p>
+<pre><code class="language-toml">[native.linux]
+pkgConfig = ["sdl2", "zlib"]</code></pre>
+<p>The build runs <code>pkg-config --cflags --libs sdl2 zlib</code>; the include directories and definitions it
+answers go to your package's C sources (and to its bindings), the libraries and flags to the link.
+<code>PKG_CONFIG</code> names another <code>pkg-config</code>. Its answer is about this machine, so it holds for a build
+for this machine only: a build for another target stops with <code>LYR-BLD0004</code>.</p>
+<p>On macOS, system libraries come as <strong>frameworks</strong>:</p>
+<pre><code class="language-toml">[native.macos]
+frameworks = ["Cocoa", "IOKit", "CoreVideo"]</code></pre>
+<p>Each is linked as <code>-framework Cocoa</code>. A framework is part of the macOS SDK, which only a Mac has,
+and the C compiler finds it for the Mac it runs on: a build for macOS from Linux or Windows — or
+for an Intel Mac from an Apple-silicon one — stops with <code>LYR-BLD0004</code>; build it on the Mac it is
+for. <code>frameworks</code>
+belongs in <code>[native.macos]</code> or a macOS triple's table; anywhere else it is refused.</p>
 <h2 id="a-library-from-an-sdk">A library from an SDK</h2>
 <p>Many libraries come as an SDK you unpack somewhere: SDL3 for Windows, say, with the import library
 <code>libSDL3.dll.a</code> under <code>lib/</code> and <code>SDL3.dll</code> under <code>bin/</code>. Where that lies differs from machine to
@@ -223,6 +239,38 @@ asked.</li>
 <p>The root package's build script always runs. A dependency's runs only where your manifest trusts
 it, under <code>[trust] build-scripts = [&quot;name&quot;]</code>: a build script is a program, and you decide whose
 programs run on your machine.</p>
+<h2 id="c-a-build-script-compiles">C a build script compiles</h2>
+<p>The manifest says what is always so. A build script decides what depends on the build — the target,
+the profile, the environment. <code>build.target()</code> tells it what the build is for:</p>
+<pre><code class="language-text">// build.lyr
+import std.build;
+
+fn main(): void {
+    let target = build.target();
+    let lua = build.cLibrary("lua").sources("@lua/src/*.c").include("@lua/src").flags("-O2");
+    if (target.os == .Windows) {
+        lua.define("LUA_USE_WINDOWS");
+    } else {
+        lua.define("LUA_USE_POSIX");
+    }
+    lua.compile();
+    if (target.os == .MacOS) {
+        build.linkFramework("Accelerate");
+    }
+}</code></pre>
+<p><strong><code>cLibrary(name)</code></strong> is a C library the script compiles with the program. Its <code>define</code>s and
+<code>flags</code> are its own — your package's other C does not see them, so a flag one library needs does
+not change another. Its sources see their own <code>include</code> first, then what the package's sources see.
+Its paths are your package's or a source tree's, as in the manifest.</p>
+<p><code>target()</code> holds the <code>triple</code>, the <code>os</code> and <code>arch</code> as <code>Platform</code> and <code>Arch</code> name them, and whether
+the build <code>isHost</code>. The script also has the manifest's keys as calls — <code>linkLib</code>, <code>linkArchive</code>,
+<code>linkFramework</code>, <code>pkgConfig</code> —, for what it decides while it runs.</p>
+<p>Some libraries are built by their own build system — CMake, a <code>configure</code> script. <strong><code>cEnv()</code></strong>
+gives the environment they compile C under with Lyric's C compiler, for the build's target: <code>CC</code>,
+<code>AR</code> and <code>CFLAGS</code>, to hand to a <code>std.process.Command</code>. Run the library's build into <code>outDir()</code>,
+then link what it made with <code>linkArchive</code>. <strong><code>vendorDir(&quot;name&quot;)</code></strong> is where a source tree lies —
+the tree is fetched when the script first asks, and the script runs again from its start, so ask
+before doing anything you would not do twice.</p>
 <h2 id="loading-a-library-while-the-program-runs">Loading a library while the program runs</h2>
 <p>A library the program picks while it runs — a plugin — is not linked at all: <code>std.ffi</code>'s <code>Library</code>
 opens it by its path and looks up its functions by name. <a href="https://github.com/lyriclang/lyric/blob/main/examples/ffi"><code>examples/ffi</code></a> shows

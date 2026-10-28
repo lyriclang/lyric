@@ -101,7 +101,7 @@ is refused (<code>LYR-PKG0002</code>).</li>
 <p>The packages a package imports from (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V7</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases that hold their dependencies in
 their own directories, and the git repositories they read as their versions
-(<a href="https://github.com/lyriclang/lyric-spec/blob/07079b2d25908c25309fc3c7da6b82938b846f8f/conformance/README.md">the suite's README</a>); the toolchain's own tests
+(<a href="https://github.com/lyriclang/lyric-spec/blob/1321b665a97e3192ded2db306c3d076f4e23a462/conformance/README.md">the suite's README</a>); the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>: <code>DependencyTests</code>, <code>GitDependencyTests</code>, <code>PackageContentTests</code>).</p>
 <ol>
 <li><code>[dependencies]</code> names them, each where it is read from: a directory,
@@ -232,7 +232,7 @@ memory is not.</li>
 <p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code> and <code>conformance/cases/15-project/</code>, package cases
 that call their native part or whose manifest a rule refuses; the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>, <code>NativeTests</code>, <code>VendorTests</code>, <code>BindingsTests</code>).</p>
-<p><em>(Rules 9–11 and the findings <code>LYR-LNK…</code> of rule 12 are written ahead of their implementation, milestone M14b of the Lyric 5 plan — the
+<p><em>(The findings <code>LYR-LNK…</code> of rule 12 are written ahead of their implementation, milestone M14b of the Lyric 5 plan — the
 decisions of <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11, review 2026-10-28</a>;
 each comes with its cases.)</em></p>
 <h3 id="51-sources">5.1 Sources</h3>
@@ -285,15 +285,18 @@ shared library of a package — <a href="https://github.com/lyriclang/lyric/blob
 <li><strong><code>frameworks = [&quot;Cocoa&quot;]</code></strong> are macOS frameworks, linked as <code>-framework Cocoa</code>: a key of
 <code>[native.macos]</code> and of the macOS triples' tables only (<code>LYR-PKG0003</code> elsewhere).</li>
 <li><strong><code>pkgConfig = [&quot;sdl2&quot;]</code></strong> names libraries of the system as <code>pkg-config</code> knows them: a build for
-the host asks <code>pkg-config --cflags --libs</code> and gives what it says about include directories and
-definitions to the package's sources, and the rest to the link. <code>pkg-config</code> missing, or a
-name it does not know, stops the build (<code>LYR-BLD0004</code>, exit 2).</li>
+the host asks <code>pkg-config --cflags --libs</code> — or the program the environment's <code>PKG_CONFIG</code>
+names — and gives what it says about include directories and definitions to the package's
+sources and to its bindings (§5.4), its directories and libraries to the link as <code>libs</code> are
+linked, its frameworks as rule 9's, and every other flag to the link as it is. <code>pkg-config</code>
+missing, or a name it does not know, stops the build (<code>LYR-BLD0004</code>, exit 2).</li>
 <li><strong>What only the host has</strong>: a framework comes from the macOS SDK and a name of <code>pkgConfig</code> from
 the host's system, so a build for another target that needs one is refused before it compiles
 (<code>LYR-BLD0004</code>, exit 2, naming the package and the key). <em>(Informative: with the toolchain's C
 compiler a build for Windows links Windows' system libraries from any host; a build for Linux
 links a library of the system beside libc only on a Linux host, and one for macOS a framework
-only on a macOS host.)</em></li>
+only on the Mac it is for: zig finds the SDK's frameworks for the Mac it runs on, and for no
+target named — another Mac's included.)</em></li>
 <li>The link takes, in this order: the program's objects and the native parts' — the packages
 <strong>before the packages they depend on</strong>, the root's first —, their <code>archives</code> and <code>dylibs</code> in that order, the
 libraries by name and from <code>pkgConfig</code>, then the frameworks; each archive, library and framework
@@ -447,9 +450,9 @@ package's program sees none of its dependencies; <code>build</code> names no pac
 on the host, with the package's root as its working directory, whatever the build's target.</li>
 <li><strong><code>std.build</code></strong> is its view of the build: <code>target()</code> and <code>profile()</code>, the build's; <code>outDir()</code>,
 the package's <code>out/</code>; <code>genDir()</code>; <code>rerunIfChanged(paths…)</code>, <code>rerunIfEnvChanged(names…)</code>,
-<code>linkLib(name)</code>, <code>linkSearch(dir)</code>, <code>cFlags(flags…)</code>, <code>compileC(sources…)</code>,
-<code>besideBinary(paths…)</code> — paths from the package's root, or absolute —, and <code>warn(message)</code>,
-which the build shows (<code>LYR-BLD0003</code>). Outside a build script they panic.
+<code>linkLib(name)</code>, <code>linkSearch(dir)</code>, <code>besideBinary(paths…)</code> — paths from the package's root, or
+absolute —, and <code>warn(message)</code>, which the build shows (<code>LYR-BLD0003</code>); and those of rules
+3.3–3.6. Outside a build script they panic.
 <ol>
 <li><strong><code>linkSearch(dir)</code></strong> names a directory the link searches for the libraries of <code>linkLib</code>
 and of <code>[native]</code>'s <code>libs</code> (§5), before the linker's own and in the order named — the
@@ -466,18 +469,27 @@ directory of every binary it makes of the program — of <code>build</code> and 
 a binary searches its own directory for shared libraries first: an ELF binary by the run path
 <code>$ORIGIN</code>, a Mach-O binary by <code>@executable_path</code>; a Windows binary does so by itself. A file
 that is not there when the script has ended, and two files of one name — counting the
-<code>dylibs</code> of §5 rule 8 —, stop the build (<code>LYR-BLD0006</code>, exit 1).
-<em>(Written ahead of M14b, replacing <code>cFlags</code> and <code>compileC</code> when it lands:)</em> <code>target()</code> is a
-<strong><code>Target</code></strong> — its <code>triple</code>, its <code>os</code> (<code>Os.linux</code>, <code>Os.windows</code>, <code>Os.macos</code>), its <code>arch</code>
-(<code>Arch.x86_64</code>, <code>Arch.aarch64</code>) and whether it <code>isHost</code> —; <code>vendorDir(name)</code> is the directory of
-a source tree (§5.3), read where the script asks for it; <strong><code>cLibrary(name)</code></strong> is a C library the
-script compiles with the program — its <code>sources(…)</code>, <code>include(…)</code>, <code>define(name)</code> and
-<code>define(name, value)</code>, and <code>flags(…)</code>, the C compiler's own, its alone — and <code>compile()</code> adds it:
-its sources see the package's <code>include</code>, <code>&lt;lyric.h&gt;</code> and the headers §5 rule 6 names; paths are
-the package's or a tree's (<code>@name/…</code>). <code>linkLib(name)</code>, <code>linkArchive(path)</code>,
-<code>linkFramework(name)</code> and <code>pkgConfig(name)</code> are §5.2's keys, with their rules; <code>cEnv()</code> is the
-environment — <code>CC</code>, <code>AR</code>, <code>CFLAGS</code> — under which another build system compiles C for the target
-with the toolchain's C compiler.</li>
+<code>dylibs</code> of §5 rule 8 —, stop the build (<code>LYR-BLD0006</code>, exit 1).</li>
+<li><strong><code>target()</code></strong> is a <strong><code>BuildTarget</code></strong> — its <code>triple</code>, its <code>os</code> and <code>arch</code> as the prelude's
+<code>Platform</code> and <code>Arch</code> name them (<code>.Linux</code>, <code>.Windows</code>, <code>.MacOS</code>; <code>.X86_64</code>, <code>.Aarch64</code>), and
+whether it <code>isHost</code>, the machine the script runs on.</li>
+<li><strong><code>cLibrary(name)</code></strong> is a C library the script compiles with the program — its
+<code>sources(…)</code>, patterns as <code>[native]</code>'s <code>sources</code>, <code>include(…)</code>, <code>define(name)</code> and
+<code>define(name, value)</code>, and <code>flags(…)</code>, the C compiler's own — and <code>compile()</code> adds it. Its
+sources see its own <code>include</code> first, then what the package's sources see (§5 rule 6); its
+definitions and flags are its own, no other source's. Its paths are the package's or a
+tree's (<code>@name/…</code>); another is refused (<code>LYR-BLD0002</code>).</li>
+<li><code>linkLib(name)</code>, <strong><code>linkArchive(path)</code></strong>, <strong><code>linkFramework(name)</code></strong> and <strong><code>pkgConfig(name)</code></strong>
+add to the package's native part what <code>libs</code>, <code>archives</code>, <code>frameworks</code> and <code>pkgConfig</code> add
+(§5), with their rules; an archive the script names — under <code>out/</code>, where it made it, or
+absolute — is the script's, not of the package's content (§5 rule 7).</li>
+<li><strong><code>vendorDir(name)</code></strong> is the directory of the package's source tree <code>name</code> (§5.3), read when
+the script asks for it: the script stops, the build reads the tree, and the script runs
+again from its start with the tree there. A name <code>[native.vendor]</code> does not hold is refused
+(<code>LYR-BLD0002</code>). <strong><code>cEnv()</code></strong> is the environment — <code>CC</code>, <code>AR</code>, <code>CFLAGS</code> — under which another
+build system compiles C for the target with the toolchain's C compiler: <code>CC</code> and <code>AR</code> run the
+toolchain's compiler for the target, as the build's own C is compiled, and <code>CFLAGS</code> holds the
+profile's optimization.</li>
 </ol>
 </li>
 <li><strong><code>gen/</code></strong>, which the toolchain makes before the script runs, is a module space of the
