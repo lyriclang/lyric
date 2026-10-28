@@ -59,9 +59,10 @@ public static partial class Bindgen
         var tree = ProcessRunner.Run(compiler.Path, [.. flags, "-Xclang", "-ast-dump=json", "-fsyntax-only", header], CompileTime);
         // zig's driver ends a syntax-only run with "FileNotFound" and exit 1 after the tree is out;
         // what else is an error is the header's
-        var errors = tree.Stderr.Split('\n').Where(l => l.Contains("error", StringComparison.Ordinal) && !l.Contains("FileNotFound", StringComparison.Ordinal)).ToList();
+        var errors = tree.Stderr.Split('\n').Where(l => l.Contains("error", StringComparison.Ordinal) && !l.Contains("FileNotFound", StringComparison.Ordinal)
+                                                           && !l.Contains("generated.", StringComparison.Ordinal)).ToList();
         if (errors.Count > 0 || tree.Stdout.Length == 0)
-            throw new BindgenException(errors.Count > 0 ? string.Join("\n", errors.Select(e => e.Trim())) : tree.Stderr.Trim());
+            throw new BindgenException(errors.Count > 0 ? string.Join("; ", errors.Select(e => e.Trim())) : tree.Stderr.Trim());
 
         var depends = Path.Combine(Path.GetTempPath(), $"lyric-bindgen-{Environment.ProcessId}-{Guid.NewGuid():N}.d");
         string macros;
@@ -628,8 +629,8 @@ public static partial class Bindgen
                     var where = Display(file);
                     if (macro.Function) Left.Add(new LeftOut(name, where, i + 1, "a function-like macro is no declaration"));
                     else if (macro.Body.Length == 0) continue;
-                    else if (Integer(macro.Body) is { } value)
-                        _out.Add($"pub let {Name(name)}: {(value > long.MaxValue ? "uint" : "int")} = {value};");
+                    else if (Integer(macro.Body) is ({ } value, var type))
+                        _out.Add($"pub let {Name(name)}: {type} = {value};");
                     else if (LyricString(macro.Body) is { } text) _out.Add($"pub let {Name(name)}: string = {text};");
                     else Left.Add(new LeftOut(name, where, i + 1, "its body is no integer and no string literal"));
                 }
@@ -637,8 +638,10 @@ public static partial class Bindgen
         }
 
         /// <summary>A C integer literal — decimal, hexadecimal, octal or binary, with its suffix, in
-        /// parentheses or with a minus —, or <c>null</c>.</summary>
-        private static BigInteger? Integer(string body)
+        /// parentheses or with a minus —, and the type C gives it: the first of <c>int32</c> and
+        /// <c>int64</c> it fits, unsigned with a <c>u</c> (a hexadecimal one may be unsigned too), at
+        /// least 64 bits with an <c>l</c>; or <c>null</c>.</summary>
+        private static (BigInteger Value, string Type)? Integer(string body)
         {
             var m = IntegerLiteral().Match(body);
             if (!m.Success) return null;
@@ -651,8 +654,22 @@ public static partial class Bindgen
             else if (digits.Length > 1 && digits[0] == '0')
                 value = digits[1..].Aggregate(BigInteger.Zero, (v, c) => v * 8 + (c - '0'));
             else value = BigInteger.Parse(digits, CultureInfo.InvariantCulture);
-            if (m.Groups["minus"].Success) value = -value;
-            return value < long.MinValue || value > ulong.MaxValue ? null : value;
+            var suffix = m.Groups["suffix"].Value.ToLowerInvariant();
+            var unsigned = suffix.Contains('u');
+            var wide = suffix.Contains('l');
+            var hexadecimal = !digits.All(char.IsAsciiDigit) || digits.Length > 1 && digits[0] == '0';
+            string? type = null;
+            if (!unsigned && !wide && value <= int.MaxValue) type = "int32";
+            else if ((unsigned || hexadecimal) && !wide && value <= uint.MaxValue) type = "uint32";
+            else if (!unsigned && value <= long.MaxValue) type = "int64";
+            else if ((unsigned || hexadecimal) && value <= ulong.MaxValue) type = "uint64";
+            if (type is null) return null;
+            if (m.Groups["minus"].Success)
+            {
+                if (type.StartsWith('u')) return null;
+                value = -value;
+            }
+            return (value, type);
         }
 
         /// <summary>A C string literal written as Lyric writes it, or <c>null</c> where it is none.</summary>
@@ -715,7 +732,7 @@ public static partial class Bindgen
     [GeneratedRegex(@"^\s*#\s*define\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)")]
     private static partial Regex DefineLine();
 
-    [GeneratedRegex(@"^\(?\s*(?<minus>-)?\s*(?<digits>0[xX][0-9a-fA-F]+|0[bB][01]+|[0-9]+)(?:[uU]?[lL]{0,2}|[lL]{1,2}[uU])\s*\)?$")]
+    [GeneratedRegex(@"^\(?\s*(?<minus>-)?\s*(?<digits>0[xX][0-9a-fA-F]+|0[bB][01]+|[0-9]+)(?<suffix>[uU]?[lL]{0,2}|[lL]{1,2}[uU])\s*\)?$")]
     private static partial Regex IntegerLiteral();
 
     [GeneratedRegex(@"^""(?:[^""\\]|\\.)*""$")]
