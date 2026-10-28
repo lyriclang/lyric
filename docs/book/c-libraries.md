@@ -1,8 +1,8 @@
 # C libraries
 
 Lyric compiles through C, and C is the one language it talks to directly. This chapter shows how a
-package calls C, brings C of its own, and links a C library — from the system, or from an SDK that
-lies somewhere on your machine. A complete package that does all of it is
+package calls C, brings C of its own, compiles a C library from its source, and links one — prebuilt,
+from the system, or from an SDK that lies somewhere on your machine. A complete package that does all of it is
 [`examples/ffi`](../../examples/ffi).
 
 ## Calling C
@@ -99,6 +99,56 @@ refused with `LYR-BLD0006`, and the message says how to rename it.
 A prebuilt file has to be part of the package — under `native/`, or named in `[package] include` —
 because that is what the package is when someone else gets it from git, and what the lock holds
 the bytes of. When you replace one, the next build links again, even if the file kept its time.
+
+## C from its source
+
+Most C libraries are easiest to build from their own source, with the program. You don't copy the
+source into your package: `[native.vendor]` names it as a **source tree**, and the native part's
+paths reach into it with `@name/`:
+
+```toml
+[native.vendor]
+raylib = { git = "https://github.com/raysan5/raylib", tag = "5.5" }
+
+[native]
+sources = ["@raylib/src/rcore.c", "@raylib/src/rshapes.c", "@raylib/src/utils.c"]
+include = ["@raylib/src"]
+defines = ["PLATFORM_DESKTOP"]
+```
+
+A tree from git names its revision as a dependency does — `tag`, `branch`, `rev`, or none for the
+default branch. It is no package: it needs no `lyric.toml`, and every file of the revision is part
+of it. The build fetches it into your user cache, once for every project, and `lyric.lock` holds
+the commit and a hash of its content with `kind = "native"`; check the lock in, and every build reads
+the same C. `lyric update raylib` moves the tree to its branch's head or its tag's new commit, as
+it does a package.
+
+A tree can also be a release file — a `.tar.gz` or a `.zip` — at a URL, pinned by its SHA-256:
+
+```toml
+[native.vendor]
+sqlite = { url = "https://www.sqlite.org/2024/sqlite-amalgamation-3460000.zip", hash = "sha256:…" }
+```
+
+The build loads the file once, checks its hash, and unpacks it, leaving out the single top directory
+most release files have. You don't compute the hash yourself: `lyric add` loads the file and writes
+the line with it,
+
+```sh
+lyric add sqlite --vendor --url https://www.sqlite.org/2024/sqlite-amalgamation-3460000.zip
+lyric add raylib --vendor --git https://github.com/raysan5/raylib --tag 5.5
+```
+
+and a URL written without its hash is refused, the message giving the hash of what it loaded. A
+`.tar.xz` is not unpacked; take such a library from git.
+
+A tree is read only when a build needs it: one named only in `[native.windows]` is never fetched
+by a build for Linux. `--offline` reads the cache alone, and `--locked` refuses a tree the lock
+does not hold. Compiling a tree runs nothing of it — there is no script in it to trust.
+
+A tree belongs to the package that names it. If two packages of a program compile the same C, its
+symbols are defined twice and the link fails — share a C library by wrapping it in one package
+that the others depend on.
 
 ## Libraries of the system
 
