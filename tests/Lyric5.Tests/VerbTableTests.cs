@@ -106,4 +106,24 @@ public class VerbTableTests
         Assert.Contains("profile.opt", text);
         Assert.Contains("(default)", text);
     }
+
+    [Fact]
+    public void Env_says_each_lint_s_level_and_who_set_it_and_where_zig_comes_from()
+    {
+        var root = Package(("lyric.toml", AppManifest + "\n[lints]\nwarn = [\"unused-label\"]\ndeny = [\"deprecated\"]\n"), ("src/main.lyr", Warns));
+        var (exit, output, error) = RunRaw("env", "-C", root, "-D", "unused-import", "-A", "deprecated", "--warn-deps", "--json");
+        Assert.True(exit == 0, output + error);
+        var settings = JsonDocument.Parse(output).RootElement.GetProperty("settings").EnumerateArray()
+            .ToDictionary(s => s.GetProperty("name").GetString()!, s => (s.GetProperty("value").GetString(), s.GetProperty("origin").GetString()));
+        Assert.Equal(("deny", "command line"), settings["lint.unused-import"]);
+        Assert.Equal(("allow", "command line"), settings["lint.deprecated"]);
+        Assert.Equal(("warn", "lyric.toml"), settings["lint.unused-label"]);
+        Assert.Equal("default", settings["lint.unreachable-code"].Item2);
+        Assert.Equal(("true", "command line"), settings["lint.warnDeps"]);
+        Assert.Equal(Lyric.Core.DiagnosticCatalog.Lints.Count + 1, settings.Keys.Count(k => k.StartsWith("lint.", StringComparison.Ordinal)));
+
+        // the tests' home holds no zig: it is the PATH's, or none
+        Assert.Contains(settings["zig"].Item2, new[] { "PATH", "default" });
+        Assert.Contains(settings["cc"].Item2, new[] { "PATH", "LYRIC_CC", "default" });
+    }
 }

@@ -58,7 +58,7 @@ public static partial class Program
             "api" => Api(rest),
             "lsp" => Lsp(rest),
             "dap" => Dap(rest),
-            "env" => Env(rest),
+            "env" => Env(rest, lints),
             "new" => New(rest, here: false),
             "init" => New(rest, here: true),
             "completions" => Completions(rest),
@@ -240,5 +240,5 @@ public static partial class Program
     }
 
     private static string DescribeCompiler(CCompiler? compiler) =>
-        compiler?.ToString() ?? "none found — install zig (recommended), clang or gcc";
+        compiler?.ToString() ?? "none found — lyric5 toolchain install zig installs one";
 }

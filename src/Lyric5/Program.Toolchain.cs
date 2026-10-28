@@ -24,6 +24,7 @@ public static partial class Program
         {
             return (words[0], words.Count) switch
             {
+                ("install", 2) when words[1] == "zig" => ToolchainInstallZig(home),
                 ("install", 2) => ToolchainInstall(home, words[1]),
                 ("list", 1) => available ? ToolchainAvailable(home) : ToolchainList(home),
                 ("default", 1) => ToolchainDefault(home, null),
@@ -60,6 +61,22 @@ public static partial class Program
         return 0;
     }
 
+    /// <summary>The zig this toolchain pins, under the home, where the search for a C compiler
+    /// takes it before the PATH.</summary>
+    private static int ToolchainInstallZig(ToolchainHome home)
+    {
+        var version = Lyric5.Toolchain.LyricHome.ZigVersion;
+        if (!ZigFetch.ForUser(DisplayVersion(), Console.IsErrorRedirected ? null : Console.Error).Install(home, version))
+        {
+            Console.Out.WriteLine($"zig {version} is installed already");
+            return 0;
+        }
+        Console.Out.WriteLine($"installed zig {version} in {home.ZigDirectoryOf(version)}");
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("LYRIC_CC")))
+            Console.Out.WriteLine("  = note: LYRIC_CC is set, and names the C compiler over it");
+        return 0;
+    }
+
     /// <summary>The default set and said, with the advice to put <c>bin</c> on the PATH where it
     /// is not.</summary>
     private static void MakeDefault(ToolchainHome home, string version)
@@ -75,13 +92,11 @@ public static partial class Program
     private static int ToolchainList(ToolchainHome home)
     {
         var installed = home.Installed();
-        if (installed.Count == 0)
-        {
-            Console.Out.WriteLine($"no toolchain is installed in {home.Toolchains}");
-            return 0;
-        }
+        if (installed.Count == 0) Console.Out.WriteLine($"no toolchain is installed in {home.Toolchains}");
         var chosen = home.Default();
         foreach (var version in installed) Console.Out.WriteLine(version == chosen ? $"{version} (default)" : version);
+        var zig = Lyric5.Toolchain.LyricHome.ZigVersion;
+        if (home.IsZigInstalled(zig)) Console.Out.WriteLine($"zig {zig} (the C compiler)");
         return 0;
     }
 

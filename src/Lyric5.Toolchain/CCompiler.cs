@@ -5,9 +5,10 @@ namespace Lyric5.Toolchain;
 public enum CCompilerKind { Zig, Clang, Gcc }
 
 /// <summary>
-/// A C compiler the toolchain can drive. <see cref="Locate"/> takes
-/// <c>LYRIC_CC</c> when set, otherwise the first of <c>zig</c>, <c>clang</c>
-/// and <c>gcc</c> that answers for its version.
+/// A C compiler the toolchain can drive. <see cref="Locate()"/> takes
+/// <c>LYRIC_CC</c> when set, otherwise the zig <c>lyric toolchain install zig</c>
+/// put under the home, otherwise the first of <c>zig</c>, <c>clang</c> and
+/// <c>gcc</c> on the PATH that answers for its version.
 /// </summary>
 public sealed record CCompiler(CCompilerKind Kind, string Path, string Version)
 {
@@ -65,19 +66,28 @@ public sealed record CCompiler(CCompilerKind Kind, string Path, string Version)
         }
     }
 
-    public static CCompiler? Locate(string? chosen)
+    public static CCompiler? Locate(string? chosen) => Locate(chosen, LyricHome.Root);
+
+    /// <summary>The compiler <paramref name="chosen"/> names; else the zig installed under the home
+    /// <paramref name="home"/> in the version this toolchain pins; else the first of <c>zig</c>,
+    /// <c>clang</c> and <c>gcc</c> on the PATH.</summary>
+    public static CCompiler? Locate(string? chosen, string home)
     {
         if (!string.IsNullOrWhiteSpace(chosen)) return Probe(chosen, KindOf(chosen));
-        return Probe("zig", CCompilerKind.Zig) ?? Probe("clang", CCompilerKind.Clang) ?? Probe("gcc", CCompilerKind.Gcc);
+        return InstalledZig(home) ?? Probe("zig", CCompilerKind.Zig) ?? Probe("clang", CCompilerKind.Clang) ?? Probe("gcc", CCompilerKind.Gcc);
     }
 
     /// <summary>A specific kind, for profiles that require one (the sanitizer profiles need clang).</summary>
     public static CCompiler? Locate(CCompilerKind kind) => kind switch
     {
-        CCompilerKind.Zig => Probe("zig", kind),
+        CCompilerKind.Zig => InstalledZig(LyricHome.Root) ?? Probe("zig", kind),
         CCompilerKind.Clang => Probe("clang", kind),
         _ => Probe("gcc", kind),
     };
+
+    /// <summary>The pinned zig under the home <paramref name="home"/>, where it is installed and answers.</summary>
+    public static CCompiler? InstalledZig(string home) =>
+        LyricHome.InstalledZig(home) is { } binary ? Probe(binary, CCompilerKind.Zig) : null;
 
     private static CCompilerKind KindOf(string command)
     {

@@ -161,13 +161,15 @@ public sealed class ToolchainFetch
         }
     }
 
+    private byte[]? Get(string url, out string reason) => Get(_http, url, out reason);
+
     /// <summary>The body at <paramref name="url"/>; <c>null</c> with the reason where the server
     /// cannot be reached or does not serve it.</summary>
-    private byte[]? Get(string url, out string reason)
+    internal static byte[]? Get(HttpClient http, string url, out string reason)
     {
         try
         {
-            using var response = _http.Send(new HttpRequestMessage(HttpMethod.Get, url));
+            using var response = http.Send(new HttpRequestMessage(HttpMethod.Get, url));
             if (!response.IsSuccessStatusCode)
             {
                 reason = $"{url}: {(int)response.StatusCode} {response.ReasonPhrase}";
@@ -186,15 +188,19 @@ public sealed class ToolchainFetch
         }
     }
 
+    private void Download(string url, string file, ChannelArchive archive) => Download(_http, _progress, url, file, archive);
+
     /// <summary>The archive at <paramref name="url"/> into <paramref name="file"/>, read no further
-    /// than the index's size and hashed on the way.</summary>
-    private void Download(string url, string file, ChannelArchive archive)
+    /// than the index's size and hashed on the way; its progress drawn on <paramref name="progress"/>.</summary>
+    /// <exception cref="ToolchainException"><c>LYR-CLI0023</c> where it cannot be had,
+    /// <c>LYR-CLI0024</c> where it is not the size or the hash the index gives.</exception>
+    internal static void Download(HttpClient http, TextWriter? progress, string url, string file, ChannelArchive archive)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         long read = 0;
         try
         {
-            using var response = _http.Send(new HttpRequestMessage(HttpMethod.Get, url), HttpCompletionOption.ResponseHeadersRead);
+            using var response = http.Send(new HttpRequestMessage(HttpMethod.Get, url), HttpCompletionOption.ResponseHeadersRead);
             if (!response.IsSuccessStatusCode)
                 throw new ToolchainException("LYR-CLI0023", $"{url}: {(int)response.StatusCode} {response.ReasonPhrase}");
             using var body = response.Content.ReadAsStream();
@@ -208,9 +214,9 @@ public sealed class ToolchainFetch
                     throw new ToolchainException("LYR-CLI0024", $"{archive.File} is larger than the {archive.Size} bytes its index gives", "nothing was installed");
                 hash.AppendData(buffer, 0, n);
                 output.Write(buffer, 0, n);
-                if (_progress is not null && DateTime.UtcNow - drawn > TimeSpan.FromMilliseconds(100))
+                if (progress is not null && DateTime.UtcNow - drawn > TimeSpan.FromMilliseconds(100))
                 {
-                    _progress.Write($"\r  fetching {archive.File}  {read / 1048576.0:0.0} of {archive.Size / 1048576.0:0.0} MB");
+                    progress.Write($"\r  fetching {archive.File}  {read / 1048576.0:0.0} of {archive.Size / 1048576.0:0.0} MB");
                     drawn = DateTime.UtcNow;
                 }
             }
@@ -221,7 +227,7 @@ public sealed class ToolchainFetch
         }
         finally
         {
-            if (_progress is not null && read > 0) _progress.WriteLine($"\r  fetched {archive.File}  {read / 1048576.0:0.0} MB{new string(' ', 16)}");
+            if (progress is not null && read > 0) progress.WriteLine($"\r  fetched {archive.File}  {read / 1048576.0:0.0} MB{new string(' ', 16)}");
         }
         if (read != archive.Size)
             throw new ToolchainException("LYR-CLI0024", $"{archive.File} ended after {read} of the {archive.Size} bytes its index gives", "nothing was installed");

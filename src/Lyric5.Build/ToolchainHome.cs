@@ -16,7 +16,8 @@ public sealed class ToolchainException(string code, string message, params strin
 /// the default (<c>default = "&lt;version&gt;"</c>), and <c>bin</c> is a link to the default's
 /// directory — a symbolic link, on Windows a junction —, so that the one directory on the PATH
 /// runs the default with its standard library and runtime beside it, and changing the default
-/// replaces a link, never a binary that may be running.
+/// replaces a link, never a binary that may be running. <c>zig/&lt;version&gt;/</c> holds the zig
+/// <c>lyric toolchain install zig</c> installs.
 /// </summary>
 public sealed class ToolchainHome(string root)
 {
@@ -34,15 +35,14 @@ public sealed class ToolchainHome(string root)
     public string Config => Path.Combine(Root, ConfigName);
 
     /// <summary>The home <c>LYRIC_HOME</c> names, else <c>.lyric</c> in the user's home directory.</summary>
-    public static ToolchainHome ForUser()
-    {
-        var configured = Environment.GetEnvironmentVariable("LYRIC_HOME");
-        return new ToolchainHome(!string.IsNullOrWhiteSpace(configured)
-            ? configured
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".lyric"));
-    }
+    public static ToolchainHome ForUser() => new(LyricHome.Root);
 
     public string DirectoryOf(string version) => Path.Combine(Toolchains, version);
+
+    /// <summary>Where the zig <paramref name="version"/> is installed: <c>zig/&lt;version&gt;/</c>.</summary>
+    public string ZigDirectoryOf(string version) => LyricHome.ZigDirectory(Root, version);
+
+    public bool IsZigInstalled(string version) => File.Exists(LyricHome.ZigBinary(Root, version));
 
     /// <summary>The binary of the installed <paramref name="version"/>.</summary>
     public string BinaryOf(string version) => Path.Combine(DirectoryOf(version), BinaryName + Target.Host.ExecutableSuffix);

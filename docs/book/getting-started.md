@@ -20,8 +20,10 @@ The archive holds the command `lyric5`, the standard library and the runtime's C
 first release the command is called `lyric5`; this Book writes `lyric`, and every `lyric` here is
 `lyric5` for now.
 
-The C compiler is `zig`, version 0.16.0, from <https://ziglang.org/download/>, on your `PATH`;
-clang or gcc work too. `lyric5 --version` says which one it found:
+The C compiler is `zig`, version 0.16.0. `lyric5 toolchain install zig` fetches it from zig's
+mirrors, checks zig's signature and puts it under `~/.lyric`, where `lyric` looks before your
+`PATH`; a zig, clang or gcc on the `PATH` works too, and `LYRIC_CC` names one over both.
+`lyric5 --version` says which one it found:
 
 ```text
 $ lyric5 --version
@@ -62,6 +64,9 @@ is. `LYRIC_TOOLCHAIN=local` runs the one you started, and `LYRIC_TOOLCHAIN=5.1.0
 
 The channels are published from the first signed release on; until then `lyric toolchain` installs
 only from a mirror of your own, which `LYRIC_MIRROR` names with its key in `LYRIC_MIRROR_KEY`.
+
+`lyric env` says what a build here reads and where each value comes from — the C compiler and zig
+(`installed` or `PATH`), the profile, and each lint's level with who set it (`-D`, `[lints]`).
 
 ## A package
 

@@ -13,4 +13,9 @@
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- the zig version the toolchain is built and tested with, which `lyric toolchain install zig` installs -->
+    <EmbeddedResource Include="..\..\tooling\zig-version" LogicalName="zig-version" />
+  </ItemGroup>
+
 </Project>

@@ -1650,3 +1650,26 @@ bestätigt oder geplant, nicht gebaut); `lyric publish` und eine Paket-Registry 
 - **Gemessen** (NativeAOT, Linux, warm, das Beste aus 5 × 20): der Stellvertreter allein 2,1 ms, `lyric5 version`
   ohne Pin 21,2 ms, mit Pin an den Stellvertreter gereicht 20,9 ms — der Wechsel kostet einen `lyric5`-Start,
   rund 19 ms, unter C9s 50 ms über dem Programmstart.
+
+**S5, beim Bauen entschieden** (2026-10-28):
+
+- **zig kommt über zigs Community-Mirrors**, wie zig es von einem Werkzeug verlangt: Name, Größe und SHA-256 aus
+  zigs `index.json`, die Mirrors aus `community-mirrors.txt` daneben, gemischt, jede Anfrage mit `?source=lyric`, die
+  Download-Seite zuletzt. Geprüft mit zigs minisign-Schlüssel (im Binary, wie ihn die Download-Seite nennt) und gegen
+  die Datei, die der trusted comment nennt — sonst reichte ein Mirror ein älteres signiertes Archiv unter dem Namen
+  eines neueren. Ein Mirror, dessen Archiv nicht hält, wird **übergangen**, anders als beim eigenen Mirror (S3):
+  zigs Mirrors sind Dritte, die Signatur ist zigs. Die Liste wird nicht zwischengespeichert (zig bittet um einen
+  Tag) — installiert wird einmal. `LYRIC_ZIG_MIRROR` mit `LYRIC_ZIG_MIRROR_KEY` ersetzt die Seite, wie
+  `LYRIC_MIRROR` (S3); so prüfen die Tests gegen einen lokalen Server.
+- **Ein eigener `.xz`-Leser** (`Xz` in `Lyric5.Toolchain`): .NET liest kein xz, und zigs Archive für Linux und macOS
+  gibt es nur so; das `tar` des Systems bräuchte `xz` daneben, das nicht jede Maschine hat. LZMA2 nach Pavlovs
+  Spezifikation, die Prüfsummen CRC32, CRC64 und SHA-256, Index und Fußzeile gegen die Blöcke; **nur der Filter
+  LZMA2** — zigs Archiv von 0.16.0 ist ein Block mit 64 MiB Wörterbuch und CRC64 (an seinen ersten Bytes
+  nachgesehen); BCJ und die anderen Filter werden abgelehnt. Gemessen an 320 MB aus `xz -9` (ein Block): 7,3 s
+  gegen 2,3 s für `xz -d`, dieselben Bytes — für eine einmalige Installation genug.
+- **`lyric env`** nennt `zig` getrennt vom C-Compiler, beide mit der Herkunft `installed` (unter dem Zuhause) oder
+  `PATH`, und jede Lint-Stufe als `lint.<name>` mit `command line`, `lyric.toml` oder `default`, dazu
+  `lint.warnDeps`; `env` nimmt dafür `-A`, `-W`, `-D` und `--warn-deps` — Punkt 248 ist zu.
+- Die Suche nach dem C-Compiler: `LYRIC_CC` > das installierte zig **der gepinnten Version** > `zig`, `clang`, `gcc`
+  auf dem PATH. Ein zig anderer Version unter `~/.lyric/zig/` zählt nicht. Nicht gebaut: `toolchain remove zig`
+  und eine andere als die gepinnte Version (Tür).
