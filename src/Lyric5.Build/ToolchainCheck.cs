@@ -19,12 +19,12 @@ public static class ToolchainCheck
         {
             if (manifest.Toolchain is not { } pin || pin.Minimum.CompareTo(version) <= 0) continue;
             throw new ManifestException("LYR-PKG0009", manifest.File, pin.Line, 1,
-                $"package '{manifest.Name}' needs lyric {pin.Minimum} or later, and this is lyric {running}", exit: 2);
+                $"package '{manifest.Name}' needs lyric {pin.Minimum} or later, and this is lyric {running} (lyric5 toolchain install stable installs the newest)", exit: 2);
         }
     }
 
     /// <summary>The version's numbers, without its pre-release and build parts.</summary>
-    private static SemVer Numbers(string running)
+    public static SemVer Numbers(string running)
     {
         var end = running.IndexOfAny(['-', '+']);
         return SemVer.Parse(end < 0 ? running : running[..end]) ?? new SemVer(0, 0, 0, null);

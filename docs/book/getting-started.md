@@ -34,6 +34,35 @@ The runtime comes prebuilt for your system. A build with another C compiler than
 target, or with another collector or a sanitizer builds it from its source first, once; that build
 takes a little longer than the ones after it.
 
+## Several toolchains
+
+`lyric toolchain` keeps toolchains side by side under `~/.lyric` (`LYRIC_HOME` puts them elsewhere)
+and checks each before it is in place: the channel's list is signed, and every archive is checked
+against it. `~/.lyric/bin` on your `PATH` runs the default:
+
+```sh
+lyric toolchain install stable     # or dev, or a version such as 5.0.0
+lyric toolchain list               # the installed ones; --available, what the channels offer
+lyric toolchain default 5.0.0
+lyric toolchain update             # the newest of the default's channel, beside it
+```
+
+A package can name the least toolchain it needs, in `lyric.toml`:
+
+```toml
+[package]
+name = "hello"
+version = "0.1.0"
+toolchain = "5.1"
+```
+
+A command in that package then runs with an installed toolchain that is 5.1 or later — the default
+where it is — whichever one you started; at a terminal, one is offered for installing where none
+is. `LYRIC_TOOLCHAIN=local` runs the one you started, and `LYRIC_TOOLCHAIN=5.1.0` a version.
+
+The channels are published from the first signed release on; until then `lyric toolchain` installs
+only from a mirror of your own, which `LYRIC_MIRROR` names with its key in `LYRIC_MIRROR_KEY`.
+
 ## A package
 
 A program lives in a **package**: a directory with a manifest, `lyric.toml`, and its source under
