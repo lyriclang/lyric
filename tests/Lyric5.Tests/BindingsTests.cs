@@ -44,6 +44,7 @@ public class BindingsTests
         static inline int geo_twice(int x) { return 2 * x; }
         extern int geo_count;
         void geo_any(union Any a);
+        typedef int string;
         #endif
         """;
 
@@ -125,6 +126,8 @@ public class BindingsTests
                      "pub let GEO_MAX: int32 = 10;",
                      "pub let GEO_HEX: int32 = 31;",
                      "pub let GEO_NAME: string = \"geo\";",
+                     // a builtin type's name is no declaration's
+                     "pub type string_ = int32;",
                      "// Left out:",
                      "// - GEO_PI (geo.h:9): its body is no integer and no string literal",
                      "// - GEO_SQ (geo.h:10): a function-like macro is no declaration",

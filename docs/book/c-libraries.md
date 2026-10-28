@@ -150,6 +150,75 @@ A tree belongs to the package that names it. If two packages of a program compil
 symbols are defined twice and the link fails — share a C library by wrapping it in one package
 that the others depend on.
 
+## Bindings from the header
+
+Declaring every function by hand is where binding C gets tedious. A library's header already says
+what it has, so the build can write the declarations for you:
+
+```toml
+[native]
+sources  = ["@raylib/src/rcore.c", "@raylib/src/rshapes.c", "@raylib/src/utils.c"]
+include  = ["@raylib/src"]
+bindings = [{ header = "@raylib/src/raylib.h", module = "rl" }]
+```
+
+The build reads `raylib.h` with the C compiler, as your package's sources see it — the same
+`include` and `defines`, for the target you build for — and makes the module `rl` of your package:
+in a package `game`, `game.rl`. You import it like any module you wrote:
+
+```text
+import game.rl { InitWindow, WindowShouldClose, BeginDrawing, EndDrawing, CloseWindow };
+
+fn main(): void {
+    InitWindow(800, 450, "hello");
+    while (!WindowShouldClose()) {
+        BeginDrawing();
+        EndDrawing();
+    }
+    CloseWindow();
+}
+```
+
+The module holds the header's functions as `extern "C"` declarations — a variadic one with its
+`...` —, its structs as `@Layout(C)` structs, its enums as constants with the enum's name as their
+type, its typedefs as aliases, its pointers to functions as `extern "C" fn` types, and every
+`#define` that is one number or one string as a constant. Names stay C's: `InitWindow`, not
+`initWindow`. A name Lyric reserves gets a `_` after it — a parameter `in` is `in_`, a type
+`string` is `string_` — and no lint looks at the module, since you did not write it.
+
+The types are what each C type is **on your target**: a `long` is `int` on Linux and macOS and
+`int32` on Windows, a `char` is `uint8` on Linux for Arm, so the module is made for every target
+you build for. A pointer you hand to C may be null, so a parameter `const char *` is `?CStr` — a
+string goes in as it is — and `T *` is `?Ptr<T>`; in a struct's field, where Lyric takes no
+optional, they are `CStr` and `Ptr<T>`, and a null there is yours to look for. A struct the header
+names without its fields is a `Ptr<void>` behind its pointer.
+
+What the module cannot hold is left out and listed at its end, with the place in the header and why:
+
+```text
+// Left out:
+// - union Any (geo.h:16): a union does not cross
+// - geo_twice (geo.h:27): a static or inline function has no symbol to link
+// - GEO_SQ (geo.h:10): a function-like macro is no declaration
+```
+
+Unions, bit fields, function-like macros, `static inline` functions and variables are not in it;
+for one of those, write the declaration yourself, or a small C function in your package that wraps
+it. The module is made again only when the header, a header it includes, `include`, `defines`, the
+target or the toolchain changes.
+
+To see the module — or to keep it in your package instead of making it every build —, write it
+out:
+
+```sh
+lyric bindgen native/geo.h > src/geo.lyr
+```
+
+`lyric bindgen` uses the package's `include` and `defines`, `--target` picks another target, and a
+path `@name/…` reads a header of a source tree. A header that does not compile stops the build with
+`LYR-BLD0005` and what the C compiler said; a module that also lies under `src/` is
+`LYR-RES0016`.
+
 ## Libraries of the system
 
 `libs` links libraries by name — `"m"` is `-lm`. What a build needs only on one system goes into a

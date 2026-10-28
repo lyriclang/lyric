@@ -94,6 +94,45 @@ fn main(): void {
 }
 '''
 
+[LYR-BLD0005]
+title = "a module cannot be made from a C header"
+severity = "error"
+area = "15-project"
+summary = "Reported when a header a package's `bindings` names does not compile — with what the C compiler said — or when the C compiler writes no syntax tree of it, which only zig cc and clang do. Nothing is built; the exit code is 1."
+explanation = '''
+`bindings = [{ header = "native/geo.h", module = "geo" }]` asks the build to write the module `<package>.geo` from the header: its functions as `extern "C"` declarations, its structs, enums, typedefs and constants, each in the types they have on the build's target. To know them, the build has the C compiler read the header — with the package's `include` and `defines`, for that target — and write its syntax tree. A header that does not compile has no tree, and the message quotes the C compiler.
+
+Make the header compile as the package's own C sources would see it: a missing include directory belongs in `include`, a definition the header expects in `defines`. The tree comes from zig cc or clang; with gcc as the C compiler, the build looks for zig, and where there is none it stops here — set `LYRIC_CC` to zig or clang. `lyric bindgen <header>` makes the same module on the command line, to see what the build would read.
+'''
+wrong = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+bindings = [{ header = "native/geo.h", module = "geo" }]
+//- native/geo.h
+int geo_add(int a, int b)
+//- src/main.lyr
+fn main(): void {
+}
+'''
+right = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+bindings = [{ header = "native/geo.h", module = "geo" }]
+//- native/geo.h
+int geo_add(int a, int b);
+//- src/main.lyr
+fn main(): void {
+}
+'''
+
 [LYR-BLD0006]
 title = "a file the build puts beside the binary is not there, shares its name, or would not be found there"
 severity = "error"
@@ -2862,7 +2901,7 @@ fn main(): void {
 title = "a manifest or lock field that is missing or malformed"
 severity = "error"
 area = "15-project"
-summary = "Reported when `lyric.toml` or `lyric.lock` parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a `[[bin]]` entry, a profile, `[native]`, `[trust]`, `[lints]`, a toolchain pin, a locked revision, a source tree of `[native.vendor]` or an `@name/` path that names none — and a prebuilt file `[native]` names that is not part of the package or not there, or a URL's tree without its `hash`, when the build needs it."
+summary = "Reported when `lyric.toml` or `lyric.lock` parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a `[[bin]]` entry, a profile, `[native]`, `[trust]`, `[lints]`, a toolchain pin, a locked revision, a source tree of `[native.vendor]` or an `@name/` path that names none, a `bindings` entry — and a prebuilt file `[native]` names that is not part of the package or not there, or a URL's tree without its `hash`, when the build needs it."
 explanation = '''
 Every key of a manifest has a type and a form: `name` is a lowercase identifier, `version` a semantic version `MAJOR.MINOR.PATCH`, a dependency `{ path = "…" }` or `{ git = "…", tag = "…" }`, a `[[bin]]` entry a `.lyr` file under `src/`. A value of another type or form is refused rather than guessed at, so a manifest means one thing to every toolchain that reads it.
 
@@ -3818,6 +3857,53 @@ basic.lyr
 $ lyric5 test
 error[LYR-RES0015]: the module 'app.tests.basic' lies under src/tests/ and under tests/
   = help: rename one of the two files
+'''
+
+[LYR-RES0016]
+title = "a module made from a C header lies in the package's source too"
+severity = "error"
+area = "15-project"
+summary = "Reported when the module a `bindings` entry makes — `geo` in `app` is `app.geo` — is also a file under the package's `src/`, `gen/` or `tests/`: one module path would name two modules. Nothing is built; the exit code is 1."
+explanation = '''
+A module made from a header is a module of the package like any other: `bindings = [{ header = "native/geo.h", module = "geo" }]` in the package `app` makes `app.geo`, which `import app.geo { … }` reads. A file `src/geo.lyr` would be `app.geo` too, and the build does not choose between them.
+
+Give one of them another name. A common shape keeps the made module apart — `module = "c.geo"`, or `module = "sys"` — and writes the package's own, friendlier functions in `src/geo.lyr` on top of it.
+'''
+wrong = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+bindings = [{ header = "native/geo.h", module = "geo" }]
+//- native/geo.h
+int geo_add(int a, int b);
+//- src/geo.lyr
+pub fn add(a: int, b: int): int {
+    return a + b;
+}
+//- src/main.lyr
+fn main(): void {
+}
+'''
+right = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+bindings = [{ header = "native/geo.h", module = "sys" }]
+//- native/geo.h
+int geo_add(int a, int b);
+//- src/geo.lyr
+pub fn add(a: int, b: int): int {
+    return a + b;
+}
+//- src/main.lyr
+fn main(): void {
+}
 '''
 
 [LYR-RT0001]
