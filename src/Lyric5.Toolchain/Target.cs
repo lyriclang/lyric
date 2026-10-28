@@ -19,6 +19,13 @@ public sealed record Target(string Triple, string Arch, TargetOs Os)
         Parse("x86_64-macos"),
     ];
 
+    /// <summary>The targets that build and are not tested: Tier 2.</summary>
+    public static readonly IReadOnlyList<Target> Tier2 =
+    [
+        Parse("x86_64-linux-musl"),
+        Parse("aarch64-windows-gnu"),
+    ];
+
     public static Target Parse(string triple)
     {
         var parts = triple.Split('-');

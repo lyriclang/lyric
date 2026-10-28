@@ -941,7 +941,7 @@ public class NativeTests
     [InlineData("[native]\ninclude = [\"native/*\"]\n", "LYR-PKG0002", "'native/*' in 'include' of [native] is no directory of the package")]
     [InlineData("[native]\nlibs = [\"bad name\"]\n", "LYR-PKG0002", "'bad name' in 'libs' of [native] is no library name")]
     [InlineData("[native]\nflags = [\"-O3\"]\n", "LYR-PKG0003", "[native] has no key 'flags'")]
-    [InlineData("[native.beos]\nlibs = [\"z\"]\n", "LYR-PKG0003", "[native] has no key 'beos'")]
+    [InlineData("[native.beos]\nlibs = [\"z\"]\n", "LYR-PKG0003", "[native.beos] names no operating system and no target")]
     [InlineData("[native.linux]\nlinux = []\n", "LYR-PKG0003", "[native.linux] has no key 'linux'")]
     public void A_native_part_is_checked(string native, string code, string why)
     {

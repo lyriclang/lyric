@@ -142,9 +142,18 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     public IReadOnlyDictionary<Lyric5.Toolchain.TargetOs, NativePart> NativePerSystem { get; init; } =
         new Dictionary<Lyric5.Toolchain.TargetOs, NativePart>();
 
-    /// <summary>The native part a build for <paramref name="os"/> compiles and links.</summary>
-    public NativePart NativeOn(Lyric5.Toolchain.TargetOs os) =>
-        NativePerSystem.TryGetValue(os, out var more) ? Native.With(more) : Native;
+    /// <summary><c>[native.x86_64-linux-gnu]</c> and its siblings: what one target gets on top of its
+    /// operating system's table.</summary>
+    public IReadOnlyDictionary<string, NativePart> NativePerTriple { get; init; } =
+        new Dictionary<string, NativePart>(StringComparer.Ordinal);
+
+    /// <summary>The native part a build for <paramref name="target"/> compiles and links: <c>[native]</c>,
+    /// its operating system's table on top, its triple's on top of that.</summary>
+    public NativePart NativeFor(Lyric5.Toolchain.Target target)
+    {
+        var part = NativePerSystem.TryGetValue(target.Os, out var system) ? Native.With(system) : Native;
+        return NativePerTriple.TryGetValue(target.Triple, out var triple) ? part.With(triple) : part;
+    }
 
     /// <summary>The directory of the manifest: the package's root, where <c>out/</c> lies.</summary>
     public string Root => Path.GetDirectoryName(File)!;
@@ -226,11 +235,12 @@ public sealed partial record Manifest(string File, string Name, string Version, 
             edition = e;
         }
 
-        var (native, nativePerSystem) = NativePart.Read(document, file);
+        var (native, nativePerSystem, nativePerTriple) = NativePart.Read(document, file);
         return new Manifest(Path.GetFullPath(file), name, version, edition)
         {
             Native = native,
             NativePerSystem = nativePerSystem,
+            NativePerTriple = nativePerTriple,
             Dependencies = ReadDependencies(document, "dependencies", file),
             BuildDependencies = ReadBuildDependencies(document, file),
             Overrides = ReadDependencies(document, "override", file),
