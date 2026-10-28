@@ -380,6 +380,19 @@ the one form, with no options to change it; comments and the parentheses a progr
 a file that does not parse is left as it is. <code>--check</code> writes nothing and fails where a file would
 change; <code>--diff</code> shows how. The standard library is in the form.</p>
 </li>
+<li><p><strong>FFI and embedding (M14</strong> — <code>design/v5/spec/11</code> X1–X8, H1–H7, 01 K4; spec chapter 13 §2–§6**):**
+<code>extern &quot;C&quot;</code> takes C's types: <code>std.ffi</code>'s <code>Ptr&lt;T&gt;</code>, <code>?Ptr&lt;T&gt;</code> and <code>CStr</code> — a <code>string</code> passes as one without a
+copy —, <code>@Layout(C)</code> structs by value and behind a pointer, <code>@Layout</code> enums, <code>char</code>, C function pointers
+<code>extern &quot;C&quot; fn(…) -&gt; …</code>, the block <code>extern &quot;C&quot; { … }</code> and C's <code>...</code>. Memory through <code>alloc</code>/<code>free</code> and
+<code>Ptr.read</code>/<code>write</code>/<code>offset</code>/<code>cast</code> inside <code>unsafe { }</code>. A function or a lambda that captures nothing is C's
+callback; a closure is one through <code>Callback&lt;…&gt;.new</code> and its userdata; an error crosses C through
+<code>stash</code>/<code>takeStashed</code>; a callback C calls on a thread of its own runs on the thread that made it. <code>GcHandle</code> holds
+an object for C. <code>@Export(&quot;sym&quot;)</code> makes a function C calls; <code>lyric build --lib</code> builds <code>lib&lt;name&gt;.a</code>, with
+<code>--shared</code> the <code>.so</code>/<code>.dylib</code>/<code>.dll</code>, beside <code>&lt;name&gt;.h</code> and <code>lyric.h</code>: <code>lyr_init</code>, each export a task,
+<code>lyr_step</code>/<code>lyr_run</code>, <code>LyrStatus</code> and <code>lyr_take_error</code>, a thread of the host attached at its first call.
+<code>std.ffi.Library</code> loads a shared library while the program runs. <code>examples/ffi</code> and <code>examples/embedded-host</code> go
+each way.</p>
+</li>
 <li><p><strong>The editor and the debugger (M13b</strong> — <code>design/v5/spec/11</code> E1–E4, E8; spec chapter 14 §11, §12**):**
 <code>lyric lsp</code> is the language server of a package — diagnostics as you type, quick fixes from the compiler's
 suggestions and an <code>@Allow</code> for a lint, a finding's link to its page, formatting, hover with a declaration's head as
