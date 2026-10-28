@@ -441,6 +441,54 @@ $ lyric5 api --diff v9.9.9
 error[LYR-CLI0022]: git cannot read 'v9.9.9': fatal: not a valid object name v9.9.9
 '''
 
+[LYR-CLI0023]
+title = "a toolchain cannot be fetched"
+severity = "error"
+area = "14-cli"
+summary = "`lyric toolchain` reaches neither the mirror nor GitHub, the channel has no such version or no archive for this machine, or there is no key to check a signature with. The exit code is 2."
+explanation = '''
+`lyric toolchain install`, `update` and `list --available` read a channel's index — `dev.json` or `stable.json`, signed — from the mirror, and from GitHub where the mirror cannot be reached. `LYRIC_MIRROR` names another mirror in place of both, and `LYRIC_MIRROR_KEY` the key its signatures are made with. A version is one the index lists, with its build part (`+…`) or without; `dev` and `stable` name the newest of each channel.
+
+Check the network, name a version `lyric toolchain list --available` shows, or install on a machine whose target the release has an archive for.
+'''
+example = '''
+$ lyric5 toolchain install 5.9.0
+error[LYR-CLI0023]: the channel 'stable' has no version 5.9.0
+  = help: lyric5 toolchain list --available says which it has
+'''
+
+[LYR-CLI0024]
+title = "a toolchain fetched is not what its index says"
+severity = "error"
+area = "14-cli"
+summary = "A channel's index does not carry a signature the toolchain's key made, or an archive's size, SHA-256 or `toolchain.json` differs from what the index and the archive itself list. Nothing is installed; the exit code is 2."
+explanation = '''
+An install trusts the signature, not the server: the index is signed with the project's key, and it gives each archive's size and SHA-256; the archive lists every file it holds in `toolchain.json`. A difference anywhere stops the install before the toolchain is in place, and the mirror is not routed around — a mirror that serves a forged index is not one to fall back from quietly.
+
+Try again later or from GitHub (`LYRIC_MIRROR` unset); if it persists, the mirror is broken or tampered with.
+'''
+example = '''
+$ lyric5 toolchain install dev
+error[LYR-CLI0024]: lyric-5.0.0-dev.20261028-linux-x64.tar.gz has the SHA-256 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08, and its index gives 4e4c294b331f7a2099a379bec34b9f9fc03dc46ab465d998f4d683da53487e6d
+  = help: nothing was installed
+'''
+
+[LYR-CLI0025]
+title = "the installed toolchains refuse the change"
+severity = "error"
+area = "14-cli"
+summary = "`lyric toolchain default` or `remove` names a version that is not installed, `remove` names the default or the toolchain that runs the command, `update` finds no default, or `config.toml` under `LYRIC_HOME` is not one the toolchain reads. The exit code is 2."
+explanation = '''
+The toolchains live under `~/.lyric` — or the directory `LYRIC_HOME` names —, each in `toolchains/<version>/`; `config.toml` holds the one key `default`, and `bin` is a link to the default's directory. The default cannot be removed before another is made the default, nor can the toolchain a command runs from remove itself.
+
+Install the version first, make another the default (`lyric toolchain default <version>`), or run the removal from another toolchain.
+'''
+example = '''
+$ lyric5 toolchain remove 5.0.0
+error[LYR-CLI0025]: lyric 5.0.0 is the default
+  = help: make another the default first: lyric5 toolchain default <version>
+'''
+
 [LYR-CT0001]
 title = "a panic while evaluating at compile time"
 severity = "error"
