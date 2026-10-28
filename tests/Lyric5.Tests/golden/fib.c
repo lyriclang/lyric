@@ -4,13 +4,13 @@
 #include <math.h>
 
 /* prototypes */
-int64_t lyr_app_main_fib(int64_t l0_n);
-int64_t lyr_app_main_fibIter(int64_t l0_n);
+int64_t lyr_app_main_fib(int64_t n);
+int64_t lyr_app_main_fibIter(int64_t n);
 LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 
 #line 3 "programs/fib.lyr"
-int64_t lyr_app_main_fib(int64_t l0_n) {
+int64_t lyr_app_main_fib(int64_t n) {
 #line 3
     LYR_STACK_CHECK();
 #line 3
@@ -41,7 +41,7 @@ int64_t lyr_app_main_fib(int64_t l0_n) {
     int64_t t12 = 0;
 bb0:;
 #line 3
-    t0 = l0_n;
+    t0 = n;
 #line 3
     t1 = (int64_t)INT64_C(2);
 #line 3
@@ -50,12 +50,12 @@ bb0:;
     if (t2) goto bb1; else goto bb2;
 bb1:;
 #line 3
-    t3 = l0_n;
+    t3 = n;
 #line 3
     return t3;
 bb2:;
 #line 4
-    t4 = l0_n;
+    t4 = n;
 #line 4
     t5 = (int64_t)INT64_C(1);
 #line 4
@@ -63,7 +63,7 @@ bb2:;
 #line 4
     t7 = lyr_app_main_fib(t6);
 #line 4
-    t8 = l0_n;
+    t8 = n;
 #line 4
     t9 = (int64_t)INT64_C(2);
 #line 4
@@ -77,19 +77,19 @@ bb2:;
 }
 
 #line 8 "programs/fib.lyr"
-int64_t lyr_app_main_fibIter(int64_t l0_n) {
+int64_t lyr_app_main_fibIter(int64_t n) {
 #line 8
-    int64_t l1_a = 0;
+    int64_t a = 0;
 #line 8
-    int64_t l2_b = 0;
+    int64_t b = 0;
 #line 8
     int64_t l3__range0 = 0;
 #line 8
     int64_t l4__last1 = 0;
 #line 8
-    int64_t l5_i = 0;
+    int64_t i = 0;
 #line 8
-    int64_t l6_next = 0;
+    int64_t next = 0;
 #line 8
     int64_t t0 = 0;
 #line 8
@@ -128,15 +128,15 @@ bb0:;
 #line 8
     t0 = (int64_t)INT64_C(0);
 #line 8
-    l1_a = t0;
+    a = t0;
 #line 9
     t1 = (int64_t)INT64_C(1);
 #line 9
-    l2_b = t1;
+    b = t1;
 #line 10
     t2 = (int64_t)INT64_C(0);
 #line 10
-    t3 = l0_n;
+    t3 = n;
 #line 10
     l3__range0 = t2;
 #line 10
@@ -154,23 +154,23 @@ bb1:; LYR_LOOP_POLL(lyr_poll);
     if (t6) goto bb2; else goto bb4;
 bb2:;
 #line 10
-    l5_i = t4;
+    i = t4;
 #line 11
-    t7 = l1_a;
+    t7 = a;
 #line 11
-    t8 = l2_b;
+    t8 = b;
 #line 11
     t9 = LYR_CHECKED_ADD(t7, t8);
 #line 11
-    l6_next = t9;
+    next = t9;
 #line 12
-    t10 = l2_b;
+    t10 = b;
 #line 12
-    l1_a = t10;
+    a = t10;
 #line 13
-    t11 = l6_next;
+    t11 = next;
 #line 13
-    l2_b = t11;
+    b = t11;
 #line 10
     goto bb3;
 bb3:;
@@ -186,7 +186,7 @@ bb3:;
     goto bb1;
 bb4:;
 #line 15
-    t15 = l1_a;
+    t15 = a;
 #line 15
     return t15;
 }

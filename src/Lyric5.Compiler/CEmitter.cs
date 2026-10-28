@@ -28,7 +28,7 @@ namespace Lyric5.Compiler;
 /// <para>Only what the <see cref="SubsetGate"/> lets through arrives here, so an instruction or a
 /// type this emitter has no case for is a bug, not a diagnostic.</para>
 /// </summary>
-public sealed class CEmitter
+public sealed partial class CEmitter
 {
     /// <summary>What the gate lets through but this emitter cannot translate yet: the
     /// driver reports it like a gate refusal (<see cref="SubsetGate.NotYet"/>).</summary>
@@ -52,6 +52,7 @@ public sealed class CEmitter
     private int _data;
     private StringBuilder _fn = null!;
     private IrFunction _function = null!;
+    private readonly Dictionary<IrFunction, string[]> _localNames = new(ReferenceEqualityComparer.Instance);
     private FileId? _file;
 
     /// <summary>Which entry of the type table is a variant of which enum, and which number it
@@ -267,8 +268,68 @@ public sealed class CEmitter
         return $"{plain}_{hash:x8}";
     }
 
-    private static string LocalName(IrLocal local) =>
-        $"l{local.Id.Value}_" + new string(local.Name.Select(c => char.IsAsciiLetterOrDigit(c) ? c : '_').ToArray());
+    /// <summary>
+    /// The C name of each local of <paramref name="function"/>, by its id: the Lyric name where C can
+    /// carry it (<see cref="PlainInC"/>) and no other local of the function has it — every local
+    /// is declared at the top of the C function, so two blocks' <c>x</c> would be one —, else
+    /// <c>l&lt;id&gt;_&lt;name&gt;</c>. A debugger then shows the program's own names.
+    /// </summary>
+    private string[] LocalNamesOf(IrFunction function)
+    {
+        if (_localNames.TryGetValue(function, out var known)) return known;
+        var counts = function.Locals.GroupBy(l => l.Name).ToDictionary(g => g.Key, g => g.Count());
+        var names = new string[function.Locals.Count];
+        foreach (var local in function.Locals)
+            names[local.Id.Value] = PlainInC(local.Name) && counts[local.Name] == 1
+                ? local.Name
+                : $"l{local.Id.Value}_" + Identifier(local.Name);
+        _localNames[function] = names;
+        return names;
+    }
+
+    private string LocalName(IrFunction function, IrLocal local) => LocalNamesOf(function)[local.Id.Value];
+
+    /// <summary>A local of the function being emitted.</summary>
+    private string Local(LocalId local) => LocalNamesOf(_function)[local.Value];
+
+    /// <summary>
+    /// Names C keeps for itself, or that the emitted C and its headers write without a prefix: the
+    /// keywords of C11 and C23, the lowercase macros of the standard headers and the ones a GNU
+    /// mode predefines, and the functions the emitter calls bare. A Lyric name among them is
+    /// mangled — a local <c>errno</c> or <c>fmod</c> would be the macro or hide the function.
+    /// </summary>
+    private static readonly HashSet<string> CTaken = new(StringComparer.Ordinal)
+    {
+        "auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern",
+        "float", "for", "goto", "if", "inline", "int", "long", "register", "restrict", "return", "short", "signed",
+        "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while", "asm",
+        "alignas", "alignof", "bool", "constexpr", "false", "nullptr", "static_assert", "thread_local", "true",
+        "typeof", "typeof_unqual",
+        "errno", "stdin", "stdout", "stderr", "assert", "offsetof", "complex", "imaginary", "noreturn", "unreachable",
+        "setjmp", "va_arg", "va_start", "va_end", "va_copy", "linux", "unix", "i386",
+        "fmod", "fmodf", "main",
+    };
+
+    /// <summary>
+    /// Whether C can carry a Lyric name as it is: an ASCII identifier that is none of
+    /// <see cref="CTaken"/>, not reserved to the implementation (a leading underscore, a name ending
+    /// in <c>_t</c>), not a macro's form (capitals, digits and underscores only), and not in a form
+    /// the emitter keeps for its own names — <c>lyr_</c>, <c>Lyr</c>, <c>LYR_</c>, a temp
+    /// (<c>t3</c>, <c>t3_s</c>) or a mangled name (<c>f_…</c>, <c>l2_…</c>), so that a plain name and
+    /// a mangled one never meet.
+    /// </summary>
+    private static bool PlainInC(string name) =>
+        PlainShape().IsMatch(name)
+        && !CTaken.Contains(name)
+        && !name.EndsWith("_t", StringComparison.Ordinal)
+        && !name.All(c => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c) || c == '_')
+        && !OwnShape().IsMatch(name);
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[A-Za-z][A-Za-z0-9_]*$")]
+    private static partial System.Text.RegularExpressions.Regex PlainShape();
+
+    [System.Text.RegularExpressions.GeneratedRegex("^(?:lyr_|Lyr|LYR_|f_|l[0-9]+_|t[0-9]+(?:_s)?$)")]
+    private static partial System.Text.RegularExpressions.Regex OwnShape();
 
     private static string Temp(TempId temp) => $"t{temp.Value}";
 
@@ -494,7 +555,9 @@ public sealed class CEmitter
     private static string Identifier(string name) =>
         new string(name.Select(c => char.IsAsciiLetterOrDigit(c) ? c : '_').ToArray());
 
-    private static string FieldName(string name) => "f_" + Identifier(name);
+    /// <summary>A field's C name: its Lyric name where C can carry it (<see cref="PlainInC"/>) — and
+    /// not <c>header</c>, which a class's struct holds beside its fields —, else <c>f_&lt;name&gt;</c>.</summary>
+    private static string FieldName(string name) => PlainInC(name) && name != "header" ? name : "f_" + Identifier(name);
 
     private string Field(TypeId type, FieldId field) => FieldName(_module.Types[type.Value].FieldNames[field.Value]);
 
@@ -797,8 +860,8 @@ public sealed class CEmitter
             {
                 var target = _module.Functions[index];
                 var parameters = target.Locals.Take(target.ParamCount).ToList();
-                var signature = string.Concat(parameters.Select(p => ", " + Declare(p.Type, LocalName(p))));
-                var arguments = parameters.Select(LocalName).Concat(target.Throws ? ["lyr_err"] : []);
+                var signature = string.Concat(parameters.Select(p => ", " + Declare(p.Type, LocalName(target, p))));
+                var arguments = parameters.Select(p => LocalName(target, p)).Concat(target.Throws ? ["lyr_err"] : []);
                 var call = $"{FunctionName(target.Name)}({string.Join(", ", arguments)})";
                 prototypes.AppendLine($"static {CType(target.ReturnType)} {CodeOf(target)}(void *lyr_env{signature}, LyrErr **lyr_err) {{ (void)lyr_env; "
                     + (target.Throws ? "" : "(void)lyr_err; ")
@@ -1530,10 +1593,10 @@ public sealed class CEmitter
     /// caller's place.</summary>
     private string Parameter(IrFunction function, IrLocal local) =>
         function.ReceiverByRef && local.Id.Value == 0
-            ? $"{CType(local.Type)} *{LocalName(local)}"
+            ? $"{CType(local.Type)} *{LocalName(function, local)}"
             : TakesEnvironment(function) && local.Id.Value == 0
                 ? "void *lyr_env"
-                : Declare(local.Type, LocalName(local));
+                : Declare(local.Type, LocalName(function, local));
 
     private bool IsReceiverPlace(LocalId local) => _function.ReceiverByRef && local.Value == 0;
 
@@ -1796,12 +1859,12 @@ public sealed class CEmitter
         // the environment's own type — and is cast to it once, here.
         if (TakesEnvironment(function))
         {
-            _fn.AppendLine($"    {Declare(function.Locals[0].Type, LocalName(function.Locals[0]))} = ({CType(function.Locals[0].Type)})lyr_env;");
+            _fn.AppendLine($"    {Declare(function.Locals[0].Type, LocalName(function, function.Locals[0]))} = ({CType(function.Locals[0].Type)})lyr_env;");
             // A closure's code that cannot throw has the slot every function value takes, unused.
             if (!function.Throws) _fn.AppendLine("    (void)lyr_err;");
         }
         foreach (var local in function.Locals.Skip(function.ParamCount))
-            _fn.AppendLine($"    {Declare(local.Type, LocalName(local))} = {Zero(local.Type)};");
+            _fn.AppendLine($"    {Declare(local.Type, LocalName(function, local))} = {Zero(local.Type)};");
         // The in-flight error: what a throw sets, what a call that failed wrote, what a
         // catch reads and clears.
         if (UsesErrors(function)) _fn.AppendLine("    LyrErr *lyr_e = NULL;");
@@ -1940,12 +2003,12 @@ public sealed class CEmitter
         Lyric.Ir.Convert v => $"{Temp(v.Dest)} = {Conversion(v)};",
         // The receiver of a struct method is already the place; every other struct local is
         // storage, and its temp aliases it.
-        LoadLocal l when IsReceiverPlace(l.Local) => $"{Temp(l.Dest)} = {LocalName(_function.Locals[l.Local.Value])};",
+        LoadLocal l when IsReceiverPlace(l.Local) => $"{Temp(l.Dest)} = {Local(l.Local)};",
         LoadLocal l => IsAggregate(l.Type)
-            ? $"{Temp(l.Dest)} = &{LocalName(_function.Locals[l.Local.Value])};"
-            : $"{Temp(l.Dest)} = {LocalName(_function.Locals[l.Local.Value])};",
-        StoreLocal s when IsReceiverPlace(s.Local) => $"*{LocalName(_function.Locals[s.Local.Value])} = {Value(s.Value)};",
-        StoreLocal s => $"{LocalName(_function.Locals[s.Local.Value])} = {Value(s.Value)};",
+            ? $"{Temp(l.Dest)} = &{Local(l.Local)};"
+            : $"{Temp(l.Dest)} = {Local(l.Local)};",
+        StoreLocal s when IsReceiverPlace(s.Local) => $"*{Local(s.Local)} = {Value(s.Value)};",
+        StoreLocal s => $"{Local(s.Local)} = {Value(s.Value)};",
         // A global is storage like a local: an aggregate is aliased in place, anything else read.
         LoadGlobal l => IsAggregate(l.Type)
             ? $"{Temp(l.Dest)} = &{GlobalName(l.Global.Value)};"
@@ -1953,8 +2016,8 @@ public sealed class CEmitter
         StoreGlobal g => $"{GlobalName(g.Global.Value)} = {Value(g.Value)};",
         // Places. The receiver of a struct method already is one.
         AddrLocal a => IsReceiverPlace(a.Local)
-            ? $"{Temp(a.Dest)} = {LocalName(_function.Locals[a.Local.Value])};"
-            : $"{Temp(a.Dest)} = &{LocalName(_function.Locals[a.Local.Value])};",
+            ? $"{Temp(a.Dest)} = {Local(a.Local)};"
+            : $"{Temp(a.Dest)} = &{Local(a.Local)};",
         AddrField a => $"{Temp(a.Dest)} = &{Temp(a.Object)}->{Field(a.Type, a.Field)};",
         AddrElem a => $"LYR_CHECK_INDEX({Temp(a.Index)}, {Length(a.Array)}); "
             + $"{Temp(a.Dest)} = &{Elements(a.Array, a.Element)}[{Temp(a.Index)}];",

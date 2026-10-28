@@ -7,23 +7,23 @@
 typedef struct lyr_ty_app_main_Point lyr_ty_app_main_Point;
 typedef struct lyr_ty_app_main_Segment lyr_ty_app_main_Segment;
 struct lyr_ty_app_main_Point {
-    int64_t f_x;
-    int64_t f_y;
+    int64_t x;
+    int64_t y;
 };
 struct lyr_ty_app_main_Segment {
-    lyr_ty_app_main_Point f_a;
-    lyr_ty_app_main_Point f_b;
+    lyr_ty_app_main_Point a;
+    lyr_ty_app_main_Point b;
 };
 
 /* prototypes */
-lyr_ty_app_main_Point lyr_app_main_shift(lyr_ty_app_main_Point l0_p, int64_t l1_dx);
+lyr_ty_app_main_Point lyr_app_main_shift(lyr_ty_app_main_Point p, int64_t dx);
 LYR_NOINLINE int64_t lyr_app_main_main(void);
 void lyr__globals__9ee5f9b5(void);
 
 #line 7 "programs/structs.lyr"
-lyr_ty_app_main_Point lyr_app_main_shift(lyr_ty_app_main_Point l0_p, int64_t l1_dx) {
+lyr_ty_app_main_Point lyr_app_main_shift(lyr_ty_app_main_Point p, int64_t dx) {
 #line 7
-    lyr_ty_app_main_Point l2_q = {0};
+    lyr_ty_app_main_Point q = {0};
 #line 7
     lyr_ty_app_main_Point t0_s = {0};
 #line 7
@@ -56,25 +56,25 @@ lyr_ty_app_main_Point lyr_app_main_shift(lyr_ty_app_main_Point l0_p, int64_t l1_
     lyr_ty_app_main_Point *t8 = &t8_s;
 bb0:;
 #line 7
-    t0 = &l0_p;
+    t0 = &p;
 #line 7
     t1_s = *t0; t1 = &t1_s;
 #line 7
-    l2_q = *t1;
+    q = *t1;
 #line 8
-    t2 = &l2_q;
+    t2 = &q;
 #line 8
-    t3 = &l2_q;
+    t3 = &q;
 #line 8
-    t4 = t3->f_x;
+    t4 = t3->x;
 #line 8
-    t5 = l1_dx;
+    t5 = dx;
 #line 8
     t6 = LYR_CHECKED_ADD(t4, t5);
 #line 8
-    t2->f_x = t6;
+    t2->x = t6;
 #line 9
-    t7 = &l2_q;
+    t7 = &q;
 #line 9
     t8_s = *t7; t8 = &t8_s;
 #line 9
@@ -86,9 +86,9 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
 #line 13
     LYR_STACK_CHECK();
 #line 13
-    lyr_ty_app_main_Point l0_p = {0};
+    lyr_ty_app_main_Point p = {0};
 #line 13
-    lyr_ty_app_main_Segment l1_s = {0};
+    lyr_ty_app_main_Segment s = {0};
 #line 13
     int64_t t0 = 0;
 #line 13
@@ -183,17 +183,17 @@ bb0:;
 #line 13
     t2_s = (lyr_ty_app_main_Point){0}; t2 = &t2_s;
 #line 13
-    t2->f_x = t0;
+    t2->x = t0;
 #line 13
-    t2->f_y = t1;
+    t2->y = t1;
 #line 13
-    l0_p = *t2;
+    p = *t2;
 #line 14
-    t3 = &l0_p;
+    t3 = &p;
 #line 14
     t4_s = *t3; t4 = &t4_s;
 #line 14
-    t5 = &l0_p;
+    t5 = &p;
 #line 14
     t6_s = *t5; t6 = &t6_s;
 #line 14
@@ -203,23 +203,23 @@ bb0:;
 #line 14
     t9_s = (lyr_ty_app_main_Segment){0}; t9 = &t9_s;
 #line 14
-    t9->f_a = *t4;
+    t9->a = *t4;
 #line 14
-    t9->f_b = *t8;
+    t9->b = *t8;
 #line 14
-    l1_s = *t9;
+    s = *t9;
 #line 15
-    t10 = &l0_p;
+    t10 = &p;
 #line 15
     t11 = (int64_t)INT64_C(5);
 #line 15
-    t10->f_y = t11;
+    t10->y = t11;
 #line 16
-    t12 = &l1_s;
+    t12 = &s;
 #line 16
-    t13 = &t12->f_a;
+    t13 = &t12->a;
 #line 16
-    t14 = t13->f_y;
+    t14 = t13->y;
 #line 16
     t15 = (int64_t)INT64_C(2);
 #line 16
@@ -233,23 +233,23 @@ bb1:;
     return t17;
 bb2:;
 #line 17
-    t18 = &l1_s;
+    t18 = &s;
 #line 17
-    t19 = &t18->f_b;
+    t19 = &t18->b;
 #line 17
-    t20 = t19->f_x;
+    t20 = t19->x;
 #line 17
-    t21 = &l1_s;
+    t21 = &s;
 #line 17
-    t22 = &t21->f_a;
+    t22 = &t21->a;
 #line 17
-    t23 = t22->f_y;
+    t23 = t22->y;
 #line 17
     t24 = LYR_CHECKED_ADD(t20, t23);
 #line 17
-    t25 = &l0_p;
+    t25 = &p;
 #line 17
-    t26 = t25->f_y;
+    t26 = t25->y;
 #line 17
     t27 = LYR_CHECKED_ADD(t24, t26);
 #line 17

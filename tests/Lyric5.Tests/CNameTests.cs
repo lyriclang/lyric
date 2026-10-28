@@ -40,6 +40,50 @@ public class CNameTests
         Assert.Contains("struct lyr_ty_app_main_Earlier {", behind);
     }
 
+    /// <summary>
+    /// A field and a local are named in C as the program names them, so that every debugger shows
+    /// Lyric's names: <c>x</c>, not <c>f_x</c>; <c>total</c>, not <c>l3_total</c>. A name C or its
+    /// headers keep (<c>errno</c>, <c>size_t</c>, a macro's capitals, <c>fmod</c>), one in a form the
+    /// emitter keeps for its own (<c>t3</c>, <c>f_x</c>), <c>header</c> beside a class's fields, and
+    /// two locals of one name in a function stay mangled — and the program with all of them builds
+    /// and runs.
+    /// </summary>
+    [Fact]
+    public void Fields_and_locals_carry_their_Lyric_names_where_C_can_take_them()
+    {
+        const string program = """
+            struct Point { x: int, y: int }
+            struct Odd { errno: int, size_t: int, MAX: int, f_x: int, fmod: int }
+            class Box { header: int, value: int }
+            fn main(): int {
+                let p = Point { x = 1, y = 2 };
+                let o = Odd { errno = 3, size_t = 4, MAX = 5, f_x = 6, fmod = 7 };
+                let b = Box { header = 8, value = 9 };
+                let errno = p.x;
+                let t3 = p.y;
+                var total = 0;
+                if (true) { let s = o.errno; total = total + s; }
+                if (true) { let s = o.size_t; total = total + s; }
+                return errno + t3 + total + o.MAX + o.f_x + o.fmod + b.header + b.value;
+            }
+            """;
+        // the emitter writes the platform's line ends; the C is read here with '\n'
+        var c = Emit(program).Replace("\r\n", "\n");
+
+        Assert.Contains("    int64_t x;\n    int64_t y;\n", c);
+        Assert.Contains("    int64_t f_errno;\n    int64_t f_size_t;\n    int64_t f_MAX;\n    int64_t f_f_x;\n    int64_t f_fmod;\n", c);
+        Assert.Contains("    LyrObj header;\n    int64_t f_header;\n    int64_t value;\n", c);
+        Assert.Matches(@"\n    lyr_ty_app_main_Point p = ", c);
+        Assert.Matches(@"\n    int64_t total = 0;", c);
+        Assert.Matches(@"\n    int64_t l\d+_errno = 0;", c);
+        Assert.Matches(@"\n    int64_t l\d+_t3 = 0;", c);
+        Assert.Equal(2, Regex.Matches(c, @"\n    int64_t l\d+_s = 0;").Count);
+
+        var root = Package(("lyric.toml", AppManifest), ("src/main.lyr", program));
+        var (exit, _, error) = Run("run", "-C", root);
+        Assert.True(exit == 45, $"{exit}: {error}");
+    }
+
     /// <summary>The environments of two lambdas in one function are both named after the function
     /// in the IR; in C they are two structs, the second with a 2 behind its name.</summary>
     [Fact]

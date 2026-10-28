@@ -236,10 +236,10 @@ public class CompilerInstructionTests
         var dir = App(main);
         var (exit, c, error) = Run("build", "-C", dir, "--emit", "c");
         Assert.True(exit == 0, error);
-        Assert.Contains("LYR_ALWAYS_INLINE int64_t lyr_app_main_twice(int64_t l0_x) {", c);
-        Assert.Contains("LYR_NOINLINE int64_t lyr_app_main_small(int64_t l0_x) {", c);
+        Assert.Contains("LYR_ALWAYS_INLINE int64_t lyr_app_main_twice(int64_t x) {", c);
+        Assert.Contains("LYR_NOINLINE int64_t lyr_app_main_small(int64_t x) {", c);
         Assert.Contains("LYR_NOINLINE LYR_COLD void lyr_app_main_rare(void) {", c);
-        Assert.Contains(c.Split('\n'), l => l.StartsWith("int64_t lyr_app_main_plain(int64_t l0_x) {", StringComparison.Ordinal));
+        Assert.Contains(c.Split('\n'), l => l.StartsWith("int64_t lyr_app_main_plain(int64_t x) {", StringComparison.Ordinal));
         var (built, ir, failed) = Run("build", "-C", dir, "--profile", "release", "--emit", "ir");
         Assert.True(built == 0, failed);
         var body = ir[ir.IndexOf("fn app.main.main", StringComparison.Ordinal)..];
