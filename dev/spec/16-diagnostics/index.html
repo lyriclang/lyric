@@ -111,8 +111,9 @@ not drawn. The exit code is what it would be without the limit.</li>
 <p><strong>Conformance.</strong> Every rejecting case names its codes; the catalogue against the compiler in the toolchain's
 own tests (<code>tests/Lyric5.Tests</code>, <code>CatalogTests</code>).</p>
 <ol>
-<li>A code is <code>LYR-</code>, an area — <code>LEX</code>, <code>PAR</code>, <code>RES</code>, <code>SEM</code>, <code>MAC</code>, <code>CT</code>, <code>CG</code>, <code>PKG</code>, <code>BLD</code>, <code>CLI</code>, <code>ICE</code>,
-<code>RT</code>, and <code>IR</code>, retired —, and four digits. The code and its severity are contract; the message's wording is not.</li>
+<li>A code is <code>LYR-</code>, an area — <code>LEX</code>, <code>PAR</code>, <code>RES</code>, <code>SEM</code>, <code>MAC</code>, <code>CT</code>, <code>CG</code>, <code>PKG</code>, <code>BLD</code>, <code>LNK</code>, <code>CLI</code>,
+<code>ICE</code>, <code>RT</code>, and <code>IR</code>, retired —, and four digits. <em>(<code>LNK</code>, the link's findings
+(<a href="../../spec/15-project/#52-linking">15 §5.2</a> rule 12), is written ahead of M14b.)</em> The code and its severity are contract; the message's wording is not.</li>
 <li>Every code the toolchain reports stands in <a href="../../spec/appendix-a-diagnostics/">Appendix A</a>, generated from the
 toolchain's catalogue, with its severity, the chapter whose rule it is, and when it is reported. A code no
 longer reported is <strong>retired</strong> there: its number is not given to another finding.</li>
@@ -138,7 +139,9 @@ know and refuses a version it does not know.</li>
 <code>applicability</code> <code>safe</code> or <code>needs-review</code>), and <code>rendered</code>, the finding in the text form without colour.
 A span is <code>null</code> or <code>{file, start, end}</code>, <code>start</code> and <code>end</code> each <code>{line, column, offset}</code>, the file as
 the text form says it (§1 rule 5). Every finding is a line — §2's limit is the text form's.</li>
-<li><strong><code>artifact</code></strong>: what a build wrote — <code>kind</code> (<code>binary</code>, or <code>library</code> for <code>build --lib</code>), <code>name</code>, <code>path</code>.</li>
+<li><strong><code>artifact</code></strong>: what a build wrote — <code>kind</code> (<code>binary</code>, or <code>library</code> for <code>build --lib</code>), <code>name</code>, <code>path</code>;
+<em>(written ahead of M14b)</em> a static library's also <code>linkArgs</code>, what a C program links beside it
+(<a href="../../spec/13-abi/#4-exports-and-libraries">13 §4</a> rule 9), an array of strings.</li>
 <li><strong><code>test</code></strong>: a test of <code>lyric test</code> as it ends — <code>name</code>, <code>outcome</code> (<code>passed</code>, <code>failed</code>, <code>skipped</code>), and
 where there is one a <code>message</code> (why it was skipped, what ended it) and the <code>panic</code>'s code. <strong><code>tests</code></strong>:
 the run's count — <code>passed</code>, <code>failed</code>, <code>skipped</code>. <strong><code>output</code></strong>: a line the program wrote that is no event

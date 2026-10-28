@@ -99,7 +99,7 @@ is refused (<code>LYR-PKG0002</code>).</li>
 <p>The packages a package imports from (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V7</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases that hold their dependencies in
 their own directories, and the git repositories they read as their versions
-(<a href="https://github.com/lyriclang/lyric-spec/blob/6027b95d914c8f803dd4b0badcef0ba8c9fddd49/conformance/README.md">the suite's README</a>); the toolchain's own tests
+(<a href="https://github.com/lyriclang/lyric-spec/blob/172eb24d387d75395809175bdb88a2799eba57c1/conformance/README.md">the suite's README</a>); the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>: <code>DependencyTests</code>, <code>GitDependencyTests</code>, <code>PackageContentTests</code>).</p>
 <ol>
 <li><code>[dependencies]</code> names them, each where it is read from: a directory,
@@ -227,18 +227,133 @@ memory is not.</li>
 <h2 id="5-the-native-part">5. The native part</h2>
 <p>C a package brings with it, compiled with the program and linked into it
 (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 B5</a>; <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>).</p>
-<p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code>, package cases that call their native part; the
-toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>NativeTests</code>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code> and <code>conformance/cases/15-project/</code>, package cases
+that call their native part or whose manifest a rule refuses; the toolchain's own tests
+(<code>tests/Lyric5.Tests</code>, <code>NativeTests</code>, <code>VendorTests</code>, <code>BindingsTests</code>).</p>
+<p><em>(Rules 4–21 are written ahead of their implementation, milestone M14b of the Lyric 5 plan — the
+decisions of <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11, review 2026-10-28</a>;
+each comes with its cases.)</em></p>
+<h3 id="51-sources">5.1 Sources</h3>
 <ol>
 <li><code>[native]</code> names <code>sources</code>, patterns of the package's files as §2's <code>include</code> has them — the C
 sources compiled with the program under its profile —, <code>include</code>, directories of the package
 the sources find their includes in, and <code>libs</code>, libraries linked by name (<code>-lz</code>). Another key
-is refused (<code>LYR-PKG0003</code>), as is another form of an entry (<code>LYR-PKG0002</code>).</li>
+than this section's is refused (<code>LYR-PKG0003</code>), as is another form of an entry (<code>LYR-PKG0002</code>).</li>
 <li><code>[native.linux]</code>, <code>[native.windows]</code> and <code>[native.macos]</code> take the same keys: what a build for
 that operating system gets on top of <code>[native]</code>.</li>
 <li>Every package of the program brings its native part — a dependency's too —, and each library is
 linked once. The C functions of a native part are called through <code>extern &quot;C&quot;</code>
 (<a href="../../spec/13-abi/">13 §2</a>).</li>
+<li><strong><code>[native.&lt;triple&gt;]</code></strong> — a Tier 1 or Tier 2 target's triple, <code>[native.x86_64-windows-gnu]</code> —
+takes the same keys, and what a build for that target gets comes on top of <code>[native]</code> and of its
+operating system's table: the three tables are <strong>layered</strong>, each list the one before with its
+own entries after. A triple no tier holds is refused (<code>LYR-PKG0003</code>).</li>
+<li><strong><code>defines = [&quot;RAYLIB_STATIC&quot;, &quot;LEVEL=2&quot;]</code></strong> are the package's sources' preprocessor
+definitions, <code>NAME</code> or <code>NAME=value</code>, <code>NAME</code> a C identifier (<code>LYR-PKG0002</code>). The manifest takes no
+other flag for the C compiler: one that names the machine or a path outside the package would
+break §6 and the builds for other targets.</li>
+<li>A native source finds, besides its package's <code>include</code>, the toolchain's <strong><code>&lt;lyric.h&gt;</code></strong>
+(<a href="../../spec/13-abi/#4-exports-and-libraries">13 §4</a>) and the <code>include</code> of each package its package
+declares as a dependency — not of the packages those depend on (§2 rule 5). Of the toolchain's
+headers only <code>lyric.h</code> is promised.</li>
+</ol>
+<h3 id="52-linking">5.2 Linking</h3>
+<ol start="7">
+<li><strong><code>archives = [&quot;native/lib/libz.a&quot;]</code></strong> are static libraries the package brings, prebuilt — files
+of the package's content (§2) or of a source tree (§5.3): each is linked <strong>by its path</strong>, not
+searched for. A file outside the content is refused (<code>LYR-PKG0002</code>). An archive is built for one
+target, so it stands in the table of its triple (rule 4) as a rule. On Windows an archive is
+promised to link where it was built for the GNU ABI — by MinGW or zig cc —, not by MSVC.</li>
+<li>A package brings <strong>no shared library</strong> of its own — no <code>.so</code>, <code>.dylib</code> or <code>.dll</code>
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 B5</a>);
+one named in <code>archives</code> is refused (<code>LYR-PKG0002</code>). A shared library of the system is linked by
+name (<code>libs</code>), one the program finds at run time is <code>std.ffi</code>'s <code>Library</code>
+(<a href="../../spec/13-abi/">13 §5</a>).</li>
+<li><strong><code>frameworks = [&quot;Cocoa&quot;]</code></strong> are macOS frameworks, linked as <code>-framework Cocoa</code>: a key of
+<code>[native.macos]</code> and of the macOS triples' tables only (<code>LYR-PKG0003</code> elsewhere).</li>
+<li><strong><code>pkgConfig = [&quot;sdl2&quot;]</code></strong> names libraries of the system as <code>pkg-config</code> knows them: a build for
+the host asks <code>pkg-config --cflags --libs</code> and gives what it says about include directories and
+definitions to the package's sources, and the rest to the link. <code>pkg-config</code> missing, or a
+name it does not know, stops the build (<code>LYR-BLD0004</code>, exit 2).</li>
+<li><strong>What only the host has</strong>: a framework comes from the macOS SDK and a name of <code>pkgConfig</code> from
+the host's system, so a build for another target that needs one is refused before it compiles
+(<code>LYR-BLD0004</code>, exit 2, naming the package and the key). <em>(Informative: with the toolchain's C
+compiler a build for Windows links Windows' system libraries from any host; a build for Linux
+links a library of the system beside libc only on a Linux host, and one for macOS a framework
+only on a macOS host.)</em></li>
+<li>The link takes, in this order: the program's objects and the native parts' — the packages
+<strong>before the packages they depend on</strong>, the root's first —, their <code>archives</code> in that order, the
+libraries by name and from <code>pkgConfig</code>, then the frameworks; each archive, library and framework
+once, where it first stands. A symbol two packages define fails the link (<code>LYR-LNK0003</code>), and
+so does one nothing defines (<code>LYR-LNK0001</code>) or a library the linker does not find
+(<code>LYR-LNK0002</code>) — each exit 2, as the link is (<a href="../../spec/14-cli/">14 §1.3</a>). A binary is linked anew
+where an archive's bytes changed, not only its time.</li>
+</ol>
+<h3 id="53-source-trees">5.3 Source trees</h3>
+<ol start="13">
+<li><strong><code>[native.vendor]</code></strong> names <strong>source trees</strong>: C that the package does not hold and that is no
+package — no manifest, no modules. <code>raylib = { git = &quot;https://…&quot;, tag = &quot;5.5&quot; }</code> is a revision
+of a repository, read as §2 rule 2 reads one (<code>branch</code>, <code>rev</code>, or none), cached and locked as
+§2 rule 3 and §3 have it; <code>sqlite = { url = &quot;https://…/sqlite.zip&quot;, hash = &quot;sha256:…&quot; }</code> is a
+file loaded over <code>https</code>, a <code>.tar.gz</code>, <code>.tar.xz</code> or <code>.zip</code>, whose SHA-256 — 64 hexadecimal
+digits — is its <code>hash</code>, unpacked with a single top directory left out. A name is a lowercase
+letter, then letters, digits, <code>_</code> and <code>-</code>; another key or form is refused (<code>LYR-PKG0002</code>).</li>
+<li>A path of the native part — in <code>sources</code>, <code>include</code>, <code>archives</code> and <code>bindings</code> — that begins
+with <strong><code>@name/</code></strong> lies in the tree <code>name</code>; a name <code>[native.vendor]</code> does not hold is refused
+(<code>LYR-PKG0002</code>). A tree is the package's own: another package's <code>@name</code> is another tree, and
+two packages that compile one tree define its symbols twice (rule 12).</li>
+<li>A tree is read <strong>only where a build needs it</strong>: where a table that holds for the build's target
+names it. What it reads is fetched into the user's cache — a URL's file once by its hash —,
+under <code>--offline</code> not at all (<code>LYR-PKG0007</code>). A URL without <code>hash</code> is refused, the message giving
+the hash of what it loaded (<code>LYR-PKG0002</code>); a file whose hash is another, or a revision whose
+content is not what the lock holds, is refused (<code>LYR-PKG0008</code>); a revision the repository does
+not have (<code>LYR-PKG0006</code>); one that cannot be reached is the environment's (<code>LYR-PKG0007</code>, exit
+2). The lock holds a git tree as it holds a package read from git (§3 rule 1), its content's
+hash over every file of the tree; <code>lyric update</code> and <code>--locked</code> read it as they read those.</li>
+<li>A tree runs nothing: it is compiled, as the package's sources are, and no trust is asked for it
+(§8 rule 6). What an archive does, its bytes say; the lock holds them.</li>
+</ol>
+<h3 id="54-bindings">5.4 Bindings</h3>
+<ol start="17">
+<li><p><strong><code>bindings = [{ header = &quot;@raylib/src/raylib.h&quot;, module = &quot;rl&quot; }]</code></strong> makes a <strong>module of the
+package from a C header</strong>: <code>rl</code> in <code>game</code> is the module <code>game.rl</code>, a path of segments as §2's
+modules have, each a lowercase letter, then letters, digits and <code>_</code> (<code>LYR-PKG0002</code>). Its
+declarations are <code>pub</code>, its names C's. A module of that path under <code>src/</code>, <code>gen/</code> or <code>tests/</code>
+is refused (<code>LYR-RES0016</code>). The packages that declare the package as a dependency import it as
+any of its modules.</p>
+</li>
+<li><p>The module is made <strong>for the build's target</strong>, from what the C compiler reads of the header
+with the package's <code>include</code> and <code>defines</code> — C's types differ between targets. It holds the
+declarations of the header and of the headers beside and below it, in the order they come, not
+the system's:</p>
+<ul>
+<li>a function as <code>extern &quot;C&quot; fn</code> (<a href="../../spec/13-abi/">13 §2</a>), with <code>...</code> where it is variadic;</li>
+<li>a struct as a <code>@Layout(C)</code> struct of the same fields (<a href="../../spec/13-abi/">13 §3</a> rule 4); a struct
+C declares without its fields as <code>Ptr&lt;void&gt;</code> where a pointer names it;</li>
+<li>an enum's constants as module-level constants of its integer type, and the enum's name as an
+alias of that type;</li>
+<li>a <code>typedef</code> as an alias (<a href="../../spec/03-types/">03 §10</a>), a pointer to a C function as its type
+<code>extern &quot;C&quot; fn(…) -&gt; R</code>;</li>
+<li>a <code>#define</code> whose body is one integer literal, or one string literal, as a constant.</li>
+</ul>
+<p>The C types as <a href="../../spec/13-abi/">13 §2–§3</a> cross them: the integers by their width on the target —
+<code>char</code> as the target's <code>int8</code> or <code>uint8</code>, <code>size_t</code> as <code>uint</code>, <code>ptrdiff_t</code> as <code>int</code> —, <code>float</code>
+and <code>double</code>, <code>bool</code>; <code>const char *</code> as <code>?CStr</code>; any other <code>T *</code> as <code>?Ptr&lt;T&gt;</code>, <code>void *</code> as
+<code>?Ptr&lt;void&gt;</code>; an array parameter as the pointer it is. A name that is a word of Lyric gets a <code>_</code>
+after it.</p>
+</li>
+<li><p>What it cannot write — a union, a bit field, a struct with one, a function-like macro, a
+<code>static inline</code> function, a variable, a declaration that needs one of them — is <strong>left out</strong>,
+and the module's last lines list each by its name, its file and line, and why. The lints
+<code>naming</code> and <code>dead-code</code> do not look at it (<a href="../../spec/16-diagnostics/#5-lints">16 §5</a>).</p>
+</li>
+<li><p>A header that does not compile, or a module the toolchain cannot write, stops the build
+(<code>LYR-BLD0005</code>, exit 1) with what the C compiler said. The module is made anew where the
+header, a header it reads, the <code>defines</code>, the target or the toolchain changed.</p>
+</li>
+<li><p><strong><code>lyric bindgen</code></strong> writes the module one entry makes to standard output, to keep it under
+<code>src/</code> instead (<a href="../../spec/14-cli/">14</a>).</p>
+</li>
 </ol>
 <h2 id="6-reproducibility">6. Reproducibility</h2>
 <p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 P6</a>)</p>
@@ -257,6 +372,10 @@ it.</li>
 Windows binary's PDB, a macOS binary's <code>.dSYM</code> — gathered on a macOS host, where <code>dsymutil</code> is.
 The binary names it by a hash of its own bytes — a PE image's PDB GUID, a Mach-O image's UUID —,
 so the two still pair.</li>
+<li>A package's <strong>archives</strong> and <strong>source trees</strong> (§5.2, §5.3) are inputs as its sources are: the
+lock holds their bytes, and an archive comes into the binary as it was built — what it carries
+of the machine that built it is its own. A library linked by name or through <code>pkgConfig</code> is the
+machine's: the same bytes need the same system libraries. <em>(Written ahead of M14b.)</em></li>
 </ol>
 <h2 id="7-tests">7. Tests</h2>
 <p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V4</a>)</p>
@@ -284,7 +403,18 @@ on the host, with the package's root as its working directory, whatever the buil
 <li><strong><code>std.build</code></strong> is its view of the build: <code>target()</code> and <code>profile()</code>, the build's; <code>outDir()</code>,
 the package's <code>out/</code>; <code>genDir()</code>; <code>rerunIfChanged(paths…)</code>, <code>linkLib(name)</code>,
 <code>cFlags(flags…)</code>, <code>compileC(sources…)</code> — paths from the package's root —, and <code>warn(message)</code>,
-which the build shows (<code>LYR-BLD0003</code>). Outside a build script they panic.</li>
+which the build shows (<code>LYR-BLD0003</code>). Outside a build script they panic.
+<em>(Written ahead of M14b, replacing <code>cFlags</code> and <code>compileC</code> when it lands:)</em> <code>target()</code> is a
+<strong><code>Target</code></strong> — its <code>triple</code>, its <code>os</code> (<code>Os.linux</code>, <code>Os.windows</code>, <code>Os.macos</code>), its <code>arch</code>
+(<code>Arch.x86_64</code>, <code>Arch.aarch64</code>) and whether it <code>isHost</code> —; <code>vendorDir(name)</code> is the directory of
+a source tree (§5.3), read where the script asks for it; <strong><code>cLibrary(name)</code></strong> is a C library the
+script compiles with the program — its <code>sources(…)</code>, <code>include(…)</code>, <code>define(name)</code> and
+<code>define(name, value)</code>, and <code>flags(…)</code>, the C compiler's own, its alone — and <code>compile()</code> adds it:
+its sources see the package's <code>include</code>, <code>&lt;lyric.h&gt;</code> and the headers §5 rule 6 names; paths are
+the package's or a tree's (<code>@name/…</code>). <code>linkLib(name)</code>, <code>linkArchive(path)</code>,
+<code>linkFramework(name)</code> and <code>pkgConfig(name)</code> are §5.2's keys, with their rules; <code>cEnv()</code> is the
+environment — <code>CC</code>, <code>AR</code>, <code>CFLAGS</code> — under which another build system compiles C for the target
+with the toolchain's C compiler.</li>
 <li><strong><code>gen/</code></strong>, which the toolchain makes before the script runs, is a module space of the
 package: <code>gen/schema.lyr</code> in <code>app</code> is <code>app.gen.schema</code>, as <code>tests/</code> is §7's. It is no part of
 the package's content (§2).</li>
@@ -308,6 +438,10 @@ anything runs (<code>LYR-PKG0012</code>), at the line that declares the dependen
 <li class="level-2"><a href="#3-the-lock-file">3. The lock file</a></li>
 <li class="level-2"><a href="#4-profiles">4. Profiles</a></li>
 <li class="level-2"><a href="#5-the-native-part">5. The native part</a></li>
+<li class="level-3"><a href="#51-sources">5.1 Sources</a></li>
+<li class="level-3"><a href="#52-linking">5.2 Linking</a></li>
+<li class="level-3"><a href="#53-source-trees">5.3 Source trees</a></li>
+<li class="level-3"><a href="#54-bindings">5.4 Bindings</a></li>
 <li class="level-2"><a href="#6-reproducibility">6. Reproducibility</a></li>
 <li class="level-2"><a href="#7-tests">7. Tests</a></li>
 <li class="level-2"><a href="#8-the-build-script">8. The build script</a></li>

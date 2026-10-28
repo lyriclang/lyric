@@ -260,7 +260,7 @@ with the line <code>panic while panicking [CODE]: message</code>, still with 101
 </tr>
 <tr>
 <td><code>LYR-RT0022</code></td>
-<td>C called a Lyric function through its pointer on a thread Lyric does not run: <code>C called a Lyric function on a thread Lyric does not run …</code> — but for a Callback's that returns nothing, which goes to its thread (§3 rules 9, 13)</td>
+<td>C called a Lyric function through its pointer on a thread Lyric does not run: <code>C called a Lyric function on a thread Lyric does not run …</code> — but for a Callback's that returns nothing, which goes to its thread (§3 rules 9, 13); or an export before the runtime started: <code>C called an export before lyr_init started the runtime</code> (§4 rule 6)</td>
 </tr>
 </tbody>
 </table>
@@ -288,8 +288,8 @@ foreign code —: running into it ends the process with the same report.</p>
 <li>A standalone program starts the runtime with its defaults, which install the handlers of
 §1.4 item 6. Its exit code is the value <code>main</code> returns, masked to <code>0..255</code>
 (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C5</a>).</li>
-<li>A host starts the runtime itself (<code>lyr_init</code>), once per process: a second start is refused and
-changes nothing. The host chooses the program's arguments, a heap limit (0: none), whether the
+<li>A host starts the runtime itself (<code>lyr_init</code>, §5 rule 1), once per process: a second start is
+refused and changes nothing. The host chooses the program's arguments, a heap limit (0: none), whether the
 runtime installs its fault handlers (a host owns its signals, so an embedding host says no),
 and where the runtime's standard and error output go.</li>
 </ol>
@@ -555,15 +555,15 @@ hands the parameters and takes the result. A <code>string</code> is no parameter
 refused, as a parameter and as a result (<code>LYR-SEM0099</code>).</li>
 <li>An export that <strong>throws</strong> is C's <code>LyrStatus name(parameters…, R *out)</code>: <code>LYR_OK</code> with its
 result written through <code>out</code>, <code>LYR_ERROR</code> where it threw, <code>out</code> left as it was. Without a
-result there is no <code>out</code>. The error itself stays behind.</li>
+result there is no <code>out</code>. The error stays behind for <code>lyr_take_error</code> (§5 rule 4).</li>
 <li>An export is a <strong>root</strong> of every build: of a program's — a C function of its native part
 (<a href="../../spec/15-project/">15 §5</a>) may call it — and of a library's.</li>
-<li>C calls an export after the runtime started (§1.5 rule 2), on the thread that started it: before
-it, or on another thread, the process ends with its report (<code>LYR-RT0022</code>). The first call into
-a library fills the library's module-level bindings, once, as a program's start does before
-<code>main</code> (<a href="../../spec/04-modules/">04 §1</a> rule 2); in a program <code>main</code>'s start filled them. The function
-runs as one C calls through its pointer does (§3 rule 9): its C frames are counted, it may park,
-and a panic in it ends the process with its report.</li>
+<li>C calls an export after the runtime started (§1.5 rule 2) — before it the process ends with its
+report (<code>LYR-RT0022</code>) —, on any thread (§5 rule 5). The first call into a library fills the
+library's module-level bindings, once, as a program's start does before <code>main</code>
+(<a href="../../spec/04-modules/">04 §1</a> rule 2); in a program <code>main</code>'s start filled them. How the function
+runs is §5's: as a task of its own, or in the task that runs where Lyric called the C that
+calls it.</li>
 <li><strong><code>lyric build --lib</code></strong> (<a href="../../spec/14-cli/">14 §1.1</a> rule 9) builds the package's <strong>library</strong>: its root
 module <code>src/lib.lyr</code> and the modules it reaches by import, as a program is its entry module's
 (<a href="../../spec/04-modules/">04 §2</a>) — without a <code>main</code> to start from; one there is an ordinary function.
@@ -573,8 +573,9 @@ archive's place: <code>lib&lt;name&gt;.so</code>, <code>lib&lt;name&gt;.dylib</c
 <code>&lt;name&gt;.lib</code>.</li>
 <li>The <strong>header</strong> declares, in this order:
 <ul>
-<li>the runtime's API: <code>LyrConfig</code>, <code>lyr_init</code>, <code>lyr_shutdown</code>, and <code>LyrStatus</code> with <code>LYR_OK</code>,
-<code>LYR_ERROR</code>, <code>LYR_PANIC</code>;</li>
+<li>the runtime's API (§5): <code>LyrStatus</code> with <code>LYR_OK</code>, <code>LYR_ERROR</code>, <code>LYR_PANIC</code>, <code>LyrConfig</code>,
+<code>lyr_init</code>, <code>lyr_shutdown</code>, <code>LyrError</code>, <code>lyr_take_error</code>, <code>lyr_step</code>, <code>lyr_run</code>,
+<code>lyr_detach_thread</code>;</li>
 <li>the <code>@Layout</code> types the exports name, each before the first that needs it, named by its
 module's path and its own name joined by <code>_</code> — <code>geo.Point</code> is <code>geo_Point</code> —: a struct as C's
 <code>struct</code> of the same fields in their order, an enum with <code>@Layout(C)</code> as C's <code>enum</code>, one with
@@ -587,11 +588,58 @@ function's pointer in C's form. A parameter is named as in Lyric, with a <code>_
 reserves.</li>
 </ul>
 </li>
-<li>A shared library gives the system's loader its exports, <code>lyr_init</code> and <code>lyr_shutdown</code>, and no
+<li>A shared library gives the system's loader its exports and the runtime's API of rule 8, and no
 other symbol. A C program that links the archive links the libraries the runtime calls too — on
 Linux <code>-lpthread -lm</code>, with zig cc <code>-lunwind</code>; on Windows <code>-lshell32 -lws2_32</code> — and those the
 packages' native parts name (<a href="../../spec/15-project/">15 §5</a>), which a shared library is linked against
-itself.</li>
+itself. <em>(Written ahead of M14b:)</em> the <strong>archives</strong> of the native parts
+(<a href="../../spec/15-project/#52-linking">15 §5.2</a>) lie inside <code>lib&lt;name&gt;.a</code> with the library and the runtime,
+so a C program links that one file; what it links beside it — the libraries by name and from
+<code>pkgConfig</code>, the frameworks, the runtime's — <code>build --lib</code> says after the archive, as the
+arguments of a C compiler in the order they are linked (<code>note: link it with -lpthread -lm …</code>),
+and its <code>--json</code> form gives them as the artifact's <code>linkArgs</code>
+(<a href="../../spec/16-diagnostics/">16 §4</a>). They are the target's: another target has others.</li>
+</ol>
+<h2 id="5-embedding">5. Embedding</h2>
+<p>A C program that embeds Lyric: the runtime started, the exports called as tasks, the tasks they
+leave pumped, a failure as a status
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 H1–H6</a>).</p>
+<p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code>; that a C program embeds a library with threads and
+output of its own — <code>examples/embedded-host</code> —, in the toolchain's own tests (<code>tests/Lyric5.Tests</code>,
+<code>EmbeddingTests</code>).</p>
+<ol>
+<li><strong><code>lyr_init(config)</code></strong> starts the runtime, once per process, and answers <code>LYR_OK</code>; a second call
+answers <code>LYR_ERROR</code> and changes nothing. <code>config</code> — <code>NULL</code> for zeros — gives the program's
+arguments, a heap limit, whether the runtime installs its fault handlers (§1.4 item 6), and the
+writers its standard output and error go to instead of the process's (<code>stdout_write</code>,
+<code>stderr_write</code>, with <code>write_context</code>). <strong><code>lyr_shutdown()</code></strong> writes out what the program wrote and
+stops the runtime.</li>
+<li>An export C calls where no Lyric runs below the call on the thread <strong>runs as a task</strong> on the
+thread's scheduler (<a href="../../spec/10-concurrency/">10</a>): it may wait, the thread's other tasks run
+meanwhile, and the call returns to C when the task is done. What the task wrote is written out
+before the call returns.</li>
+<li>A task an export starts with <code>spawnDetached</code> goes on after the export: in the thread's next
+export calls, in <strong><code>lyr_step()</code></strong> — one turn where a task is ready or due, without waiting;
+<code>true</code> while tasks remain on the thread — and in <strong><code>lyr_run()</code></strong>, which runs them to their end,
+waiting as they wait. On a thread where no export ran, and called from Lyric's C, neither does
+anything (<code>lyr_step</code> answers <code>false</code>).</li>
+<li>A <strong>panic</strong> of an export's task (rule 2) is <strong><code>LYR_PANIC</code></strong> where the export throws (§4 rule 4):
+the runtime goes on as after any task's panic, and the next call runs. Where the export does
+not throw, the panic ends the process with its report, as in a program.
+<strong><code>lyr_take_error(&amp;error)</code></strong> takes what the thread's last export that answered <code>LYR_ERROR</code> or
+<code>LYR_PANIC</code> left, and answers its status — <code>LYR_OK</code>, with <code>error</code> zeroed, where nothing waits,
+as after a take. For an error: its type as Lyric names it (<code>std.core.Exception</code>), its message,
+and the error that caused it as <code>cause</code>, on down to <code>NULL</code>; for a panic: its code as the type
+(<code>LYR-RT0008</code>), its message, and its frames as <code>trace</code>. The strings are the runtime's until the
+thread's next <code>lyr_take_error</code>.</li>
+<li>A thread that never ran Lyric becomes Lyric's at its <strong>first export</strong> — attached to the
+collector, with a scheduler of its own (<a href="../../spec/10-concurrency/">10</a>) —, and <strong><code>lyr_detach_thread()</code></strong>
+gives it back: its tasks that remain never run again. On the thread that called <code>lyr_init</code>, and
+on one Lyric started, it does nothing.</li>
+<li>Where Lyric runs below the call on the thread — Lyric called C, which calls the export — the
+export runs in the task that runs, as a Lyric function C calls through its pointer does (§3
+rule 9): its C frames are counted, it may park, and a panic in it ends the process with its
+report. Calls nest as deep as the stack lets them, without a count of their own.</li>
 </ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
@@ -609,6 +657,7 @@ itself.</li>
 <li class="level-2"><a href="#2-c-functions-stage-1">2. C functions, stage 1</a></li>
 <li class="level-2"><a href="#3-the-type-table-stage-2">3. The type table, stage 2</a></li>
 <li class="level-2"><a href="#4-exports-and-libraries">4. Exports and libraries</a></li>
+<li class="level-2"><a href="#5-embedding">5. Embedding</a></li>
 </ul>
 </aside>
 </div>
