@@ -94,6 +94,43 @@ fn main(): void {
 }
 '''
 
+[LYR-BLD0006]
+title = "a file the build puts beside the binary is not there, shares its name, or would not be found there"
+severity = "error"
+area = "15-project"
+summary = "Reported when a package's `build.lyr` names a file with `std.build.besideBinary` that is not there when the script has ended, when two such files — or `dylibs` of the native part — have one name, or when a Mach-O library of `dylibs` has an install name that does not begin with `@rpath/`. Nothing is built; the exit code is 1."
+explanation = '''
+`build.besideBinary(path)` asks the build to copy a file into the directory of every binary it makes of the program — a shared library the program loads when it starts, most of all, such as `SDL3.dll` beside `app.exe`. The binary looks for shared libraries in its own directory first, so the program starts from wherever it is copied, with the library beside it. The copy goes under the file's own name, so the file must be there when the script ends, and two files with one name — from two packages, or from two directories — would overwrite each other.
+
+A path relative to the package's root is read from there; one from the environment (`SDL3_DIR`) is likely wrong where it is missing. Name the variable with `build.rerunIfEnvChanged`, so the script runs again when it is set right, and check that the file is there before naming it: `build.warn` can say what to set.
+
+The library's own directory goes to the link with `build.linkSearch(dir)`, which is never written into the binary: the program does not depend on where the build found it.
+'''
+wrong = '''
+//- build.lyr
+import std.build;
+
+fn main(): void {
+    build.besideBinary("lib/missing.dll");
+}
+//- src/main.lyr
+fn main(): void {
+}
+'''
+right = '''
+//- build.lyr
+import std.build;
+
+fn main(): void {
+    build.besideBinary("data/notes.txt");
+}
+//- data/notes.txt
+beside the binary
+//- src/main.lyr
+fn main(): void {
+}
+'''
+
 [LYR-CG0001]
 title = "a construct the C backend does not translate"
 severity = "error"

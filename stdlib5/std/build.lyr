@@ -1,10 +1,10 @@
 //! The build script's view of its build.
 //!
 //! A package's `build.lyr` is an ordinary program that `lyric5` runs before it compiles the
-//! package: it does things — writes modules into `gen/`, names C to compile and libraries to
-//! link — and defines nothing. What it asks of the toolchain goes back as directives, a line
-//! each, into the file the toolchain names; what the build is comes from the environment the
-//! toolchain sets.
+//! package: it does things — writes modules into `gen/`, names C to compile, libraries to link
+//! and where to find them, and files to put beside the program — and defines nothing. What it
+//! asks of the toolchain goes back as directives, a line each, into the file the toolchain names;
+//! what the build is comes from the environment the toolchain sets.
 //!
 //! # Panics
 //!
@@ -19,6 +19,23 @@
 //! build.compileC("native/fast.c");
 //! build.linkLib("m");
 //! build.rerunIfChanged("native/fast.c");
+//! ```
+//!
+//! A library from an SDK outside the package — SDL3 on Windows, its directory in `SDL3_DIR` —
+//! is linked from where the SDK lies, and its DLL goes beside the program:
+//!
+//! ```lyric,no_run
+//! import std.build;
+//! import std.os;
+//!
+//! build.rerunIfEnvChanged("SDL3_DIR");
+//! if (let sdk = os.env("SDL3_DIR")) {
+//!     build.linkSearch(f"{sdk}/x86_64-w64-mingw32/lib");
+//!     build.linkLib("SDL3");
+//!     build.besideBinary(f"{sdk}/x86_64-w64-mingw32/bin/SDL3.dll");
+//! } else {
+//!     build.warn("set SDL3_DIR to the SDL3 SDK");
+//! }
 //! ```
 import std.fs;
 import std.io { IoError };
@@ -59,9 +76,44 @@ pub fn rerunIfChanged(paths: string...): void {
     }
 }
 
+/// Asks the toolchain to run the script again when one of these environment variables has another
+/// value than in the script's last run, or is set where it was not, or not where it was.
+///
+/// A script that reads where a library lies from the environment names the variable here: else
+/// a changed value keeps what the last run asked.
+pub fn rerunIfEnvChanged(names: string...): void {
+    for (i in 0..names.length()) {
+        direct("rerun-if-env-changed", names[i]);
+    }
+}
+
 /// Links the C library `name` into the program: `linkLib("m")` is `-lm`.
 pub fn linkLib(name: string): void {
     direct("link-lib", name);
+}
+
+/// Adds a directory the link searches for the libraries of [linkLib] and of `[native]`, before the
+/// linker's own: `linkSearch("C:/Libs/SDL3/x86_64-w64-mingw32/lib")` is `-L` with it.
+///
+/// The path is relative to the package's root, or absolute. The directory is never written into
+/// the binary: a shared library found there is found again when the program starts where the
+/// system looks, or beside the program — name it with [besideBinary]. For a Windows target a
+/// MinGW SDK's import library `libX.dll.a` is found as well.
+pub fn linkSearch(dir: string): void {
+    direct("link-search", dir);
+}
+
+/// Puts files beside every binary the build makes of the program — of `build`, `run`, `test` and
+/// `bench`, and a library `--lib` makes — when it has linked it: a shared library the program
+/// loads when it starts, most of all. Such a binary searches its own directory for shared
+/// libraries first. A file is copied only where the bytes beside the binary differ.
+///
+/// The paths are relative to the package's root, or absolute. A file that is not there when the
+/// script has ended, and two files of one name, stop the build (`LYR-BLD0006`).
+pub fn besideBinary(paths: string...): void {
+    for (i in 0..paths.length()) {
+        direct("beside-binary", paths[i]);
+    }
 }
 
 /// Adds flags for the C sources this script names with [compileC]:

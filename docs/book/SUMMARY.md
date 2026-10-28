@@ -6,3 +6,4 @@ the ones before it.
 - [Getting started](getting-started.md)
 - [A first program](first-program.md)
 - [What the compiler tells you](diagnostics.md)
+- [C libraries](c-libraries.md)
