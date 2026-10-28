@@ -1609,3 +1609,22 @@ bestätigt oder geplant, nicht gebaut); `lyric publish` und eine Paket-Registry 
 - Die Codes: `LYR-CLI0023` (nicht zu haben), `LYR-CLI0024` (nicht, was der Index sagt), `LYR-CLI0025` (die
   installierten Toolchains lehnen die Änderung ab); alle Exit 2. `toolchain default` ohne Version sagt die
   Standardversion. Die Prüfung auf `com.apple.quarantine` läuft im Test auf macOS.
+
+**S4, beim Bauen entschieden** (2026-10-28):
+
+- **Gelesen wird nur das Paket, in dem der Befehl läuft** (das um `-C` oder das Arbeitsverzeichnis), nicht der Graph:
+  den Graphen aufzulösen hieße vor dem Wechsel git zu fragen. Der Pin einer Abhängigkeit bleibt die Prüfung des
+  Baus (`LYR-PKG0009`), wie Go die `toolchain`-Zeile nur des Hauptmoduls liest.
+- **Ohne Terminal kein eigener Fehler vor dem Verb**: das Verb läuft und lehnt das Paket ab (`LYR-PKG0009`); die
+  Meldung nennt jetzt `lyric5 toolchain install stable`. So bleiben Verben, die kein Paket brauchen (`version`), auch
+  in einem gepinnten Paket benutzbar. Nie gewechselt wird bei `toolchain`, `help`, `explain`, `completions`, `new`,
+  `init`; das Angebot am Terminal nimmt nur den stabilen Kanal und nicht bei `version`.
+- **Weitergereicht wird die Befehlszeile, wie sie kam** — die globalen Optionen vor dem Verb eingeschlossen; unter
+  Unix mit `execve` und einer eigenen Umgebung (die verwaltete Umgebung von .NET erreicht `environ` nicht), unter
+  Windows als Kind, dessen Ctrl+C der Elternprozess wartend übergeht.
+- **Die Tests laufen im Testprozess**: ein Modulinitialisierer setzt `LYRIC_HOME` auf ein leeres Verzeichnis und
+  nimmt `LYRIC_TOOLCHAIN*` weg, sonst ersetzte ein `execve` den Testhost, wo `~/.lyric` etwas Passendes hält. Der
+  Wechsel selbst ist ein Prozesstest gegen einen Stellvertreter, den `zig cc` baut.
+- **Gemessen** (NativeAOT, Linux, warm, das Beste aus 5 × 20): der Stellvertreter allein 2,1 ms, `lyric5 version`
+  ohne Pin 21,2 ms, mit Pin an den Stellvertreter gereicht 20,9 ms — der Wechsel kostet einen `lyric5`-Start,
+  rund 19 ms, unter C9s 50 ms über dem Programmstart.

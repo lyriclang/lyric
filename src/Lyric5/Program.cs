@@ -16,8 +16,10 @@ public static partial class Program
     {
         try
         {
+            var given = args;
             if (TakeRenderOptions(ref args, out var lints) is { } refused) return refused;
             if (args.Length == 0) return Usage(Console.Out, 0);
+            if (Switch(args, given) is { } handedOn) return handedOn;
             var exit = Dispatch(args, lints);
             // the JSON form closes with the count (16 §4); 'run' said it before its program ran
             Lyric.Core.Rendering.RenderStyle.Current.Events?.Summary();

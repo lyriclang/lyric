@@ -477,7 +477,7 @@ error[LYR-CLI0024]: lyric-5.0.0-dev.20261028-linux-x64.tar.gz has the SHA-256 9f
 title = "the installed toolchains refuse the change"
 severity = "error"
 area = "14-cli"
-summary = "`lyric toolchain default` or `remove` names a version that is not installed, `remove` names the default or the toolchain that runs the command, `update` finds no default, or `config.toml` under `LYRIC_HOME` is not one the toolchain reads. The exit code is 2."
+summary = "`lyric toolchain default` or `remove`, or `LYRIC_TOOLCHAIN`, names a version that is not installed, `remove` names the default or the toolchain that runs the command, `update` finds no default, an installed toolchain a command is handed to cannot be run, or `config.toml` under `LYRIC_HOME` is not one the toolchain reads. The exit code is 2."
 explanation = '''
 The toolchains live under `~/.lyric` — or the directory `LYRIC_HOME` names —, each in `toolchains/<version>/`; `config.toml` holds the one key `default`, and `bin` is a link to the default's directory. The default cannot be removed before another is made the default, nor can the toolchain a command runs from remove itself.
 
