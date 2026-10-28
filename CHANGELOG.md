@@ -271,6 +271,18 @@ promise. This entry fills with the milestones.
   the one form, with no options to change it; comments and the parentheses a program writes stay, and
   a file that does not parse is left as it is. `--check` writes nothing and fails where a file would
   change; `--diff` shows how. The standard library is in the form.
+- **FFI and embedding (M14** — `design/v5/spec/11` X1–X8, H1–H7, 01 K4; spec chapter 13 §2–§6**):**
+  `extern "C"` takes C's types: `std.ffi`'s `Ptr<T>`, `?Ptr<T>` and `CStr` — a `string` passes as one without a
+  copy —, `@Layout(C)` structs by value and behind a pointer, `@Layout` enums, `char`, C function pointers
+  `extern "C" fn(…) -> …`, the block `extern "C" { … }` and C's `...`. Memory through `alloc`/`free` and
+  `Ptr.read`/`write`/`offset`/`cast` inside `unsafe { }`. A function or a lambda that captures nothing is C's
+  callback; a closure is one through `Callback<…>.new` and its userdata; an error crosses C through
+  `stash`/`takeStashed`; a callback C calls on a thread of its own runs on the thread that made it. `GcHandle` holds
+  an object for C. `@Export("sym")` makes a function C calls; `lyric build --lib` builds `lib<name>.a`, with
+  `--shared` the `.so`/`.dylib`/`.dll`, beside `<name>.h` and `lyric.h`: `lyr_init`, each export a task,
+  `lyr_step`/`lyr_run`, `LyrStatus` and `lyr_take_error`, a thread of the host attached at its first call.
+  `std.ffi.Library` loads a shared library while the program runs. `examples/ffi` and `examples/embedded-host` go
+  each way.
 - **The editor and the debugger (M13b** — `design/v5/spec/11` E1–E4, E8; spec chapter 14 §11, §12**):**
   `lyric lsp` is the language server of a package — diagnostics as you type, quick fixes from the compiler's
   suggestions and an `@Allow` for a lint, a finding's link to its page, formatting, hover with a declaration's head as

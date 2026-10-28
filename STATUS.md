@@ -57,7 +57,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M12c | Docs foundation and website (comments in the W8 form, `Lyric5.Doc`, Book scaffold, `/dev/` live) | L | **done** 2026-10-24 |
 | M13a | fmt, doc, api | M | **done** 2026-10-25 |
 | M13b | LSP, DAP, clients | XL | **done** 2026-10-26 |
-| M14 | FFI and embedding | L | — |
+| M14 | FFI and embedding | L | **done** 2026-10-28 |
 | M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | — (planned 2026-10-28) |
 | M15 | Distribution | M | — |
 | M16 | Migration (`lyric fix --from-4`) | L | — |
@@ -1380,6 +1380,47 @@ released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "
   job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
   step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
 
+### M14 — done (2026-10-28)
+
+The plan is design 13's addendum "der Plan für M14" (P1–P11, S1–S10), #578. The mode of M13b: no halt until the
+close, merged on green CI with the platform matrix dispatched, open points collected. Spec chapter 13 grew §2–§6.
+
+- **S1** pointers, C strings, structs and enums (#579 + spec#361): `std.ffi`'s `Ptr<T>`, `?Ptr<T>` and `CStr`, a
+  `string` into a `CStr` without a copy, `@Layout(C)` structs by value, `@Layout` enums with `LYR-RT0021` for an
+  integer no variant stands for; what crosses is one function (`CFault`) the checker, the header and the spec's table
+  read.
+- **S2** C's variadic arguments (#580 + spec#362): a bare `...`, C's promotions written as casts.
+- **S3** memory and `unsafe` (#581 + spec#363): `alloc`/`free`, `read`/`write`/`offset`/`cast` in an `unsafe` block
+  (`LYR-SEM0233` outside), `asPtr()` safe.
+- **S4a–c** callbacks (#582, #587, #588 + spec#364, #366, #367): the type `extern "C" fn(…) -> …` (moved here from S1,
+  open point 291); functions and capture-free lambdas become C's pointers through trampolines that count the C frames;
+  `Callback<C>.new(closure)` with its userdata — the C type written out, the maintainer's choice of two —;
+  `?extern "C" fn` as a parameter and a result (294); `stash`/`takeStashed`; 01 K4 in the runtime: a coroutine with C
+  frames is neither closed (`LYR-RT0014`) nor collected.
+- **S5a–b** handles and C's threads (#590, #592 + spec#368, #369): `GcHandle` (`LYR-RT0023` for the wrong class), a
+  `Callback` called on a thread Lyric does not run queued to the thread that made it; one with a result there is
+  `LYR-RT0022`. The platform run found a race in the scheduler's first turn.
+- **S6a–c** std calls its runtime by `extern "C"` (#593, #594, #595 + spec#370): of the 156 rows of
+  `Intrinsics.Runtime` 28 stay, each documented (macros for every type, the starters, StringView's inline helpers);
+  the rest are checked `extern "C"` declarations — std's runtime objects cross as a row of the table only std
+  has —; the compile-time interpreter finds a C function by its Lyric name; code size measured against main before
+  S6 in #595.
+- **S7** exports and the library (#596 + spec#371): `@Export("sym")`, `lyric build --lib` (`lib<name>.a`) and
+  `--lib --shared` (`.so`/`.dylib`/`.dll` with only the exports and the API visible), the header `<name>.h` and the
+  curated `lyric.h`; a throwing export answers `LyrStatus`.
+- **S8** embedding (#598 + spec#373): an export runs as a task on its thread's scheduler; `lyr_step`/`lyr_run`,
+  `lyr_take_error` with the type, message, cause chain or a panic's trace, a thread attached at its first export and
+  `lyr_detach_thread`; `lyr_init` answers `LyrStatus`. `examples/embedded-host` links the library statically and as a
+  DLL. Decided on the way (open points 298, 299): a panic is `LYR_PANIC` in an export that throws and ends the
+  process in one that does not; an export reached through C from Lyric runs in the running task.
+- **S9** a library loaded while the program runs (#599 + spec#374): `std.ffi.Library` — `open`, `symbol<F>` held to
+  a C function's type, `close` —, `-ldl` on Linux; `examples/ffi` binds its native part and loads its plugin.
+- **S10** the close (#600).
+- The exit criterion — `examples/ffi` binds a C library; `examples/embedded-host` is a C program against
+  `lib<app>.a`; spec 13 complete — holds: both run in `ExampleTests`/`EmbeddingTests` on Linux, macOS and Windows in
+  the platform run. Open points 287–299; 287, 288, 289, 292, 293 and 297 are each "decide or door" and wait for the
+  maintainer. **Next: M14b (C libraries, planned 2026-10-28), then M15 — its plan in design 13 first.**
+
 ### M13b — done (2026-10-26)
 
 The plan is design 13's addendum "der Plan für M13b" (P1–P11, S1–S10), #567. The mode of M12: no halt until the
@@ -1640,7 +1681,7 @@ Claude plans **and** implements; the maintainer reviews (in force since the scop
 merged once its CI is green; the milestones follow each other without a pause until 5.0 stands,
 and the last push toward 5.0 waits for the maintainer's review of the points collected on the
 way (those of M4 to M8a were reviewed on 2026-10-05, those of the run that closed M8a on
-2026-10-07, M8b's on 2026-10-08, M8c's on 2026-10-09, M10's on 2026-10-15, M11's on 2026-10-19). Claude also merges, tags and releases. Anything that acts outside the repository — creating
+2026-10-07, M8b's on 2026-10-08, M8c's on 2026-10-09, M10's on 2026-10-15, M11's on 2026-10-19, M14's 298–299 on 2026-10-28). Claude also merges, tags and releases. Anything that acts outside the repository — creating
 repositories, publishing releases, deleting published things — is laid out first and done on the
 maintainer's word.
 
