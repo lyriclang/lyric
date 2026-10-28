@@ -74,7 +74,12 @@ pub fn target(): BuildTarget {
     } else if (triple.startsWith("aarch64-")) {
         arch = .Aarch64;
     }
-    return BuildTarget { triple = triple, os = os, arch = arch, isHost = triple == given("LYRIC_BUILD_HOST") };
+    return BuildTarget {
+        triple = triple,
+        os = os,
+        arch = arch,
+        isHost = triple == given("LYRIC_BUILD_HOST"),
+    };
 }
 
 /// Returns the profile the package is built in: `debug`, `release`, or one of the manifest's.
