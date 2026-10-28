@@ -51,13 +51,13 @@
 <h1>LYR-CLI0002</h1>
 <p class="code-title">no C compiler was found</p>
 <p class="meta">error · <a href="../../spec/14-cli/">spec 14-cli</a></p>
-<p>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when no C compiler is found — <code>LYRIC_CC</code>, then <code>zig</code>, <code>clang</code>, <code>gcc</code> on the PATH — or when the profile needs clang (<code>asan</code>, <code>tsan</code>) and there is none. The exit code is 2.</p>
+<p>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when no C compiler is found — <code>LYRIC_CC</code>, then the zig <code>lyric toolchain install zig</code> installed, then <code>zig</code>, <code>clang</code>, <code>gcc</code> on the PATH — or when the profile needs clang (<code>asan</code>, <code>tsan</code>) and there is none. The exit code is 2.</p>
 <h2 id="explanation">Explanation</h2>
 <p><code>lyric5</code> builds through C: it needs a C compiler to turn the program and its runtime into a binary. <code>--emit ir</code> and <code>--emit c</code> print without one; everything that produces a binary needs it.</p>
-<p>Install zig (recommended), clang or gcc, or point <code>LYRIC_CC</code> at a compiler. The <code>asan</code> and <code>tsan</code> profiles need clang, whose sanitizer runtimes they link. <code>lyric5 version</code> says which compiler was found.</p>
+<p><code>lyric5 toolchain install zig</code> installs the zig this toolchain is built and tested with, under <code>~/.lyric</code>, where the search finds it before the PATH. Else put zig, clang or gcc on the PATH, or point <code>LYRIC_CC</code> at a compiler. The <code>asan</code> and <code>tsan</code> profiles need clang, whose sanitizer runtimes they link. <code>lyric5 version</code> says which compiler was found.</p>
 <h2 id="example">Example</h2>
 <pre><code>$ lyric5 build
-error[LYR-CLI0002]: no C compiler found — install zig (recommended), clang or gcc, or set LYRIC_CC
+error[LYR-CLI0002]: no C compiler found — 'lyric5 toolchain install zig' installs the one this toolchain is tested with; or put zig, clang or gcc on the PATH, or set LYRIC_CC
 $ lyric5 build --profile asan
 error[LYR-CLI0002]: the asan profile needs clang, and none was found</code></pre>
 </main>

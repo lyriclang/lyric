@@ -404,7 +404,7 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <td><code>env</code></td>
 <td>—</td>
 <td><code>-C &lt;dir&gt;</code>, <code>--profile &lt;name&gt;</code>, <code>--target &lt;triple&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--offline</code>, <code>--json</code></td>
-<td>—</td>
+<td>yes</td>
 <td>—</td>
 </tr>
 <tr>
@@ -465,7 +465,7 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 </tr>
 <tr>
 <td><code>toolchain</code></td>
-<td><code>&lt;install|list|default|remove|update&gt; [&lt;version&gt;]</code></td>
+<td><code>&lt;install|list|default|remove|update&gt; [&lt;version&gt;|zig]</code></td>
 <td><code>--available</code></td>
 <td>—</td>
 <td>—</td>
@@ -505,13 +505,15 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <p><strong>Conformance.</strong> The toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>VerbTableTests</code>).</p>
 <ol>
 <li><strong><code>lyric env</code></strong> says every setting a build of the package here reads — the toolchain, the
-standard library, the manifest, the C compiler, the cache, the profile and each of its fields,
-the target, and each <code>LYRIC_*</code> variable that is set — with its value and <strong>where it comes
-from</strong>: <code>command line</code>, the variable's name (<code>LYRIC_PROFILE</code>), <code>lyric.toml</code>, or <code>default</code>. The
-command line is over the environment, the environment over the manifest, the manifest over the
-default.</li>
+standard library, the manifest, the C compiler and <strong>zig</strong> apart from it, the cache, the profile
+and each of its fields, the target, <strong>each lint's level</strong> (<code>lint.&lt;name&gt;</code>, and <code>lint.warnDeps</code>),
+and each <code>LYRIC_*</code> variable that is set — with its value and <strong>where it comes from</strong>:
+<code>command line</code>, the variable's name (<code>LYRIC_PROFILE</code>), <code>lyric.toml</code>, or <code>default</code>; the C
+compiler and zig also <code>installed</code> (the zig of §13 rule 12) or <code>PATH</code>. The command line is over
+the environment, the environment over the manifest, the manifest over the default.</li>
 <li>It takes the options that change a setting — <code>-C</code>, <code>--profile</code>, the profile's fields,
-<code>--target</code> — so that it says what the build with them would read. <strong><code>--json</code></strong> writes one
+<code>--target</code>, the lint options <code>-A</code>, <code>-W</code>, <code>-D</code> and <code>--warn-deps</code> — so that it says what the
+build with them would read. <strong><code>--json</code></strong> writes one
 document instead: <code>{&quot;version&quot;: 1, &quot;settings&quot;: [{&quot;name&quot;, &quot;value&quot;, &quot;origin&quot;}, …]}</code>.</li>
 </ol>
 <h2 id="7-new-init-and-completions">7. <code>new</code>, <code>init</code> and <code>completions</code></h2>
@@ -758,6 +760,19 @@ version that is, installed on a yes; elsewhere the verb runs and refuses the pac
 handed on, and only the package the command runs in is read — a dependency's pin is the
 build's to check.</p>
 </li>
+<li><p><strong><code>lyric toolchain install zig</code></strong> installs the zig the toolchain is built and tested with — its
+version is the toolchain's — under the home as <code>zig/&lt;version&gt;/</code>, where the search for a C
+compiler finds it after <code>LYRIC_CC</code> and before the <code>PATH</code>. The archive's name, size and SHA-256
+come from zig's index on its download page; the archive comes from zig's community mirrors in
+a shuffled order, each asked with <code>?source=lyric</code>, and from the download page last. It is
+checked with zig's minisign key and against the file its signature's trusted comment names; a
+source whose archive does not hold is passed over for the next, and where none holds, nothing
+is installed (<code>LYR-CLI0024</code>). An index that cannot be had, or that has no archive of the
+version for this machine, is <code>LYR-CLI0023</code>. <strong><code>LYRIC_ZIG_MIRROR</code></strong> names a server in place of
+the download page — its index, its list of mirrors and the archives —, and
+<strong><code>LYRIC_ZIG_MIRROR_KEY</code></strong> the key it signs with; set without the server, it is refused.
+<code>lyric toolchain list</code> names the zig installed.</p>
+</li>
 </ol>
 <h3 id="131-the-archive-the-index-and-the-signature-informative">13.1 The archive, the index and the signature <em>(informative)</em></h3>
 <ul>
@@ -774,6 +789,10 @@ the release <code>dev</code> carries the development build with <code>dev.json</
 <li><strong>The signature</strong> is minisign's, beside the file as <code>&lt;file&gt;.minisig</code>: Ed25519 over the file's
 BLAKE2b-512 hash, and over that signature with its trusted comment; minisign's legacy form,
 which signs the file itself, is refused.</li>
+<li><strong>zig's archives</strong> are a <code>.tar.xz</code> — a <code>.zip</code> for Windows — holding one directory with <code>zig</code> and
+its <code>lib</code>; zig's index is <code>index.json</code> on its download page (<code>{&quot;&lt;version&gt;&quot;: {&quot;&lt;arch&gt;-&lt;os&gt;&quot;: {&quot;tarball&quot;, &quot;shasum&quot;, &quot;size&quot;}}}</code>), the archives lie under <code>&lt;page&gt;/&lt;version&gt;/</code>, its community
+mirrors are listed in <code>community-mirrors.txt</code> beside the index, one address a line, and serve
+an archive as <code>&lt;mirror&gt;/&lt;file&gt;</code>.</li>
 </ul>
 </main>
 <aside class="on-this-page" aria-label="On this page">

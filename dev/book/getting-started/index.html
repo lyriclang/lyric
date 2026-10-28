@@ -41,8 +41,10 @@ export PATH="$HOME/.local/lyric:$PATH"</code></pre>
 <p>The archive holds the command <code>lyric5</code>, the standard library and the runtime's C source. Until the
 first release the command is called <code>lyric5</code>; this Book writes <code>lyric</code>, and every <code>lyric</code> here is
 <code>lyric5</code> for now.</p>
-<p>The C compiler is <code>zig</code>, version 0.16.0, from <a href="https://ziglang.org/download/">https://ziglang.org/download/</a>, on your <code>PATH</code>;
-clang or gcc work too. <code>lyric5 --version</code> says which one it found:</p>
+<p>The C compiler is <code>zig</code>, version 0.16.0. <code>lyric5 toolchain install zig</code> fetches it from zig's
+mirrors, checks zig's signature and puts it under <code>~/.lyric</code>, where <code>lyric</code> looks before your
+<code>PATH</code>; a zig, clang or gcc on the <code>PATH</code> works too, and <code>LYRIC_CC</code> names one over both.
+<code>lyric5 --version</code> says which one it found:</p>
 <pre><code class="language-text">$ lyric5 --version
 lyric 5.0.0-dev.20261023+6d7bd38
   edition     5
@@ -68,6 +70,8 @@ where it is — whichever one you started; at a terminal, one is offered for ins
 is. <code>LYRIC_TOOLCHAIN=local</code> runs the one you started, and <code>LYRIC_TOOLCHAIN=5.1.0</code> a version.</p>
 <p>The channels are published from the first signed release on; until then <code>lyric toolchain</code> installs
 only from a mirror of your own, which <code>LYRIC_MIRROR</code> names with its key in <code>LYRIC_MIRROR_KEY</code>.</p>
+<p><code>lyric env</code> says what a build here reads and where each value comes from — the C compiler and zig
+(<code>installed</code> or <code>PATH</code>), the profile, and each lint's level with who set it (<code>-D</code>, <code>[lints]</code>).</p>
 <h2 id="a-package">A package</h2>
 <p>A program lives in a <strong>package</strong>: a directory with a manifest, <code>lyric.toml</code>, and its source under
 <code>src/</code>. <code>lyric new</code> makes one:</p>
