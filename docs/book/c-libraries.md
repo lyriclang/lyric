@@ -43,6 +43,63 @@ The build compiles them with the program, under its profile, and links them in; 
 declaration in any module of the package calls them. A dependency's native part comes along with
 the dependency.
 
+`defines` gives the sources their preprocessor definitions — the manifest's way of saying `-D`:
+
+```toml
+[native]
+sources = ["native/*.c"]
+defines = ["RAYLIB_STATIC", "LEVEL=2"]
+```
+
+Besides the directories of `include`, every source finds `<lyric.h>`, the toolchain's header for C
+that works with Lyric, and the `include` directories of each package your package names under
+`[dependencies]` — so a package that wraps a C library shares its headers with the packages that
+use it. Only direct dependencies count: a package does not see the headers of a package it never
+named.
+
+## Prebuilt libraries
+
+A library you already have built goes into the package and is named by its path. A static library
+is an **archive**:
+
+```toml
+[native.x86_64-linux-gnu]
+archives = ["native/lib/x86_64-linux-gnu/libraylib.a"]
+
+[native.x86_64-windows-gnu]
+archives = ["native/lib/x86_64-windows-gnu/libraylib.a"]
+```
+
+An archive is built for one target, so it goes into the table of that target's triple. The tables
+layer: `[native]` holds for every build, `[native.linux]` and its siblings add to it for one system,
+and `[native.x86_64-linux-gnu]` and its siblings add to that for one target. Because the archive is
+named by its path, a build for another target links it from any machine:
+`lyric build --target x86_64-windows-gnu` on Linux links the Windows archive. On Windows the
+archive must be built for the GNU ABI — by MinGW or `zig cc`; one built by MSVC does not link.
+
+A **shared library** is a `.so`, a `.dylib` or a DLL, named in `dylibs`:
+
+```toml
+[native.linux]
+dylibs = ["native/linux/libgreet.so"]
+
+[native.macos]
+dylibs = ["native/macos/libgreet.dylib"]
+
+[native.windows]
+dylibs = [{ dll = "native/windows/greet.dll", lib = "native/windows/libgreet.dll.a" }]
+```
+
+On Windows the link reads the DLL's import library, so an entry names both. The build puts every
+shared library beside each binary it makes — `lyric build`, `run`, `test` and `bench` — and the
+binary looks there first: copy the directory, and the program runs anywhere. For that the library
+has to name itself by its file name, which most do; one that names the directory it was built in is
+refused with `LYR-BLD0006`, and the message says how to rename it.
+
+A prebuilt file has to be part of the package — under `native/`, or named in `[package] include` —
+because that is what the package is when someone else gets it from git, and what the lock holds
+the bytes of. When you replace one, the next build links again, even if the file kept its time.
+
 ## Libraries of the system
 
 `libs` links libraries by name — `"m"` is `-lm`. What a build needs only on one system goes into a

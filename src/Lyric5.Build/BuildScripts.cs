@@ -121,7 +121,7 @@ public static class BuildScripts
 
     /// <summary>File names as the systems compare them: Windows and macOS's default volumes
     /// do not tell 'SDL3.dll' from 'sdl3.dll'.</summary>
-    private static readonly StringComparer FileNames =
+    internal static readonly StringComparer FileNames =
         OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
 
     /// <summary>Where the graph's manifests declare the package — the root's first, for the line a
