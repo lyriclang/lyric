@@ -44,15 +44,17 @@ internal static class ToolchainFixture
     }
 
     /// <summary>
-    /// The fixtures' mirror over HTTP on the loopback: a request's path is a file under
-    /// <c>mirror/</c>, unless <see cref="Served"/> gives other bytes for it or <see cref="Missing"/>
-    /// names it. Each path asked for is kept in <see cref="Asked"/>.
+    /// The fixtures' mirror over HTTP on the loopback: a request's path, its query left aside, is a
+    /// file under <c>mirror/</c> — or the directory given —, unless <see cref="Served"/> gives other
+    /// bytes for it or <see cref="Missing"/> names it. Each path asked for, with its query, is kept
+    /// in <see cref="Asked"/>.
     /// </summary>
     public sealed class MirrorServer : IDisposable
     {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
         private readonly List<IDisposable> _undo = [];
         private readonly Thread _thread;
+        private readonly string _root;
 
         public Dictionary<string, byte[]> Served { get; } = new(StringComparer.Ordinal);
         public HashSet<string> Missing { get; } = new(StringComparer.Ordinal);
@@ -60,8 +62,9 @@ internal static class ToolchainFixture
         public int Port { get; }
         public string Address => $"http://127.0.0.1:{Port}";
 
-        public MirrorServer()
+        public MirrorServer(string? root = null)
         {
+            _root = root ?? Mirror;
             _listener.Start();
             Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
             _thread = new Thread(Serve) { IsBackground = true };
@@ -104,9 +107,10 @@ internal static class ToolchainFixture
                 if (b < 0) return;
                 head.Append((char)b);
             }
-            var path = head.ToString().Split(' ')[1];
-            lock (Asked) Asked.Add(path);
-            var file = Path.Combine(Mirror, path.TrimStart('/'));
+            var asked = head.ToString().Split(' ')[1];
+            lock (Asked) Asked.Add(asked);
+            var path = asked.Split('?')[0];
+            var file = Path.Combine(_root, path.TrimStart('/'));
             var body = Missing.Contains(path) ? null
                 : Served.TryGetValue(path, out var given) ? given
                 : File.Exists(file) ? File.ReadAllBytes(file) : null;

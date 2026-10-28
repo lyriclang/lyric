@@ -285,7 +285,7 @@ public static partial class Program
         if (compiler is null)
             Console.Error.WriteLine(profile.RequiresClang
                 ? $"error[LYR-CLI0002]: the {profile.Name} profile needs clang, and none was found"
-                : "error[LYR-CLI0002]: no C compiler found — install zig (recommended), clang or gcc, or set LYRIC_CC");
+                : "error[LYR-CLI0002]: no C compiler found — 'lyric5 toolchain install zig' installs the one this toolchain is tested with; or put zig, clang or gcc on the PATH, or set LYRIC_CC");
         return compiler;
     }
 }

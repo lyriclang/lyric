@@ -236,15 +236,15 @@ error[LYR-CLI0001]: no such file '/home/ada/app/missing.lyr'
 title = "no C compiler was found"
 severity = "error"
 area = "14-cli"
-summary = "Reported by `build`, `run`, `test` and `bench` when no C compiler is found — `LYRIC_CC`, then `zig`, `clang`, `gcc` on the PATH — or when the profile needs clang (`asan`, `tsan`) and there is none. The exit code is 2."
+summary = "Reported by `build`, `run`, `test` and `bench` when no C compiler is found — `LYRIC_CC`, then the zig `lyric toolchain install zig` installed, then `zig`, `clang`, `gcc` on the PATH — or when the profile needs clang (`asan`, `tsan`) and there is none. The exit code is 2."
 explanation = '''
 `lyric5` builds through C: it needs a C compiler to turn the program and its runtime into a binary. `--emit ir` and `--emit c` print without one; everything that produces a binary needs it.
 
-Install zig (recommended), clang or gcc, or point `LYRIC_CC` at a compiler. The `asan` and `tsan` profiles need clang, whose sanitizer runtimes they link. `lyric5 version` says which compiler was found.
+`lyric5 toolchain install zig` installs the zig this toolchain is built and tested with, under `~/.lyric`, where the search finds it before the PATH. Else put zig, clang or gcc on the PATH, or point `LYRIC_CC` at a compiler. The `asan` and `tsan` profiles need clang, whose sanitizer runtimes they link. `lyric5 version` says which compiler was found.
 '''
 example = '''
 $ lyric5 build
-error[LYR-CLI0002]: no C compiler found — install zig (recommended), clang or gcc, or set LYRIC_CC
+error[LYR-CLI0002]: no C compiler found — 'lyric5 toolchain install zig' installs the one this toolchain is tested with; or put zig, clang or gcc on the PATH, or set LYRIC_CC
 $ lyric5 build --profile asan
 error[LYR-CLI0002]: the asan profile needs clang, and none was found
 '''
