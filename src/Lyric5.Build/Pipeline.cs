@@ -246,6 +246,8 @@ public static class Pipeline
             // a library's code, the runtime's too, as a library's must be (LinkageOf)
             var profile = project.Library is { } kind ? request.Profile with { Linkage = LinkageOf(kind, request.Target) } : request.Profile;
             var archive = RuntimeArchive.For(request.Compiler, request.Target, profile, request.ToolchainVersion);
+            // what fails from here on is the C side's, at no declaration of the program
+            Lyric.Core.CompilerPosition.End();
             var build = new CBuild(request.Compiler, request.Target, profile, project.CacheDir);
             var runtimeRoot = RuntimeArchive.SourceRoot()!;
             // The program's units carry what the profile asks of the program alone (fast-math), and

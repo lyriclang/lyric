@@ -151,7 +151,7 @@ public sealed class CBuild
         var arguments = Driver();
         arguments.AddRange(FlagsFor(unit));
         arguments.AddRange(["-c", unit.Source, "-o", partial]);
-        var result = ProcessRunner.Run(Compiler.Path, arguments, TimeSpan.FromMinutes(5));
+        var result = Run(Compiler.Path, arguments, $"compiling {unit.Source} for {Target} ({Profile.Name})", partial);
         if (result.ExitCode != 0)
         {
             File.Delete(partial);
@@ -211,7 +211,7 @@ public sealed class CBuild
         arguments.Add("rcs");
         arguments.Add(partial);
         arguments.AddRange(objects);
-        var result = ProcessRunner.Run(tool, arguments, TimeSpan.FromMinutes(2));
+        var result = Run(tool, arguments, $"archiving {keyed}", partial);
         if (result.ExitCode != 0)
         {
             File.Delete(partial);
@@ -312,7 +312,7 @@ public sealed class CBuild
         if (Target.Os == TargetOs.MacOs && !debugMap) arguments.Add("-Wl,-S");
         if (Compiler.Kind == CCompilerKind.Zig) arguments.Add("-fno-sanitize=undefined");
         if (Target.Os == TargetOs.Linux && Compiler.Kind == CCompilerKind.Zig) arguments.Add("-lunwind");
-        var result = RunLong(arguments, Path.GetDirectoryName(Path.GetFullPath(output))!);
+        var result = RunLong(arguments, Path.GetDirectoryName(Path.GetFullPath(output))!, $"linking {output}");
         if (result.ExitCode != 0)
         {
             throw new CBuildException($"linking {output} for {Target} ({Profile.Name}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
@@ -369,17 +369,17 @@ public sealed class CBuild
     /// quoted, a backslash doubled — the GNU reading takes it for an escape and gives one back; the
     /// Windows reading keeps two, a separator twice, which Windows takes as one.
     /// </summary>
-    private ProcessRunner.Result RunLong(List<string> arguments, string directory)
+    private ProcessRunner.Result RunLong(List<string> arguments, string directory, string what)
     {
         if (Command(arguments).Length <= LongestCommandLine)
-            return ProcessRunner.Run(Compiler.Path, arguments, TimeSpan.FromMinutes(5));
+            return Run(Compiler.Path, arguments, what, null);
         var driver = Driver().Count;
         var responseFile = Path.Combine(directory, $".link-{Guid.NewGuid():N}.rsp");
         File.WriteAllLines(responseFile, arguments.Skip(driver)
             .Select(a => "\"" + a.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\""));
         try
         {
-            return ProcessRunner.Run(Compiler.Path, [.. arguments.Take(driver), "@" + responseFile], TimeSpan.FromMinutes(5));
+            return Run(Compiler.Path, [.. arguments.Take(driver), "@" + responseFile], what, null);
         }
         finally
         {
@@ -418,6 +418,26 @@ public sealed class CBuild
         finally
         {
             if (Directory.Exists(scratch)) Directory.Delete(scratch, recursive: true);
+        }
+    }
+
+    /// <summary>How long one run of the C compiler, the archiver or the linker may take before it
+    /// is stopped.</summary>
+    public TimeSpan Limit { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>Runs <paramref name="tool"/> within <see cref="Limit"/>: one that does not finish is
+    /// the environment's failure (a machine under load, a unit too large), said with what it did and
+    /// the limit — never the toolchain's own. Its half-written <paramref name="partial"/> goes.</summary>
+    private ProcessRunner.Result Run(string tool, IEnumerable<string> arguments, string what, string? partial)
+    {
+        try
+        {
+            return ProcessRunner.Run(tool, arguments, Limit);
+        }
+        catch (TimeoutException)
+        {
+            if (partial is not null) File.Delete(partial);
+            throw new CBuildException($"{what} did not finish within {Limit.TotalSeconds:0} s, and was stopped:\n{tool} {string.Join(' ', arguments)}");
         }
     }
 
