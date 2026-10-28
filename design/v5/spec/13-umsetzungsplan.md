@@ -1476,3 +1476,87 @@ eine zweite Tabelle zu bekommen.
 **Nicht in M14b**: ein Sysroot je Tripel (E5, Uhr M15); Objective-C-Quellen (N7, Uhr M15); freie Linker-Flags
 (E7, Uhr: Abschluss von M14b); mitgebrachte dynamische Bibliotheken (E3, verworfen für 5.0); ein C-Paketindex
 und ein eingebauter CMake-Lauf (verworfen für 5.0).
+
+## Nachtrag 2026-10-28 — der Plan für M15
+
+M15 nach seiner Zeile oben, 11 W9 (T1–T8), 11 C4/C9/C10, 14 C9 und den Uhren, die auf M15 zeigen: **Distribution** —
+die Toolchain als signiertes Archiv je Plattform, `lyric toolchain` installiert Versionen nebeneinander und wechselt
+in die, die ein Paket verlangt, `zig` kommt auf Wunsch dazu, Releases laufen durch eine Pipeline, der Mirror auf dem
+VPS spiegelt sie. Das Artefakt: **`lyric toolchain install dev` auf drei OS; die Release-Pipeline probeweise mit
+`5.0.0-dev`**. Der Befehl heißt bis M18 `lyric5` (11 C1); der Plan schreibt `lyric`, wo er das Verb meint.
+Grundlage ist der Stand nach M14 (#600), gemessen vor dem Plan:
+
+- **Der `dev`-Kanal steht** (`dev.yml`, seit M0): je Push auf `main` vier Archive (`win-x64`, `linux-x64`,
+  `linux-arm64`, `osx-arm64`) mit `lyric5`, `stdlib5/` und der C-Quelle der Laufzeit, `SHA256SUMS`, die
+  Vorabversion `dev` auf GitHub ersetzt; ein Probelauf je Archiv baut und fährt hello. **Es fehlen**: `osx-x64`
+  (Tier 1, „gebaut, nicht ausgeführt“, Uhr M15), Signaturen, eine vorgebaute Laufzeit, `lyric.lldbinit`, der Header.
+- **Der Pin steht halb**: `[package] toolchain` ist eine Untergrenze (`ToolchainCheck`, `LYR-PKG0009`, Exit 2) —
+  kein Wechsel in eine andere Version, kein `toolchain`-Verb, keine `~/.lyric/`, keine `config.toml`.
+- **Der C-Compiler** kommt aus `LYRIC_CC` oder dem PATH (`zig`, `clang`, `gcc`); die Laufzeit wird beim ersten Bau in
+  den Benutzer-Cache übersetzt (`UserCache`, `~/.cache/lyric`).
+- **Uhren auf M15**: 01 C2 (eine `.c` je Programm — neu entscheiden mit Messpunkt 1 kalt), `x86_64-macos` ausführen,
+  11 E5 (Sysroot je Tripel), 11 N7 (Objective-C-Quellen), offene Punkte 219 (musl), 245 (`-q`/`-v`, Fortschritt),
+  248 (`lyric env` und `zig`), 250 (ICE-Dump), 251 (C-Compiler-Zeitlimit als ICE), 252 (Windows-Backtrace-Flake),
+  285 (`lyric5` gegen `lyric` in den Clients), 286 (`lldb-dap.exe` unter Windows), 295 (Lyrics Namen im erzeugten C,
+  entschieden).
+
+**Was außerhalb des Repos wirkt, tut der Maintainer oder gibt es frei** (STATUS, Arbeitsmodus): das Schlüsselpaar
+und die Secrets (S6), das Laden von `minisign` (S6), der VPS, sein DNS-Name und der Deploy-Schlüssel (S7), die erste
+echte Veröffentlichung auf dem Mirror (S7). Diese Schritte stehen im Plan als **Halt mit Vorlage**: Claude legt
+Skript und Anleitung hin und wartet auf das Wort.
+
+| # | Entscheidung | Vergleich / Verworfen |
+|---|---|---|
+| P1 | **Das Archiv** (T1, T4): je Tier-1-Tripel eines, jetzt fünf — `osx-x64` kommt dazu (NativeAOT baut quer über die Architektur auf dem ARM-Runner; ausgeführt unter Rosetta, wo der Runner es hat, sonst auf einem Intel-Runner — gemessen in S1). Inhalt: `lyric5`, `stdlib5/`, die Laufzeit als C-Quelle **und vorgebaut** für das eigene Tripel (beide Profile, der Standard-Sammler — dieselben Objekte, die `UserCache` heute beim ersten Bau erzeugt, nur vorher), `lyric.lldbinit` mit `lyric_lldb.py`, `include/lyric.h`, die Lizenzen, und **`toolchain.json`** (Version, Tripel, jede Datei mit SHA-256), das `lyric toolchain` beim Installieren gegen das Archiv prüft. Cross-Ziele bauen die Laufzeit weiter aus der Quelle (T3). **musl** (219) ist Tier 2 nach T4: ein Cross-Bau in der CI, kein Archiv der Toolchain dafür | Go (ein Archiv, `GOROOT` relativ), Zig (ein Archiv, keine Installation); verworfen: Installer-Pakete je OS (`.msi`, `.pkg`, `.deb`) — ein Archiv je Tripel reicht für `lyric toolchain`, Pakete für Distributionen sind eine Tür |
+| P2 | **Signaturen mit minisign** (T5): geprüft **im Binary** — BLAKE2b-512 als Vorhash und Ed25519, in C# (~400 Zeilen, ohne Abhängigkeit, NativeAOT-fest), gegen die Vektoren aus RFC 8032 und RFC 7693 und gegen Signaturen, die `minisign` selbst gemacht hat. Der **öffentliche Schlüssel steht im Binary** und auf der Website; signiert wird in der CI mit dem `minisign`-Binary (Version und Hash in `tooling/minisign-version`, wie `zig` und Pagefind), der geheime Schlüssel als Secret. Ein Schlüssel; ein Wechsel kommt mit einer Release, die den neuen trägt | Zig signiert mit minisign (dasselbe Format prüft `lyric toolchain install zig`, P6); verworfen: nur `SHA256SUMS` über HTTPS (der Mirror wäre die Wahrheit, 14 C9 sagt: die Signatur), sigstore/cosign (OIDC-Infrastruktur, ein Prüfer von vielfacher Größe), GPG (Schlüsselringe, Format) |
+| P3 | **Der Kanal-Index** (T5, 14 C9): je Kanal eine Datei — `dev.json`, `stable.json` — mit den Versionen, je Version und Tripel Archivname, Größe und SHA-256; **signiert** (`.minisig` daneben), damit ein Mirror keine Version unterschieben kann. Liegt auf dem Mirror (`https://dl.lyric.oil1i.de/`) und auf GitHub (der `dev`-Release trägt `dev.json`; `stable.json` liegt in einer festen Release `channels`, die der Release-Job ersetzt). `lyric toolchain` fragt den Mirror zuerst, GitHub danach (T8); beide liefern dieselben Bytes | Go (`go.dev/dl/?mode=json`), Zig (`index.json`, unsigniert); verworfen: das Verzeichnis listen (kein Format, keine Signatur) |
+| P4 | **`~/.lyric/` und `lyric toolchain`** (T2, T7): `toolchains/<version>/` je Version, `zig/<version>/` (P6), `bin/` mit dem Binary der Standardversion (unter Unix ein Link, unter Windows eine Kopie), `config.toml` mit `default` — die benutzerweite Stufe der Leiter C4, `LYRIC_HOME` verlegt alles. Verben: `install <version\|dev\|stable>` (lädt Index und Archiv, prüft Signatur, Hash und `toolchain.json`, entpackt in ein Zwischenverzeichnis, benennt erst dann um — ein abgebrochener Lauf hinterlässt nichts), `list` (installiert; `--available` aus dem Index), `default <version>`, `remove <version>` (nicht die laufende, nicht die Standardversion), `update` (installiert die neueste des Kanals der Standardversion **daneben** und macht sie zum Standard; die alte bleibt bis `remove`). Fortschritt beim Laden nur am TTY (C7) — der erste Teil von 245 | Go (`go install golang.org/dl/…`, `GOTOOLCHAIN`), rustup (verworfen: Multiplexer, T2); Cargo-Präzedenz |
+| P5 | **Der Wechsel** (T2, T7, P12): bevor `lyric` ein Verb ausführt, bestimmt es die gewünschte Toolchain — `LYRIC_TOOLCHAIN` (`local` = dieses Binary, oder eine Version) > der Pin des Pakets im Arbeitsverzeichnis (eine Untergrenze) > `default` aus `config.toml`. Erfüllt das laufende Binary sie, läuft es; sonst die Standardversion, wenn sie erfüllt, sonst die neueste installierte, die erfüllt; sonst bietet es am TTY die Installation der kleinsten stabilen Version an, die erfüllt, und schreibt ohne TTY `LYR-PKG0009` mit dem Befehl. Gewechselt wird unter Unix mit `execv`, unter Windows über einen Kindprozess mit geerbten Handles und durchgereichtem Exit-Code; `LYRIC_TOOLCHAIN_FROM` verhindert einen zweiten Wechsel. Eine Dev-Version zählt für den Pin als ihre Zahl (wie heute). Der Wechsel kostet einen Prozessstart — gemessen gegen C9 (warm ≤ 50 ms über dem Programmstart) | Go 1.21 (`toolchain`-Zeile, `GOTOOLCHAIN=auto`, Re-exec, Windows als Kindprozess); verworfen: ein Shim-Binary (T2), ein exakter Pin (P12 ist eine Untergrenze) |
+| P6 | **`lyric toolchain install zig`** (T1): die Version aus `tooling/zig-version` (ins Binary übernommen), geladen aus zigs eigenem Index, **geprüft mit zigs minisign-Schlüssel** und dem SHA-256 aus dem Index, nach `~/.lyric/zig/<version>/`. Die Suche nach dem C-Compiler wird: `LYRIC_CC` > das installierte `zig` der gepinnten Version > `zig`, `clang`, `gcc` auf dem PATH. Fehlt jeder, nennt die Meldung den Befehl. `lyric env` zeigt `zig` mit Herkunft und die Lint-Stufen eines Baus (248) | Zig selbst; verworfen: `zig` ins Archiv (T1: kein C-Compiler im Archiv — Größe, Lizenzen, eine Version für alle) |
+| P7 | **Die Release-Pipeline** (T5): `release.yml` auf ein Tag `v5.*` — die Paketmatrix (mit `dev.yml` geteilt als wiederverwendbarer Workflow), die Probeläufe, signieren, `SHA256SUMS`, GitHub-Release, `stable.json` neu, Upload auf den Mirror. Von Hand mit `dry-run`: ein **Entwurf** auf GitHub (nicht öffentlich) und der Upload in `staging/` auf dem Mirror. Das Artefakt der Zeile, „probeweise `5.0.0-dev`“, ist ein solcher Lauf; der Entwurf wird danach gelöscht. `dev.yml` signiert und schreibt `dev.json` ebenso; der Mirror behält die letzten zehn Dev-Builds | Zig (Master-Builds und Tags aus einer Pipeline); verworfen: Release von Hand |
+| P8 | **Der Mirror** (14 C9): auf dem VPS des Maintainers, gehärtet wie 14 es vorschreibt — nur Schlüssel-Login, kein Root über SSH, Firewall 22/80/443, automatische Sicherheitsupdates, ein statischer Webserver mit TLS (Caddy), ein Deploy-Benutzer ohne Shell, der über `rrsync` nur ins Mirror-Verzeichnis schreibt. Die Anleitung und ein Skript liegen in `tooling/mirror/`; **ausgeführt mit dem Maintainer** (Zugang, DNS `dl.lyric.oil1i.de`, der Deploy-Schlüssel als Secret). Die Unversehrtheit hängt an P2, nicht am Server | 14 C9; verworfen: Objektspeicher eines Anbieters (Konto, Kosten, nicht entschieden) |
+| P9 | **Die CLI-Reste mit Uhr M15**: 245 — `-q`/`-v` als globale Optionen über M14bs `build -v`, Fortschritt nur für Laden und Installieren (P4), für den Bau eine Tür nach 5.0; 250 — ein ICE schreibt neben Meldung und Trace einen Dump (Version, Befehl, Eingabedatei, Phase) unter `out/` und nennt ihn; 251 — ein C-Compiler, der sein Zeitlimit überschreitet, ist `BLD` mit Einheit und Grenze, Exit 2, kein ICE; 248 in P6 | Cargo (`-v`, ICE-Datei wie rustc `rustc-ice-*.txt`) |
+| P10 | **Der Debugger unter Windows** (286, 295): erst messen, warum `lldb-dap.exe` auf dem Runner nicht startet (Exit-Code, fehlende DLL), dann festlegen, was ein Windows-Nutzer neben der Toolchain installiert — beschrieben in `lyric env` und im Book, nicht ins Archiv gepackt. 295 (entschieden 2026-10-26): das erzeugte C trägt Lyrics Namen (Feld `x`, Lokale `p`), gemangelt nur bei einem Zusammenstoß mit C — dann zeigt jeder Debugger Lyric, `lyric_lldb.py` bleibt | rustc/gdb; verworfen: lldb ins Archiv (Größe, Python-Abhängigkeit) |
+| P11 | **Messpunkt 1 kalt** (01 C2, C9): hello aus dem frisch installierten Archiv, kalter Cache, mit vorgebauter Laufzeit (P1) — gegen „kalt ≤ 400 ms“. Hält er, steht die Abweichung „eine `.c` je Programm und je Instanz“ fest und die Uhr ist zu; hält er nicht, wird die Einheit je Modul ein eigener Meilenstein-Eintrag, nicht M15 | Messpunkte 1–5 |
+| P12 | **Spec spec-first**: 14 (das Verb `toolchain`, seine Optionen und Exit-Codes, `LYRIC_HOME`, `LYRIC_TOOLCHAIN`), 15 (der Pin wählt eine Toolchain, die Leiter), ein Abschnitt zu Archiv, Index und Signatur als informativer Teil von 14; die Fälle prüft die Toolchain selbst (`ToolchainTests` gegen einen lokalen Server), denn ein Konformanzfall lädt nichts | wie M14 P11 |
+
+| Slice | Inhalt | Artefakt |
+|---|---|---|
+| **S1** das Archiv | P1, P11; `osx-x64` | fünf Archive in `dev.yml` mit vorgebauter Laufzeit, `toolchain.json`, `lyric.lldbinit`, `lyric.h`; der Probelauf je Archiv; `osx-x64` ausgeführt (Rosetta oder Intel); Messpunkt 1 kalt gemessen, 01 C2 entschieden |
+| **S2** Signatur und Index | P2 (Prüfung), P3 (Format) | `Minisign.Verify` gegen RFC-Vektoren und `minisign`-Signaturen; ein manipuliertes Byte, ein fremder Schlüssel, ein falscher Vorhash abgelehnt; `Channel`-Index gelesen und geprüft |
+| **S3** `lyric toolchain` | P4, 245 (Fortschritt) | `install/list/default/remove/update` gegen einen lokalen Server mit signiertem Index; Abbruch hinterlässt nichts; die Ablehnungen (falscher Hash, falsche Signatur, `remove` der laufenden) |
+| **S4** der Wechsel | P5 | ein Paket mit Pin startet die installierte Version, die ihn erfüllt; Angebot am TTY, `LYR-PKG0009` ohne; `LYRIC_TOOLCHAIN=local`; kein zweiter Wechsel; Exit-Codes durchgereicht unter Windows; die Kosten gemessen |
+| **S5** `zig` | P6, 248 | `toolchain install zig` gegen einen lokalen Server mit zigs Format; die Suchreihenfolge; `lyric env` mit `zig` und Lint-Stufen |
+| **S6** Signieren und Release | P2 (Signieren), P7 — **Halt mit Vorlage**: Schlüsselpaar und Secrets (Maintainer), `minisign` laden (Freigabe) | `dev.yml` signiert und schreibt `dev.json`; `release.yml` mit `dry-run`: ein Entwurf `5.0.0-dev.<datum>` mit fünf Archiven, Signaturen, Index — die Zeile „probeweise“ |
+| **S7** der Mirror | P8 — **Halt mit Vorlage**: VPS, DNS, Deploy-Schlüssel (Maintainer) | `tooling/mirror/`; Upload aus `dev.yml`; ein CI-Job installiert `dev` auf Linux, macOS und Windows vom Mirror und einmal mit unerreichbarem Mirror von GitHub — die Zeile |
+| **S8** die Uhren | P9 (250, 251), P10 (286, 295), 11 E5 und N7, 252 | je Punkt ein Test oder eine Entscheidung mit Text: der ICE-Dump, das Zeitlimit als `BLD`, Lyrics Namen im C (Goldens), `lldb-dap.exe` gemessen, `.m` mit `zig cc` auf macOS gemessen und entschieden, E5 als Tür bestätigt oder geplant |
+| **S9** Abschluss | STATUS, CHANGELOG, Bericht, der Plan für M16 als nächster Schritt | die Zeile oben |
+
+Nach Aufwand: groß S2, S3, S4; mittel S1, S6, S8; klein S5, S7, S9. Zusammen eher **L** als das M der Zeile — die
+Krypto-Prüfung (S2) und der Wechsel mit seiner Windows-Hälfte (S4) sind die Posten, die die Zeile nicht sah, dazu
+die Uhren (S8), die sich auf M15 gesammelt haben. Läuft M15 über das Doppelte, wird es hier neu geschnitten
+(CONTRIBUTING); der erste Kandidat zum Abtrennen ist S8. Die Reihenfolge folgt den Abhängigkeiten: das Archiv (S1)
+ist, was alles Weitere lädt; die Prüfung (S2) vor jedem Laden (S3), das Installieren vor dem Wechsel (S4), der
+sonst nichts zu starten hat; `zig` (S5) braucht nur S2 und S3. S6 und S7 hängen am Maintainer und laufen, sobald er
+Zeit hat — **S2–S5 testen gegen einen lokalen Server und warten auf nichts davon**. S8 ist unabhängig und darf
+gezogen werden, wo ein PR in CI wartet.
+
+**Plattformen**: S1, S4, S5, S7 und S8 fahren den vollen Plattformlauf; Windows ist die Stelle mit dem Risiko
+(kein `exec`, Kopie statt Link in `bin/`, eine laufende `.exe` lässt sich nicht ersetzen — `update` legt daneben,
+nie darüber), macOS die mit der Quarantäne (ein geladenes Binary trägt `com.apple.quarantine`, wenn ein Browser
+es lud; `lyric toolchain` lädt selbst und setzt kein Attribut — geprüft in S3).
+
+**Reflexion**: Die Entscheidungen stehen (11 W9, 14 C9); offen war, wie viel davon Code im Binary ist. Go zeigt den
+Weg, den T2 gewählt hat: kein zweites Programm, die Toolchain selbst liest die gewünschte Version und wechselt, und
+unter Windows ist der Wechsel ein Kindprozess. rustup zeigt, was es kostet, es anders zu machen — ein Multiplexer,
+Proxies je Werkzeug, eine zweite Versionsquelle (`rust-toolchain.toml` neben `Cargo.toml`). Die Signatur ist die
+Stelle, an der Bequemlichkeit verführt: `SHA256SUMS` über HTTPS fühlt sich sicher an, macht aber den Server zur
+Wahrheit, und 14 C9 hat entschieden, dass es die Signatur ist. minisign ist das kleinste Format, das das trägt
+(Zig benutzt es, darum prüft derselbe Code auch `zig`), und eine eigene Prüfung in C# ist ein paar hundert Zeilen
+gegen Testvektoren — weniger Risiko als eine native Krypto-Bibliothek je Plattform im NativeAOT-Binary. Das zweite
+Risiko ist nicht technisch: der VPS und die Schlüssel sind Dinge außerhalb des Repos; der Plan baut alles, was ohne
+sie geht, gegen einen lokalen Server, damit das Warten auf den Maintainer nichts blockiert.
+
+**Nicht in M15**: Installer-Pakete je OS und Distributionspakete (Tür); ein Sysroot je Tripel (11 E5 — in S8
+bestätigt oder geplant, nicht gebaut); `lyric publish` und eine Paket-Registry (Türen, 07); Fortschritt beim Bau
+(Tür, P9); Tier 2 als Archiv der Toolchain; die Umbenennung `lyric5` → `lyric` (M18, 285 dort).
