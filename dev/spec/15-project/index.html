@@ -99,7 +99,7 @@ is refused (<code>LYR-PKG0002</code>).</li>
 <p>The packages a package imports from (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V7</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases that hold their dependencies in
 their own directories, and the git repositories they read as their versions
-(<a href="https://github.com/lyriclang/lyric-spec/blob/f5b0937febee9103b93a1a684eae34b6e38fffe9/conformance/README.md">the suite's README</a>); the toolchain's own tests
+(<a href="https://github.com/lyriclang/lyric-spec/blob/6d5f3a007bb08da92a49d0d9aee42d9061a5fad4/conformance/README.md">the suite's README</a>); the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>: <code>DependencyTests</code>, <code>GitDependencyTests</code>, <code>PackageContentTests</code>).</p>
 <ol>
 <li><code>[dependencies]</code> names them, each where it is read from: a directory,
@@ -230,7 +230,8 @@ memory is not.</li>
 <p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code> and <code>conformance/cases/15-project/</code>, package cases
 that call their native part or whose manifest a rule refuses; the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>, <code>NativeTests</code>, <code>VendorTests</code>, <code>BindingsTests</code>).</p>
-<p><em>(Rules 4–21 are written ahead of their implementation, milestone M14b of the Lyric 5 plan — the
+<p><em>(Rules 9–11, the findings <code>LYR-LNK…</code> of rule 12, rules 13–21, and what rules 7 and 8 say of a
+source tree are written ahead of their implementation, milestone M14b of the Lyric 5 plan — the
 decisions of <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11, review 2026-10-28</a>;
 each comes with its cases.)</em></p>
 <h3 id="51-sources">5.1 Sources</h3>
@@ -261,7 +262,8 @@ headers only <code>lyric.h</code> is promised.</li>
 <ol start="7">
 <li><strong><code>archives = [&quot;native/lib/libz.a&quot;]</code></strong> are static libraries the package brings, prebuilt — files
 of the package's content (§2) or of a source tree (§5.3): each is linked <strong>by its path</strong>, not
-searched for. A file outside the content is refused (<code>LYR-PKG0002</code>). An archive is built for one
+searched for. A file outside the content, or one that is not there, is refused when the build
+needs it (<code>LYR-PKG0002</code>). An archive is built for one
 target, so it stands in the table of its triple (rule 4) as a rule. On Windows an archive is
 promised to link where it was built for the GNU ABI — by MinGW or zig cc —, not by MSVC.</li>
 <li><strong><code>dylibs</code></strong> are shared libraries the package brings, prebuilt — files of the package's content
@@ -273,8 +275,9 @@ Another form, a file outside the content, or a shared library named in <code>arc
 (<code>LYR-PKG0002</code>). The build puts each beside every binary it makes of the program, as §8 rule 3.2
 puts a file there, and with the same rules: the binary searches its own directory first, no
 directory of the machine is written into it, and two files of one name stop the build. A
-Mach-O library whose install name does not begin with <code>@rpath/</code> would not be found there; it
-is refused (<code>LYR-BLD0006</code>, exit 1), the message saying how to rename it. A shared library of
+Mach-O library whose install name does not begin with <code>@rpath/</code> would not be found there, and an
+ELF library without a <code>soname</code> would be recorded by the path it was linked from — the
+machine's; each is refused (<code>LYR-BLD0006</code>, exit 1), the message saying how to name it. A shared library of
 the system is linked by name (<code>libs</code>); one the program finds while it runs is <code>std.ffi</code>'s
 <code>Library</code> (<a href="../../spec/13-abi/">13 §5</a>). <em>(Rule 8 replaces, the same day, a rule that refused every
 shared library of a package — <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07, E3′</a>.)</em></li>
@@ -385,7 +388,7 @@ so the two still pair.</li>
 its sources are: the lock holds their bytes, and an archive comes into the binary as it was
 built — what it carries of the machine that built it is its own. A library linked by name,
 through <code>pkgConfig</code> or from a directory a build script names (§8 rule 3.1) is the machine's:
-the same bytes need the same system libraries. <em>(Written ahead of M14b.)</em></li>
+the same bytes need the same system libraries. <em>(Source trees are written ahead of M14b.)</em></li>
 </ol>
 <h2 id="7-tests">7. Tests</h2>
 <p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V4</a>)</p>

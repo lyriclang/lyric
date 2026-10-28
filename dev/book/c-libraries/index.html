@@ -55,6 +55,46 @@ include = ["native/include"]</code></pre>
 <p>The build compiles them with the program, under its profile, and links them in; an <code>extern &quot;C&quot;</code>
 declaration in any module of the package calls them. A dependency's native part comes along with
 the dependency.</p>
+<p><code>defines</code> gives the sources their preprocessor definitions — the manifest's way of saying <code>-D</code>:</p>
+<pre><code class="language-toml">[native]
+sources = ["native/*.c"]
+defines = ["RAYLIB_STATIC", "LEVEL=2"]</code></pre>
+<p>Besides the directories of <code>include</code>, every source finds <code>&lt;lyric.h&gt;</code>, the toolchain's header for C
+that works with Lyric, and the <code>include</code> directories of each package your package names under
+<code>[dependencies]</code> — so a package that wraps a C library shares its headers with the packages that
+use it. Only direct dependencies count: a package does not see the headers of a package it never
+named.</p>
+<h2 id="prebuilt-libraries">Prebuilt libraries</h2>
+<p>A library you already have built goes into the package and is named by its path. A static library
+is an <strong>archive</strong>:</p>
+<pre><code class="language-toml">[native.x86_64-linux-gnu]
+archives = ["native/lib/x86_64-linux-gnu/libraylib.a"]
+
+[native.x86_64-windows-gnu]
+archives = ["native/lib/x86_64-windows-gnu/libraylib.a"]</code></pre>
+<p>An archive is built for one target, so it goes into the table of that target's triple. The tables
+layer: <code>[native]</code> holds for every build, <code>[native.linux]</code> and its siblings add to it for one system,
+and <code>[native.x86_64-linux-gnu]</code> and its siblings add to that for one target. Because the archive is
+named by its path, a build for another target links it from any machine:
+<code>lyric build --target x86_64-windows-gnu</code> on Linux links the Windows archive. On Windows the
+archive must be built for the GNU ABI — by MinGW or <code>zig cc</code>; one built by MSVC does not link.</p>
+<p>A <strong>shared library</strong> is a <code>.so</code>, a <code>.dylib</code> or a DLL, named in <code>dylibs</code>:</p>
+<pre><code class="language-toml">[native.linux]
+dylibs = ["native/linux/libgreet.so"]
+
+[native.macos]
+dylibs = ["native/macos/libgreet.dylib"]
+
+[native.windows]
+dylibs = [{ dll = "native/windows/greet.dll", lib = "native/windows/libgreet.dll.a" }]</code></pre>
+<p>On Windows the link reads the DLL's import library, so an entry names both. The build puts every
+shared library beside each binary it makes — <code>lyric build</code>, <code>run</code>, <code>test</code> and <code>bench</code> — and the
+binary looks there first: copy the directory, and the program runs anywhere. For that the library
+has to name itself by its file name, which most do; one that names the directory it was built in is
+refused with <code>LYR-BLD0006</code>, and the message says how to rename it.</p>
+<p>A prebuilt file has to be part of the package — under <code>native/</code>, or named in <code>[package] include</code> —
+because that is what the package is when someone else gets it from git, and what the lock holds
+the bytes of. When you replace one, the next build links again, even if the file kept its time.</p>
 <h2 id="libraries-of-the-system">Libraries of the system</h2>
 <p><code>libs</code> links libraries by name — <code>&quot;m&quot;</code> is <code>-lm</code>. What a build needs only on one system goes into a
 table for that system:</p>

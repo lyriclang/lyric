@@ -2406,7 +2406,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/15-project/">15-project</a></td>
 <td>a manifest or lock field that is missing or malformed</td>
-<td>Reported when <code>lyric.toml</code> or <code>lyric.lock</code> parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a <code>[[bin]]</code> entry, a profile, <code>[native]</code>, <code>[trust]</code>, <code>[lints]</code>, a toolchain pin, a locked revision.</td>
+<td>Reported when <code>lyric.toml</code> or <code>lyric.lock</code> parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a <code>[[bin]]</code> entry, a profile, <code>[native]</code>, <code>[trust]</code>, <code>[lints]</code>, a toolchain pin, a locked revision — and a prebuilt file <code>[native]</code> names that is not part of the package or not there, when the build needs it.</td>
 </tr>
 <tr>
 <td>LYR-PKG0003</td>
@@ -2519,7 +2519,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/15-project/">15-project</a></td>
 <td>a file the build puts beside the binary is not there, shares its name, or would not be found there</td>
-<td>Reported when a package's <code>build.lyr</code> names a file with <code>std.build.besideBinary</code> that is not there when the script has ended, when two such files — or <code>dylibs</code> of the native part — have one name, or when a Mach-O library of <code>dylibs</code> has an install name that does not begin with <code>@rpath/</code>. Nothing is built; the exit code is 1.</td>
+<td>Reported when a package's <code>build.lyr</code> names a file with <code>std.build.besideBinary</code> that is not there when the script has ended, when two such files — or <code>dylibs</code> of the native part — have one name, or when a library of <code>dylibs</code> would not be found there — a Mach-O library whose install name does not begin with <code>@rpath/</code>, an ELF library without a soname. Nothing is built; the exit code is 1.</td>
 </tr>
 </tbody>
 </table>
