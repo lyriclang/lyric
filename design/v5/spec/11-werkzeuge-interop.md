@@ -356,7 +356,7 @@ bindings = [{ header = "@raylib/src/raylib.h", module = "rl" }]
 |---|---|---|---|
 | E1 | **`archives = ["native/lib/libraylib.a"]`**: vorgebaute statische Archive, Dateien des Paketinhalts (P8) oder eines Quellbaums (N1), **über ihren Pfad** gelinkt — nach den Objekten des Programms, vor den Bibliotheken nach Namen | build.zig `addObjectFile`, CMake `IMPORTED_LOCATION`; verworfen: Cargos `rustc-link-search` + `link-lib` (die Suchreihenfolge entscheidet, eine `.so` schlägt die `.a`, eine Systembibliothek gleichen Namens gewinnt still), Pfade in `libs` (ein Schlüssel, zwei Bedeutungen) | P1, X1, 07 B5 |
 | E2 | **`[native.<tripel>]`** neben `[native.<os>]` (nur Tier-1- und Tier-2-Tripel, T4), dieselben Schlüssel; geschichtet `[native]` → OS → Tripel. Ein Archiv ist je Tripel ein anderes | Cargo `[target.<triple>]`; verworfen: ein Platzhalter `{target}` in Pfaden (Templating als zweiter Mechanismus), Universal-Archive | P4 |
-| E3 | **Nur statisch** (07 B5): ein mitgebrachtes `.so`/`.dylib`/`.dll` gibt es in 5.0 nicht; zur Laufzeit lädt `ffi.Library` (H7). Ein Archiv mit **GNU-ABI** (mingw) ist unter Windows zugesagt, eines von MSVC nicht — die C-Laufzeiten passen nicht | — | 07 B5 |
+| E3 | ~~**Nur statisch**~~ — **ersetzt durch E3′a–f** (Nachtrag unten). Was bleibt: ein Archiv oder eine Importbibliothek mit **GNU-ABI** (mingw) ist unter Windows zugesagt, eines von MSVC nicht — die C-Laufzeiten passen nicht | — | 07 B5 |
 | E4 | **`frameworks = ["Cocoa"]`** nur unter macOS (`[native.macos]`, macOS-Tripel; anderswo abgelehnt), gelinkt als `-framework X`; dazu `build.linkFramework`. Ein Framework kommt aus dem SDK des Wirts: cross ohne SDK lehnt der Bau ab, mit dem Hinweis, auf einem macOS-Wirt zu bauen | Cargo `link-lib=framework=`, build.zig `linkFramework`; verworfen: `libs = ["framework=Cocoa"]` (Syntax im String) | X1 |
 | E5 | **Kein Sysroot/SDK-Mechanismus in 5.0**: was cross geht, sagt die Spec — Windows-Systembibliotheken ja, Linux-Systembibliotheken außer libc und macOS-Frameworks nur auf dem Wirt. Tür: `--sysroot` je Tripel; **Uhr: M15** (Distribution, `lyric toolchain`) | Zig (bringt nur libc), Go (cgo cross braucht `CC` mit Sysroot) | T3, T4 |
 | E6 | **`defines = ["RAYLIB_STATIC", "LEVEL=2"]`** für die C-Quellen des Pakets; **keine freien `cFlags` im Manifest** — `-march=native` oder ein absolutes `-I` brechen P6 und die Cross-Builds; freie Flags hat nur das Build-Skript (N4) | CMake `target_compile_definitions`; verworfen: cgo `#cgo CFLAGS` | P1, P6 |
@@ -379,6 +379,26 @@ bindings = [{ header = "@raylib/src/raylib.h", module = "rl" }]
 
 **Verworfen für 5.0**: ein C-Paketindex (vcpkg, Conan) und ein eingebauter CMake-Lauf — beides ist mit N1 und
 `cEnv()` (N4) erreichbar, ohne dass die Toolchain ein Bausystem für C wird. Plan: 13, M14b.
+
+### Nachtrag 2026-10-28 — E3′, die dynamische Bibliothek eines Pakets
+
+E3 („nur statisch“) war ohne den häufigsten Fall entschieden. lyriclang/lyric#585 (lyrgui, SDL3 unter Windows)
+zeigte ihn: ein SDK bringt `SDL3.dll` und die Importbibliothek `libSDL3.dll.a`, viele Bibliotheken gibt es nur
+als `.so` oder `.dylib`, und ein Archiv selbst zu bauen ist das Gegenteil von angenehm. #585 fand dabei zwei
+Eigenheiten von zig, die bleiben: **zig schreibt jedes `-L`, das ihm eine geteilte Bibliothek lieferte, als
+`RUNPATH` in ein ELF- oder Mach-O-Binary** (die Verzeichnisse des Bauenden, in jedem Binary), und **zigs
+Windows-Link sucht `X.dll`, `X.lib`, `libX.a`, nicht MinGWs `libX.dll.a`**. Der Maintainer hat nach Empfehlung
+entschieden; #585 und lyric-spec#365 gehen in M14b auf (L2a), ihr Code `LYR-BLD0004` wird `LYR-BLD0006` (0004
+und 0005 hält schon L1).
+
+| # | Entscheidung | Vorbild / Verworfenes | Betrifft |
+|---|---|---|---|
+| E3′a | **`dylibs`** im nativen Teil, nur in Tabellen je OS oder Tripel (eine geteilte Bibliothek ist je Ziel eine andere): unter Linux und macOS Pfade (`"native/linux/libfoo.so"`), unter Windows `{ dll = "…/SDL3.dll", lib = "…/libSDL3.dll.a" }` — zigs lld linkt nicht gegen eine DLL, nur gegen ihre Importbibliothek (GNU-ABI, E3). Dateien des Paketinhalts oder eines Quellbaums (N1), **über ihren Pfad** gelinkt wie ein Archiv (E1), also auch cross. Eine Mach-O-Bibliothek, deren Name (`LC_ID_DYLIB`) nicht mit `@rpath/` beginnt, lehnt der Bau ab (`LYR-BLD0006`) und sagt, wie man sie umbenennt — sie würde neben dem Binary nicht gefunden | build.zig `addObjectFile`, CMake `IMPORTED_LOCATION` + `IMPORTED_IMPLIB`; verworfen: „nur statisch“ (E3), ein String mit gesuchter Importbibliothek (Magie über Dateinamen) | 07 B5 |
+| E3′b | **Neben das Binary, automatisch**: was `dylibs` des Graphen nennen, kopiert der Bau nach jedem Link unter seinem Namen neben jedes Binary des Programms (`build`, `run`, `test`, `bench`; kein Build-Skript), nur wo die Bytes sich unterscheiden. ELF bekommt den Laufpfad `$ORIGIN`, Mach-O `@executable_path`; Windows sucht selbst zuerst dort. **Kein durchsuchtes Verzeichnis kommt ins Binary** (der zig-Befund oben) — der Bau übergibt eine gefundene Bibliothek über ihren Pfad. Zwei Dateien gleichen Namens lehnt er ab (`LYR-BLD0006`) | Cargo kann es nicht (ein Skript kopiert, `target/` je nach Profil); .NET kopiert native Assets neben die Anwendung | P6 |
+| E3′c | **SDKs außerhalb des Pakets über das Skript**: `build.linkSearch(dir)` (vor den Verzeichnissen des Linkers, unter Windows auch `libX.dll.a`/`X.dll.a`) und `build.besideBinary(paths…)` (eine DLL, aber auch Daten) — aus #585. Im Manifest gibt es keine Suchpfade: ein absoluter Pfad bricht P6 und jede andere Maschine | Cargo `rustc-link-search`, aber nur im Skript | BS2 |
+| E3′d | **`build.rerunIfEnvChanged(names…)`** — ein Skript, das den Ort eines SDK aus der Umgebung liest (`SDL3_DIR`), läuft wieder, wo der Wert sich ändert; der Zustand hält den Wert als SHA-256, kein Geheimnis landet in `out/` | Cargo `rerun-if-env-changed` | BS4 |
+| E3′e | **`--lib`**: die `dylibs` kommen neben `lib<name>.a`/`.so`/`.dll` und stehen in der Link-Zeile (E11, `linkArgs`) | — | X8 |
+| E3′f | **Reproduzierbarkeit und Vertrauen**: eine `dylib` des Pakets hält der Lock-Hash wie ein Archiv; was ein Skript über `linkSearch` findet, gehört der Maschine wie `pkgConfig` (N3). Keine neue Vertrauensregel (E13) | — | P6, BS5 |
 
 ---
 

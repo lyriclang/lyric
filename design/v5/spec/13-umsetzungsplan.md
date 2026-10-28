@@ -66,7 +66,7 @@ Zeilen**, Meilensteine M0–M18.
 | **M13a fmt, doc, api** | E5/E7: Formatter mit Trivia (Kommentare, Klammern), Semantik-Erhalt-Test, `lyric doc` (Site aus `///`, über `Lyric5.Doc` aus M12c; die std unter `/dev/std/`, ihre `# Examples` als Doc-Tests), `///`-Doc-Tests, `lyric api` + `--diff` | Repo hält `lyric fmt --check`; Doc-Site der std | M |
 | **M13b LSP, DAP, Clients** | E1–E4, E8: `lyric lsp` mit modulgranularer Wiederverwendung, Code Actions, Tests im Editor; `lyric dap` über lldb-dap + `lyric.lldbinit` (Summaries, Panik-Breakpoint, Tasks-Scope); `tree-sitter-lyric`; VS Code/JetBrains-Clients auf 5 | Editor: Hover/Completion/Rename/Fix, Test-CodeLens; Debugger hält an Panik mit Lyric-Werten; Windows-lldb-Risiko gemessen | XL |
 | **M14 FFI und Einbettung** | W4/W5 nutzerseitig: `extern "C"` vollständig, `@Layout`, `Ptr`/`CStr`/`unsafe`, `ffi.Callback`/`GcHandle`, fremde Threads (X7), `@Export` + Header, `lyric build --lib`, `LyrConfig`/`LyrStatus`/`lyr_step` (H1–H6), `ffi.Library` | `examples/ffi` (C-Bibliothek gebunden), `embedded-host` in C gegen `lib<app>.a`; Spec `13-abi` | L |
-| **M14b C-Bibliotheken** | 11 „Review 2026-10-28“ (E1–E13, N1–N8): `[native]` mit `archives`, `defines`, `frameworks`, `pkgConfig`, Tabellen je Tripel; `[native.vendor]` (Git, URL mit Hash, lazy, im Lock); Bindungen aus dem Header (`bindings`, `lyric bindgen`); `std.build` neu (`Target`, `cLibrary`, `link*`, `cEnv`); `--lib` bündelt Archive; `LNK`-Diagnosen — Plan im Nachtrag 2026-10-28 | `examples/native-prebuilt` (vorgebautes Archiv, CoreFoundation auf macOS), `examples/raylib` aus dem Quelltext mit erzeugten Bindungen | L |
+| **M14b C-Bibliotheken** | 11 „Review 2026-10-28“ (E1–E13, E3′, N1–N8): `[native]` mit `archives`, `dylibs` (neben das Binary), `defines`, `frameworks`, `pkgConfig`, Tabellen je Tripel; `[native.vendor]` (Git, URL mit Hash, lazy, im Lock); Bindungen aus dem Header (`bindings`, `lyric bindgen`); `std.build` neu (`Target`, `cLibrary`, `link*`, `cEnv`); `--lib` bündelt Archive; `LNK`-Diagnosen — Plan im Nachtrag 2026-10-28 | `examples/native-prebuilt` (vorgebautes Archiv, CoreFoundation auf macOS), `examples/raylib` aus dem Quelltext mit erzeugten Bindungen | L |
 | **M15 Distribution** | W9: Archive Tier 1, minisign, `lyric toolchain install/list/default/update`, Go-1.21-Re-exec nach `[package] toolchain`, `lyric toolchain install zig`, `dev`/`stable`-Kanäle, Website-Mirror auf dem VPS des Maintainers (14 C9: härten, `dl.lyric.oil1i.de`, Upload im Release-Job) | `lyric toolchain install dev` auf drei OS; Release-Pipeline probeweise `5.0.0-dev` | M |
 
 ### Phase 4 — Abschluss
@@ -1446,21 +1446,32 @@ ist der Stand nach M14 S7 (#596), gemessen vor dem Plan:
 | Slice | Inhalt | Artefakt |
 |---|---|---|
 | **L1** Entwurf und Spec | 07, 11, dieser Plan; Spec 15 §5/§6/§8, 13 §4, 16 §1 | die Regeln als Text |
-| **L2** der Kern des nativen Teils | P1, P2 ohne `--lib`: `archives`, `defines`, Tripel-Tabellen, `lyric.h` (E9), Header der Abhängigkeiten (N8), Reihenfolge und Inhaltsschlüssel (E12) | `NativeTests`: ein Archiv, im Test gebaut, auf dem Wirt gelaufen und auf alle Tier-1-Tripel cross gelinkt; `ReproducibilityTests` mit Archiv; Ablehnungen als Konformanzfälle |
+| **L2a** SDKs über das Skript | E3′c, E3′d, der Kopierteil von E3′b: lyriclang/lyric#585 und lyric-spec#365 auf main gezogen — `linkSearch`, `besideBinary`, `rerunIfEnvChanged`, `$ORIGIN`/`@executable_path`, kein Suchpfad im Binary, zigs `libX.dll.a`; `LYR-BLD0004` → `LYR-BLD0006`; das Book-Kapitel „C libraries“ entsteht | die drei Tests aus #585 (geteilte Bibliothek außerhalb des Pakets, Umgebungsvariable, Namenskonflikt); der Katalogfall von `BLD0006` |
+| **L2b** der Kern des nativen Teils | P1, P2 ohne `--lib`: `archives`, `dylibs` (E3′a/b, mit der Prüfung des Mach-O-Namens), `defines`, Tripel-Tabellen, `lyric.h` (E9), Header der Abhängigkeiten (N8), Reihenfolge und Inhaltsschlüssel (E12); Suchpfade und „eigenes Verzeichnis zuerst“ aus L2a gehen im `LinkPlan` auf | `NativeTests`: ein Archiv und eine geteilte Bibliothek, im Test gebaut, auf dem Wirt gelaufen und auf alle Tier-1-Tripel cross gelinkt; `ReproducibilityTests` mit Archiv; Ablehnungen als Konformanzfälle |
 | **L3** Quellbäume | P3: Git, dann URL mit Hash; Lock; lazy; `lyric add --vendor` (N5) | ein Paket baut einen Baum aus einem lokalen Git-Repository und einer URL eines lokalen Servers; Hash-Fehler, `--offline`, `--locked` |
 | **L4** Bindungen | P4: der Generator, das Modul je Ziel, `lyric bindgen` | Header mit Struct, Enum, Typedef, Funktionszeiger, Variadik, Konstanten → aufrufbares Modul; das Übersprungene aufgelistet; je Tier-1-Tripel erzeugt |
 | **L5** `std.build`, Frameworks, `pkgConfig` | P5, E4, N3; der macOS-Messlauf zuerst (zig + Framework auf dem Wirt) | ein Skript baut eine `cLibrary` und linkt ein Framework; `pkgConfig` auf Linux; cross abgelehnt |
-| **L6** `--lib` | P2 für Bibliotheken (E11) | ein C-Programm linkt `lib<name>.a` mit gebündeltem Archiv und der genannten Zeile |
+| **L6** `--lib` | P2 für Bibliotheken (E11, E3′e) | ein C-Programm linkt `lib<name>.a` mit gebündeltem Archiv und der genannten Zeile; die `dylibs` liegen daneben |
 | **L7** `LNK`-Diagnosen | P6, `lyric build -v` | undefiniertes Symbol → die `extern`-Zeile; fehlende Bibliothek → die Manifestzeile; doppeltes Symbol → die Pakete |
 | **L8** Beispiele und Abschluss | `examples/native-prebuilt` (Archive je Tripel mit Quelle und Skript zum Neuerzeugen, die CI prüft die Bytes; CoreFoundation auf macOS), `examples/raylib` (gebaut, nicht gefahren: die Runner haben kein Display); STATUS, CHANGELOG, Bericht, die Uhr von E7 | die Zeile oben, im vollen Plattformlauf |
 
-Nach Aufwand: groß L4; mittel L2, L3, L5; klein L1, L6, L7, L8. Zusammen **L**. Die Reihenfolge folgt den
+Nach Aufwand: groß L4; mittel L2b, L3, L5; klein L1, L2a, L6, L7, L8. Zusammen **L**. Die Reihenfolge folgt den
 Abhängigkeiten: der Kern (L2) trägt alles; Quellbäume (L3) vor den Bindungen (L4), die ihre Header lesen; die
 Skript-API (L5) nach beiden, weil `vendorDir` und `cLibrary` sie nennen; `--lib` (L6) und die Diagnosen (L7)
 lesen den fertigen Link-Plan. **L2 beginnt nach dem Merge von M14 S8** — beide ändern `Pipeline` und `CBuild`.
+L2a zuerst, weil #585 fertig und getestet ist und L2b seinen `LinkPlan` darauf baut.
+
+**Doku je Slice** (Maintainer, 2026-10-28: „alle diese Änderungen müssen auch in die Erklärungen und in das
+Book“): jeder Slice zieht im selben PR nach, was ein Benutzer davon sieht — das Book-Kapitel
+`docs/book/c-libraries.md` (entsteht in L2a, wächst je Slice, L8 schließt es), die Erklärung (`explanation`,
+`wrong`/`right`) jedes neuen Codes in `diagnostics.toml`, die Doc-Kommentare von `std.build` und die
+Manifest-Beschreibung von `lyric new`/`lyric metadata`, wo sie Schlüssel nennen. Der 4.x-Guide (`docs/guide`)
+bleibt unberührt.
 
 **Plattformen**: L2, L5, L6 und L8 fahren den vollen Plattformlauf vor dem Merge; macOS ist die Stelle mit dem
-Risiko (Frameworks über den Mach-O-Linker von zig, ungeprüft), Windows die mit der ABI-Frage (E3: nur mingw).
+Risiko (Frameworks über den Mach-O-Linker von zig, ungeprüft; der Laufpfad `@executable_path`), Windows die mit
+der ABI-Frage (E3: nur mingw). L2a fährt ihn ebenfalls: der Mach-O-Laufpfad und die `.dylib`-Suche aus #585
+liefen nie auf macOS.
 
 **Reflexion**: Die Vorbilder liegen an zwei Enden. Cargo lässt fast alles das Build-Skript tun (`build.rs`,
 `cc`, `pkg-config`, `bindgen` als Crates) — mächtig, aber jede C-Bibliothek ist ein kleines Programm, und die
@@ -1474,7 +1485,7 @@ Generator (L4) bildet nur ab, was die Typtabelle schon trägt; was sie nicht tr�
 eine zweite Tabelle zu bekommen.
 
 **Nicht in M14b**: ein Sysroot je Tripel (E5, Uhr M15); Objective-C-Quellen (N7, Uhr M15); freie Linker-Flags
-(E7, Uhr: Abschluss von M14b); mitgebrachte dynamische Bibliotheken (E3, verworfen für 5.0); ein C-Paketindex
+(E7, Uhr: Abschluss von M14b); ein C-Paketindex
 und ein eingebauter CMake-Lauf (verworfen für 5.0).
 
 ## Nachtrag 2026-10-28 — der Plan für M15

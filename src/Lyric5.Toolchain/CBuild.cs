@@ -16,6 +16,13 @@ public sealed record CUnit(
 
 public sealed class CBuildException(string message) : Exception(message);
 
+/// <summary>Where a link finds libraries beyond the linker's own directories, and whether the
+/// binary searches its own directory for shared libraries first — where files lie beside it.</summary>
+public sealed record LinkPaths(IReadOnlyList<string> SearchDirs, bool OwnDirFirst)
+{
+    public static readonly LinkPaths None = new([], false);
+}
+
 /// <summary>
 /// Turns C units into objects, objects into an archive, and archives into an executable, for one
 /// compiler, target and profile. Objects are cached by content: the key covers the compiler
@@ -215,16 +222,20 @@ public sealed class CBuild
     /// it, which is where libbacktrace reads line tables from (<see cref="Reproducible"/>).
     /// </summary>
     /// <param name="libraries">Libraries by name (<c>-l</c>), after every input that needs them.</param>
-    public string LinkExecutable(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries = null)
+    /// <param name="paths">Where the libraries are searched, and whether the binary looks for shared
+    /// libraries in its own directory first.</param>
+    public string LinkExecutable(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries = null,
+        LinkPaths? paths = null)
     {
+        paths ??= LinkPaths.None;
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
-        Link(inputs, output, libraries, debugMap: false);
+        Link(inputs, output, libraries, paths, debugMap: false);
         if (Target.Os == TargetOs.Windows)
         {
             try { Reproducible.NormalizePe(output, Path.ChangeExtension(output, ".pdb")); }
             catch (InvalidDataException failure) { throw new CBuildException($"{output}: {failure.Message}"); }
         }
-        if (Target.Os == TargetOs.MacOs && OperatingSystem.IsMacOS()) GatherDebugInfo(inputs, output, libraries);
+        if (Target.Os == TargetOs.MacOs && OperatingSystem.IsMacOS()) GatherDebugInfo(inputs, output, libraries, paths);
         return output;
     }
 
@@ -234,16 +245,18 @@ public sealed class CBuild
     /// library beside it (<c>&lt;name&gt;.lib</c>) —, the program's
     /// exports and the runtime's start and stop its only symbols (<c>LYRIC_API</c>).
     /// </summary>
-    public string LinkShared(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries = null)
+    public string LinkShared(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries = null,
+        LinkPaths? paths = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
-        Link(inputs, output, libraries, debugMap: false, shared: true);
+        Link(inputs, output, libraries, paths ?? LinkPaths.None, debugMap: false, shared: true);
         return output;
     }
 
     /// <summary>One link. A Mach-O image keeps its debug map only when asked: <c>-S</c> leaves out
     /// what would name every object by its path and time.</summary>
-    private void Link(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries, bool debugMap, bool shared = false)
+    private void Link(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries, LinkPaths paths, bool debugMap,
+        bool shared = false)
     {
         var arguments = Driver();
         // No LTO flag at the link: lld runs LTO over bitcode inputs by itself, and with the flag
@@ -253,7 +266,16 @@ public sealed class CBuild
         arguments.AddRange(Profile.Instrumentation);
         if (shared) arguments.Add("-shared");
         arguments.AddRange(inputs);
-        foreach (var library in libraries ?? []) arguments.Add("-l" + library);
+        // The directories named are searched before the linker's own, in their order. zig writes
+        // each -L that gave it a shared library into an ELF or Mach-O binary as a run path — the
+        // build's own directories, in every binary — so for zig the toolchain finds the library
+        // itself and hands it over by its path, which zig keeps out of the binary.
+        if (Compiler.Kind != CCompilerKind.Zig || Target.Os == TargetOs.Windows)
+            foreach (var dir in paths.SearchDirs) arguments.Add("-L" + dir);
+        foreach (var library in libraries ?? []) arguments.Add(Found(library, paths.SearchDirs) ?? "-l" + library);
+        // Windows' loader looks beside the image first by itself; ELF and Mach-O are told to
+        if (paths.OwnDirFirst && Target.Os == TargetOs.Linux) arguments.Add("-Wl,-rpath,$ORIGIN");
+        if (paths.OwnDirFirst && Target.Os == TargetOs.MacOs) arguments.Add("-Wl,-rpath,@executable_path");
         arguments.AddRange(["-o", output]);
         arguments.AddRange(Target.Os switch
         {
@@ -283,6 +305,38 @@ public sealed class CBuild
         {
             throw new CBuildException($"linking {output} for {Target} ({Profile.Name}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
         }
+    }
+
+    /// <summary>
+    /// <c>-l<paramref name="library"/></c> found in the named directories by zig's link, by its path;
+    /// <c>null</c> where the linker is to look itself — clang and gcc, or no directory holds it.
+    /// <list type="bullet">
+    /// <item>ELF and Mach-O: the first directory with <c>libX.so</c>, <c>libX.dylib</c>,
+    /// <c>libX.tbd</c> or <c>libX.a</c>, as the linker would search — by its path, no run path is
+    /// written.</item>
+    /// <item>Windows: zig's linker looks for <c>X.dll</c>, <c>X.lib</c> and <c>libX.a</c> itself
+    /// (under <c>-L</c>), and an SDK built with MinGW — SDL's among them — ships the import library
+    /// <c>libX.dll.a</c>, which GNU ld and clang find by the name and zig does not.</item>
+    /// </list>
+    /// </summary>
+    private string? Found(string library, IReadOnlyList<string> searchDirs)
+    {
+        if (Compiler.Kind != CCompilerKind.Zig) return null;
+        string[] own = Target.Os switch
+        {
+            TargetOs.Windows => [$"{library}.dll", $"{library}.lib", $"lib{library}.a"],
+            TargetOs.MacOs => [$"lib{library}.dylib", $"lib{library}.tbd", $"lib{library}.a"],
+            _ => [$"lib{library}.so", $"lib{library}.a"],
+        };
+        foreach (var dir in searchDirs)
+        {
+            if (own.Select(n => Path.Combine(dir, n)).FirstOrDefault(File.Exists) is { } file)
+                return Target.Os == TargetOs.Windows ? null : file;
+            if (Target.Os == TargetOs.Windows
+                && new[] { $"lib{library}.dll.a", $"{library}.dll.a" }.Select(n => Path.Combine(dir, n)).FirstOrDefault(File.Exists) is { } import)
+                return import;
+        }
+        return null;
     }
 
     /// <summary>The main task's stack, in bytes (<c>LYR_MAIN_TASK_STACK</c>), asked of the linker for
@@ -328,7 +382,7 @@ public sealed class CBuild
     /// the image when the two hold the same bytes at the same addresses. It then takes the image's
     /// UUID, by which libbacktrace pairs the two.
     /// </summary>
-    private void GatherDebugInfo(IReadOnlyList<string> inputs, string executable, IReadOnlyList<string>? libraries)
+    private void GatherDebugInfo(IReadOnlyList<string> inputs, string executable, IReadOnlyList<string>? libraries, LinkPaths paths)
     {
         var dsymutil = CCompiler.FindOnPath("dsymutil");
         if (dsymutil is null) return;
@@ -339,7 +393,7 @@ public sealed class CBuild
         try
         {
             Directory.CreateDirectory(scratch);
-            Link(inputs, mapped, libraries, debugMap: true);
+            Link(inputs, mapped, libraries, paths, debugMap: true);
             if (!Reproducible.SameSegments(mapped, executable)) return;
             ProcessRunner.Run(dsymutil, [mapped, "-o", dsym], TimeSpan.FromMinutes(2));
             var dwarf = Path.Combine(dsym, "Contents", "Resources", "DWARF", Path.GetFileName(executable));

@@ -257,6 +257,7 @@ public static class Pipeline
                 if (!libraries.Contains(library)) libraries.Add(library);
             var scripts = directives.Sources.Select(unit => unit with { ExtraFlags = [.. unit.ExtraFlags ?? [], .. paths] }).ToList();
             var objects = build.Compile([.. units, .. native, .. scripts]);
+            var linkPaths = new LinkPaths(directives.SearchDirs, OwnDirFirst: directives.Beside.Count > 0);
             if (project.Library is { } libraryKind)
             {
                 // The archive holds the runtime too: a C program links one file and the libraries the
@@ -268,19 +269,22 @@ public static class Pipeline
                     var runtime = RuntimeArchive.Objects(request.Compiler, request.Target, profile, request.ToolchainVersion);
                     File.Copy(build.Archive([.. objects, .. runtime], Path.Combine(project.CacheDir, "lib", $"lib{project.Name}.a")), file, overwrite: true);
                 }
-                else build.LinkShared([.. objects, archive], file, libraries);
+                else build.LinkShared([.. objects, archive], file, libraries, linkPaths);
                 File.Copy(header, project.HeaderFile(request.Profile, request.Target), overwrite: true);
+                // what the library needs when it runs lies beside it, as beside a program
+                PutBeside(directives.Beside, file);
                 return (0, file);
             }
             var executable = project.Executable(request.Profile, request.Target);
             string[] inputs = [.. objects, archive];
             var record = Path.Combine(project.CacheDir, $"{project.BinaryName}-{Key(executable)}.link");
-            if (!UpToDate(executable, record, inputs, libraries))
+            if (!UpToDate(executable, record, inputs, libraries, linkPaths))
             {
-                build.LinkExecutable(inputs, executable, libraries);
-                File.WriteAllText(record, LinkLines(inputs, libraries));
+                build.LinkExecutable(inputs, executable, libraries, linkPaths);
+                File.WriteAllText(record, LinkLines(inputs, libraries, linkPaths));
             }
             if (File.Exists(names)) File.Copy(names, NamesOf(executable), overwrite: true);
+            PutBeside(directives.Beside, executable);
             return (0, executable);
         }
         catch (CBuildException failure)
@@ -553,16 +557,36 @@ public static class Pipeline
     /// content-keyed and cached, so a build that goes back to inputs built earlier — the other
     /// collector's archive, a profile field and back — finds every one older than the
     /// binary the other inputs made.</summary>
-    private static bool UpToDate(string executable, string record, IReadOnlyList<string> inputs, IReadOnlyList<string> libraries)
+    private static bool UpToDate(string executable, string record, IReadOnlyList<string> inputs, IReadOnlyList<string> libraries,
+        LinkPaths paths)
     {
         if (!File.Exists(executable)) return false;
-        if (!File.Exists(record) || File.ReadAllText(record) != LinkLines(inputs, libraries)) return false;
+        if (!File.Exists(record) || File.ReadAllText(record) != LinkLines(inputs, libraries, paths)) return false;
         var linked = File.GetLastWriteTimeUtc(executable);
         return inputs.All(input => File.GetLastWriteTimeUtc(input) <= linked);
     }
 
-    private static string LinkLines(IEnumerable<string> inputs, IEnumerable<string> libraries) =>
-        string.Join("\n", inputs.Concat(libraries.Select(library => "-l" + library))) + "\n";
+    private static string LinkLines(IEnumerable<string> inputs, IEnumerable<string> libraries, LinkPaths paths) =>
+        string.Join("\n", inputs
+            .Concat(paths.SearchDirs.Select(dir => "-L" + dir))
+            .Concat(libraries.Select(library => "-l" + library))
+            .Concat(paths.OwnDirFirst ? ["own-dir-first"] : [])) + "\n";
+
+    /// <summary>The files the build scripts put beside the binary, copied into its directory under
+    /// their own names — each only where what lies there is not already the same bytes, so an
+    /// up-to-date build touches nothing.</summary>
+    private static void PutBeside(IReadOnlyList<string> files, string executable)
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(executable))!;
+        foreach (var file in files)
+        {
+            var target = Path.Combine(dir, Path.GetFileName(file));
+            if (File.Exists(target) && new FileInfo(target).Length == new FileInfo(file).Length
+                && File.ReadAllBytes(target).AsSpan().SequenceEqual(File.ReadAllBytes(file)))
+                continue;
+            File.Copy(file, target, overwrite: true);
+        }
+    }
 
     internal static string Key(params string[] parts)
     {
