@@ -5,7 +5,10 @@
 
 #include <stdint.h>
 
+#include "lyric.h"
 #include "lyr/types.h"
+#include "lyr/coro.h"
+#include "lyr/error.h"
 #include "lyr/gc.h"
 
 /* The name the linker knows a C function by: its own, behind the platform's prefix ('_' on
@@ -51,12 +54,32 @@ void lyr_ffi_free(uint64_t address);
 void lyr_ffi_callback_enter(void);
 void lyr_ffi_callback_leave(void);
 
-/* An export's wrapper (@Export), around the Lyric function C calls by its symbol: as a
- * callback's, and before it the runtime started (lyr_init) — else the process ends with a report —
- * and, at the first call, the library's own start: its globals registered and filled. `start` is
- * NULL in a program, whose main did that. */
-void lyr_export_enter(void (*start)(void));
-void lyr_export_leave(void);
+/* What a library's exports run under where its code waits: std.task's side of the embedding. `run`
+ * takes an export's context and runs the thread's scheduler until it is done — making the
+ * scheduler at the thread's first call —, answering as lyr_task_resume; `step`, `pump` and `end`
+ * are lyr_step, lyr_run and lyr_detach_thread's. */
+typedef struct LyrEmbedding {
+    int64_t (*run)(LyrCoro *context);
+    uint8_t (*step)(void);
+    void (*pump)(void);
+    void (*end)(void);
+} LyrEmbedding;
+
+/* An export's call (@Export), from its wrapper: `body` calls the Lyric function with the values in
+ * `frame` and leaves its result there. The runtime must be started (lyr_init) — else the process
+ * ends with a report —, and a thread that never ran Lyric is attached. Where Lyric runs below the
+ * call on the thread — C that Lyric called calls the export — the body runs right there, in the
+ * running task, between the marks of C's frames; elsewhere in a task of its own, under `embedding`
+ * where the library waits (NULL where it never does). The library's own start comes first, at its
+ * first call: its globals registered and filled. `start` is NULL in a program, whose main did that.
+ * A panic of that task is LYR_PANIC, kept for lyr_take_error, where `throws` — the wrapper can say
+ * so —, else the process ends with it. */
+LyrStatus lyr_export_call(void (*start)(void), const LyrEmbedding *embedding, void (*body)(void *frame),
+                          void *frame, int throws);
+
+/* Keeps the error an export's function threw for lyr_take_error: its type, its message and its
+ * causes' through Error's members, which the program defines. Inside the export's task. */
+void lyr_export_keep_error(const LyrErr *err, LyrErrMessage message, LyrErrCause cause);
 
 /* std.ffi.Callback: a Lyric closure C holds through its userdata — its code and its environment
  * in an object a root keeps alive until the callback is released. The userdata C hands back is the

@@ -1,16 +1,19 @@
 /* The conversions std.ffi's types make at a C function's boundary. */
 #include "lyr/ffi.h"
+#include "lyr/console.h"
 #include "lyr/coro.h"
 #include "lyr/gc.h"
 #include "lyr/init.h"
 #include "lyr/panic.h"
 #include "lyr/string.h"
+#include "lyr/task.h"
 
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "lyr/poll.h"
+#include "internal.h"
 
 uint64_t lyr_ffi_string_address(const LyrStr *s) { return (uint64_t)(uintptr_t)s->bytes; }
 
@@ -52,13 +55,7 @@ void lyr_ffi_callback_leave(void) { lyr_coro_leave_foreign(); }
 /* 0: the library has not started, 1: a thread starts it, 2: started */
 static atomic_int library_state;
 
-void lyr_export_enter(void (*start)(void)) {
-    if (!lyr_started())
-        lyr_panic(LYR_RT_FOREIGN_THREAD, "C called an export before lyr_init started the runtime");
-    if (!lyr_thread_attached())
-        lyr_panic(LYR_RT_FOREIGN_THREAD, "C called an export on a thread Lyric does not run — "
-                                         "the thread that called lyr_init is Lyric's");
-    lyr_coro_enter_foreign();
+static void library_start(void (*start)(void)) {
     if (start == NULL || atomic_load_explicit(&library_state, memory_order_acquire) == 2) return;
     int expected = 0;
     if (atomic_compare_exchange_strong(&library_state, &expected, 1)) {
@@ -66,10 +63,177 @@ void lyr_export_enter(void (*start)(void)) {
         atomic_store_explicit(&library_state, 2, memory_order_release);
         return;
     }
-    while (atomic_load_explicit(&library_state, memory_order_acquire) != 2) { }
+    while (atomic_load_explicit(&library_state, memory_order_acquire) != 2) lyr_task_spin();
 }
 
-void lyr_export_leave(void) { lyr_coro_leave_foreign(); }
+/* The library's embedding, once its first export ran: what lyr_step, lyr_run and
+ * lyr_detach_thread call. */
+static _Atomic(const LyrEmbedding *) embedding_here;
+
+/* Whether an export attached the thread: lyr_detach_thread gives back only such a one. */
+static _Thread_local int attached_by_export;
+
+/* What failed: the thread's record for lyr_take_error, one link per error of the chain, each
+ * with its strings in one block behind it; the one waiting, and the one taken last, freed at the
+ * next take. */
+static _Thread_local LyrError *waiting_error, *taken_error;
+
+static void free_error(LyrError *e) {
+    while (e != NULL) {
+        LyrError *cause = (LyrError *)e->cause;
+        free(e);
+        e = cause;
+    }
+}
+
+/* A link of the record, its strings copied behind it; NULL where C's heap has no room. */
+static LyrError *error_link(LyrStatus status, const char *type, size_t type_len, const char *message,
+                            size_t message_len, const char *trace) {
+    size_t trace_len = trace != NULL ? strlen(trace) : 0;
+    LyrError *e = malloc(sizeof *e + type_len + 1 + message_len + 1 + (trace != NULL ? trace_len + 1 : 0));
+    if (e == NULL) return NULL;
+    char *at = (char *)(e + 1);
+    e->status = status;
+    memcpy(at, type, type_len);
+    at[type_len] = '\0';
+    e->type = at;
+    at += type_len + 1;
+    memcpy(at, message, message_len);
+    at[message_len] = '\0';
+    e->message = at;
+    at += message_len + 1;
+    e->trace = trace != NULL ? memcpy(at, trace, trace_len + 1) : NULL;
+    e->cause = NULL;
+    return e;
+}
+
+static void keep(LyrError *e) {
+    free_error(waiting_error);
+    waiting_error = e;
+}
+
+/* The type a value of Error is: its table's first word is the concrete type's descriptor — a
+ * value type's box's, `box<…>` around the type's name. */
+static const char *type_of(LyrIface value, size_t *len) {
+    const LyrDesc *desc = *(const LyrDesc *const *)value.vt;
+    const char *name = desc != NULL && desc->name != NULL ? desc->name : "";
+    *len = strlen(name);
+    if (*len > 5 && strncmp(name, "box<", 4) == 0 && name[*len - 1] == '>') {
+        *len -= 5;
+        return name + 4;
+    }
+    return name;
+}
+
+void lyr_export_keep_error(const LyrErr *err, LyrErrMessage message, LyrErrCause cause) {
+    LyrError *first = NULL, **link = &first;
+    LyrIface at = err->value, next;
+    /* the chain is the program's data: a cycle in it ends here, as the report bounds it */
+    for (int depth = 0; depth < 64; depth++) {
+        const LyrStr *text = message != NULL ? message(at) : NULL;
+        size_t type_len;
+        const char *type = type_of(at, &type_len);
+        LyrError *e = error_link(LYR_ERROR, type, type_len, text != NULL ? (const char *)text->bytes : "",
+                                 text != NULL ? (size_t)text->len : 0, NULL);
+        if (e == NULL) break;
+        *link = e;
+        link = (LyrError **)&e->cause;
+        if (cause == NULL || !cause(at, &next)) break;
+        at = next;
+    }
+    keep(first);
+}
+
+static void keep_panic(LyrCoro *co) {
+    const LyrStr *code = co->panic_code, *message = co->panic_message, *trace = co->panic_trace;
+    keep(error_link(LYR_PANIC, code != NULL ? (const char *)code->bytes : "", code != NULL ? (size_t)code->len : 0,
+                    message != NULL ? (const char *)message->bytes : "", message != NULL ? (size_t)message->len : 0,
+                    trace != NULL ? (const char *)trace->bytes : ""));
+}
+
+LyrStatus lyr_take_error(LyrError *error) {
+    free_error(taken_error);
+    taken_error = waiting_error;
+    waiting_error = NULL;
+    if (taken_error == NULL) {
+        memset(error, 0, sizeof *error);
+        return LYR_OK;
+    }
+    *error = *taken_error;
+    return taken_error->status;
+}
+
+/* An export's task: the call. */
+typedef struct ExportRun {
+    void (*body)(void *frame);
+    void *frame;
+} ExportRun;
+
+static void export_run(void *arg) {
+    ExportRun *run = arg;
+    run->body(run->frame);
+}
+
+static const LyrDesc export_desc = { .size = 0, .flags = LYR_DESC_CORO, .name = "<export>" };
+
+LyrStatus lyr_export_call(void (*start)(void), const LyrEmbedding *embedding, void (*body)(void *frame),
+                          void *frame, int throws) {
+    if (!lyr_started())
+        lyr_panic(LYR_RT_FOREIGN_THREAD, "C called an export before lyr_init started the runtime");
+    if (!lyr_thread_attached()) {
+        if (lyr_thread_attach() != 0) lyr_panic(LYR_RT_SYSTEM, "a thread could not attach to the collector");
+        attached_by_export = 1;
+    }
+    if (lyr_coro_current() != NULL) {
+        /* Lyric below, C between: the task that runs owns the call, and its frames count C's */
+        lyr_coro_enter_foreign();
+        library_start(start);
+        body(frame);
+        lyr_coro_leave_foreign();
+        return LYR_OK;
+    }
+    /* the globals before the scheduler: std.task's loop reads its module's own */
+    library_start(start);
+    if (embedding != NULL) atomic_store_explicit(&embedding_here, embedding, memory_order_release);
+    ExportRun run = { body, frame };
+    LyrCoro *co = lyr_coro_new(&export_desc, export_run, &run, 0);
+    co->task = 1;
+    int64_t state = embedding != NULL ? embedding->run(co) : lyr_task_resume(co);
+    /* what it wrote, out before C goes on */
+    lyr_console_flush_all(1);
+    if (state == 1) return LYR_OK;
+    if (state == 0) lyr_panic(LYR_RT_INVARIANT, "an export's task waited where no scheduler runs");
+    if (!throws) lyr_coro_repanic(co);
+    keep_panic(co);
+    return LYR_PANIC;
+}
+
+bool lyr_step(void) {
+    const LyrEmbedding *e = atomic_load_explicit(&embedding_here, memory_order_acquire);
+    if (e == NULL || !lyr_started() || !lyr_thread_attached() || lyr_coro_current() != NULL) return false;
+    bool remain = e->step() != 0;
+    lyr_console_flush_all(1);
+    return remain;
+}
+
+void lyr_run(void) {
+    const LyrEmbedding *e = atomic_load_explicit(&embedding_here, memory_order_acquire);
+    if (e == NULL || !lyr_started() || !lyr_thread_attached() || lyr_coro_current() != NULL) return;
+    e->pump();
+    lyr_console_flush_all(1);
+}
+
+void lyr_detach_thread(void) {
+    if (!attached_by_export || lyr_coro_current() != NULL) return;
+    const LyrEmbedding *e = atomic_load_explicit(&embedding_here, memory_order_acquire);
+    if (e != NULL) e->end();
+    free_error(waiting_error);
+    free_error(taken_error);
+    waiting_error = taken_error = NULL;
+    lyr_poller_release();
+    lyr_thread_detach();
+    attached_by_export = 0;
+}
 
 /* word 2 of the object, the environment, is a reference; the code is not the collector's */
 static const uint64_t closure_refs[1] = { 1u << 2 };

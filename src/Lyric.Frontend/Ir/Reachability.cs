@@ -73,6 +73,9 @@ internal static class Reachability
             module.GlobalInit = new FunctionId(initNeu);
         if (module.TaskMain is { } loop)
             module.TaskMain = new FunctionId(neueId[loop.Value]);
+        if (module.Embedding is { } e)
+            module.Embedding = new IrEmbedding(new FunctionId(neueId[e.Run.Value]), new FunctionId(neueId[e.Step.Value]),
+                new FunctionId(neueId[e.Pump.Value]), new FunctionId(neueId[e.End.Value]));
         for (var i = 0; i < module.ExportRoots.Count; i++)
             module.ExportRoots[i] = new FunctionId(neueId[module.ExportRoots[i].Value]);
         for (var i = 0; i < module.Exports.Count; i++)
@@ -176,6 +179,13 @@ internal static class Reachability
         Wurzel(module.EntryFunction);
         Wurzel(module.GlobalInit);
         Wurzel(module.TaskMain);
+        if (module.Embedding is { } embedding)
+        {
+            Wurzel(embedding.Run);
+            Wurzel(embedding.Step);
+            Wurzel(embedding.Pump);
+            Wurzel(embedding.End);
+        }
         foreach (var export in module.ExportRoots) Wurzel(export);
 
         // An attributed function is a root: the row in section 11 is a promise to the host that

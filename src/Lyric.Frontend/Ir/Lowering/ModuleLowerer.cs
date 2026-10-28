@@ -685,6 +685,14 @@ public static class ModuleLowerer
             && Reachability.CallsImport(result, "std.task.currentScheduler", unless: "std.task.schedulerRuns"))
             result.TaskMain = loopId;
 
+        // A library's exports are tasks where what they reach waits, the same question: each runs
+        // under std.task's loop for the embedding, and the host pumps what one left running.
+        if (compilation.Library && exports.Count > 0
+            && compilation.FindModule(["std", "task"]) is { } task
+            && EmbeddingOf(task, ids) is { } embedding
+            && Reachability.CallsImport(result, "std.task.currentScheduler", unless: "std.task.schedulerRuns"))
+            result.Embedding = embedding;
+
         var verifies = verify ?? VerifyByDefault;
         if (timings is not null) timings.Verified = verifies;
 
@@ -807,6 +815,17 @@ public static class ModuleLowerer
     /// <summary>Runs the action and adds its duration to the tally. The verifier is 90% of the
     /// lowering time, so <c>--verbose</c> showing it as part of 'lower' would misname the bill; ONE
     /// tally for both runs, because the table reports a pipeline stage, not a number of calls.</summary>
+    /// <summary>std.task's four functions of the embedding, each lowered, or null.</summary>
+    private static IrEmbedding? EmbeddingOf(ModuleSymbol task, Dictionary<FunctionSymbol, FunctionId> ids)
+    {
+        FunctionId? Of(string name) =>
+            task.Members.LookupLocal(name) is FunctionSymbol f && ids.TryGetValue(f, out var id) ? id : null;
+        return Of("runExport") is { } run && Of("stepEmbedded") is { } step && Of("runEmbedded") is { } pump
+               && Of("endEmbedded") is { } end
+            ? new IrEmbedding(run, step, pump, end)
+            : null;
+    }
+
     private static void Timed(LoweringTimings? timings, Action action)
     {
         if (timings is null)

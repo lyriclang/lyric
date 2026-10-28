@@ -322,6 +322,15 @@ public class IrModule(List<IrFunction> Functions)
     /// </summary>
     public FunctionId? TaskMain { get; set; }
 
+    /// <summary>
+    /// std.task's side of the embedding where a library's exports wait, or <c>null</c>.
+    ///
+    /// <para>Set as <see cref="TaskMain"/> is, for a library: then each export C calls runs as a
+    /// task under these functions, and the host pumps what an export left running. A library that
+    /// never waits runs an export's task once, and needs no scheduler.</para>
+    /// </summary>
+    public IrEmbedding? Embedding { get; set; }
+
     /// <summary>The vtable rows. They land as the Impls section in the bytecode; the runtime builds its
     /// dispatch table from them at load time, so <c>callvirt</c> is a lookup rather than a
     /// search.</summary>
@@ -364,6 +373,11 @@ public class IrModule(List<IrFunction> Functions)
 /// form, the result goes back in its own; one that <see cref="Throws"/> answers C's
 /// <c>LyrStatus</c> and hands its result through a last pointer.</summary>
 public sealed record IrExport(FunctionId Function, string Symbol, IrCForm[] Params, IrCForm Return, bool Throws);
+
+/// <summary>std.task's functions the runtime calls for a library (<c>LyrEmbedding</c>): an
+/// export's context run to its end, a turn of the pump, the pump to the end, the thread's
+/// scheduler stopped.</summary>
+public sealed record IrEmbedding(FunctionId Run, FunctionId Step, FunctionId Pump, FunctionId End);
 
 /// <summary>The library's header beyond the runtime's API: the types' definitions in the
 /// order C needs them, and each export's declaration.</summary>

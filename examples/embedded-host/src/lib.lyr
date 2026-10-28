@@ -1,0 +1,74 @@
+// The library of the embedded host: `lyric build --lib` makes `libtally.a` and `tally.h` of it,
+// and host.c links the one and includes the other. Each export runs as a task on the thread that
+// calls it: it may wait, and C sees it return once it is done.
+import std.io { println };
+import std.ffi { CStr };
+import std.task { spawn, spawnDetached, sleep, Cancelled };
+import std.time { Duration };
+import std.core { Exception, ParseError, Utf8Error };
+
+/// The sum of 1 to `n`, in two tasks that each wait a moment first.
+@Export("tally_sum")
+pub fn sum(n: int): int {
+    let low = spawn(() => {
+        return try range(1, n / 2);
+    });
+    let high = spawn(() => {
+        return try range(n / 2 + 1, n);
+    });
+    return (try! low.await()) + (try! high.await());
+}
+
+fn range(from: int, to: int): int throws Cancelled {
+    try sleep(Duration.ofMillis(1));
+    var total = 0;
+    var i = from;
+    while (i <= to) {
+        total += i;
+        i += 1;
+    }
+    return total;
+}
+
+/// Starts `n` jobs and returns: job `i` waits `i` milliseconds, then says so. They run while the
+/// host pumps (`lyr_step`, `lyr_run`) and while it calls the next export.
+@Export("tally_start")
+pub fn start(n: int): void {
+    var i = 1;
+    while (i <= n) {
+        let job = i;
+        spawnDetached(() => {
+            try sleep(Duration.ofMillis(job));
+            println(f"job {job} of {n}");
+        });
+        i += 1;
+    }
+}
+
+/// The count C's text says: an error that says why not, with the error under it as its cause.
+@Export("tally_parse")
+pub fn parse(text: CStr): int throws Exception {
+    try {
+        let s = text.toString();
+        try {
+            return int.parse(s);
+        } catch (e: ParseError) {
+            throw Exception.new(f"'{s}' is no count", cause: e);
+        }
+    } catch (e: Utf8Error) {
+        throw Exception.new("the text is no UTF-8", cause: e);
+    }
+}
+
+/// `n` as it is; zero is an error, and a negative count a bug — a panic, which C sees as
+/// LYR_PANIC, after which the library goes on.
+@Export("tally_check")
+pub fn check(n: int): int throws Exception {
+    if (n < 0) {
+        panic(f"a count is never negative: {n}");
+    }
+    if (n == 0) {
+        throw Exception.new("zero counts nothing");
+    }
+    return n;
+}

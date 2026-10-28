@@ -16,7 +16,7 @@ int lyr_test_run_main(int argc, char **argv, int64_t (*program_main)(void)) {
     config.argv = argv;
     config.heap_limit = (size_t)16 << 20;
     config.install_signal_handlers = 1;
-    if (lyr_init(&config) != 0) return 3;
+    if (lyr_init(&config) != LYR_OK) return 3;
     int64_t result = program_main();
     /* the program's output is held in the console's buffers (lyr/console.h): out first, so the
      * line below comes after it */

@@ -2290,6 +2290,79 @@ fn runMain(main: Coroutine<void>): void {
     setCurrentScheduler(null);
 }
 
+// The embedding: a library's exports, which C calls, each as a task on the calling thread.
+
+/// Runs an export's context where C called the export, on the thread's scheduler — made at the
+/// thread's first call and kept from then on, so the tasks an export leaves go on with the next
+/// call and the host's pump (`stepEmbedded`, `runEmbedded`). It runs until that context is done:
+/// 1 its body returned, 2 it panicked — the panic the export's, which the runtime answers C with.
+fn runExport(body: Coroutine<void>): int {
+    let s = embeddedScheduler();
+    let c = Context { body = body, home = s };
+    c.onPanic = (_: PanicInfo) => { };
+    s.ready(c);
+    while (!body.isDone() && panicCode(body) == null) {
+        s.step();
+    }
+    return if (panicCode(body) == null) 1 else 2;
+}
+
+/// The calling thread's scheduler for the exports: the one it runs, or a new one that lives from
+/// here on — in the list of the living, which keeps it between the calls.
+fn embeddedScheduler(): Scheduler {
+    if (let s = currentScheduler()) {
+        return s;
+    }
+    let s = Scheduler { };
+    setCurrentScheduler(s);
+    s.started();
+    living.join(s);
+    return s;
+}
+
+/// `lyr_step`: one turn where a task is ready or due — without waiting — and whether tasks
+/// remain on the thread.
+fn stepEmbedded(): bool {
+    if (let s = currentScheduler()) {
+        if (s.first == null) {
+            // nothing ready: what came in, what is due, what the poller has, all without a wait
+            lyr_ffi_drain();
+            s.takeInbox();
+            if (s.sleepers != null) {
+                s.wakeSleepers(monotonicNanos());
+            }
+            if (waitOnPoller(0)) {
+                s.pollerWoke();
+            }
+            s.takeFired();
+            s.takeInbox();
+        }
+        if (s.first != null) {
+            s.step();
+        }
+        return s.first != null || s.liveFirst != null || s.pending();
+    }
+    return false;
+}
+
+/// `lyr_run`: the thread's tasks to their end, waiting as they wait.
+fn runEmbedded(): void {
+    if (let s = currentScheduler()) {
+        while (s.first != null || s.liveFirst != null || s.pending()) {
+            s.step();
+        }
+    }
+}
+
+/// `lyr_detach_thread`: the thread's scheduler stops; what remains on it never runs again.
+fn endEmbedded(): void {
+    if (let s = currentScheduler()) {
+        s.stopped();
+        living.leave(s);
+        setCurrentScheduler(null);
+    }
+}
+
 // The runtime's side, the module's own.
 
 /// Creates a task's context around `body` on a stack of its own — `stack` bytes, 0 for the

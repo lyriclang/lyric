@@ -83,11 +83,16 @@ public partial class FormatterProofTests
         return (AppContext.BaseDirectory, copy);
     }, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    /// <summary>The program's C against the <c>stdlib5</c> in <paramref name="compiler"/>;
-    /// <c>null</c> where it does not build.</summary>
+    /// <summary>The program's C against the <c>stdlib5</c> in <paramref name="compiler"/> — a
+    /// library's, where the package has <c>src/lib.lyr</c> and no program; <c>null</c> where it
+    /// does not build.</summary>
     private static string? EmitC(string compiler, string package)
     {
-        if (Lyric5.Build.Project.ProgramsOf(package) is not [var project, ..]) return null;
+        var library = !File.Exists(Path.Combine(package, "src", "main.lyr")) && File.Exists(Path.Combine(package, "src", "lib.lyr"));
+        var project = library
+            ? Lyric5.Build.Project.LibraryOf(package, Lyric5.Build.LibraryKind.Static)
+            : Lyric5.Build.Project.ProgramsOf(package) is [var first, ..] ? first : null;
+        if (project is null) return null;
         return Lyric5.Build.Pipeline.EmitC(project, Path.Combine(compiler, "stdlib5"), TextWriter.Null);
     }
 

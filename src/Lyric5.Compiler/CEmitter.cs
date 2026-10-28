@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "r1g";
+    public const string Version = "r1h";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -862,10 +862,10 @@ public sealed class CEmitter
         }
 
         // The members of Error the runtime reports through: defined by the module's
-        // unit wherever an error can end the program, declared by an instance's unit that panics.
-        var adapters = !ErrorsEndTheProgram() ? ""
-            : _main ? ReportAdapters(define: true)
-            : Scope().Any(f => f.Blocks.Any(b => b.Terminator is PanicError)) ? ReportAdapters(define: false) : "";
+        // unit wherever an error can end the program or an export keeps one for C, declared by an
+        // instance's unit that panics.
+        var adapters = _main ? (ErrorsEndTheProgram() || _module.Exports.Any(e => e.Throws) ? ReportAdapters(define: true) : "")
+            : ErrorsEndTheProgram() && Scope().Any(f => f.Blocks.Any(b => b.Terminator is PanicError)) ? ReportAdapters(define: false) : "";
 
         var body = new StringBuilder();
         foreach (var function in Scope()) body.Append(Function(function));
@@ -1638,11 +1638,12 @@ public sealed class CEmitter
     }
 
     /// <summary>
-    /// The functions C calls by their symbols (<c>@Export</c>): each a wrapper that takes C's values
-    /// as Lyric's, calls the function and gives its result back as C's, between the runtime's marks
-    /// (<c>lyr_export_enter</c>). One that throws answers <c>LyrStatus</c> and writes its result
-    /// through the last parameter. A library has no main to start its globals: the first export's
-    /// call does.
+    /// The functions C calls by their symbols (<c>@Export</c>): each a wrapper that hands C's values
+    /// to the runtime's call (<c>lyr_export_call</c>), which runs the function as a task where C
+    /// called it — under std.task's loop for the embedding where the library waits — and gives its
+    /// result back as C's. One that throws answers <c>LyrStatus</c>, keeps its error for
+    /// <c>lyr_take_error</c> and writes its result through the last parameter. A library has no
+    /// main to start its globals: the first export's call does.
     /// </summary>
     private string Exports()
     {
@@ -1656,35 +1657,55 @@ public sealed class CEmitter
             text.AppendLine($"static void lyr_library_start(void) {{ {GlobalStart()}}}");
             start = "lyr_library_start";
         }
-        foreach (var export in _module.Exports) text.AppendLine(Export(export, start));
+        var embedding = "NULL";
+        if (_module.Embedding is { } e)
+        {
+            string Name(FunctionId f) => FunctionName(_module.Functions[f.Value].Name);
+            text.AppendLine($"static const LyrEmbedding lyr_embedding = {{ {Name(e.Run)}, {Name(e.Step)}, {Name(e.Pump)}, {Name(e.End)} }};");
+            embedding = "&lyr_embedding";
+        }
+        foreach (var export in _module.Exports) text.Append(Export(export, start, embedding));
         return text.ToString();
     }
 
-    private string Export(IrExport export, string start)
+    /// <summary>One export: its frame — C's values in, the function's result and error out —, the
+    /// body its task runs, and the wrapper C calls.</summary>
+    private string Export(IrExport export, string start, string embedding)
     {
         var target = _module.Functions[export.Function.Value];
         var environment = TakesEnvironment(target) ? 1 : 0;
         var parameters = target.Locals.Skip(environment).Take(target.ParamCount - environment).ToList();
         var signature = parameters.Select((p, i) => $"{CAbiType(p.Type, export.Params[i])} lyr_a{i}").ToList();
-        var arguments = (environment == 1 ? ["NULL"] : Array.Empty<string>())
-            .Concat(parameters.Select((p, i) => ComingIn($"lyr_a{i}", p.Type, export.Params[i]))).ToList();
         var returns = !IsVoid(target.ReturnType);
+        var frame = $"lyr_xf_{export.Symbol}";
+        var fields = string.Concat(parameters.Select((p, i) => $" {CAbiType(p.Type, export.Params[i])} a{i};"))
+                     + (returns ? $" {Declare(target.ReturnType, "r")};" : "")
+                     + (export.Throws ? " LyrErr *e;" : "");
+        var arguments = (environment == 1 ? ["NULL"] : Array.Empty<string>())
+            .Concat(parameters.Select((p, i) => ComingIn($"f->a{i}", p.Type, export.Params[i]))).ToList();
         if (export.Throws)
         {
             if (returns) signature.Add($"{CAbiType(target.ReturnType, export.Return)} *lyr_out");
-            arguments.Add("&lyr_e");
+            arguments.Add("&f->e");
         }
         var call = $"{FunctionName(target.Name)}({string.Join(", ", arguments)})";
-        var result = export.Throws ? "LyrStatus" : CAbiType(target.ReturnType, export.Return);
-        var body = new StringBuilder($"lyr_export_enter({start}); ");
-        if (export.Throws) body.Append("LyrErr *lyr_e = NULL; ");
-        body.Append(returns ? $"{CType(target.ReturnType)} lyr_r = {call}; " : $"{call}; ");
-        body.Append("lyr_export_leave(); ");
+        var text = new StringBuilder();
+        text.AppendLine($"typedef struct {{{(fields.Length == 0 ? " uint8_t none;" : fields)} }} {frame};");
+        var (message, cause) = ReportNames();
+        text.AppendLine($"static void lyr_xb_{export.Symbol}(void *lyr_p) {{ {frame} *f = lyr_p; "
+                        + (returns ? $"f->r = {call}; " : $"{call}; ")
+                        + (export.Throws ? $"if (LYR_UNLIKELY(f->e != NULL)) lyr_export_keep_error(f->e, {message}, {cause}); " : "")
+                        + "}");
+        var body = new StringBuilder($"{frame} f = {{0}}; ");
+        for (var i = 0; i < parameters.Count; i++) body.Append($"f.a{i} = lyr_a{i}; ");
+        body.Append($"LyrStatus lyr_s = lyr_export_call({start}, {embedding}, lyr_xb_{export.Symbol}, &f, {(export.Throws ? 1 : 0)}); ");
         if (export.Throws)
-            body.Append("if (LYR_UNLIKELY(lyr_e != NULL)) return LYR_ERROR; "
-                        + (returns ? $"*lyr_out = {CrossingOut("lyr_r", export.Return)}; " : "") + "return LYR_OK; ");
-        else if (returns) body.Append($"return {CrossingOut("lyr_r", export.Return)}; ");
-        return $"LYRIC_API {result} {export.Symbol}({(signature.Count == 0 ? "void" : string.Join(", ", signature))}) {{ {body}}}";
+            body.Append("if (lyr_s != LYR_OK) return lyr_s; if (LYR_UNLIKELY(f.e != NULL)) return LYR_ERROR; "
+                        + (returns ? $"*lyr_out = {CrossingOut("f.r", export.Return)}; " : "") + "return LYR_OK; ");
+        else body.Append("(void)lyr_s; " + (returns ? $"return {CrossingOut("f.r", export.Return)}; " : ""));
+        var result = export.Throws ? "LyrStatus" : CAbiType(target.ReturnType, export.Return);
+        text.AppendLine($"LYRIC_API {result} {export.Symbol}({(signature.Count == 0 ? "void" : string.Join(", ", signature))}) {{ {body}}}");
+        return text.ToString();
     }
 
     /// <summary>The runtime's start around the program's main function, as a task under std.task's
