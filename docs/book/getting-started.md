@@ -7,7 +7,7 @@ C into one native binary, so besides the toolchain you need a C compiler.
 
 Lyric 5 is in development; nothing is released yet. Every change to `main` is built into the `dev`
 prerelease on GitHub: <https://github.com/lyriclang/lyric/releases/tag/dev>. Take the archive for
-your system — Linux (x64 or ARM64), macOS (ARM64) or Windows (x64) — and unpack it where you keep
+your system — Linux (x64 or ARM64), macOS (ARM64 or x64) or Windows (x64) — and unpack it where you keep
 tools:
 
 ```sh
@@ -30,8 +30,9 @@ lyric 5.0.0-dev.20261023+6d7bd38
   c compiler  zig 0.16.0 (/usr/bin/zig)
 ```
 
-The first build of a program also builds the runtime for your system, once; it takes a little
-longer than the ones after it.
+The runtime comes prebuilt for your system. A build with another C compiler than zig 0.16.0, for another
+target, or with another collector or a sanitizer builds it from its source first, once; that build
+takes a little longer than the ones after it.
 
 ## A package
 
