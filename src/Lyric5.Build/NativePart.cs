@@ -44,7 +44,7 @@ public sealed partial record NativePart(
         ["macos"] = TargetOs.MacOs,
     };
 
-    /// <summary>The triples a table may name: Tier 1 and Tier 2 (11 T4).</summary>
+    /// <summary>The triples a table may name: Tier 1 and Tier 2.</summary>
     private static readonly Dictionary<string, Target> Triples =
         Target.Tier1.Concat(Target.Tier2).ToDictionary(t => t.Triple, StringComparer.Ordinal);
 

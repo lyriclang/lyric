@@ -4,7 +4,7 @@ using static Lyric5.Tests.PackageFixture;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// What a package's native part links (spec 15 §5, M14b L2b): prebuilt archives and shared
+/// What a package's native part links (spec 15 §5): prebuilt archives and shared
 /// libraries by their paths, the tables per triple on top of the system's, the sources'
 /// definitions, <c>lyric.h</c> and a dependency's headers, and a link held by the bytes of what it
 /// read. The prebuilt files are built here, with the C compiler the build uses. Through
