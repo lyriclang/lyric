@@ -14,6 +14,16 @@ public static partial class Program
 {
     public static int Main(string[] args)
     {
+        // what goes into a pipe or a file is UTF-8 — on Windows it would leave in the console's
+        // code page, '·' as 0xFA under 850 —; a console keeps its own
+        Lyric.Core.ConsoleStreams.UseUtf8WhenRedirected();
+        return Drive(args);
+    }
+
+    /// <summary>The driver behind <see cref="Main"/>, on the streams it finds: what the tests call,
+    /// with streams of their own.</summary>
+    public static int Drive(string[] args)
+    {
         var given = args;
         try
         {
