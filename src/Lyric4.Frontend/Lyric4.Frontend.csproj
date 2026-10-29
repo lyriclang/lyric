@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Lyric 4.6's front end, frozen for the migration from Lyric 4 (design/v5/spec/12 R1 F1): the lexer, the
+    parser, the syntax tree, the resolver and the checker of release/v4.6.0 with the part of
+    Lyric.Core they read, under the namespaces Lyric4.*, and 4.6's standard library as resources.
+    tooling/from4/freeze.py writes the frozen directories and frozen.sha256; nothing else edits
+    them. From4/ is this project's own code: what reads a 4.x program with the copy.
+  -->
+  <PropertyGroup>
+    <AssemblyName>Lyric4.Frontend</AssemblyName>
+    <RootNamespace>Lyric4</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="stdlib\**\*.lyr" LogicalName="stdlib/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

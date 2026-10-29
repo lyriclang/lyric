@@ -1,0 +1,50 @@
+// Frozen from release/v4.6.0 (002b7a4b) by tooling/from4/freeze.py: Lyric 4.6 as it was. Do not edit.
+namespace Lyric4.Core;
+
+/// <summary>
+/// A half-open byte range within a source file: [Start, End).
+/// </summary>
+/// <remarks>
+/// 0-based UTF-16 code unit indices into the file's source text
+/// Use <see cref="SourceManager.Locate(Span)"/> to convert to line/column.
+/// </remarks>
+public readonly record struct Span(FileId File, int Start, int End)
+{
+    public int Length => End - Start;
+
+    public bool IsEmpty => Start == End;
+
+    public bool Contains(int offset) => offset >= Start && offset < End;
+
+    /// <summary>
+    /// Returns the smallest span that covers both this span and <paramref name="other"/>.
+    /// Both spans must reference the same file.
+    /// </summary>
+    public Span Union(Span other)
+    {
+        if (other.File != File)
+        {
+            throw new ArgumentException(
+                $"cannot union spans from different files: {File} vs {other.File}",
+                nameof(other));
+        }
+        return new Span(File, Math.Min(Start, other.Start), Math.Max(End, other.End));
+    }
+
+    /// <summary>
+    /// Returns the smallest span that covers both <paramref name="first"/> and <paramref name="second"/>.
+    /// Both spans must reference the same file.
+    /// </summary>
+    public static Span Union(Span first, Span second)
+    {
+        if (first.File != second.File)
+        {
+            throw new ArgumentException(
+                $"cannot union spans from different files: {first.File} vs {second.File}",
+                nameof(second));
+        }
+        return new Span(first.File, Math.Min(first.Start, second.Start), Math.Max(first.End, second.End));
+    }
+
+    public override string ToString() => $"{File}[{Start}..{End})";
+}

@@ -1,0 +1,13 @@
+// A module WITHOUT an entry point: valid bytecode, but not a program.
+//
+// This is the normal case for embedded code: a host loads the module and calls individual functions
+// out of it without there ever being a 'main'. 'lyric run' on it is therefore an error
+// (LYR-VM0001); 'lyrc build' and 'lyrvm verify' are not, because the Start section is optional.
+
+pub fn onStart(): int {
+    return 0;
+}
+
+pub fn onUpdate(frame: int): int {
+    return frame + 1;
+}

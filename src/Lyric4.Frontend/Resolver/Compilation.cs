@@ -1,0 +1,248 @@
+// Frozen from release/v4.6.0 (002b7a4b) by tooling/from4/freeze.py: Lyric 4.6 as it was. Do not edit.
+using Lyric4.AST;
+using Lyric4.Core;
+
+namespace Lyric4.Resolver;
+
+/// <summary>
+/// What a <see cref="Compilation.ModuleLoader"/> produces for one module path.
+///
+/// <para>A named record rather than a tuple: the third member is documentation and the second is a
+/// flag, and at that width a positional tuple stops being readable at the call site. Declared here,
+/// where the consumer is, so the loader's implementation can live beside the parser without the
+/// resolver depending on it.</para>
+/// </summary>
+public sealed record LoadedModule(Module Ast, bool IsNative, DocumentationTable Documentation);
+
+/// <summary>
+/// Holds the parsed modules of a translation unit and drives resolution.
+///
+/// Single-file first: usually one module, but several are possible, and then their imports resolve
+/// against each other. Modules outside the compilation (the standard library) count as
+/// extern/opak.
+/// </summary>
+public sealed class Compilation
+{
+    private readonly SourceManager _sm;
+    private readonly DiagnosticEngine _de;
+    private readonly SymbolTable _builtins = BuiltinTypes.CreateScope();
+    private readonly List<ModuleSymbol> _modules = new();
+    private readonly Dictionary<ModuleSymbol, Module> _asts = new(ReferenceEqualityComparer.Instance);
+
+    public Compilation(SourceManager sm, DiagnosticEngine de)
+    {
+        _sm = sm;
+        _de = de;
+    }
+
+    private readonly HashSet<ModuleSymbol> _native = new(ReferenceEqualityComparer.Instance);
+
+    public IReadOnlyList<ModuleSymbol> Modules => _modules;
+    public SymbolTable Builtins => _builtins;
+    public ExtensionRegistry Extensions { get; } = new();
+
+    /// <summary>
+    /// Loads a module that is not yet in the compilation. Returns <c>null</c> when the path does
+    /// not exist.
+    ///
+    /// <para>A delegate rather than a fixed dependency, so <c>Lyric4.Resolver</c> need not
+    /// reference <c>Lyric4.Parsing</c>. The implementation lives where the parser lives.</para>
+    /// </summary>
+    public Func<string[], LoadedModule?>? ModuleLoader { get; set; }
+
+    /// <summary>
+    /// The documentation of every module in this compilation, gathered as they are added.
+    ///
+    /// <para>Here rather than beside the syntax because a doc block is written per file and asked
+    /// for per program: hovering a standard library call has to reach a table the entry module knows
+    /// nothing about.</para>
+    /// </summary>
+    public DocumentationTable Documentation { get; } = new();
+
+    /// <summary>
+    /// Does the module come from the standard library? Only there is a bodyless function an import
+    /// declaration; anywhere else it is an error (<c>LYR-SEM0051</c>).
+    ///
+    /// <para>The property follows the ORIGIN, not the content.
+    /// a user could obtain native functions by naming their module <c>std.foo</c>.</para>
+    /// </summary>
+    public bool IsNative(ModuleSymbol module) => _native.Contains(module);
+
+    /// <summary>Does module <paramref name="from"/> see declarations from <paramref name="to"/>?
+    /// The same module, or an import of <paramref name="to"/>.</summary>
+    public bool Sees(ModuleSymbol from, ModuleSymbol to)
+    {
+        if (ReferenceEquals(from, to)) return true;
+
+        // 'std.core' is always visible without an import. It is the module the language itself
+        // uses: 'panic' and 'coroutineEnded' live there and are bound by the compiler, in a
+        // dispatcher nobody wrote.
+        //
+        // The 'Display' extensions for the built-ins hang there too, so without this rule a
+        // program would have to import 'std.core' just to satisfy the constraint of
+        // does. The same model as Roslyn's well-known members.
+        if (to.FullName == "std.core") return true;
+        foreach (var decl in AstOf(from).Declarations)
+            if (decl is ImportDecl imp && FindModule(imp.Path) is { } t && ReferenceEquals(t, to))
+                return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Registers a module. A <paramref name="name"/> given by the caller wins; otherwise the header
+    /// decides, and without one the module is "main".
+    ///
+    /// <para>The caller wins because it knows something the file does not: a loaded module was found
+    /// at a path, and a host that supplies a name needs that name to call back in. When the header
+    /// disagrees with a path it was loaded from, the mismatch is reported before this is
+    /// reached — here the name is simply the authority.</para>
+    /// </summary>
+    /// <param name="documentation">What was written above the declarations of this module.
+    /// <c>null</c> means none was kept — a caller that parsed without holding on to it, and a
+    /// program that then has no documentation to show rather than the wrong one.</param>
+    public ModuleSymbol AddModule(Module ast, string? name = null, bool isNative = false,
+        DocumentationTable? documentation = null)
+    {
+        var path = name is not null ? name.Split('.')
+                 : ast.Header is not null ? ast.Header.Segments
+                 : ["main"];
+
+        // Two files claiming one module name: everything downstream assumes a name means ONE
+        // module — imports find the first, symbols of the second shadow nothing and resolve
+        // nowhere obvious. The import loaders guard with FindModule before loading, so this fires
+        // for two ROOTS of a project compilation, which is exactly where a user can cause it.
+        if (FindModule(path) is { } existing)
+        {
+            var second = ast.Header?.Span ?? ast.Span;
+            var firstAst = AstOf(existing);
+            _de.Report("LYR-RES0007", Severity.Error, second,
+                $"module '{string.Join('.', path)}' is declared by more than one file",
+                new DiagnosticNote(firstAst.Header?.Span ?? firstAst.Span, "also declared here"));
+        }
+
+        var members = new SymbolTable(_builtins); // the parent is the builtins, so 'int' and friends resolve through the lookup chain
+        var symbol = new ModuleSymbol(path, members, ast);
+        _modules.Add(symbol);
+        _asts[symbol] = ast;
+        if (isNative) _native.Add(symbol);
+        if (documentation is not null) Documentation.Absorb(documentation);
+        return symbol;
+    }
+
+    /// <summary>
+    /// Loads everything an <c>import</c> requires and that is not there yet, transitively.
+    ///
+    /// <para>It runs BEFORE resolution rather than during it, or the module list would grow while
+    /// the resolver iterates over it. The loop is index-based because <c>_modules</c> grows in its
+    /// body.</para>
+    ///
+    /// <para>A cycle terminates by itself: only what <see cref="FindModule"/> does not yet know is
+    /// loaded, and registration happens before a module's own imports are examined.</para>
+    /// </summary>
+    /// <summary>
+    /// Modules the COMPILER itself needs, regardless of what the user imports: the f-string
+    /// lowering calls <c>std.string.concat</c> and the <c>fromXxx</c> converters.
+    /// </summary>
+    private static readonly string[][] WellKnownModules =
+        [["std", "string"], ["std", "core"], ["std", "iter"], ["std", "fmt"],
+            ["std", "collections"]];
+
+    private void LoadImportedModules()
+    {
+        if (ModuleLoader is null) return;
+
+        foreach (var path in WellKnownModules)
+        {
+            if (FindModule(path) is not null) continue;
+            if (ModuleLoader(path) is not { } wellKnown) continue; // without a stdlib path this does not apply
+            AddModule(wellKnown.Ast, string.Join('.', path), wellKnown.IsNative,
+                wellKnown.Documentation);
+        }
+
+        for (var i = 0; i < _modules.Count; i++)
+        {
+            foreach (var decl in AstOf(_modules[i]).Declarations)
+            {
+                if (decl is not ImportDecl import) continue;
+                if (FindModule(import.Path) is not null) continue;
+                if (ModuleLoader(import.Path) is not { } loaded) continue;
+
+                var name = string.Join('.', import.Path);
+
+                // A file found at a path must agree that it lives there. Without the check the
+                // module registers under the name its header claims, the import that pulled it in
+                // still finds nothing, and the message says "cannot find" about a file that was
+                // just read — and a second importer loads it a second time.
+                if (loaded.Ast.Header is { } header && !header.Segments.SequenceEqual(import.Path))
+                    _de.Report("LYR-RES0006", Severity.Error, header.Span,
+                        $"this file was loaded as '{name}' but declares module "
+                        + $"'{string.Join('.', header.Segments)}'");
+
+                AddModule(loaded.Ast, name, loaded.IsNative, loaded.Documentation);
+            }
+        }
+    }
+
+    public Module AstOf(ModuleSymbol module) => _asts[module];
+
+    public ModuleSymbol? FindModule(string[] path) =>
+        _modules.FirstOrDefault(m => m.Path.Length == path.Length && m.Path.SequenceEqual(path));
+
+    /// <summary>
+    /// The modules in the order their globals are initialized: every module AFTER the ones it
+    /// imports.
+    ///
+    /// <para><see cref="Modules"/> is discovery order — the entry file, then what its imports
+    /// pulled in, breadth first. Initializing in that order made a third module decide whether a
+    /// second one compiles: <c>b</c> reading a global of <c>a</c> was fine when the entry imported
+    /// <c>a</c> first and an error otherwise, including when <c>b</c> was compiled on its own.
+    /// The import IS the dependency statement, and it is already there to be read.</para>
+    ///
+    /// <para>A depth-first post-order over the import edges, seeded with the modules the compiler
+    /// binds WITHOUT an import (§4.4): those are dependencies too, they are simply not written
+    /// down, and a program that never names <c>std.string</c> still reaches it through an
+    /// f-string.</para>
+    ///
+    /// <para>A CYCLE cannot be ordered, and the resolver already refuses one
+    /// (<c>LYR-RES0005</c>). The guard below is not tolerance, then, but survival: the sema runs
+    /// on the broken graph anyway — one error does not stop the pass that would report the next
+    /// twenty — and a walk that recursed into a cycle would hang instead of letting the diagnostic
+    /// through.</para>
+    ///
+    /// <para>Deterministic: the walk follows this list and each module's declarations, so the same
+    /// input yields the same order and therefore the same bytecode.</para>
+    /// </summary>
+    public IReadOnlyList<ModuleSymbol> InitializationOrder()
+    {
+        var order = new List<ModuleSymbol>(_modules.Count);
+        var seen = new HashSet<ModuleSymbol>(ReferenceEqualityComparer.Instance);
+
+        foreach (var path in WellKnownModules)
+            if (FindModule(path) is { } wellKnown)
+                Visit(wellKnown);
+
+        foreach (var module in _modules) Visit(module);
+        return order;
+
+        void Visit(ModuleSymbol module)
+        {
+            // Already placed, or standing on the stack above us — which is the cycle, and the
+            // reason this is an Add-once guard rather than a three-colour walk.
+            if (!seen.Add(module)) return;
+
+            foreach (var decl in AstOf(module).Declarations)
+                if (decl is ImportDecl import && FindModule(import.Path) is { } imported)
+                    Visit(imported);
+
+            order.Add(module);
+        }
+    }
+
+    /// <summary>Resolves every module and returns the binding side table. Errors go to the
+    /// diagnostic engine as LYR-RES####.</summary>
+    public BindingResult Resolve()
+    {
+        LoadImportedModules();
+        return new Resolver(this, _sm, _de).Run();
+    }
+}

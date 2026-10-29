@@ -1,0 +1,429 @@
+// Frozen from release/v4.6.0 (002b7a4b) by tooling/from4/freeze.py: Lyric 4.6 as it was. Do not edit.
+using Lyric4.AST;
+using Lyric4.Core;
+using Lyric4.Lexing;
+
+namespace Lyric4.Parsing;
+
+/// <summary>
+/// The statement parser, recursive descent. Dispatch is on the first token; anything without a
+/// statement keyword is an <c>ExprStmt</c>. Control statements hold their body as a <c>Block</c>.
+/// Like the rest of the parser: never throw,
+/// reporting errors as LYR-PAR#### plus an ErrorStmt or ErrorExpr, then carrying on as best it can.
+/// </summary>
+public sealed partial class Parser
+{
+    /// <summary>Entry point for exactly ONE statement; a block covers sequences.</summary>
+    public Stmt ParseStatement()
+    {
+        var stmt = ParseStmt();
+        if (!_buffer.AtEnd)
+            _de.Report("LYR-PAR0001", Severity.Error, _buffer.Current.Span,
+                $"unexpected token after statement: {_buffer.Current.TokenKind}");
+        return stmt;
+    }
+
+    private Stmt ParseStmt() => _buffer.Current.TokenKind switch
+    {
+        // 'name:' at the start of a statement is a loop label — nothing else begins that way
+        // (§6.8: an expression statement is a call, an assignment or 'resume').
+        TokenKind.Identifier when _buffer.Peek(1).TokenKind == TokenKind.Colon => ParseLabeled(),
+        TokenKind.LBrace => ParseBlock(),
+        TokenKind.Let or TokenKind.Var => ParseBinding(),
+        TokenKind.If => ParseIf(),
+        TokenKind.While => ParseWhile(),
+        TokenKind.Do => ParseDoWhile(),
+        TokenKind.For => ParseForIn(),
+        TokenKind.Break => ParseBreak(),
+        TokenKind.Continue => ParseContinue(),
+        TokenKind.Return => ParseReturn(),
+        TokenKind.Yield => ParseYield(),
+        TokenKind.Defer => ParseDefer(),
+        TokenKind.Throw => ParseThrow(),
+        TokenKind.Try => ParseTry(),
+        TokenKind.Match => ParseMatchStmt(),
+        _ => ParseExprStmt(),
+    };
+
+    /// <summary>'outer: while (…) { … }' — the label names the loop that follows it, and only a
+    /// loop. On anything else the label is reported and the statement parsed as written, so one
+    /// misplaced label yields one diagnostic rather than a cascade.</summary>
+    private Stmt ParseLabeled()
+    {
+        var nameTok = _buffer.Advance(); // IDENTIFIER
+        _buffer.Advance();               // ':'
+        var label = _sm.Slice(nameTok.Span).ToString();
+        var start = nameTok.Span;
+        switch (_buffer.Current.TokenKind)
+        {
+            case TokenKind.While:
+            {
+                var w = (WhileStmt)ParseWhile();
+                return w with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, w.Span) };
+            }
+            case TokenKind.Do:
+            {
+                var d = (DoWhileStmt)ParseDoWhile();
+                return d with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, d.Span) };
+            }
+            case TokenKind.For:
+            {
+                var f = (ForInStmt)ParseForIn();
+                return f with { Label = label, LabelSpan = nameTok.Span, Span = Span.Union(start, f.Span) };
+            }
+            default:
+                _de.Report("LYR-PAR0044", Severity.Error, nameTok.Span,
+                    $"a label names a loop: expected 'while', 'do' or 'for' after '{label}:'");
+                return ParseStmt();
+        }
+    }
+
+    private Stmt ParseMatchStmt()
+    {
+        var kw = _buffer.Advance(); // 'match'
+        var (scrutinee, arms, end) = ParseMatchCore();
+        return new MatchStmt(scrutinee, arms, Span.Union(kw.Span, end));
+    }
+
+    /// <summary>A block; with <paramref name="valueBlock"/> one in value position — a match arm,
+    /// a lambda body — whose last statement may be a tail expression without ';' (§6.9). The flag
+    /// holds for the block's OWN statements only: a nested statement block resets it, so a tail
+    /// can stand exactly where its value has somewhere to go.</summary>
+    private Block ParseBlock(bool valueBlock = false)
+    {
+        var open = _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open block");
+        var stmts = new List<Stmt>();
+        var savedTail = _allowTail;
+        _allowTail = valueBlock;
+        while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
+        {
+            var before = _buffer.Position;
+            stmts.Add(ParseStmt());
+            if (_buffer.Position == before && !_buffer.AtEnd)
+                _buffer.Advance(); // force progress, so an unconsumed token cannot loop forever
+        }
+        var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close block");
+        _allowTail = savedTail;
+        return new Block(stmts.ToArray(), Span.Union(open.Span, close.Span));
+    }
+
+    private Stmt ParseBinding()
+    {
+        var kw = _buffer.Advance(); // let / var
+        var isMutable = kw.TokenKind == TokenKind.Var;
+
+        // 'let (a, b) = …' — destructuring. The parenthesis decides, and at this position it can
+        // introduce nothing else: a binding name is an identifier.
+        if (_buffer.Check(TokenKind.LParen)) return ParseDestructuring(kw, isMutable);
+
+        // 'let [a, b] = …': a bracket where a name stands opens an array pattern.
+        if (_buffer.Check(TokenKind.LBracket)) return ParseLetPattern(kw, isMutable);
+
+        // 'let Circle(r) = …', 'let Point { x, y } = …', 'let Shape.Empty = …': a name followed
+        // by '(', '{' or '.' opens a pattern, never a binding — a binding name is followed by
+        // ':', '=' or ';'.
+        if (_buffer.Check(TokenKind.Identifier)
+            && _buffer.Peek(1).TokenKind is TokenKind.LParen or TokenKind.LBrace or TokenKind.Dot)
+            return ParseLetPattern(kw, isMutable);
+
+        var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0020",
+            $"expected binding name, got {_buffer.Current.TokenKind}");
+        TypeNode? type = _buffer.Match(TokenKind.Colon) ? ParseType() : null;
+        Expr? init = _buffer.Match(TokenKind.Equal) ? ParseExpr(0) : null;
+
+        // 'let x = opt else { return; };' — the plain name is a pattern too, and the 'else'
+        // makes it a let-else. An if-expression initializer has already consumed its own
+        // 'else', so the one seen here is unambiguous.
+        if (init is not null && _buffer.Check(TokenKind.Else))
+        {
+            _buffer.Advance();
+            var elseBlock = ParseBlock();
+            var end = ExpectSemicolon();
+            return new LetPatternStmt(isMutable, new BindingPattern(_sm.Slice(nameTok.Span).ToString(), nameTok.Span),
+                type, init, elseBlock, Span.Union(kw.Span, end.Span));
+        }
+
+        var semi = ExpectSemicolon();
+        return new BindingStmt(isMutable, _sm.Slice(nameTok.Span).ToString(), type, init,
+            Span.Union(kw.Span, semi.Span)) { NameSpan = nameTok.Span };
+    }
+
+    /// <summary>
+    /// <c>let Pattern [: Type] = Expr [else Block];</c> — a binding through any pattern. The
+    /// else block is what makes a pattern that can fail legal here; whether it is needed is the
+    /// sema's question (LYR-SEM0098), the grammar takes both forms.
+    /// </summary>
+    private Stmt ParseLetPattern(Token kw, bool isMutable)
+    {
+        var pattern = ParseOrPattern();
+        TypeNode? type = _buffer.Match(TokenKind.Colon) ? ParseType() : null;
+        if (!_buffer.Match(TokenKind.Equal))
+        {
+            _de.Report("LYR-PAR0020", Severity.Error, _buffer.Current.Span,
+                "a pattern binding needs an initializer ('let Circle(r) = …;')");
+            var bad = ExpectSemicolon();
+            return new LetPatternStmt(isMutable, pattern, type, new ErrorExpr(bad.Span), null,
+                Span.Union(kw.Span, bad.Span));
+        }
+        var init = ParseExpr(0);
+        Block? elseBlock = _buffer.Match(TokenKind.Else) ? ParseBlock() : null;
+        var semi = ExpectSemicolon();
+        return new LetPatternStmt(isMutable, pattern, type, init, elseBlock, Span.Union(kw.Span, semi.Span));
+    }
+
+    /// <summary>
+    /// The condition of an <c>if</c> or a <c>while</c>: an expression, or <c>let Pattern = Expr</c>.
+    /// Unambiguous, because <c>let</c> is a keyword and begins no expression.
+    /// </summary>
+    private Expr ParseCondition()
+    {
+        if (!_buffer.Check(TokenKind.Let)) return ParseExpr(0);
+        var kw = _buffer.Advance();
+        var pattern = ParseOrPattern();
+        _buffer.Expect(TokenKind.Equal, "LYR-PAR0020", "expected '=' after the pattern of a 'let' condition");
+        var init = ParseExpr(0);
+        return new LetCondExpr(pattern, init, Span.Union(kw.Span, init.Span));
+    }
+
+    /// <summary>
+    /// <c>let (a, b) = pair;</c> — see <c>docs/Grammar.md</c> §5.
+    ///
+    /// <para>The pattern is parsed as an ordinary tuple pattern — the same one a
+    /// <c>match</c> arm uses. Whatever holds there holds here: nested
+    /// pattern uses, with <c>_</c> as a placeholder, and the arity has to match.</para>
+    /// </summary>
+    private Stmt ParseDestructuring(Token kw, bool isMutable)
+    {
+        // ParseOrPattern rather than ParsePattern: the latter is the test entry point and requires
+        // the file to end after it.
+        var pattern = ParseOrPattern();
+        if (pattern is not TuplePattern tuple)
+        {
+            _de.Report("LYR-PAR0020", Severity.Error, pattern.Span,
+                "a destructuring binding needs a tuple pattern like '(a, b)'");
+            tuple = new TuplePattern([], pattern.Span);
+        }
+
+        TypeNode? type = _buffer.Match(TokenKind.Colon) ? ParseType() : null;
+
+        // The initializer is required: without it there would be nothing to take apart, and the
+        // definite-assignment analysis would have to track several names without a value.
+        if (!_buffer.Match(TokenKind.Equal))
+        {
+            _de.Report("LYR-PAR0020", Severity.Error, _buffer.Current.Span,
+                "a destructuring binding needs an initializer ('let (a, b) = …;')");
+            var bad = ExpectSemicolon();
+            return new DestructuringStmt(isMutable, tuple, type, new ErrorExpr(bad.Span),
+                Span.Union(kw.Span, bad.Span));
+        }
+
+        var init = ParseExpr(0);
+        var semi = ExpectSemicolon();
+        return new DestructuringStmt(isMutable, tuple, type, init, Span.Union(kw.Span, semi.Span));
+    }
+
+    private Stmt ParseIf()
+    {
+        var kw = _buffer.Advance(); // if
+        _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'if'");
+        var cond = ParseCondition();
+        _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after if-condition");
+        var then = ParseBlock();
+
+        Stmt? elseBranch = null;
+        var end = then.Span;
+        if (_buffer.Match(TokenKind.Else))
+        {
+            elseBranch = _buffer.Check(TokenKind.If) ? ParseIf() : ParseBlock(); // else-if kettet
+            end = elseBranch.Span;
+        }
+        return new IfStmt(cond, then, elseBranch, Span.Union(kw.Span, end));
+    }
+
+    private Stmt ParseWhile()
+    {
+        var kw = _buffer.Advance(); // while
+        _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'while'");
+        var cond = ParseCondition();
+        _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after while-condition");
+        var body = ParseBlock();
+        return new WhileStmt(cond, body, Span.Union(kw.Span, body.Span));
+    }
+
+    private Stmt ParseDoWhile()
+    {
+        var kw = _buffer.Advance(); // do
+        var body = ParseBlock();
+        _buffer.Expect(TokenKind.While, "LYR-PAR0022", "expected 'while' after do-block");
+        _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'while'");
+        var cond = ParseExpr(0);
+        _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after while-condition");
+        var semi = ExpectSemicolon();
+        return new DoWhileStmt(body, cond, Span.Union(kw.Span, semi.Span));
+    }
+
+    private Stmt ParseForIn()
+    {
+        var kw = _buffer.Advance(); // for
+        _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'for'");
+
+        // 'for ((k, v) in …)': a parenthesis where the name stands opens a pattern — the
+        // element is taken apart at the top of every iteration. Only names stood here before,
+        // so the form is free.
+        if (_buffer.Check(TokenKind.LParen))
+        {
+            var patternStart = new Span(_buffer.Current.Span.File,
+                _buffer.Current.Span.Start, _buffer.Current.Span.Start); // no name: an empty span
+            var pattern = ParseTuplePattern();
+            _buffer.Expect(TokenKind.In, "LYR-PAR0021", "expected 'in' in for-loop");
+            var patternIter = ParseExpr(0);
+            _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after for-loop header");
+            var patternBody = ParseBlock();
+            return new ForInStmt("_", patternIter, patternBody, Span.Union(kw.Span, patternBody.Span))
+                { NameSpan = patternStart, Pattern = pattern };
+        }
+
+        var varTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0020",
+            $"expected loop variable, got {_buffer.Current.TokenKind}");
+        _buffer.Expect(TokenKind.In, "LYR-PAR0021", "expected 'in' in for-loop");
+        var iter = ParseExpr(0);
+        _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after for-loop header");
+        var body = ParseBlock();
+        return new ForInStmt(_sm.Slice(varTok.Span).ToString(), iter, body, Span.Union(kw.Span, body.Span))
+            { NameSpan = varTok.Span };
+    }
+
+    private Stmt ParseBreak()
+    {
+        var kw = _buffer.Advance();
+        var (label, labelSpan) = ParseOptionalLabel();
+        var semi = ExpectSemicolon();
+        return new BreakStmt(Span.Union(kw.Span, semi.Span)) { Label = label, LabelSpan = labelSpan };
+    }
+
+    private Stmt ParseContinue()
+    {
+        var kw = _buffer.Advance();
+        var (label, labelSpan) = ParseOptionalLabel();
+        var semi = ExpectSemicolon();
+        return new ContinueStmt(Span.Union(kw.Span, semi.Span)) { Label = label, LabelSpan = labelSpan };
+    }
+
+    /// <summary>'break outer;' — the identifier, when one stands before the ';'.</summary>
+    private (string? label, Span span) ParseOptionalLabel()
+    {
+        if (!_buffer.Check(TokenKind.Identifier)) return (null, default);
+        var tok = _buffer.Advance();
+        return (_sm.Slice(tok.Span).ToString(), tok.Span);
+    }
+
+    private Stmt ParseReturn()
+    {
+        var kw = _buffer.Advance();
+        Expr? value = _buffer.Check(TokenKind.Semicolon) ? null : ParseExpr(0);
+        var semi = ExpectSemicolon();
+        return new ReturnStmt(value, Span.Union(kw.Span, semi.Span));
+    }
+
+    private Stmt ParseYield()
+    {
+        var kw = _buffer.Advance();
+        Expr? value = _buffer.Check(TokenKind.Semicolon) ? null : ParseExpr(0);
+        var semi = ExpectSemicolon();
+        return new YieldStmt(value, Span.Union(kw.Span, semi.Span));
+    }
+
+    // resume is an expression; 'resume co;' runs as an ExprStmt through ParseExprStmt.
+
+    private Stmt ParseDefer()
+    {
+        var kw = _buffer.Advance();
+        Stmt body;
+        if (_buffer.Check(TokenKind.LBrace))
+        {
+            body = ParseBlock();
+        }
+        else
+        {
+            var expr = ParseExpr(0);
+            var semi = ExpectSemicolon();
+            body = new ExprStmt(expr, Span.Union(expr.Span, semi.Span));
+        }
+        return new DeferStmt(body, Span.Union(kw.Span, body.Span));
+    }
+
+    private Stmt ParseThrow()
+    {
+        var kw = _buffer.Advance();
+        var value = ParseExpr(0);
+        // 'throw e' as the tail of a value block: the arm's value is 'never' (§6.9), and the
+        // block diverges — the same thing 'throw e;' says, in the position a tail stands in.
+        if (_allowTail && _buffer.Check(TokenKind.RBrace))
+        {
+            var span = Span.Union(kw.Span, value.Span);
+            return new TailExprStmt(new ThrowExpr(value, span), span);
+        }
+        var semi = ExpectSemicolon();
+        return new ThrowStmt(value, Span.Union(kw.Span, semi.Span));
+    }
+
+    private Stmt ParseTry()
+    {
+        var kw = _buffer.Advance(); // try
+        var body = ParseBlock();
+        var catches = new List<CatchClause>();
+        while (_buffer.Check(TokenKind.Catch))
+            catches.Add(ParseCatch());
+        if (catches.Count == 0)
+            _de.Report("LYR-PAR0023", Severity.Error, Span.Union(kw.Span, body.Span),
+                "try needs at least one catch clause");
+        var end = catches.Count > 0 ? catches[^1].Span : body.Span;
+        return new TryStmt(body, catches.ToArray(), Span.Union(kw.Span, end));
+    }
+
+    private CatchClause ParseCatch()
+    {
+        var kw = _buffer.Advance(); // catch
+        _buffer.Expect(TokenKind.LParen, "LYR-PAR0019", "expected '(' after 'catch'");
+        // CatchBinding: '_' | IDENTIFIER ':' TypeExpr | IDENTIFIER  ('_' is an identifier)
+        var idTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0020",
+            $"expected catch binding, got {_buffer.Current.TokenKind}");
+        var text = _sm.Slice(idTok.Span).ToString();
+        string? name = text == "_" ? null : text; // '_' means catch-all without a binding
+        TypeNode? type = _buffer.Match(TokenKind.Colon) ? ParseType() : null;
+        _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' after catch binding");
+        var body = ParseBlock();
+        return new CatchClause(name, type, body, Span.Union(kw.Span, body.Span)) { NameSpan = idTok.Span };
+    }
+
+    private Stmt ParseExprStmt()
+    {
+        // No struct initializer at the start of a statement: 'Foo { … };' would otherwise be
+        // ambiguous with a block. In value positions (bindings, arguments) it stays allowed.
+        var saved = _allowStructInit;
+        _allowStructInit = false;
+        var expr = ParseExpr(0);
+        _allowStructInit = saved;
+        // In a value block an expression followed by the closing brace is the block's tail: the
+        // one place a missing ';' is not an error (it was one before 4.5, so nothing changes
+        // meaning). A tail struct initializer needs parentheses, like any statement-first one.
+        //
+        // BEFORE the trailing-lambda rule below, because it is the narrower question: '_allowTail'
+        // holds only inside a value block, and there the last expression IS the value — including
+        // when it is written as a trailing lambda.
+        if (_allowTail && _buffer.Check(TokenKind.RBrace))
+            return new TailExprStmt(expr, expr.Span);
+
+        // 'xs.forEach { println(it); }' — a statement that ends in a trailing lambda's '}'
+        // needs no ';', as a block arm of a match needs no ','. One may still stand there.
+        if (expr is CallExpr { Arguments: [.., LambdaExpr { Form: LambdaForm.Trailing }] } && !_buffer.Check(TokenKind.Semicolon))
+            return new ExprStmt(expr, expr.Span);
+
+        var semi = ExpectSemicolon();
+        return new ExprStmt(expr, Span.Union(expr.Span, semi.Span));
+    }
+
+
+    private Token ExpectSemicolon() =>
+        _buffer.Expect(TokenKind.Semicolon, "LYR-PAR0016", "expected ';'");
+}

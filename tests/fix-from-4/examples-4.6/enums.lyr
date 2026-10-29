@@ -1,0 +1,45 @@
+// enums.lyr — complexity: medium
+// Shows: an enum with unit, tuple and struct variants, methods, and `match` as an expression and as
+// a statement. `shapes.lyr` is the same subject fully built out, with `for-in` and `std.math`.
+
+import std.io.console { println };
+
+pub enum Shape {
+    Circle(int),
+    Rect { w: int, h: int },
+    Empty;
+
+    // Every variant has its own layout, and the tag decides which one is present. `match` reads the
+    // tag and narrows afterwards, so the field access is an ordinary field access.
+    fn area(): int {
+        return match (this) {
+            Circle(r) => r * r * 3,
+            Rect { w, h } => w * h,
+            Empty => 0,
+        };
+    }
+
+    fn name(): string {
+        return match (this) {
+            Circle(_) => "Kreis",
+            Rect { w, h } => "Rechteck",
+            Empty => "Leer",
+        };
+    }
+}
+
+fn describe(s: Shape) {
+    println(f"{s.name()}: Flaeche = {s.area()}");
+}
+
+fn main(): int {
+    let circle = Shape.Circle(2);
+    let rect: Shape = Shape.Rect { w = 3, h = 4 };
+    let empty = Shape.Empty;
+
+    describe(circle);
+    describe(rect);
+    describe(empty);
+
+    return circle.area() + rect.area() + empty.area();
+}

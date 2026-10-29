@@ -1,0 +1,62 @@
+// Patterns that nest: a state machine as ONE table over a tuple of enums.
+//
+// Before the pattern compiler (4.5) a tuple pattern could hold names and '_' only, a variant
+// could not sit inside a variant, and a literal could not sit inside a payload — this program
+// crashed the compiler at the first arm. Now every arm is tried in the order written, the
+// tuple elements are tested left to right, and the first arm whose pattern and guard both
+// hold answers.
+import std.io.console { println };
+
+enum State {
+    Idle,
+    Connecting { attempt: int },
+    Connected(string),
+    Closed { reason: string },
+}
+
+enum Event {
+    Dial(string),
+    Timeout,
+    Data(int),
+    Hangup,
+}
+
+fn step(s: State, ev: Event): State {
+    return match ((s, ev)) {
+        (Idle, Dial(host)) => State.Connected(host),
+        (Connecting { attempt }, Timeout) if attempt < 3 => State.Connecting {
+            attempt = attempt + 1,
+        },
+        (Connecting { attempt = 3 }, Timeout) => State.Closed { reason = "gave up" },
+        (Connecting { attempt = _ }, Dial(h)) => State.Connected(h),
+        (Connected(_), Hangup) => State.Closed { reason = "hangup" },
+        (Connected(_) | Idle, Data(0)) => State.Closed { reason = "empty frame" },
+        _ => s,
+    };
+}
+
+fn show(s: State): string {
+    return match (s) {
+        Idle => "Idle",
+        Connecting { attempt } => f"Connecting({attempt})",
+        Connected(h) => "Connected(" + h + ")",
+        Closed { reason } => "Closed(" + reason + ")",
+    };
+}
+
+fn main(): int {
+    var s = State.Connecting { attempt = 1 };
+    for (ev in [Event.Timeout, Event.Timeout, Event.Timeout, Event.Dial("x")]) {
+        s = step(s, ev);
+        println(show(s));
+    }
+    s = step(step(State.Idle, Event.Dial("host")), Event.Data(0));
+    println(show(s));
+    return 0;
+}
+// Output:
+// Connecting(2)
+// Connecting(3)
+// Closed(gave up)
+// Closed(gave up)
+// Closed(empty frame)
