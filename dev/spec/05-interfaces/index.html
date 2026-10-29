@@ -61,7 +61,9 @@ their blanket under <a href="#13-generic-extends">§13</a> rule 9. What is not w
 <strong>default</strong> body. A member carries no <code>pub</code> (<code>LYR-SEM0118</code>): an interface's members are
 public always (D14).</li>
 <li>A struct, a class or an enum <strong>conforms</strong> in its interface list, <code>struct S :: [I, J] { … }</code>,
-or through an extend block, <code>extend T :: [I] { … }</code>; every entry names an interface
+or through an extend block, <code>extend T :: [I] { … }</code> — one interface also without the brackets,
+<code>struct S :: I</code>, <code>extend T :: I</code>, the list rule (<a href="../../spec/02-grammar/">02</a>); several without them are refused
+(<code>LYR-PAR0066</code>) —; every entry names an interface
 (<code>LYR-SEM0078</code>). A conformance implements every abstract member of the interface's chain with
 an exact signature — arity, parameter types, return type, <code>mut</code> (<code>LYR-SEM0020</code>,
 <code>LYR-SEM0042</code>); a default may be left as it is, and an own member of the name overrides it.

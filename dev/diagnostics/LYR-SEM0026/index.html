@@ -247,7 +247,7 @@
 <p>A generic type, alias or function is given more or fewer type arguments than it declares type parameters (after defaults), or a function that is not generic is given type arguments.</p>
 <h2 id="explanation">Explanation</h2>
 <p><code>Cell&lt;T&gt;</code> takes one type argument and <code>Pair&lt;A, B&gt;</code> two; a type parameter with a default may be left out. A function that is not generic takes none.</p>
-<p>Write as many type arguments as the declaration has parameters, or leave them out where the context or the arguments determine them.</p>
+<p>Write as many type arguments as the declaration has parameters, or leave them out where the context or the arguments determine them. A call writes them all or none: <code>_</code> stands for one the inference is to fill — <code>arrayOf&lt;string, _&gt;(3, f)</code> writes <code>T</code> and leaves <code>E</code>, what <code>f</code> throws, to the call. Where a call writes too few, <code>lyric fix</code> adds a <code>_</code> for each one left out.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">struct</span> <span class="ty">Cell</span>&lt;<span class="ty">T</span>&gt; { v: <span class="ty">T</span> }
 

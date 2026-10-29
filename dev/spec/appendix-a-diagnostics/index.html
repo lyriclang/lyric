@@ -376,8 +376,8 @@ code is no longer reported, and its number is not given again.</p>
 <td>LYR-PAR0030</td>
 <td>E</td>
 <td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
-<td>a list after '::' without its '['</td>
-<td>The interfaces after <code>::</code> — of a struct, class, enum, interface or extend block, of a type parameter's constraints, of an associated type's bound — do not open with <code>[</code>.</td>
+<td>a list after '::' without its '[' <em>(retired)</em></td>
+<td>The interfaces after <code>::</code> did not open with <code>[</code>. Retired: the list rule: one interface after '::' stands without brackets, 'struct S :: I'; several without them are LYR-PAR0066</td>
 </tr>
 <tr>
 <td>LYR-PAR0031</td>
@@ -602,6 +602,13 @@ code is no longer reported, and its number is not given again.</p>
 <td><a href="../../spec/16-diagnostics/">16-diagnostics</a></td>
 <td>a 'continue', 'break' or 'return' where a value stands</td>
 <td>A jump stands where an expression is wanted — a match arm, a branch of an <code>if</code> expression —; it is a statement and goes in a block, <code>=&gt; { continue; }</code>.</td>
+</tr>
+<tr>
+<td>LYR-PAR0066</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>several interfaces after '::' without brackets</td>
+<td>Several interfaces follow <code>::</code> — of a struct, class, enum, interface or extend block, or of an associated type's bound — without brackets around them. One interface stands without them, several in them.</td>
 </tr>
 </tbody>
 </table>

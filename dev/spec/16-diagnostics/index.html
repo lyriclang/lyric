@@ -212,7 +212,9 @@ the changes as a unified diff on the standard output.</li>
 <li>The safe changes: <code>unused-import</code> takes the import out, or the one name out of its list;
 <code>unused-var</code> writes <code>let</code> for <code>var</code>; <code>useless-try</code> takes a plain <code>try</code> out (<code>try?</code> and <code>try!</code> change the
 value's type, and a <code>catch</code> is code); <code>needless-return</code> takes the <code>return;</code> out; <code>self-assignment</code>
-writes <code>x++</code> for <code>x = x++</code>; <code>deprecated</code> writes the <code>@Deprecated</code>'s <code>replacement</code> where it is a name.
+writes <code>x++</code> for <code>x = x++</code>; <code>deprecated</code> writes the <code>@Deprecated</code>'s <code>replacement</code> where it is a name;
+a call that writes fewer type arguments than the function has gets a <code>_</code> for each one left out
+(<code>LYR-SEM0026</code>), the call the inference would have made.
 A change that needs a reader: <code>naming</code>'s new name, written where the name is declared (its uses are an
 editor's rename); <code>self-assignment</code>'s removal of <code>x = x</code>, which may stand for an assignment meant
 otherwise; an unknown name's closest known one (<code>did you mean</code>).</li>

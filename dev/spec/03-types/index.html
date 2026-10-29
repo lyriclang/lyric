@@ -743,7 +743,8 @@ parameters take no default and no variadic rest (<code>LYR-PAR0060</code>).</li>
 <li>A function, a struct, a class, an enum, an interface and a type alias (<a href="#10-aliases">§10</a>)
 may declare <strong>type parameters</strong>,
 <code>fn ident&lt;T&gt;(x: T): T</code>, <code>struct Pair&lt;A, B&gt; { … }</code>; a parameter may carry <strong>constraints</strong>,
-<code>&lt;T :: [Show, Eq&lt;T&gt;]&gt;</code>, the interfaces an argument must satisfy (<a href="../../spec/05-interfaces/">05</a>).
+<code>&lt;T :: [Show, Eq&lt;T&gt;]&gt;</code>, the interfaces an argument must satisfy (<a href="../../spec/05-interfaces/">05</a>) — one also
+without the brackets, <code>&lt;T :: Show&gt;</code>, where a <code>,</code> after it begins the next parameter.
 Inside the declaration a value of type <code>T</code> has the members its constraints give it and no
 others (T18): the body is checked once, at the declaration, not per instance.</li>
 <li>An <strong>instance</strong> names the arguments: <code>Pair&lt;int, string&gt;</code>, <code>ident&lt;int&gt;</code>. Two argument lists
