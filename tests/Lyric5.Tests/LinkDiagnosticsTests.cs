@@ -92,7 +92,9 @@ public class LinkDiagnosticsTests
         var (exit, _, error) = RunRaw("build", "-C", dir, "--color", "never");
         Assert.Equal(2, exit);
         Assert.Contains("error[LYR-BLD0001]", error);
-        Assert.Contains("the directories searched for headers: " + Path.Combine(dir, "native", "include"), error);
+        // the package's directory as the manifest names it: '/' after the package's root on Windows too
+        Assert.Contains("the directories searched for headers: " + Path.Combine(dir, "native"), error);
+        Assert.Contains("include", error[error.IndexOf("the directories searched", StringComparison.Ordinal)..]);
     }
 
     [Fact]
