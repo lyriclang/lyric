@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYR-LNK0001 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">LNK</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../diagnostics/">All codes</a></li>
+<li><a class="current" href="../../diagnostics/LYR-LNK0001/">LYR-LNK0001</a></li>
+<li><a href="../../diagnostics/LYR-LNK0002/">LYR-LNK0002</a></li>
+<li><a href="../../diagnostics/LYR-LNK0003/">LYR-LNK0003</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
+<h1>LYR-LNK0001</h1>
+<p class="code-title">a C symbol nothing the link takes defines</p>
+<p class="meta">error · <a href="../../spec/15-project/">spec 15-project</a></p>
+<p>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when the linker finds no definition of a symbol the program or a package's C calls. The finding stands at the <code>extern</code> declaration that names the symbol, where the program declares it; else it says what references it. Nothing is linked; the exit code is 2.</p>
+<h2 id="explanation">Explanation</h2>
+<p>An <code>extern &quot;C&quot; fn</code> declaration promises that some C defines the function. The compiler takes the promise; the linker checks it, against everything the link takes: the program, the packages' C sources and archives, the libraries their <code>[native]</code> parts and build scripts name, the runtime. When none of them defines the symbol, the link fails, and this finding points at the declaration.</p>
+<p>Most often the library that defines it is not named. Name it where the package says what it links: <code>libs</code> for a library of the system by name, <code>archives</code> for one the package brings prebuilt, <code>frameworks</code> on macOS, <code>pkgConfig</code> for one pkg-config knows — or let the build script link it. A symbol spelled otherwise than the C header spells it, or a function the header declares only as a macro, is the other common cause: compare the declaration with the header, or have <code>lyric bindgen</code> write it.</p>
+<h2 id="example">Example</h2>
+<pre><code>$ cat src/main.lyr
+extern "C" fn sqlite3_libversion(): CStr;
+
+fn main(): void {
+    let _ = sqlite3_libversion();
+}
+$ lyric5 build
+error[LYR-LNK0001]: nothing the link takes defines 'sqlite3_libversion'
+ --&gt; src/main.lyr:1:1
+  |
+1 | extern "C" fn sqlite3_libversion(): CStr;
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ declared here, and defined nowhere the link looks
+  |
+  = help: name the library that defines it in the package's [native] — 'libs', 'archives', 'frameworks' or 'pkgConfig' — or link it from the build script</code></pre>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#explanation">Explanation</a></li>
+<li class="level-2"><a href="#example">Example</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

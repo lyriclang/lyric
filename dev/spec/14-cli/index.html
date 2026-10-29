@@ -109,6 +109,10 @@ imports — instead of its programs (<a href="../../spec/13-abi/#4-exports-and-l
 archive's place; for the archive it says what a C program links beside it (13 §4 rule 9).
 Without <code>src/lib.lyr</code> there is nothing to build (<code>LYR-CLI0001</code>); <code>--shared</code>
 without <code>--lib</code>, and <code>--lib</code> with a file, <code>--bin</code> or <code>--emit</code>, are refused (exit 2).</li>
+<li><strong><code>-v</code></strong> (<code>--verbose</code>) on <code>build</code>, <code>run</code>, <code>check</code>, <code>expand</code>, <code>test</code> and <code>bench</code> says each command
+of the C compiler, the archiver and the linker on the standard error as it starts —
+<code>running: </code> and the command —, the build scripts' and the bindings' among them; what is up to
+date runs nothing and says nothing. It writes text: with <code>--json</code> it is refused (exit 2).</li>
 </ol>
 <h3 id="12-where-the-files-go">1.2 Where the files go</h3>
 <ol>
@@ -151,7 +155,7 @@ once. The lock is the operating system's on an open file; it ends with its proce
 </tr>
 <tr>
 <td>2</td>
-<td>the command line or the environment: unknown verb, option or value, a missing file, no package to build, a program to run among several unnamed, no C compiler, a C compiler that fails or does not finish within its limit (<code>LYR-BLD0001</code>), a git repository that cannot be reached, a toolchain below what a package asks for</td>
+<td>the command line or the environment: unknown verb, option or value, a missing file, no package to build, a program to run among several unnamed, no C compiler, a C compiler that fails or does not finish within its limit (<code>LYR-BLD0001</code>), a link that fails (<code>LYR-LNK…</code>, <a href="../../spec/15-project/#52-linking">15 §5.2</a>), a git repository that cannot be reached, a toolchain below what a package asks for</td>
 </tr>
 <tr>
 <td>101</td>
@@ -320,42 +324,42 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <tr>
 <td><code>build</code></td>
 <td><code>[&lt;file.lyr&gt;]</code></td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--emit &lt;ir|c&gt;</code>, <code>--lib</code>, <code>--shared</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code>, <code>--emit &lt;ir|c&gt;</code>, <code>--lib</code>, <code>--shared</code></td>
 <td>yes</td>
 <td>yes</td>
 </tr>
 <tr>
 <td><code>run</code></td>
 <td><code>[&lt;file.lyr&gt;] [-- &lt;args&gt;…]</code></td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code></td>
 <td>yes</td>
 <td>yes</td>
 </tr>
 <tr>
 <td><code>check</code></td>
 <td><code>[&lt;file.lyr&gt;]</code></td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code></td>
 <td>yes</td>
 <td>yes</td>
 </tr>
 <tr>
 <td><code>expand</code></td>
 <td><code>[&lt;file.lyr&gt;]</code></td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code></td>
 <td>yes</td>
 <td>—</td>
 </tr>
 <tr>
 <td><code>test</code></td>
 <td>—</td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--filter, -f &lt;text&gt;</code>, <code>--no-run</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code>, <code>--filter, -f &lt;text&gt;</code>, <code>--no-run</code></td>
 <td>yes</td>
 <td>yes</td>
 </tr>
 <tr>
 <td><code>bench</code></td>
 <td>—</td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--filter, -f &lt;text&gt;</code>, <code>--save &lt;file&gt;</code>, <code>--compare &lt;file&gt;</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code>, <code>--filter, -f &lt;text&gt;</code>, <code>--save &lt;file&gt;</code>, <code>--compare &lt;file&gt;</code></td>
 <td>yes</td>
 <td>—</td>
 </tr>

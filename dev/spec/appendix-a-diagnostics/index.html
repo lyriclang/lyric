@@ -2505,7 +2505,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/14-cli/">14-cli</a></td>
 <td>the C compiler or the linker failed</td>
-<td>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails, or does not finish within five minutes and is stopped. The message carries the command and what the C compiler wrote, or the limit; the exit code is 2.</td>
+<td>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails, or does not finish within five minutes and is stopped. The message carries the command and what the C compiler wrote, or the limit; the exit code is 2. A link whose failure the build can read is said as its findings instead (<code>LYR-LNK0001</code>–<code>LYR-LNK0003</code>); this error stands for what is left. A header no directory holds adds the directories that were searched.</td>
 </tr>
 <tr>
 <td>LYR-BLD0002</td>
@@ -2544,7 +2544,43 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a10-cli--the-command-line">A.10 CLI — The command line</h2>
+<h2 id="a10-lnk--the-link">A.10 LNK — The link</h2>
+<p>What the linker says, read: a symbol nothing defines, a library it does not find, a symbol defined twice (15 §5.2 rule 12).</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-LNK0001</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a C symbol nothing the link takes defines</td>
+<td>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when the linker finds no definition of a symbol the program or a package's C calls. The finding stands at the <code>extern</code> declaration that names the symbol, where the program declares it; else it says what references it. Nothing is linked; the exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-LNK0002</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a library the linker does not find</td>
+<td>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when the linker finds no library by a name a package's <code>[native]</code> part, its build script or pkg-config gave it, or no macOS framework by its name. The finding stands at the line of the manifest that names it, or says who named it. Nothing is linked; the exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-LNK0003</td>
+<td>E</td>
+<td><a href="../../spec/15-project/">15-project</a></td>
+<td>a C symbol two inputs of the link define</td>
+<td>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when the linker finds a symbol defined twice — by two packages' C, a package and the program, or one package twice. The finding names who defines it and where. Nothing is linked; the exit code is 2.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a11-cli--the-command-line">A.11 CLI — The command line</h2>
 <p>The driver's options and verbs.</p>
 <table>
 <thead>
@@ -2734,7 +2770,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a11-ir--the-lowering">A.11 IR — The lowering</h2>
+<h2 id="a12-ir--the-lowering">A.12 IR — The lowering</h2>
 <p>Retired: each refusal of the lowering has a code of its own.</p>
 <table>
 <thead>
@@ -2756,7 +2792,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a12-ice--internal-compiler-errors">A.12 ICE — Internal compiler errors</h2>
+<h2 id="a13-ice--internal-compiler-errors">A.13 ICE — Internal compiler errors</h2>
 <p>The toolchain's own failure: a bug to report, never the program's fault.</p>
 <table>
 <thead>
@@ -2785,7 +2821,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a13-rt--runtime-panics">A.13 RT — Runtime panics</h2>
+<h2 id="a14-rt--runtime-panics">A.14 RT — Runtime panics</h2>
 <p>A panic ends the program with exit code 101 and a backtrace; the compile-time evaluation reports the same codes inside <code>LYR-CT0001</code>.</p>
 <table>
 <thead>
@@ -2961,7 +2997,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a14-lints">A.14 Lints</h2>
+<h2 id="a15-lints">A.15 Lints</h2>
 <p>Every warning is a lint (16 §5): its name, its code, its group and its level unless said. <code>warnings</code> names them all.</p>
 <table>
 <thead>
@@ -3332,11 +3368,12 @@ code is no longer reported, and its number is not given again.</p>
 <li class="level-2"><a href="#a7-cg--code-generation">A.7 CG — Code generation</a></li>
 <li class="level-2"><a href="#a8-pkg--packages-and-manifests">A.8 PKG — Packages and manifests</a></li>
 <li class="level-2"><a href="#a9-bld--the-build">A.9 BLD — The build</a></li>
-<li class="level-2"><a href="#a10-cli--the-command-line">A.10 CLI — The command line</a></li>
-<li class="level-2"><a href="#a11-ir--the-lowering">A.11 IR — The lowering</a></li>
-<li class="level-2"><a href="#a12-ice--internal-compiler-errors">A.12 ICE — Internal compiler errors</a></li>
-<li class="level-2"><a href="#a13-rt--runtime-panics">A.13 RT — Runtime panics</a></li>
-<li class="level-2"><a href="#a14-lints">A.14 Lints</a></li>
+<li class="level-2"><a href="#a10-lnk--the-link">A.10 LNK — The link</a></li>
+<li class="level-2"><a href="#a11-cli--the-command-line">A.11 CLI — The command line</a></li>
+<li class="level-2"><a href="#a12-ir--the-lowering">A.12 IR — The lowering</a></li>
+<li class="level-2"><a href="#a13-ice--internal-compiler-errors">A.13 ICE — Internal compiler errors</a></li>
+<li class="level-2"><a href="#a14-rt--runtime-panics">A.14 RT — Runtime panics</a></li>
+<li class="level-2"><a href="#a15-lints">A.15 Lints</a></li>
 </ul>
 </aside>
 </div>

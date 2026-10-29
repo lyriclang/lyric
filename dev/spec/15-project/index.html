@@ -101,7 +101,7 @@ is refused (<code>LYR-PKG0002</code>).</li>
 <p>The packages a package imports from (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V7</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases that hold their dependencies in
 their own directories, and the git repositories they read as their versions
-(<a href="https://github.com/lyriclang/lyric-spec/blob/029145484f1ad231316e9dad16ae7c6d6d4785f4/conformance/README.md">the suite's README</a>); the toolchain's own tests
+(<a href="https://github.com/lyriclang/lyric-spec/blob/d2a0d8e783af3079bff97c54074af173a9a2e152/conformance/README.md">the suite's README</a>); the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>: <code>DependencyTests</code>, <code>GitDependencyTests</code>, <code>PackageContentTests</code>).</p>
 <ol>
 <li><code>[dependencies]</code> names them, each where it is read from: a directory,
@@ -231,10 +231,7 @@ memory is not.</li>
 (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 B5</a>; <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code> and <code>conformance/cases/15-project/</code>, package cases
 that call their native part or whose manifest a rule refuses; the toolchain's own tests
-(<code>tests/Lyric5.Tests</code>, <code>NativeTests</code>, <code>VendorTests</code>, <code>BindingsTests</code>).</p>
-<p><em>(The findings <code>LYR-LNK…</code> of rule 12 are written ahead of their implementation, milestone M14b of the Lyric 5 plan — the
-decisions of <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11, review 2026-10-28</a>;
-each comes with its cases.)</em></p>
+(<code>tests/Lyric5.Tests</code>, <code>NativeTests</code>, <code>VendorTests</code>, <code>BindingsTests</code>, <code>LinkDiagnosticsTests</code>, <code>LinkerTextTests</code>).</p>
 <h3 id="51-sources">5.1 Sources</h3>
 <ol>
 <li><code>[native]</code> names <code>sources</code>, patterns of the package's files as §2's <code>include</code> has them — the C
@@ -261,13 +258,14 @@ headers only <code>lyric.h</code> is promised.</li>
 </ol>
 <h3 id="52-linking">5.2 Linking</h3>
 <ol start="7">
-<li><strong><code>archives = [&quot;native/lib/libz.a&quot;]</code></strong> are static libraries the package brings, prebuilt — files
+<li><p><strong><code>archives = [&quot;native/lib/libz.a&quot;]</code></strong> are static libraries the package brings, prebuilt — files
 of the package's content (§2) or of a source tree (§5.3): each is linked <strong>by its path</strong>, not
 searched for. A file outside the content, or one that is not there, is refused when the build
 needs it (<code>LYR-PKG0002</code>). An archive is built for one
 target, so it stands in the table of its triple (rule 4) as a rule. On Windows an archive is
-promised to link where it was built for the GNU ABI — by MinGW or zig cc —, not by MSVC.</li>
-<li><strong><code>dylibs</code></strong> are shared libraries the package brings, prebuilt — files of the package's content
+promised to link where it was built for the GNU ABI — by MinGW or zig cc —, not by MSVC.</p>
+</li>
+<li><p><strong><code>dylibs</code></strong> are shared libraries the package brings, prebuilt — files of the package's content
 or of a source tree, linked <strong>by their path</strong>. A shared library is built for one target, so
 <code>dylibs</code> is a key of the operating systems' and the triples' tables only (<code>LYR-PKG0003</code> in
 <code>[native]</code>): on Linux and macOS each entry is the path of a <code>.so</code> or a <code>.dylib</code>
@@ -281,29 +279,46 @@ ELF library without a <code>soname</code> would be recorded by the path it was l
 machine's; each is refused (<code>LYR-BLD0006</code>, exit 1), the message saying how to name it. A shared library of
 the system is linked by name (<code>libs</code>); one the program finds while it runs is <code>std.ffi</code>'s
 <code>Library</code> (<a href="../../spec/13-abi/">13 §5</a>). <em>(Rule 8 replaces, the same day, a rule that refused every
-shared library of a package — <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07, E3′</a>.)</em></li>
-<li><strong><code>frameworks = [&quot;Cocoa&quot;]</code></strong> are macOS frameworks, linked as <code>-framework Cocoa</code>: a key of
-<code>[native.macos]</code> and of the macOS triples' tables only (<code>LYR-PKG0003</code> elsewhere).</li>
-<li><strong><code>pkgConfig = [&quot;sdl2&quot;]</code></strong> names libraries of the system as <code>pkg-config</code> knows them: a build for
+shared library of a package — <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07, E3′</a>.)</em></p>
+</li>
+<li><p><strong><code>frameworks = [&quot;Cocoa&quot;]</code></strong> are macOS frameworks, linked as <code>-framework Cocoa</code>: a key of
+<code>[native.macos]</code> and of the macOS triples' tables only (<code>LYR-PKG0003</code> elsewhere).</p>
+</li>
+<li><p><strong><code>pkgConfig = [&quot;sdl2&quot;]</code></strong> names libraries of the system as <code>pkg-config</code> knows them: a build for
 the host asks <code>pkg-config --cflags --libs</code> — or the program the environment's <code>PKG_CONFIG</code>
 names — and gives what it says about include directories and definitions to the package's
 sources and to its bindings (§5.4), its directories and libraries to the link as <code>libs</code> are
 linked, its frameworks as rule 9's, and every other flag to the link as it is. <code>pkg-config</code>
-missing, or a name it does not know, stops the build (<code>LYR-BLD0004</code>, exit 2).</li>
-<li><strong>What only the host has</strong>: a framework comes from the macOS SDK and a name of <code>pkgConfig</code> from
+missing, or a name it does not know, stops the build (<code>LYR-BLD0004</code>, exit 2).</p>
+</li>
+<li><p><strong>What only the host has</strong>: a framework comes from the macOS SDK and a name of <code>pkgConfig</code> from
 the host's system, so a build for another target that needs one is refused before it compiles
 (<code>LYR-BLD0004</code>, exit 2, naming the package and the key). <em>(Informative: with the toolchain's C
 compiler a build for Windows links Windows' system libraries from any host; a build for Linux
 links a library of the system beside libc only on a Linux host, and one for macOS a framework
 only on the Mac it is for: zig finds the SDK's frameworks for the Mac it runs on, and for no
-target named — another Mac's included.)</em></li>
-<li>The link takes, in this order: the program's objects and the native parts' — the packages
+target named — another Mac's included.)</em></p>
+</li>
+<li><p>The link takes, in this order: the program's objects and the native parts' — the packages
 <strong>before the packages they depend on</strong>, the root's first —, their <code>archives</code> and <code>dylibs</code> in that order, the
 libraries by name and from <code>pkgConfig</code>, then the frameworks; each archive, library and framework
-once, where it first stands. A symbol two packages define fails the link (<code>LYR-LNK0003</code>), and
-so does one nothing defines (<code>LYR-LNK0001</code>) or a library the linker does not find
-(<code>LYR-LNK0002</code>) — each exit 2, as the link is (<a href="../../spec/14-cli/">14 §1.3</a>). A binary is linked anew
-where an archive's or a shared library's bytes changed, not only its time.</li>
+once, where it first stands. A link that fails is read for what failed it, and each such
+finding is said, exit 2 (<a href="../../spec/14-cli/">14 §1.3</a>):</p>
+<ul>
+<li>a symbol nothing the link takes defines — <code>LYR-LNK0001</code>, at the <code>extern</code> declaration of
+the program that names it, else with what references it;</li>
+<li>a library or a framework the linker does not find — <code>LYR-LNK0002</code>, at the line of the
+manifest whose <code>libs</code> or <code>frameworks</code> names it, else naming the build script or the
+<code>pkgConfig</code> that gave it;</li>
+<li>a symbol two inputs define — <code>LYR-LNK0003</code>, naming who defines it: a package, the
+program, the runtime.</li>
+</ul>
+<p>What the linker says that none of them is said as it is (<code>LYR-BLD0001</code>) — the reading never
+guesses. <em>(Informative: the toolchain reads lld, zig's Mach-O linker, ld64 and GNU ld.)</em> A C
+source that includes a header no directory holds fails its compile (<code>LYR-BLD0001</code>) with the
+directories it was searched in. A binary is linked anew
+where an archive's or a shared library's bytes changed, not only its time.</p>
+</li>
 </ol>
 <h3 id="53-source-trees">5.3 Source trees</h3>
 <ol start="13">

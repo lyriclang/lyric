@@ -126,7 +126,7 @@ lyric add raylib --vendor --git https://github.com/raysan5/raylib --tag 5.5</cod
 by a build for Linux. <code>--offline</code> reads the cache alone, and <code>--locked</code> refuses a tree the lock
 does not hold. Compiling a tree runs nothing of it — there is no script in it to trust.</p>
 <p>A tree belongs to the package that names it. If two packages of a program compile the same C, its
-symbols are defined twice and the link fails — share a C library by wrapping it in one package
+symbols are defined twice and the link fails, naming both (<code>LYR-LNK0003</code>) — share a C library by wrapping it in one package
 that the others depend on.</p>
 <h2 id="bindings-from-the-header">Bindings from the header</h2>
 <p>Declaring every function by hand is where binding C gets tedious. A library's header already says
@@ -291,6 +291,30 @@ files beside it and give it a run path of its own directory (<code>-Wl,-rpath,$O
 <code>-Wl,-rpath,@executable_path</code>); Windows looks there first anyway. A shared library made with
 <code>--shared</code> is linked against all of this itself, so nothing is said beside it, and only the packages'
 shared libraries lie beside it.</p>
+<h2 id="when-the-link-fails">When the link fails</h2>
+<p>The compiler trusts an <code>extern</code> declaration; the linker checks it. When the link fails, the
+build reads what the linker said and points where the fix belongs:</p>
+<pre><code class="language-text">error[LYR-LNK0001]: nothing the link takes defines 'sqlite3_libversion'
+ --&gt; src/main.lyr:1:1
+  |
+1 | extern "C" fn sqlite3_libversion(): CStr;
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ declared here, and defined nowhere the link looks
+  |
+  = help: name the library that defines it in the package's [native] — 'libs', 'archives', 'frameworks' or 'pkgConfig' — or link it from the build script</code></pre>
+<ul>
+<li><strong><code>LYR-LNK0001</code></strong> — a symbol nothing defines, at the <code>extern</code> line that declares it. Most often
+the library is not named yet; else the name differs from the header's.</li>
+<li><strong><code>LYR-LNK0002</code></strong> — a library or framework the linker does not find, at the manifest line that
+names it (or naming the build script or <code>pkgConfig</code> that did). Install its development package,
+or let <code>pkgConfig</code> say where it lies.</li>
+<li><strong><code>LYR-LNK0003</code></strong> — a symbol two packages define, naming both.</li>
+</ul>
+<p>Anything else the linker says comes as it is (<code>LYR-BLD0001</code>). A C source whose <code>#include</code> finds
+nothing also says which directories were searched — the package's <code>include</code>, then its
+dependencies'.</p>
+<p>To see the commands themselves, build with <strong><code>-v</code></strong>: each run of the C compiler, the archiver and
+the linker is said as it starts, <code>running: zig cc …</code>. What is up to date runs nothing, and says
+nothing.</p>
 <h2 id="loading-a-library-while-the-program-runs">Loading a library while the program runs</h2>
 <p>A library the program picks while it runs — a plugin — is not linked at all: <code>std.ffi</code>'s <code>Library</code>
 opens it by its path and looks up its functions by name. <a href="https://github.com/lyriclang/lyric/blob/main/examples/ffi"><code>examples/ffi</code></a> shows

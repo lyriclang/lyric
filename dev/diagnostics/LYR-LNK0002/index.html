@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYR-LNK0002 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">LNK</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../diagnostics/">All codes</a></li>
+<li><a href="../../diagnostics/LYR-LNK0001/">LYR-LNK0001</a></li>
+<li><a class="current" href="../../diagnostics/LYR-LNK0002/">LYR-LNK0002</a></li>
+<li><a href="../../diagnostics/LYR-LNK0003/">LYR-LNK0003</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
+<h1>LYR-LNK0002</h1>
+<p class="code-title">a library the linker does not find</p>
+<p class="meta">error · <a href="../../spec/15-project/">spec 15-project</a></p>
+<p>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when the linker finds no library by a name a package's <code>[native]</code> part, its build script or pkg-config gave it, or no macOS framework by its name. The finding stands at the line of the manifest that names it, or says who named it. Nothing is linked; the exit code is 2.</p>
+<h2 id="explanation">Explanation</h2>
+<p>A library named in <code>libs</code> — or by a build script's <code>linkLib</code>, or in what pkg-config answered — is looked for by the linker in the system's directories and those the build was told of. When it is not there, the link fails at once.</p>
+<p>On Linux and macOS the library is often installed without what a link needs: install its development package (<code>libsqlite3-dev</code>, <code>sqlite-devel</code>), or let <code>pkgConfig</code> find it, which also says the directory. A library in a directory of its own is named by a build script with <code>linkSearch</code>. A misspelt name — <code>sqlite</code> for <code>sqlite3</code> — fails the same way. A framework is the macOS SDK's; its name is the SDK's, with its capital letters.</p>
+<h2 id="example">Example</h2>
+<pre><code>$ cat lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+libs = ["sqlite"]
+$ lyric5 build
+error[LYR-LNK0002]: the linker finds no library 'sqlite'
+ --&gt; lyric.toml:6:9
+  |
+6 | libs = ["sqlite"]
+  |         ^^^^^^^^ app names it here
+  |
+  = help: install its development package, or name the directory that holds it — pkg-config says both ('pkgConfig'), a build script 'linkSearch'</code></pre>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#explanation">Explanation</a></li>
+<li class="level-2"><a href="#example">Example</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>
