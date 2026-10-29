@@ -1559,6 +1559,7 @@ COFF; `L` geht nur mit `q` („the 'L' modifier is only applicable to the 'q' op
 | L6-1 | **Bündeln über `ar qcsL`**: die Archive der nativen Teile gehen als Glieder in `lib<name>.a`; ihr Inhalt (Hash) ist Teil des Archivschlüssels. Ein Bau mit gcc/clang braucht `llvm-ar` dafür, GNU `ar` wird mit Grund abgelehnt | auspacken und neu packen (Namenskollisionen der Glieder); ein MRI-Skript (Pfade mit Leerzeichen) |
 | L6-2 | **Die Zeile**: Kopien der `dylibs` neben dem Archiv (unter Windows die Importbibliothek), `-L`/`-l`, der Rest von pkg-config, `-framework`, die Laufzeit (`CBuild.RuntimeLinkArgs`, dieselbe Liste wie der eigene Link) — als Note `note: link <archiv> with …` und als `linkArgs`; nichts, wo nichts ist; bei `--shared` keine | ein Lauf-Pfad in der Zeile (`-rpath`): wo das C-Programm sucht, entscheidet es selbst |
 | L6-3 | **Die Export-Tests linken mit der genannten Zeile** statt einer Liste im Test: die Zeile ist damit auf jedem Plattformlauf geprüft | die Testliste behalten (zwei Wahrheiten) |
+| L6-4 | **Gefunden im Plattformlauf** (L4): `bindgen` für Windows auf dem Mac-Runner lief über die zwei Minuten des Generators, und die `TimeoutException` kam als ICE (101). Jetzt gilt die Grenze eines C-Laufs des Baus (fünf Minuten), und eine Überschreitung ist `BLD0005` wie ein Fehler des Headers | die Grenze nur anheben (bliebe ein ICE) |
 
 ## Nachtrag 2026-10-28 — der Plan für M15
 
