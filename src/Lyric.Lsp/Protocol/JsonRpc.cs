@@ -24,9 +24,8 @@ public sealed record JsonRpcMessage
     [JsonPropertyName("method")] public string? Method { get; init; }
     [JsonPropertyName("params")] public JsonElement? Params { get; init; }
 
-    /// <summary>Present on a failed RESPONSE. Read only to log it: the one request this server
-    /// sends is the watch registration, and a client that refuses it should say so somewhere the
-    /// user can find.</summary>
+    /// <summary>Present on a failed RESPONSE. A client that refuses the watch registration or a
+    /// progress token should say so somewhere the user can find.</summary>
     [JsonPropertyName("error")] public JsonRpcError? Error { get; init; }
 
     /// <summary>A request expects an answer; a notification does not. The distinction is the
@@ -130,4 +129,8 @@ public static class JsonRpcErrorCodes
     /// <c>textDocument/diagnostic</c> the error's data says whether it should
     /// (<c>retriggerRequest</c>).</summary>
     public const int ServerCancelled = -32802;
+
+    /// <summary>The client withdrew the request (<c>$/cancelRequest</c>) before it was answered.
+    /// </summary>
+    public const int RequestCancelled = -32800;
 }

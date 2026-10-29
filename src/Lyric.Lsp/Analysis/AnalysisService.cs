@@ -146,6 +146,19 @@ public sealed class AnalysisService : IDisposable
     private readonly ConcurrentDictionary<string, AnalysisSnapshot> _lastGood =
         new(DocumentUri.PathComparer);
 
+    /// <summary>
+    /// The questions waiting for a file's FIRST analysis, by path (E20). Before it there is no
+    /// model, and an answer of null would read as "nothing here" — a client does not ask again.
+    /// Completed with the snapshot once one is stored, or with what there is once an analysis of
+    /// the file ended without one.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<AnalysisSnapshot?>> _firstWaiters =
+        new(DocumentUri.PathComparer);
+
+    /// <summary>Shows that an analysis runs, where the client draws progress: called with what is
+    /// analysed, and the handle it returns is disposed when the analysis ends.</summary>
+    private readonly Func<string, IDisposable?>? _progress;
+
     private bool _disposed;
 
     public AnalysisService(
@@ -154,9 +167,11 @@ public sealed class AnalysisService : IDisposable
         Func<string, MessageType, CancellationToken, Task> log,
         TimeSpan debounce,
         string? stdlibRoot = null,
-        string? toolVersion = null)
+        string? toolVersion = null,
+        Func<string, IDisposable?>? progress = null)
     {
         _toolVersion = toolVersion;
+        _progress = progress;
         _documents = documents;
         _publish = publish;
         _log = log;
@@ -238,6 +253,7 @@ public sealed class AnalysisService : IDisposable
             await SafeLogAsync(
                 $"analysis of {document.Path} failed: {exception.GetType().Name}: {exception.Message}")
                 .ConfigureAwait(false);
+            Settle(document.Path);
         }
         finally
         {
@@ -281,6 +297,7 @@ public sealed class AnalysisService : IDisposable
             await SafeLogAsync(
                 $"analysis after a change to {path} failed: "
                 + $"{exception.GetType().Name}: {exception.Message}").ConfigureAwait(false);
+            Settle(path);
         }
         finally
         {
@@ -465,6 +482,11 @@ public sealed class AnalysisService : IDisposable
     /// the debounce. The analysis a test drives directly.</summary>
     public async Task AnalyzeAsync(OpenDocument document, CancellationToken cancellationToken)
     {
+        // The first analysis of an open file is the wait an editor shows (E20): before it, nothing
+        // answers. Reported from its start, the package's manifest and graph included, which take
+        // seconds the first time. A later one takes milliseconds and is not worth a flicker.
+        using var progress = LastGood(document.Path) is null ? _progress?.Invoke(Path.GetFileName(document.Path)) : null;
+
         var unit = await UnitForAsync(document.Path).ConfigureAwait(false);
 
         if (unit is not null && unit.ModuleOf(document.Path) is not null)
@@ -490,7 +512,11 @@ public sealed class AnalysisService : IDisposable
         var token = run.Token;
 
         var roots = CollectRoots(unit);
-        if (roots.Count == 0) return;
+        if (roots.Count == 0)
+        {
+            if (trigger is not null) Settle(trigger.Path);
+            return;
+        }
 
         // The buffers that go into this compile, captured BEFORE it: the version guard below has
         // to ask about exactly what was compiled, not about whatever is open afterwards.
@@ -549,6 +575,7 @@ public sealed class AnalysisService : IDisposable
                 _lastGood[path] = new AnalysisSnapshot(model, result.Sources, file, moduleAst,
                     result.Sources.GetText(file), open?.Version ?? 0, ProjectWide: true);
             }
+            Settle(path);
 
             published.Add(uri);
             if (file.IsValid) _findings[path] = (result.Sources, diagnostics.Where(d => d.Span.File == file).ToList());
@@ -614,6 +641,7 @@ public sealed class AnalysisService : IDisposable
                 new AnalysisSnapshot(model, result.Sources, file, model.Entry, document.Text,
                     document.Version, ProjectWide: false);
         }
+        Settle(document.Path);
 
         // The entry file is missing from the source manager only when the run never opened it. The
         // diagnostic explaining why is in the result and is addressed to no file, so it would be
@@ -650,6 +678,7 @@ public sealed class AnalysisService : IDisposable
     public async Task CloseAsync(OpenDocument document, CancellationToken cancellationToken)
     {
         if (_pending.TryRemove(document.Path, out var pending)) Retire(pending);
+        Settle(document.Path);
 
         var unit = await UnitForAsync(document.Path).ConfigureAwait(false);
         if (unit is not null && unit.ModuleOf(document.Path) is not null)
@@ -679,6 +708,28 @@ public sealed class AnalysisService : IDisposable
     /// </summary>
     public AnalysisSnapshot? LastGood(string path) =>
         _lastGood.TryGetValue(path, out var snapshot) ? snapshot : null;
+
+    /// <summary>
+    /// <see cref="LastGood"/>, waiting for the file's first analysis where there is none yet
+    /// (E20): <c>null</c> only when that analysis ended without a model, or the file was closed.
+    /// </summary>
+    public Task<AnalysisSnapshot?> FirstAsync(string path, CancellationToken cancellationToken)
+    {
+        if (LastGood(path) is { } known) return Task.FromResult<AnalysisSnapshot?>(known);
+
+        var waiter = _firstWaiters.GetOrAdd(path,
+            _ => new TaskCompletionSource<AnalysisSnapshot?>(TaskCreationOptions.RunContinuationsAsynchronously));
+
+        // Stored between the look above and the registration: nothing would settle it again.
+        if (LastGood(path) is not null || _disposed) Settle(path);
+        return waiter.Task.WaitAsync(cancellationToken);
+    }
+
+    /// <summary>Answers what waits for the first analysis of this file, with what there is.</summary>
+    private void Settle(string path)
+    {
+        if (_firstWaiters.TryRemove(path, out var waiter)) waiter.TrySetResult(LastGood(path));
+    }
 
     /// <summary>
     /// One snapshot per live compilation — what a question WITHOUT a document behind it (the
@@ -760,6 +811,7 @@ public sealed class AnalysisService : IDisposable
     public void Dispose()
     {
         _disposed = true;
+        foreach (var path in _firstWaiters.Keys) Settle(path);
         foreach (var pending in _pending.Values) Retire(pending);
         _pending.Clear();
 
