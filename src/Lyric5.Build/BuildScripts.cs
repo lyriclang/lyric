@@ -259,6 +259,7 @@ public static class BuildScripts
         }
 
         var file = Path.Combine(dir, "directives");
+        BuildStatus.Say("Running", $"the build script of {manifest.Name} ({Pipeline.Shown(manifest.BuildScript!)})");
         var (cc, ar, cflags) = CEnv(compiler, target, profile, dir);
         var environment = new Dictionary<string, string>
         {

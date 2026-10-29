@@ -1893,3 +1893,21 @@ sein eigenes Repo; ein Migrator für Erato (Lyricpp, Z-Reihe); `--edition` (mit 
 - **`From4/` ist eigener Code** neben der Kopie: `CheckFile`, `CheckProject` (über `lyric.json`) mit 4.6s Lader, die
   Bibliothek aus den Ressourcen über das Overlay des alten `StdlibLoader` — kein Byte der Kopie geändert.
 - `CatalogTests` lässt die eingefrorenen Verzeichnisse aus: ihre Codes sind 4.6s, nicht die dieses Katalogs.
+
+## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
+
+**Anlass** (Maintainer, 2026-10-29): ein Bau mit einer eingebundenen C-Bibliothek (raylib, sieben Quellen) sagte
+nichts als seine Befunde — Fortschritt, Kompilieren, Linken: kein Wort. P9 hatte „Fortschritt für den Bau“ als Tür
+nach 5.0 gesetzt; der Maintainer öffnet sie jetzt, und entscheidet die beiden Fragen nach Empfehlung:
+
+- **Immer, `-q` schweigt** — Statuszeilen auf stderr auch ohne Terminal (eine IDE, ein CI-Log sieht sie), wie
+  Cargo. Das verfeinert 11 C7: *gezeichnet* (eine Zeile, die sich überschreibt) wird nur am Terminal — der Zähler
+  der C-Einheiten —, die Statuszeilen selbst sind kein Fortschritt im Sinn von C7, sondern Text. `--json` schreibt
+  keine (C6s Fortschrittsereignisse bleiben, was sie waren: eine Tür; der Strom trägt Befunde und Artefakte).
+- **Je Schritt, nicht je Einheit**: `Fetching`/`Updating` (git), `Running` (Bauskript), `Binding` (Header),
+  `Compiling` (Frontend, Laufzeit, „3 of 14 C units of app“), `Checking`, `Linking`, `Archiving`, `Finished` mit
+  Profil und Zeit, `Running` vor dem Programm. Was aktuell ist, schweigt (Cargo zeigt `Fresh` nur mit `-v`). Eine
+  Zeile je C-Datei verworfen: ein eingebundenes raylib wären Dutzende Zeilen, und `-v` zeigt die Befehle schon.
+
+Spec 14 §1.1 Regel 11 (die Zeilen sind Text für einen Leser, kein Format); `-q`/`--quiet` auf den Verben, die bauen.
+Tests: `BuildStatusTests`; die übrigen Tests lesen die gefaltete stderr ohne Statuszeilen (`PackageFixture.Run`).

@@ -50,7 +50,7 @@ public partial class BookTests
             Assert.True(codes.SequenceEqual([snippet.Error!]), $"{where}: expected only {snippet.Error}, the check said:\n{said}");
             if (snippet.Output is { } diagnostic)
             {
-                var text = said.Replace("\r\n", "\n").Replace("src\\main.lyr", "src/main.lyr").TrimEnd('\n') + "\n";
+                var text = WithoutStatus(said.Replace("\r\n", "\n")).Replace("src\\main.lyr", "src/main.lyr").TrimEnd('\n') + "\n";
                 Assert.True(diagnostic == text, $"{where}: the diagnostic block says\n{diagnostic}\nthe check said\n{text}");
             }
             return;

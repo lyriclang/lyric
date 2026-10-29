@@ -80,6 +80,7 @@ public static class Bindings
                         Say.Error(error, "LYR-PKG0002", $"{manifest.Name}'s manifest names '{binding.Header}' in 'bindings', and there is no such file");
                         return 1;
                     }
+                    BuildStatus.Say("Binding", $"{manifest.Name}.{binding.Module} ({Pipeline.Shown(header)})");
                     Bound bound;
                     try { bound = Bindgen.Make(compiler, target, header, include, part.Defines, binding.Header, version); }
                     catch (BindgenException failed)

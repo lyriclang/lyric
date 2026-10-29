@@ -59,8 +59,20 @@ public static partial class Program
         if (verbose && Lyric.Core.Rendering.RenderStyle.Current.Events is not null)
             return Unknown("'-v' says the commands as text; '--json' writes events and nothing else");
         CBuild.Echo = verbose ? Console.Error : null;
+        // the status lines (14 §1.1) of the verbs that build, unless '-q' or '--json' says none
+        var quiet = verb.Options.Any(o => o.Name == "-q") && (dash < 0 ? rest : rest[..dash]).Any(a => a is "-q" or "--quiet");
+        if (verb.Options.Any(o => o.Name == "-q") && !quiet && Lyric.Core.Rendering.RenderStyle.Current.Events is null)
+        {
+            BuildStatus.Writer = Console.Error;
+            BuildStatus.Color = Lyric.Core.Rendering.RenderStyle.Current.Color;
+            BuildStatus.Live = !verbose && !Console.IsErrorRedirected;
+        }
         try { return Dispatched(verb, rest, lints); }
-        finally { CBuild.Echo = null; }
+        finally
+        {
+            CBuild.Echo = null;
+            BuildStatus.Reset();
+        }
     }
 
     private static int Dispatched(VerbSpec verb, string[] rest, LintArgs lints)
