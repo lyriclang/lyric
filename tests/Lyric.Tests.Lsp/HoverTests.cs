@@ -146,6 +146,25 @@ public sealed class HoverTests
         Assert.Contains("fn id<T>(v: T): T", text);
     }
 
+    /// <summary>A name of an import clause is no node of its own; it stands for what it imports,
+    /// and answers as a use of it does, over the name alone.</summary>
+    [Fact]
+    public void A_name_in_an_import_clause_shows_what_it_imports()
+    {
+        var found = HoverAt("import std.io { pri$ntln };\nfn main(): int {\n    println(\"hi\");\n    return 0;\n}\n");
+
+        Assert.NotNull(found);
+        Assert.Contains("fn println", found.Markdown);
+        Assert.Equal("import std.io { ".Length, found.Span.Start);
+        Assert.Equal("println".Length, found.Span.Length);
+    }
+
+    [Fact]
+    public void A_renamed_import_shows_what_it_imports()
+    {
+        Assert.Contains("fn println", Text("import std.io { pri$ntln as say };\nfn main(): int {\n    say(\"hi\");\n    return 0;\n}\n"));
+    }
+
     /// <summary>An attribute is a reference to its struct, so hovering it answers with the struct
     /// — the LSP surface the attribute design gets for free, pinned so it stays free.</summary>
     [Fact]

@@ -29,6 +29,10 @@ public static class HoverProvider
     {
         var path = NodeFinder.PathAt(root, file, offset);
 
+        // A name of an import clause is no node; it stands for what it imports, as at a use.
+        if (NodeFinder.ImportedAt(model, path, file, offset, out var name) is { } imported)
+            return Describe(model, imported, type: null) is { } text ? new HoverResult(text, name) : null;
+
         // From the inside out: the innermost node is the most specific answer, but not every node
         // carries one — a literal knows its type, the argument list around it does not.
         for (var i = path.Count - 1; i >= 0; i--)
@@ -49,13 +53,18 @@ public static class HoverProvider
         var type = node is Expr expression ? model.Types.TypeOf(expression) : null;
         if (type is not null && !IsShowable(type)) type = null;
 
-        if (symbol is not null && (Written(model, symbol) ?? Signature(model, symbol, type)) is { } signature)
-            return Code(signature) + Documentation(model, symbol);
+        if (symbol is not null && Describe(model, symbol, type) is { } described)
+            return described;
 
         // No symbol, but a type: an operator, a literal, an index expression. Worth showing — "what
         // is this subexpression" is what hover is asked most often.
         return type is null ? null : Code(TypeFacts.Display(type));
     }
+
+    private static string? Describe(SemanticModel model, Symbol symbol, LyrType? type) =>
+        (Written(model, symbol) ?? Signature(model, symbol, type)) is { } signature
+            ? Code(signature) + Documentation(model, symbol)
+            : null;
 
     /// <summary>
     /// The doc block of the declaration a symbol came from, as a section below the signature.
