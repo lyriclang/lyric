@@ -2010,37 +2010,8 @@ fn main(): void {
 title = "a list after '::' without its '['"
 severity = "error"
 area = "05-interfaces"
-summary = "The interfaces after `::` — of a struct, class, enum, interface or extend block, of a type parameter's constraints, of an associated type's bound — do not open with `[`."
-explanation = '''
-What follows `::` is a list, and a list stands in brackets even when it holds one entry: `struct User :: [Named]`, `T :: [Show, Eq]`. Without the `[` the closing `]` is usually missing too, and is refused as well (LYR-PAR0004).
-
-Put the interfaces in brackets.
-'''
-wrong = '''
-interface Named {
-    fn name(): string;
-}
-
-struct User :: Named] {
-    fn name(): string { return "u"; }
-}
-
-fn main(): void {
-}
-'''
-right = '''
-interface Named {
-    fn name(): string;
-}
-
-struct User :: [Named] {
-    fn name(): string { return "u"; }
-}
-
-fn main(): void {
-    let _ = User { }.name();
-}
-'''
+summary = "The interfaces after `::` did not open with `[`."
+retired = "the list rule: one interface after '::' stands without brackets, 'struct S :: I'; several without them are LYR-PAR0066"
 
 [LYR-PAR0031]
 title = "a parameter or field without ':' before its type"
@@ -2978,6 +2949,53 @@ fn main(): void {
         };
         let _ = n;
     }
+}
+'''
+
+[LYR-PAR0066]
+title = "several interfaces after '::' without brackets"
+severity = "error"
+area = "05-interfaces"
+summary = "Several interfaces follow `::` — of a struct, class, enum, interface or extend block, or of an associated type's bound — without brackets around them. One interface stands without them, several in them."
+explanation = '''
+After `::` one interface may stand alone, `struct User :: Named`, and several stand in brackets, `struct User :: [Named, Shown]` — the list rule, the same as for `throws` and `catch`. Without the brackets the `,` after the first would leave it open what the list holds.
+
+Put the interfaces in brackets. In a type parameter's constraint a `,` after one interface begins the next parameter: `<T :: Named, U>` has the parameters `T` and `U`; `<T :: [Named, Shown]>` constrains `T` twice.
+'''
+wrong = '''
+interface Named {
+    fn name(): string;
+}
+
+interface Shown {
+    fn show(): string;
+}
+
+struct User :: Named, Shown {
+    fn name(): string { return "u"; }
+    fn show(): string { return "U"; }
+}
+
+fn main(): void {
+}
+'''
+right = '''
+interface Named {
+    fn name(): string;
+}
+
+interface Shown {
+    fn show(): string;
+}
+
+struct User :: [Named, Shown] {
+    fn name(): string { return "u"; }
+    fn show(): string { return "U"; }
+}
+
+fn main(): void {
+    let u = User { };
+    let _ = u.name() + u.show();
 }
 '''
 
@@ -5011,7 +5029,7 @@ summary = "A generic type, alias or function is given more or fewer type argumen
 explanation = '''
 `Cell<T>` takes one type argument and `Pair<A, B>` two; a type parameter with a default may be left out. A function that is not generic takes none.
 
-Write as many type arguments as the declaration has parameters, or leave them out where the context or the arguments determine them.
+Write as many type arguments as the declaration has parameters, or leave them out where the context or the arguments determine them. A call writes them all or none: `_` stands for one the inference is to fill — `arrayOf<string, _>(3, f)` writes `T` and leaves `E`, what `f` throws, to the call. Where a call writes too few, `lyric fix` adds a `_` for each one left out.
 '''
 wrong = '''
 struct Cell<T> { v: T }

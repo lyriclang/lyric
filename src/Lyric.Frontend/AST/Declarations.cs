@@ -80,6 +80,10 @@ public sealed record ImportAlias(string Alias, Span Span) : ImportClause(Span); 
 // --- generics ---
 public sealed record GenericParam(string Name, TypeNode[] Constraints, Span Span) : Node(Span), INamedDecl // T, or T :: [I1, I2]
 {
+    /// <summary>Whether the constraints after <c>::</c> stood in brackets; the formatter writes what was
+    /// written, and a node built rather than parsed has them.</summary>
+    public bool ConstraintsBracketed { get; init; } = true;
+
     public required Span NameSpan { get; init; }
 
     /// <summary><c>Rhs = Self</c>: the argument the parameter takes when a
@@ -221,6 +225,10 @@ public sealed record FieldDecl(string Name, TypeNode Type, Expr? Default, Span S
 // --- type declarations ---
 public sealed record StructDecl(VisibilityWord Visibility, string Name, GenericParam[] Generics, TypeNode[] Interfaces, Decl[] Members, Span Span) : Decl(Span), INamedDecl
 {
+    /// <summary>Whether the interfaces after <c>::</c> stood in brackets — one may stand without
+    /// them, and the formatter writes what was written. A node built rather than parsed has them.</summary>
+    public bool InterfacesBracketed { get; init; } = true;
+
     public bool IsPublic => Visibility == VisibilityWord.Pub;
 
     /// <summary><c>:: [Walker by legs]</c>: the field each entry of
@@ -235,6 +243,10 @@ public sealed record StructDecl(VisibilityWord Visibility, string Name, GenericP
 
 public sealed record ClassDecl(VisibilityWord Visibility, string Name, GenericParam[] Generics, TypeNode[] Interfaces, Decl[] Members, Span Span) : Decl(Span), INamedDecl
 {
+    /// <summary>Whether the interfaces after <c>::</c> stood in brackets — one may stand without
+    /// them, and the formatter writes what was written. A node built rather than parsed has them.</summary>
+    public bool InterfacesBracketed { get; init; } = true;
+
     public bool IsPublic => Visibility == VisibilityWord.Pub;
 
     /// <summary><c>:: [Walker by legs]</c>: the field each entry of
@@ -249,6 +261,10 @@ public sealed record ClassDecl(VisibilityWord Visibility, string Name, GenericPa
 
 public sealed record EnumDecl(VisibilityWord Visibility, string Name, GenericParam[] Generics, TypeNode[] Interfaces, EnumVariant[] Variants, FunctionDecl[] Methods, Span Span) : Decl(Span), INamedDecl
 {
+    /// <summary>Whether the interfaces after <c>::</c> stood in brackets — one may stand without
+    /// them, and the formatter writes what was written. A node built rather than parsed has them.</summary>
+    public bool InterfacesBracketed { get; init; } = true;
+
     public bool IsPublic => Visibility == VisibilityWord.Pub;
 
     public required Span NameSpan { get; init; }
@@ -275,6 +291,10 @@ public sealed record EnumVariant(string Name, TypeNode[]? TupleFields, FieldDecl
 
 public sealed record InterfaceDecl(VisibilityWord Visibility, string Name, GenericParam[] Generics, TypeNode[] Interfaces, FunctionDecl[] Members, Span Span) : Decl(Span), INamedDecl
 {
+    /// <summary>Whether the interfaces after <c>::</c> stood in brackets — one may stand without
+    /// them, and the formatter writes what was written. A node built rather than parsed has them.</summary>
+    public bool InterfacesBracketed { get; init; } = true;
+
     public bool IsPublic => Visibility == VisibilityWord.Pub;
 
     public required Span NameSpan { get; init; }
@@ -297,6 +317,10 @@ public sealed record InterfaceDecl(VisibilityWord Visibility, string Name, Gener
 
 public sealed record ExtendDecl(VisibilityWord Visibility, TypeNode Target, TypeNode[] Interfaces, FunctionDecl[] Methods, Span Span) : Decl(Span)
 {
+    /// <summary>Whether the interfaces after <c>::</c> stood in brackets — one may stand without
+    /// them, and the formatter writes what was written. A node built rather than parsed has them.</summary>
+    public bool InterfacesBracketed { get; init; } = true;
+
     public bool IsPublic => Visibility == VisibilityWord.Pub;
 
     /// <summary>The associated types a conformance block binds, <c>type Item = int;</c>.</summary>
@@ -323,6 +347,10 @@ public sealed record ExtendDecl(VisibilityWord Visibility, TypeNode Target, Type
 /// </summary>
 public sealed record AssociatedTypeDecl(string Name, TypeNode? Type, Span Span) : Decl(Span), INamedDecl
 {
+    /// <summary>Whether the bound after <c>::</c> stood in brackets; the formatter writes what was
+    /// written, and a node built rather than parsed has them.</summary>
+    public bool BoundsBracketed { get; init; } = true;
+
     public required Span NameSpan { get; init; }
 
     /// <summary>What every answer conforms to, in an interface's declaration —

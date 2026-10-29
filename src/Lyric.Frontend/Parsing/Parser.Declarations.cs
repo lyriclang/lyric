@@ -720,13 +720,14 @@ public sealed partial class Parser
         var generics = _buffer.Check(TokenKind.Less) ? ParseGenericParams() : [];
         string?[]? delegates = null;
         var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceList(out delegates, out _) : [];
+        var bracketed = interfaces.Length == 0 || _listBracketed;
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open type body");
         var members = ParseTypeMembers();
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close type body");
         var span = Span.Union(start, close.Span);
         return isClass
-            ? new ClassDecl(isPublic, name.Name, generics, interfaces, members, span) { Delegates = delegates, NameSpan = name.Span }
-            : new StructDecl(isPublic, name.Name, generics, interfaces, members, span) { Delegates = delegates, NameSpan = name.Span };
+            ? new ClassDecl(isPublic, name.Name, generics, interfaces, members, span) { Delegates = delegates, NameSpan = name.Span, InterfacesBracketed = bracketed }
+            : new StructDecl(isPublic, name.Name, generics, interfaces, members, span) { Delegates = delegates, NameSpan = name.Span, InterfacesBracketed = bracketed };
     }
 
     // struct or class body: FieldDecl | FunctionDecl. A field needs a ',', a block-bodied method
@@ -826,6 +827,7 @@ public sealed partial class Parser
         var name = ExpectNamed("LYR-PAR0026", "enum name");
         var generics = _buffer.Check(TokenKind.Less) ? ParseGenericParams() : [];
         var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceListWithoutBy() : [];
+        var bracketed = interfaces.Length == 0 || _listBracketed;
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open enum body");
 
         var variants = new List<EnumVariant>();
@@ -870,7 +872,7 @@ public sealed partial class Parser
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close enum body");
         return new EnumDecl(isPublic, name.Name, generics, interfaces, variants.ToArray(), methods.ToArray(),
             Span.Union(start, close.Span))
-            { Types = boundTypes.ToArray(), Statics = statics.ToArray(), NameSpan = name.Span };
+            { Types = boundTypes.ToArray(), Statics = statics.ToArray(), NameSpan = name.Span, InterfacesBracketed = bracketed };
     }
 
     /// <summary>Does a member of an enum begin here — <c>fn</c>, <c>mut fn</c>, <c>static</c>,
@@ -984,6 +986,7 @@ public sealed partial class Parser
         // too. What the list does NOT do the sema explains where it matters; here it is just a
         // type list, shaped like the one on structs. (LYR-PAR0039 rejected this until v1.13.)
         var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceListWithoutBy() : [];
+        var bracketed = interfaces.Length == 0 || _listBracketed;
 
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open interface body");
         var members = new List<FunctionDecl>();
@@ -992,7 +995,7 @@ public sealed partial class Parser
         ParseMethodSequence(members, types: types, statics: statics); // a static member declares, through a constraint
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close interface body");
         return new InterfaceDecl(isPublic, name.Name, generics, interfaces, members.ToArray(), Span.Union(start, close.Span))
-            { NameSpan = name.Span, Types = types.ToArray(), IsSealed = isSealed, Statics = statics.ToArray() };
+            { NameSpan = name.Span, Types = types.ToArray(), IsSealed = isSealed, Statics = statics.ToArray(), InterfacesBracketed = bracketed };
     }
 
     // --- Extend (§3.6) ---
@@ -1004,6 +1007,7 @@ public sealed partial class Parser
         var generics = _buffer.Check(TokenKind.Less) ? ParseGenericParams() : [];
         var target = ParseType();
         var interfaces = _buffer.Check(TokenKind.ColonColon) ? ParseInterfaceListWithoutBy() : [];
+        var bracketed = interfaces.Length == 0 || _listBracketed;
         _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open extend body");
         var methods = new List<FunctionDecl>();
         var boundTypes = new List<AssociatedTypeDecl>();
@@ -1011,7 +1015,7 @@ public sealed partial class Parser
         ParseMethodSequence(methods, types: boundTypes, statics: statics);
         var close = _buffer.Expect(TokenKind.RBrace, "LYR-PAR0018", "expected '}' to close extend body");
         return new ExtendDecl(isPublic, target, interfaces, methods.ToArray(), Span.Union(start, close.Span))
-            { Types = boundTypes.ToArray(), Generics = generics, Statics = statics.ToArray() };
+            { Types = boundTypes.ToArray(), Generics = generics, Statics = statics.ToArray(), InterfacesBracketed = bracketed };
     }
 
     /// <summary>
@@ -1091,18 +1095,27 @@ public sealed partial class Parser
         var start = _buffer.Advance().Span; // contextual 'type'
         var name = ExpectNamed("LYR-PAR0026", "associated type name");
         TypeNode[] bounds = [];
+        var boundsBracketed = true;
         if (_buffer.Match(TokenKind.ColonColon))
         {
-            _buffer.Expect(TokenKind.LBracket, "LYR-PAR0030", "expected '[' after '::' in a bound");
-            var list = new List<TypeNode>();
-            do { list.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma));
-            _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close the bound");
-            bounds = list.ToArray();
+            // the list rule: one interface also without the brackets, several in them
+            if (_buffer.Match(TokenKind.LBracket))
+            {
+                var list = new List<TypeNode>();
+                do { list.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma));
+                _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close the bound");
+                bounds = list.ToArray();
+            }
+            else
+            {
+                bounds = ParseUnbracketed("a bound");
+                boundsBracketed = false;
+            }
         }
         TypeNode? type = null;
         if (_buffer.Match(TokenKind.Equal)) type = ParseType();
         var semi = ExpectSemicolon();
-        return new AssociatedTypeDecl(name.Name, type, Span.Union(start, semi.Span)) { NameSpan = name.Span, Bounds = bounds };
+        return new AssociatedTypeDecl(name.Name, type, Span.Union(start, semi.Span)) { NameSpan = name.Span, Bounds = bounds, BoundsBracketed = boundsBracketed };
     }
 
     // --- Global binding & type alias (§2) ---
@@ -1156,14 +1169,25 @@ public sealed partial class Parser
             var nameTok = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",
                 $"expected type parameter, got {Shown(_buffer.Current)}");
             TypeNode[] constraints = [];
+            var constraintsBracketed = true;
             var end = nameTok.Span;
-            if (_buffer.Match(TokenKind.ColonColon)) // T :: [I1, I2]
+            if (_buffer.Match(TokenKind.ColonColon)) // T :: [I1, I2], or T :: I alone
             {
-                _buffer.Expect(TokenKind.LBracket, "LYR-PAR0030", "expected '[' after '::' in constraint");
-                var cs = new List<TypeNode>();
-                do { cs.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma));
-                end = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close constraint list").Span;
-                constraints = cs.ToArray();
+                if (_buffer.Match(TokenKind.LBracket))
+                {
+                    var cs = new List<TypeNode>();
+                    do { cs.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma));
+                    end = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close constraint list").Span;
+                    constraints = cs.ToArray();
+                }
+                else
+                {
+                    // one constraint: a ',' after it begins the next type parameter
+                    var only = ParseType();
+                    end = only.Span;
+                    constraints = [only];
+                    constraintsBracketed = false;
+                }
             }
             // 'Rhs = Self': a default type argument.
             TypeNode? fallback = null;
@@ -1173,7 +1197,7 @@ public sealed partial class Parser
                 end = fallback.Span;
             }
             parameters.Add(new GenericParam(_sm.Slice(nameTok.Span).ToString(), constraints,
-                Span.Union(nameTok.Span, end)) { NameSpan = nameTok.Span, Default = fallback });
+                Span.Union(nameTok.Span, end)) { NameSpan = nameTok.Span, Default = fallback, ConstraintsBracketed = constraintsBracketed });
         } while (_buffer.Match(TokenKind.Comma));
         // A generic parameter list closes with a plain '>', never a '>>' — but an alias's may meet
         // its '=' unspaced, 'type Pair<T>= (T, T);', and the lexer reads that '>='.
@@ -1188,10 +1212,31 @@ public sealed partial class Parser
     private TypeNode[] ParseInterfaceList(out string?[]? delegates, out Span bySpan)
     {
         _buffer.Advance(); // '::'
-        _buffer.Expect(TokenKind.LBracket, "LYR-PAR0030", "expected '[' after '::'");
         var interfaces = new List<TypeNode>();
         List<string?>? fields = null;
         bySpan = default;
+        // the list rule: one interface also without the brackets — 'struct S :: I', 'class D :: Walker by legs'
+        _listBracketed = _buffer.Check(TokenKind.LBracket);
+        if (!_buffer.Match(TokenKind.LBracket))
+        {
+            var only = ParseType();
+            string?[]? field = null;
+            if (AtContextual("by"))
+            {
+                bySpan = _buffer.Advance().Span;
+                field = [ExpectName("LYR-PAR0026", "the field to delegate to")];
+            }
+            delegates = field;
+            if (_buffer.Check(TokenKind.Comma))
+            {
+                var comma = _buffer.Current.Span;
+                var rest = ParseUnbracketedRest();
+                _de.Report("LYR-PAR0066", Severity.Error, comma,
+                    "several interfaces after '::' are written in brackets: ':: [I, J]'");
+                return [only, .. rest];
+            }
+            return [only];
+        }
         do
         {
             interfaces.Add(ParseType());
@@ -1208,6 +1253,30 @@ public sealed partial class Parser
         _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close interface list");
         delegates = fields?.ToArray();
         return interfaces.ToArray();
+    }
+
+    /// <summary>Whether the last interface list after <c>::</c> stood in brackets, for the node
+    /// that holds it.</summary>
+    private bool _listBracketed = true;
+
+    /// <summary>A bound without brackets: one interface; a ',' after it would be a second, which the
+    /// list rule writes in brackets (<c>LYR-PAR0066</c>) — the rest is read for the recovery.</summary>
+    private TypeNode[] ParseUnbracketed(string where)
+    {
+        var only = ParseType();
+        if (!_buffer.Check(TokenKind.Comma)) return [only];
+        var comma = _buffer.Current.Span;
+        var rest = ParseUnbracketedRest();
+        _de.Report("LYR-PAR0066", Severity.Error, comma, $"several interfaces in {where} are written in brackets: ':: [I, J]'");
+        return [only, .. rest];
+    }
+
+    /// <summary>The types after a ',' that should have stood in brackets.</summary>
+    private List<TypeNode> ParseUnbracketedRest()
+    {
+        var rest = new List<TypeNode>();
+        while (_buffer.Match(TokenKind.Comma)) rest.Add(ParseType());
+        return rest;
     }
 
     /// <summary>An interface list where <c>by</c> has no place: an enum, an interface's parents,

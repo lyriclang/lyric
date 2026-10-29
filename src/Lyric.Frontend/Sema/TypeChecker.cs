@@ -7940,9 +7940,19 @@ public sealed class TypeChecker
             if (call.TypeArguments is { Length: > 0 } written && fsym is { Generics.Length: > 0 })
             {
                 if (written.Length != fsym.Generics.Length)
-                    _de.Report("LYR-SEM0026", Severity.Error, call.Span,
+                {
+                    // too few: each one left out is a '_' the inference fills — the call it meant
+                    var missing = fsym.Generics.Length - written.Length;
+                    var at = written[^1].Span;
+                    DiagnosticNote[] notes = missing > 0
+                        ? [DiagnosticNote.Suggest(
+                            $"its type parameters are {string.Join(", ", fsym.Generics.Select(g => g.Name))}; '_' leaves one to the inference",
+                            new Replacement(new Span(at.File, at.End, at.End), string.Concat(Enumerable.Repeat(", _", missing)), Applicability.Safe))]
+                        : [];
+                    _de.Report(new Diagnostic("LYR-SEM0026", Severity.Error, call.Span,
                         $"generic function '{fsym.Name}' expects {fsym.Generics.Length} type "
-                        + $"argument(s), got {written.Length}");
+                        + $"argument(s), got {written.Length}", notes));
+                }
 
                 // A placeholder ('collect<_, int>(xs)') is not bound here: it is the one
                 // position the inference below is asked to fill, the way it fills every argument
