@@ -106,7 +106,8 @@ binary. It takes <code>build</code>'s options but <code>--emit</code>, <code>--l
 <li><strong><code>lyric build --lib</code></strong> builds the package's library for C — its <code>src/lib.lyr</code> and what that
 imports — instead of its programs (<a href="../../spec/13-abi/#4-exports-and-libraries">13 §4</a>): the archive
 <code>lib&lt;name&gt;.a</code> and the header <code>&lt;name&gt;.h</code>, or with <strong><code>--shared</code></strong> a shared library in the
-archive's place. Without <code>src/lib.lyr</code> there is nothing to build (<code>LYR-CLI0001</code>); <code>--shared</code>
+archive's place; for the archive it says what a C program links beside it (13 §4 rule 9).
+Without <code>src/lib.lyr</code> there is nothing to build (<code>LYR-CLI0001</code>); <code>--shared</code>
 without <code>--lib</code>, and <code>--lib</code> with a file, <code>--bin</code> or <code>--emit</code>, are refused (exit 2).</li>
 </ol>
 <h3 id="12-where-the-files-go">1.2 Where the files go</h3>

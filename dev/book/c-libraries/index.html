@@ -271,6 +271,26 @@ gives the environment they compile C under with Lyric's C compiler, for the buil
 then link what it made with <code>linkArchive</code>. <strong><code>vendorDir(&quot;name&quot;)</code></strong> is where a source tree lies —
 the tree is fetched when the script first asks, and the script runs again from its start, so ask
 before doing anything you would not do twice.</p>
+<h2 id="a-library-for-c">A library for C</h2>
+<p>The other way round: <strong><code>lyric build --lib</code></strong> builds a package's <code>src/lib.lyr</code> as a library a C
+program links. Its <code>@Export</code> functions are C functions, declared in the header beside it. Under
+<code>out/&lt;profile&gt;/&lt;target&gt;/</code> it writes <code>lib&lt;name&gt;.a</code> and <code>&lt;name&gt;.h</code>, and with <code>--shared</code> a shared library
+instead of the archive. <a href="https://github.com/lyriclang/lyric/blob/main/examples/embedded-host"><code>examples/embedded-host</code></a> is such a C program.</p>
+<p>The archive holds the library, the runtime and the <strong>archives of the packages' native parts</strong>, so a C
+program links one file. What it links beside that file, the build says once the archive is written:</p>
+<pre><code class="language-text">note: link out/debug/x86_64-linux-gnu/libcalc.a with out/debug/x86_64-linux-gnu/libgreet.so -lrt -lpthread -lm -ldl -lunwind</code></pre>
+<p>That covers the packages' shared libraries (<code>dylibs</code>), which lie beside the archive, and their
+libraries by name with the directories they are searched in. It also covers what <code>pkg-config</code> gave,
+the frameworks, and the system's libraries the runtime calls. Hand those words to the C compiler after the
+archive, in that order. They are the target's: a build for Windows says <code>-lshell32 -lws2_32</code>, and one
+for macOS often says nothing. <code>--json</code> gives the same words as the artifact's <code>linkArgs</code>, for a
+script or a build system to take:</p>
+<pre><code class="language-text">{"type":"artifact","version":1,"kind":"library","name":"calc","path":"…/libcalc.a","linkArgs":["…/libgreet.so","-lrt","-lpthread","-lm","-ldl","-lunwind"]}</code></pre>
+<p>Where the C program finds a shared library while it runs is the program's own choice. Put the
+files beside it and give it a run path of its own directory (<code>-Wl,-rpath,$ORIGIN</code>, on macOS
+<code>-Wl,-rpath,@executable_path</code>); Windows looks there first anyway. A shared library made with
+<code>--shared</code> is linked against all of this itself, so nothing is said beside it, and only the packages'
+shared libraries lie beside it.</p>
 <h2 id="loading-a-library-while-the-program-runs">Loading a library while the program runs</h2>
 <p>A library the program picks while it runs — a plugin — is not linked at all: <code>std.ffi</code>'s <code>Library</code>
 opens it by its path and looks up its functions by name. <a href="https://github.com/lyriclang/lyric/blob/main/examples/ffi"><code>examples/ffi</code></a> shows

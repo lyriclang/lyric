@@ -540,7 +540,8 @@ A call of an export is C's call of a Lyric function on the thread Lyric runs on,
 C function's pointer (§3 rule 9).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/13-abi/</code>; that a C program links the library — the archive
 and the shared one — and calls its exports, in the toolchain's own tests (<code>tests/Lyric5.Tests</code>,
-<code>ExportTests</code>).</p>
+<code>ExportTests</code>); that it links the archive with the packages' archives inside and the line the build
+names, <code>LibraryLinkTests</code>.</p>
 <ol>
 <li><strong><code>@Export(&quot;geo_area&quot;)</code></strong> on a function — a compiler instruction of the prelude
 (<a href="../../spec/11-metaprogramming/">11 §1</a> rule 17) — makes it C's to call as the function <code>geo_area</code>; a
@@ -591,15 +592,19 @@ reserves.</li>
 </li>
 <li>A shared library gives the system's loader its exports and the runtime's API of rule 8, and no
 other symbol. A C program that links the archive links the libraries the runtime calls too — on
-Linux <code>-lpthread -lm</code>, with zig cc <code>-lunwind</code>; on Windows <code>-lshell32 -lws2_32</code> — and those the
+Linux <code>-lpthread -lm -ldl</code>, with zig cc <code>-lunwind</code>; on Windows <code>-lshell32 -lws2_32</code> — and those the
 packages' native parts name (<a href="../../spec/15-project/">15 §5</a>), which a shared library is linked against
-itself. <em>(Written ahead of M14b:)</em> the <strong>archives</strong> of the native parts
-(<a href="../../spec/15-project/#52-linking">15 §5.2</a>) lie inside <code>lib&lt;name&gt;.a</code> with the library and the runtime,
-so a C program links that one file; what it links beside it — the libraries by name and from
-<code>pkgConfig</code>, the frameworks, the runtime's — <code>build --lib</code> says after the archive, as the
-arguments of a C compiler in the order they are linked (<code>note: link it with -lpthread -lm …</code>),
-and its <code>--json</code> form gives them as the artifact's <code>linkArgs</code>
-(<a href="../../spec/16-diagnostics/">16 §4</a>). They are the target's: another target has others.</li>
+itself. The <strong>archives</strong> of the native parts (<a href="../../spec/15-project/#52-linking">15 §5.2</a>) lie inside
+<code>lib&lt;name&gt;.a</code> with the library and the runtime, so a C program links that one file; their
+<strong>shared libraries</strong> lie beside it, with a Windows import library each. What a C program links
+beside the archive — the shared libraries by those copies, the libraries by name with the
+directories they are searched in, what <code>pkgConfig</code> gave, the frameworks, the runtime's —
+<code>build --lib</code> says after the archive is written, as the arguments of a C compiler in the order
+they are linked (<code>note: link out/…/lib&lt;name&gt;.a with -lpthread -lm …</code>; nothing where there is
+nothing), and its <code>--json</code> form gives them as the artifact's <code>linkArgs</code>
+(<a href="../../spec/16-diagnostics/">16 §4</a>). They are the target's: another target has others. Where the C
+program finds a shared library while it runs is its own to say. With <code>--shared</code> nothing is
+said: the library is linked against all of it, and the packages' shared libraries lie beside it.</li>
 </ol>
 <h2 id="5-embedding">5. Embedding</h2>
 <p>A C program that embeds Lyric: the runtime started, the exports called as tasks, the tasks they
