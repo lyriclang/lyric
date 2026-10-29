@@ -54,6 +54,17 @@ public static partial class Program
             Verbs.Help(Console.Out, verb);
             return 0;
         }
+        // '-v': each command of the C compiler and the linker said as it starts (14 §1.1), as text
+        var verbose = verb.Options.Any(o => o.Name == "-v") && (dash < 0 ? rest : rest[..dash]).Any(a => a is "-v" or "--verbose");
+        if (verbose && Lyric.Core.Rendering.RenderStyle.Current.Events is not null)
+            return Unknown("'-v' says the commands as text; '--json' writes events and nothing else");
+        CBuild.Echo = verbose ? Console.Error : null;
+        try { return Dispatched(verb, rest, lints); }
+        finally { CBuild.Echo = null; }
+    }
+
+    private static int Dispatched(VerbSpec verb, string[] rest, LintArgs lints)
+    {
         return verb.Name switch
         {
             "build" => Build(rest, lints, BuildVerb.Build),

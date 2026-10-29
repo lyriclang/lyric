@@ -28,6 +28,7 @@ public static class CatalogPages
         ("CG", "C generation"),
         ("PKG", "Packages"),
         ("BLD", "Building"),
+        ("LNK", "Linking"),
         ("CLI", "The command line"),
         ("RT", "Run time"),
         ("ICE", "The toolchain itself"),

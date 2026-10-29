@@ -147,7 +147,7 @@ by a build for Linux. `--offline` reads the cache alone, and `--locked` refuses 
 does not hold. Compiling a tree runs nothing of it — there is no script in it to trust.
 
 A tree belongs to the package that names it. If two packages of a program compile the same C, its
-symbols are defined twice and the link fails — share a C library by wrapping it in one package
+symbols are defined twice and the link fails, naming both (`LYR-LNK0003`) — share a C library by wrapping it in one package
 that the others depend on.
 
 ## Bindings from the header
@@ -373,6 +373,36 @@ files beside it and give it a run path of its own directory (`-Wl,-rpath,$ORIGIN
 `-Wl,-rpath,@executable_path`); Windows looks there first anyway. A shared library made with
 `--shared` is linked against all of this itself, so nothing is said beside it, and only the packages'
 shared libraries lie beside it.
+
+## When the link fails
+
+The compiler trusts an `extern` declaration; the linker checks it. When the link fails, the
+build reads what the linker said and points where the fix belongs:
+
+```text
+error[LYR-LNK0001]: nothing the link takes defines 'sqlite3_libversion'
+ --> src/main.lyr:1:1
+  |
+1 | extern "C" fn sqlite3_libversion(): CStr;
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ declared here, and defined nowhere the link looks
+  |
+  = help: name the library that defines it in the package's [native] — 'libs', 'archives', 'frameworks' or 'pkgConfig' — or link it from the build script
+```
+
+- **`LYR-LNK0001`** — a symbol nothing defines, at the `extern` line that declares it. Most often
+  the library is not named yet; else the name differs from the header's.
+- **`LYR-LNK0002`** — a library or framework the linker does not find, at the manifest line that
+  names it (or naming the build script or `pkgConfig` that did). Install its development package,
+  or let `pkgConfig` say where it lies.
+- **`LYR-LNK0003`** — a symbol two packages define, naming both.
+
+Anything else the linker says comes as it is (`LYR-BLD0001`). A C source whose `#include` finds
+nothing also says which directories were searched — the package's `include`, then its
+dependencies'.
+
+To see the commands themselves, build with **`-v`**: each run of the C compiler, the archiver and
+the linker is said as it starts, `running: zig cc …`. What is up to date runs nothing, and says
+nothing.
 
 ## Loading a library while the program runs
 

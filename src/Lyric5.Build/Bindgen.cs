@@ -36,6 +36,7 @@ public static partial class Bindgen
     /// environment's failure, said as the header's finding is — never the toolchain's own.</summary>
     private static ProcessRunner.Result Compiler(CCompiler compiler, IReadOnlyList<string> arguments, string header)
     {
+        CBuild.Said(compiler.Path, arguments);
         try { return ProcessRunner.Run(compiler.Path, arguments, CompileTime); }
         catch (TimeoutException)
         {

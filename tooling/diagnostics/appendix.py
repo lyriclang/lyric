@@ -23,6 +23,7 @@ GROUPS = [
     ("CG", "Code generation", "What the C backend does not take."),
     ("PKG", "Packages and manifests", "`lyric.toml`, the lock file, dependencies."),
     ("BLD", "The build", "The C toolchain, the runtime, the build script."),
+    ("LNK", "The link", "What the linker says, read: a symbol nothing defines, a library it does not find, a symbol defined twice (15 §5.2 rule 12)."),
     ("CLI", "The command line", "The driver's options and verbs."),
     ("IR", "The lowering", "Retired: each refusal of the lowering has a code of its own."),
     ("ICE", "Internal compiler errors", "The toolchain's own failure: a bug to report, never the program's fault."),
