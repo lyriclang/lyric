@@ -60,7 +60,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M14 | FFI and embedding | L | **done** 2026-10-28 |
 | M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | — (planned 2026-10-28) |
 | M15 | Distribution | M | — |
-| M16 | Migration (`lyric fix --from-4`) | L | — |
+| M16 | Migration (`lyric fix --from-4`) | L | — (planned 2026-10-29) |
 | M17 | Spec 5.0, suite, guide | L | — |
 | M18 | Release 5.0.0 | M | — |
 

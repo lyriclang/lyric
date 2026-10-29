@@ -1733,3 +1733,77 @@ je ein PR.
 - **252 — der Backtrace-Flake unter Windows**: seit M12b S1 (Lauf 39679825907) nicht wieder gesehen.
   **Entschieden**: Beobachtung mit Uhr M18 (vor der Veröffentlichung); kommt er wieder, wird die Symbolisierung unter
   Windows in einem eigenen Test wiederholt gelaufen, bis sie fällt.
+
+## Nachtrag 2026-10-29 — der Plan für M16
+
+M16 nach seiner Zeile oben und 12 R1–R3: **Migration** — `lyric fix --from-4` liest ein Lyric-4-Programm mit vollem
+Typwissen, schreibt die mechanischen Regeln aus 12 R2 als Lyric 5 zurück, meldet die semantischen als `needsReview`
+und die von Hand als Bericht, und macht aus `lyric.json` ein `lyric.toml`. Das Artefakt: **die Beispiele von 4.6,
+vollständig über das Werkzeug migriert; der Bericht listet jede `needsReview`-Stelle**. Der Befehl heißt bis M18
+`lyric5` (11 C1). Grundlage ist der Stand nach M15 S8 (main 23e1f26d), gemessen vor dem Plan:
+
+- **Es gibt kein eingefrorenes 4.x-Frontend.** `src/Lyric.Frontend` ist geteilt; sein 4.x-Modus (`SourceManager.Lyric5`
+  aus) ist nicht mehr 4.6: M3–M6 haben Regeln für beide Modi geändert — `xs.length` ist ein Aufruf (`LYR-SEM0012`),
+  ein bloßer Variantenname im Muster wird abgelehnt (`LYR-SEM0111`), jede werfende Stelle braucht `try`
+  (`LYR-SEM0138`), `resume` ist kein Schlüsselwort mehr, `Throwable` heißt `Error`, ein geschriebenes Feld braucht
+  `var`. Ein echtes 4.6-Programm prüft dort nicht.
+- **Auch der Korpus ist nicht mehr 4.6.** `examples/*.lyr` und `stdlib/` wurden an diesen Stellen von Hand
+  nachgezogen (fünf Commits: `.length()`, `.Red`, `var`, `Error`, `next()!`) — Mischformen. `macros/`, `ffi/` und
+  `embedded-host/` sind neu in Lyric 5 geschrieben, `jsonserver/` und `logfilter/` kamen mit M10 dazu. Die Originale
+  liegen nur im Zweig `release/v4.6.0` (Spitze 002b7a4b, Vorfahr von main): 22 Programme, `lambdas/`, `patterns/`,
+  `macros/comptime.lyr`, `ffi/dotnet.lyr`, `embedded-host/` (C#), dazu `stdlib/` mit 25 Dateien.
+- **4.6s Frontend ohne IR**: Lexer, Parser, AST, Resolver und Sema sind rund 16 000 Zeilen (Sema 8 744, davon
+  `TypeChecker` 5 953), dazu ein Teil von `Lyric.Core` (Spans, Quellen, Diagnosen, `ProjectFile` für `lyric.json`).
+  Sema führt `comptime` nicht aus (die Stellen sammelt es, ausgeführt hat sie der 4.x-Treiber über die VM) — die IR
+  mit 13 000 Zeilen und Bytecode/VM bleiben draußen.
+- **Was Lyric 5 zum Umschreiben schon hat**: `Replacement` (Span, Text, `Applicability` `Safe`/`NeedsReview`) an einer
+  Diagnose-Notiz, `SourceEdits.Apply` (nicht überlappende Ersetzungen von hinten), `FixRun` mit `--dry-run` als
+  Unified Diff, `lyric fix` als Verb. Ersetzungen über Spans behalten Kommentare und Layout genau. Der Formatierer
+  (`AstFormatter`) druckt, was der Baum hält, übersetzt aber nichts; er hält Kommentare nur auf Zeilenebene.
+- **`lyric.json` liest noch `ProjectFile`** (Lyric.Core); ein `lyric.toml` schreibt nur `NewPackage` als festen Text
+  und `ManifestEdit` zeilenweise — kein allgemeiner TOML-Schreiber.
+- **Orakel**: `tests/Lyric5.Tests/programs/` hält handgeschriebene Lyric-5-Fassungen der meisten Beispiele, mit ihren
+  Ausgaben (`ExampleTests`).
+
+| # | Entscheidung | Vergleich / Verworfen |
+|---|---|---|
+| P1 | **Das 4.6-Frontend eingefroren** (F1): Lexer, Parser, AST, Resolver und Sema aus `release/v4.6.0` (002b7a4b) als eigene Bibliothek `src/Lyric4.Frontend`, Namensräume mechanisch nach `Lyric4.*` (sonst stoßen sie mit dem geteilten Frontend im selben Prozess zusammen), mit den Teilen von `Lyric.Core`, die sie brauchen, als eigene Kopie darin; dazu 4.6s `stdlib/` als eingebettete Ressource, die Sema für die Typen liest. **Eingefroren** heißt: kein Commit ändert diese Dateien außer über das Werkzeug zum Einfrieren; ein Test hält den Inhalt gegen eine Liste mit SHA-256 (wie `toolchain.json`), Korrekturen gehen nur in die Regeln, nie in den alten Checker. Verfallsdatum: eine Major-Linie (F3) | verworfen: den 4.x-Modus des geteilten Frontends zurückdrehen — vier Regeländerungen je Modus wieder trennen und bis M17 pflegen, und M17 nimmt den Modus ohnehin weg (die Zeile „die 4.x-`stdlib/` … M17“); ein Fork über Git-Submodul — ein zweites Repo für einen Kopie-und-friere-ein-Schritt |
+| P2 | **Regeln als Besucher über den geprüften 4.x-Baum**: jede Regel aus 12 R2 ist eine Klasse, die über den getypten Baum läuft und `Replacement`s erzeugt — Art M schreibt (`Safe`), Art R wird eine Notiz `needsReview` mit Erklärung und Vorschlag (SL-28), Art H eine Zeile im Bericht. Die Ersetzungen gehen über `SourceEdits.Apply` auf den 4.x-Text: Kommentare und Layout bleiben, gedruckt wird nur, was eine Regel ändert. Ein Durchlauf, keine Schleife wie `FixRun` (die Regeln lesen den 4.x-Baum, nicht ihr eigenes Ergebnis); zwei Regeln, die dieselbe Stelle anfassen, sind ein Fehler des Katalogs, den ein Test findet | `go fix` (AST-Umschreiber mit Typen), `cargo fix` (Ersetzungen aus Diagnosen); verworfen: den Baum ändern und alles neu drucken — Kommentare im Ausdruck gingen verloren, und jede Datei sähe nach dem Formatierer aus |
+| P3 | **Bibliothekstabellen als Daten**: die 4.x-Funktionen und ihre 5er-Form (E01 `xOrThrow` → `try x`, E02 die stillen Formen, B01–B13, K04 die Modulpfade, T11) stehen in einer Tabelle neben den Regeln (`from4.toml`, eingebettet), je Eintrag 4.x-Name, Modul, Form in 5, Art; die Regeln lesen sie über das Typwissen (welche Funktion ein Aufruf trifft). Ein Test hält jede 4.6-`pub`-Funktion gegen die Tabelle: steht sie nicht drin, ist sie gleich geblieben oder ein Fehler der Tabelle | `go fix`s feste Tabellen; verworfen: eine Regel je Funktion (130 Klassen) |
+| P4 | **Der Treiber**: `lyric fix --from-4 [pfad]` — ein Verzeichnis mit `lyric.json` (dessen Quellen und Abhängigkeiten) oder eine Datei. Er prüft mit dem eingefrorenen Frontend; ein 4.x-Programm, das schon dort nicht prüft, wird nicht angefasst (`LYR-FIX…`, Exit 1 — erst 4.6 grün, dann migrieren). Schreibt um in place, `--dry-run` zeigt den Unified Diff, `--json` die Notizen nach 16 §4; macht `lyric.toml` aus `lyric.json` (K02) und legt die Quellen nach `src/` (das vorgeschlagene Layout, Datei für Datei mit `git mv`-Hinweis, nicht ausgeführt); der Bericht (`fix-from-4.txt` neben dem Manifest) listet jede Notiz mit Regel, Stelle, Grund und Vorschlag. Danach sagt er: `lyric5 check` | `cargo fix --edition`; verworfen: in einen neuen Ordner schreiben (die Versionskontrolle des Nutzers ist der Rückweg) |
+| P5 | **Codes**: die Notizen bekommen einen Bereich `MIG` mit einem Code je Regel der Art R und H (`LYR-MIG0101` für K06 usw.), im Katalog mit Erklärung; die Regeln der Art M brauchen keinen Code (sie schreiben). `lyric explain LYR-MIG…` sagt, was die Regel prüft und was zu tun ist | 16 G-Reihe |
+| P6 | **Tests je Regel** (12 R2): `tests/fix-from-4/<regel>/` mit `before.lyr` (4.6), `after.lyr` (erwartet) und `notes.txt` (die Notizen); der Läufer prüft das 4.x-Programm mit dem eingefrorenen Frontend (muss grün sein), wendet an, vergleicht, und prüft `after.lyr` mit Lyric 5 (`lyric check` grün außer den genannten `needsReview`-Stellen). So beweist jeder Fall beide Seiten | — |
+| P7 | **Abnahme (R3 Q3)**: die Beispiele von 4.6 kommen eingefroren nach `tests/fix-from-4/examples-4.6/` (die Eingabe); das Werkzeug migriert sie, das Ergebnis ersetzt `examples/` auf main (die Mischformen fallen; `macros/`, `ffi/`, `embedded-host/`, `jsonserver/`, `logfilter/` bleiben, wie sie sind — ihre 4.6-Fassungen sind `.NET`-FFI, C#-Host und VM-`comptime`, Art H). Jedes Beispiel muss danach mit Lyric 5 bauen und dieselbe Ausgabe geben wie sein Orakel in `programs/`, oder die Abweichung steht im Bericht mit Grund. Was nicht baut, ist eine fehlende Regel (R2 wird ergänzt, mit Fall) oder eine `needsReview`-Stelle — von Hand gelöst, und der Bericht nennt es. `fibonacci` bekommt seine Koroutinen-Form (Uhr M16) | 12 R3 Q3 |
+| P8 | **Spec**: 14 bekommt `fix --from-4` (die Option, was es liest und schreibt, Exit-Codes, der Bericht) als informativen Abschnitt — F3: kein Versprechen, dass das Ergebnis kompiliert; die Regeln stehen in 12 R2 und im Katalog (`MIG`), nicht in der Spec. Keine Konformanzfälle: die Fälle aus P6 prüft das Werkzeug selbst | wie M15 P12 |
+
+| Slice | Inhalt | Artefakt |
+|---|---|---|
+| **S1** einfrieren | P1: `src/Lyric4.Frontend` aus 002b7a4b, Namensräume, die Core-Kopie, 4.6s `stdlib/` als Ressource, das Werkzeug zum Einfrieren (`tooling/from4/freeze.py`) und die Liste mit SHA-256; ein API `From4.Check(files)` → getypter Baum + Diagnosen | die 22 Beispiele und `lambdas/`, `patterns/` von 4.6 prüfen mit dem eingefrorenen Frontend ohne Fehler; ein Programm, das 4.6 abgelehnt hat, wird abgelehnt; der Einfrier-Test rot bei einem geänderten Byte |
+| **S2** Treiber und Gerüst | P2, P4, P5: `lyric fix --from-4`, die Regel-Schnittstelle, die Anwendung, `--dry-run`/`--json`, der Bericht; K01–K08 (Modulkopf, `lyric.json` → `lyric.toml`, Imports, Prelude, Sichtbarkeit als R, `build.lyr` als R, `stdlib-tests` als H) und der Läufer aus P6 | `hello.lyr` von 4.6 migriert und baut mit Lyric 5; je Regel K ein Fall |
+| **S3** Syntax | S01, S04–S08, S10, S11 | je Regel ein Fall |
+| **S4** Interfaces und Werte | T01–T05, T08–T16, T18 (P3: die Tabelle beginnt) | je Regel ein Fall |
+| **S5** Fehler und Koroutinen | E01–E09, N01–N02 (die Tabelle der werfenden und stillen Formen) | je Regel ein Fall |
+| **S6** Bibliothek | B01–B13 über die Tabelle (P3); der Test, der jede 4.6-`pub`-Funktion gegen die Tabelle hält | je Regel ein Fall; die Tabelle vollständig |
+| **S7** Abnahme | P7: `examples-4.6/` eingefroren, migriert, `examples/` ersetzt, Ausgaben gegen die Orakel, der Bericht; was fehlt, wird Regel | die Zeile: `examples/` aus dem Werkzeug, Bericht mit jeder `needsReview`-Stelle |
+| **S8** Abschluss | P8 (Spec 14), STATUS, CHANGELOG, Bericht, der Plan für M17 | — |
+
+Nach Aufwand: groß S1, S4, S6; mittel S2, S5, S7; klein S3, S8 — **L** wie die Zeile, mit S1 als Unbekannter: die
+Namensräume und die Core-Kopie können mehr kosten als gedacht, wenn 4.6s Sema an Stellen hängt, die der Plan nicht
+sah. Läuft M16 über das Doppelte, wird es hier neu geschnitten (CONTRIBUTING); der erste Kandidat zum Abtrennen ist
+S6 (die Bibliothekstabelle ist lang, jede Zeile klein). Die Reihenfolge folgt den Abhängigkeiten: ohne das Frontend
+(S1) keine Typen, ohne den Treiber (S2) kein Fall; S3–S6 sind unabhängig voneinander; S7 braucht alle.
+
+**Plattformen**: S1, S2 und S7 fahren den vollen Plattformlauf (Dateipfade, `lyric.toml`, Zeilenenden); die Regeln
+sind Text und laufen überall gleich.
+
+**Reflexion**: Die Entscheidung F1 stand — ein 4.x-Frontend mit Typwissen statt Textregeln, weil `abs(-3)` und `var`
+ohne Typ nicht zu entscheiden sind. Offen war, dass es dieses Frontend nicht mehr gibt: das geteilte hat sich seit M3
+in beiden Modi bewegt, und der Korpus mit ihm. Eine eingefrorene Kopie von 4.6 ist die ehrliche Lesart von F1 — die
+Sprache, aus der migriert wird, ist 4.6, nicht der Zustand, den das geteilte Frontend heute „4.x“ nennt. Go hat es
+einfacher (`go fix` liest dieselbe Sprache, die es schreibt); rustc's Editionsmigration läuft im selben Compiler über
+Lints, weil Rust seine alten Editionen weiter spricht — Lyric 5 spricht 4 nicht mehr, darum die Kopie. Die Gefahr ist
+die Versuchung, den alten Checker zu reparieren; die Einfrier-Liste verbietet es, und jeder Fehler wird eine Regel.
+Die Ersetzung über Spans statt Neudruck folgt `cargo fix`: wer migriert, will seinen Code wiedererkennen.
+
+**Nicht in M16**: die 4.x-`stdlib/` und der 4.x-Modus des geteilten Frontends (M17); Lyric-Script (`.lyrs`) hat
+sein eigenes Repo; ein Migrator für Erato (Lyricpp, Z-Reihe); `--edition` (mit der ersten Edition).
