@@ -152,4 +152,60 @@ public class FmtCommandTests
         Assert.Contains("--check", output);
         Assert.Contains("--diff", output);
     }
+
+    /// <summary>One interface after <c>::</c> may stand with brackets or without them (the list
+    /// rule), and <c>fmt</c> writes it as it was written — in a type's list, delegating, in an
+    /// extend block, in a constraint and in an associated type's bound; several stay in brackets.</summary>
+    [Fact]
+    public void One_interface_keeps_its_brackets_or_their_absence()
+    {
+        const string formed = """
+            interface Named {
+                fn name(): string;
+            }
+
+            interface Holder :: Named {
+                type Item :: Named;
+                type Other :: [Named];
+            }
+
+            struct A :: Named {
+                fn name(): string {
+                    return "a";
+                }
+            }
+
+            struct B :: [Named] {
+                fn name(): string {
+                    return "b";
+                }
+            }
+
+            class C :: Named by a {
+                a: A,
+            }
+
+            extend int :: Named {
+                fn name(): string {
+                    return "int";
+                }
+            }
+
+            fn one<T :: Named, U :: [Named]>(t: T, u: U): string {
+                return t.name() + u.name();
+            }
+
+            fn main(): void {
+                let _ = one(A { }, B { });
+            }
+
+            """;
+        var dir = TestDirectories.Fresh("lyric5-fmt-list-");
+        var file = Path.Combine(dir, "main.lyr");
+        File.WriteAllText(file, formed);
+        var (exit, output, error) = RunRaw("fmt", file);
+        Assert.True(exit == 0, error);
+        Assert.Equal(formed, File.ReadAllText(file));
+        Assert.Equal("", output);
+    }
 }
