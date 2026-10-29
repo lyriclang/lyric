@@ -104,6 +104,16 @@ Hello, world!</code></pre>
 <p><code>lyric check</code> says what a build would say about the program, without making a binary — the
 quickest way to hear about a mistake. The chapter <a href="../../book/diagnostics/">What the compiler tells you</a>
 reads what it says.</p>
+<h2 id="debugging">Debugging</h2>
+<p>A debug build carries debug information, and its C names a field and a local as the program
+does, so a debugger shows <code>p.x</code>, not a name the compiler made. <code>lyric dap</code> is the debug adapter
+an editor starts: it builds the program and hands it to LLVM's <code>lldb-dap</code>, which you install
+beside the toolchain (<code>LYRIC_LLDB_DAP</code> names one that is not on the <code>PATH</code>); a panic stops the
+program where it happens. In plain lldb, <code>command source lldb/lyric.lldbinit</code> from the
+toolchain's directory shows Lyric's strings, arrays and enums.</p>
+<p>On Windows <code>lyric dap</code> is measured, not promised: LLVM 20's <code>lldb-dap.exe</code> needs the Python its
+lldb was built with (<code>python310.dll</code>) and, on the machines measured, ends as it starts even
+then. The program carries a PDB there, which Visual Studio's debugger reads.</p>
 <p>Next, <a href="../../book/first-program/">a first program</a> that does a little more than greet.</p>
 <nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/">← The Lyric Book</a><a class="next" href="../../book/first-program/">A first program →</a></nav>
 </main>
