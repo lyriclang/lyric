@@ -127,4 +127,17 @@ Hello, world!
 quickest way to hear about a mistake. The chapter [What the compiler tells you](diagnostics.md)
 reads what it says.
 
+## Debugging
+
+A debug build carries debug information, and its C names a field and a local as the program
+does, so a debugger shows `p.x`, not a name the compiler made. `lyric dap` is the debug adapter
+an editor starts: it builds the program and hands it to LLVM's `lldb-dap`, which you install
+beside the toolchain (`LYRIC_LLDB_DAP` names one that is not on the `PATH`); a panic stops the
+program where it happens. In plain lldb, `command source lldb/lyric.lldbinit` from the
+toolchain's directory shows Lyric's strings, arrays and enums.
+
+On Windows `lyric dap` is measured, not promised: LLVM 20's `lldb-dap.exe` needs the Python its
+lldb was built with (`python310.dll`) and, on the machines measured, ends as it starts even
+then. The program carries a PDB there, which Visual Studio's debugger reads.
+
 Next, [a first program](first-program.md) that does a little more than greet.

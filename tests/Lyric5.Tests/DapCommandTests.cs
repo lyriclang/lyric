@@ -24,7 +24,7 @@ public class DapCommandTests
         private readonly BlockingQueue _inbox = new();
         private readonly string _log = Path.Combine(Path.GetTempPath(), $"lyric-dap-{Guid.NewGuid():N}.log");
 
-        public Session()
+        public Session(params (string Name, string Value)[] environment)
         {
             var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
             var start = new ProcessStartInfo(host)
@@ -35,6 +35,7 @@ public class DapCommandTests
             start.ArgumentList.Add("dap");
             // lldb-dap's own account of the session, for a wait that fails
             start.Environment["LLDBDAP_LOG"] = _log;
+            foreach (var (name, value) in environment) start.Environment[name] = value;
             _process = Process.Start(start)!;
             _ = Task.Run(Read);
         }
@@ -308,5 +309,34 @@ public class DapCommandTests
         Assert.False((bool?)answer["success"]);
         Assert.Contains("did not build", (string?)answer["message"]);
         dap.Send("disconnect");
+    }
+
+    /// <summary>
+    /// An lldb-dap that ends as it starts — on Windows LLVM's, when the Python its lldb links is not
+    /// there (exit <c>0xC0000135</c>) — is said to the editor with its exit, instead
+    /// of leaving it waiting for an answer. Needs no lldb-dap: a stand-in that exits with 3.
+    /// </summary>
+    [Fact]
+    public void An_lldb_dap_that_ends_as_it_starts_is_said_with_its_exit()
+    {
+        var dir = TestDirectories.Fresh("lyric5-dap-stand-in-");
+        var source = Path.Combine(dir, "ends.c");
+        File.WriteAllText(source, "int main(void) {\n    return 3;\n}\n");
+        var compiler = Lyric5.Toolchain.CCompiler.Locate() ?? throw new InvalidOperationException("no C compiler");
+        var standIn = Path.Combine(dir, "lldb-dap" + Lyric5.Toolchain.Target.Host.ExecutableSuffix);
+        string[] compile = [source, "-o", standIn];
+        var built = Lyric5.Toolchain.ProcessRunner.Run(compiler.Path, compiler.Kind == Lyric5.Toolchain.CCompilerKind.Zig ? ["cc", .. compile] : compile, TimeSpan.FromMinutes(10));
+        Assert.True(built.ExitCode == 0, built.Stderr);
+
+        using var dap = new Session(("LYRIC_LLDB_DAP", standIn));
+        var answer = dap.Response(dap.Send("initialize", new JsonObject { ["adapterID"] = "lyric" }));
+        Assert.False((bool?)answer["success"]);
+        Assert.Equal($"lldb-dap at '{standIn}' ended as it started (exit 3)", (string?)answer["message"]);
+
+        Assert.Equal(
+            "lldb-dap at 'lldb-dap.exe' ended as it started (exit -1073741515, 0xC0000135): a DLL it links is not found — LLVM's lldb links Python (python310.dll for LLVM 20); on Windows lyric dap is measured, not promised — Visual Studio's debugger reads the program's PDB",
+            DapAdapter.EndedMessage("lldb-dap.exe", unchecked((int)0xC0000135)));
+        Assert.EndsWith("(exit -1073740791, 0xC0000409); on Windows lyric dap is measured, not promised — Visual Studio's debugger reads the program's PDB",
+            DapAdapter.EndedMessage("lldb-dap.exe", unchecked((int)0xC0000409)));
     }
 }

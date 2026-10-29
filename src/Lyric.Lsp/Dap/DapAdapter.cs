@@ -71,6 +71,12 @@ public sealed class DapAdapter(Stream clientInput, Stream clientOutput, DapAdapt
             await RefuseAsync(first, $"lldb-dap at '{lldbDap}' did not start", cancellationToken).ConfigureAwait(false);
             return 1;
         }
+        // one that cannot load what it links ends as it starts, and would leave the editor waiting
+        if (_process.WaitForExit(EndedAtOnce))
+        {
+            await RefuseAsync(first, EndedMessage(lldbDap, _process.ExitCode), cancellationToken).ConfigureAwait(false);
+            return 1;
+        }
         _lldb = new LspConnection(_process.StandardOutput.BaseStream, _process.StandardInput.BaseStream);
 
         var back = Task.Run(() => FromLldbAsync(cancellationToken), cancellationToken);
@@ -78,6 +84,27 @@ public sealed class DapAdapter(Stream clientInput, Stream clientOutput, DapAdapt
         await back.ConfigureAwait(false);
         await _process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
         return 0;
+    }
+
+    /// <summary>How long lldb-dap is watched after it starts: one that ends within it never
+    /// answered.</summary>
+    private static readonly TimeSpan EndedAtOnce = TimeSpan.FromMilliseconds(300);
+
+    /// <summary>Why lldb-dap ended as it started, as far as its exit says: on Windows
+    /// <c>0xC0000135</c> is a DLL it links that is not found — LLVM's lldb links Python
+    /// (<c>python310.dll</c> for LLVM 20), which LLVM's installer does not bring. With that
+    /// Python LLVM 20.1.8's ends all the same (<c>0xC0000409</c>, measured on the runner): on
+    /// Windows the adapter is measured, not promised, and Visual Studio's debugger reads the PDB.</summary>
+    public static string EndedMessage(string lldbDap, int exit)
+    {
+        var said = $"lldb-dap at '{lldbDap}' ended as it started (exit {exit}{(exit < 0 || exit > 255 ? $", 0x{exit:X8}" : "")})";
+        var windows = "; on Windows lyric dap is measured, not promised — Visual Studio's debugger reads the program's PDB";
+        return unchecked((uint)exit) switch
+        {
+            0xC0000135 => said + ": a DLL it links is not found — LLVM's lldb links Python (python310.dll for LLVM 20)" + windows,
+            0xC0000409 => said + windows,
+            _ => said,
+        };
     }
 
     /// <summary>The editor's messages, the first one already read.</summary>

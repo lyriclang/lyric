@@ -121,7 +121,7 @@ public class ToolchainSwitchTests
             + "    printf(\"\\nfrom %s\\n\", from ? from : \"(none)\");\n    return 3;\n}\n");
         var compiler = CCompiler.Locate() ?? throw new InvalidOperationException("no C compiler");
         string[] compile = [source, "-o", home.BinaryOf("7.1.0")];
-        var built = ProcessRunner.Run(compiler.Path, compiler.Kind == CCompilerKind.Zig ? ["cc", .. compile] : compile, TimeSpan.FromMinutes(2));
+        var built = ProcessRunner.Run(compiler.Path, compiler.Kind == CCompilerKind.Zig ? ["cc", .. compile] : compile, TimeSpan.FromMinutes(10));
         Assert.True(built.ExitCode == 0, built.Stderr);
 
         var package = Path.GetDirectoryName(Pinned("7.0"))!;

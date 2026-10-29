@@ -1714,3 +1714,22 @@ je ein PR.
   `header` einer Klasse nicht `header` heißen. Sonst bleibt es bei `f_…` und `l<id>_…`; synthetische Lokale
   (`$fstring` …) und Tupelfelder (`f_0`) bleiben so. `lyric_lldb.py` bleibt (es nimmt `f_` weiter ab); die
   Goldens sind neu, Verhalten und Layout gleich.
+- **Gemessen** (S8c) mit `measure.yml` — einem Workflow nur für Messungen, von Hand oder über einen Branch
+  `measure/…` gestartet, der keinen Bau scheitern lässt.
+- **286 — `lldb-dap.exe` unter Windows**: LLVM 20.1.8s `lldb-dap.exe` endet auf dem Runner mit `0xC0000135` — sein
+  `liblldb.dll` linkt `python310.dll`, das LLVMs Installer nicht mitbringt. Mit Python 3.10 auf dem PATH (und mit
+  `PYTHONHOME`) endet es ebenso, nun mit `0xC0000409`, ohne Ausgabe. **Entschieden**: `lyric dap` bleibt unter Windows
+  gemessen, nicht versprochen (11 E4); der Job `lyric dap on Windows (measured)` bleibt, wie er ist. Ein lldb-dap, das
+  binnen 300 ms nach dem Start endet, beantwortet `lyric dap` jetzt mit seinem Exit-Code — für die beiden Codes von
+  Windows mit dem Grund und dem Hinweis auf Visual Studios Debugger, der die PDB des Programms liest (seit S8b mit
+  Lyrics Namen). Das Book (Erste Schritte, „Debugging“) sagt es. Punkt 286 ist zu.
+- **N7 — Objective-C**: `zig cc` 0.16.0 übersetzt eine `.m` gegen Foundation auf dem macOS-Runner, mit und ohne
+  `-fobjc-arc`, und das Programm läuft. **Entschieden**: Tür nach 5.0, gebaut mit dem ersten Paket, das Objective-C
+  aus der Quelle braucht (die Messung steht, der Weg ist bekannt: die Datei mit ihrer Endung, `frameworks` wie
+  heute); raylib unter macOS baut bis dahin aus seinem Archiv (E1).
+- **E5 — Sysroot je Tripel**: bestätigt als Tür nach 5.0. zig bringt die libc jedes Ziels mit; ein Sysroot fehlt nur,
+  wo ein Paket quer gegen Systembibliotheken eines anderen Systems linkt (Linux außer libc, macOS-Frameworks), und
+  das braucht keines der Pakete, die es gibt. Go verlangt dafür `CC` mit Sysroot; das bleibt der Vergleich.
+- **252 — der Backtrace-Flake unter Windows**: seit M12b S1 (Lauf 39679825907) nicht wieder gesehen.
+  **Entschieden**: Beobachtung mit Uhr M18 (vor der Veröffentlichung); kommt er wieder, wird die Symbolisierung unter
+  Windows in einem eigenen Test wiederholt gelaufen, bis sie fällt.
