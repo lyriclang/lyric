@@ -1585,7 +1585,11 @@ ihren bekannten Texten.
 - **Reproduzierbare Archive**: `zig cc -O2` schreibt Debug-Information mit dem Verzeichnis des Aufrufs (`.debug_str`),
   und ein COFF-Objekt trägt den Namen von zigs temporärer Datei (CodeView `S_OBJNAME`, zufällig je Lauf). Mit
   relativen Pfaden, `-g0` und für Windows `-Xclang -object-file-name=crc32.obj` sind die fünf Archive von
-  `examples/native-prebuilt` aus jedem Verzeichnis und mit leerem zig-Cache dieselben Bytes.
+  `examples/native-prebuilt` aus jedem Verzeichnis und mit leerem zig-Cache dieselben Bytes — mit dem zig von
+  ziglang.org, das `tooling/zig-version` pinnt. Archs zig 0.16.0 (gegen das System-LLVM 21 gebaut) erzeugt für
+  Linux und Windows andere Bytes; der Plattformlauf fand es, die Archive kommen jetzt aus dem offiziellen Build.
+- **Die Linux-Runner** haben weder X11 noch OpenGL als Entwicklungsdateien: die Linux-Jobs installieren
+  `libx11-dev` und `libgl-dev` (Maintainer, 2026-10-29), wie schon `lldb`.
 - **raylib 5.5** (Release-Archiv, 42 MB, SHA-256 `aea98ecf…e258e`) baut aus dem Quellbaum mit einer `cLibrary`:
   Linux auf dem Wirt (`_GLFW_X11`, wie raylibs Makefile es setzt; X11 und GL aus dem System), Windows cross von
   Linux ohne irgendetwas des Wirts, macOS auf dem Mac (`rglfw.c` als Objective-C, sechs Frameworks); ein Mac-Ziel von

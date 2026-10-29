@@ -389,7 +389,9 @@ public class ExampleTests
 
     /// <summary>The archives the example brings are what its script makes: built again here with the
     /// toolchain's zig, they are the same bytes — no archive in the repository that nobody can make
-    /// again.</summary>
+    /// again. The bytes are those of the zig the toolchain pins (<c>tooling/zig-version</c>), as
+    /// ziglang.org builds it; a zig built otherwise — a distribution's, against its own LLVM — makes
+    /// other code and other bytes.</summary>
     [CrossTargetFact]
     public void The_native_prebuilt_archives_are_what_their_script_makes()
     {
