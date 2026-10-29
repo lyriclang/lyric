@@ -47,7 +47,7 @@ public class ToolchainFailureTests
         var compiler = CCompiler.Locate() ?? throw new InvalidOperationException("no C compiler");
         var slow = Path.Combine(dir, "slow-cc" + Target.Host.ExecutableSuffix);
         string[] compile = [source, "-o", slow];
-        var built = ProcessRunner.Run(compiler.Path, compiler.Kind == CCompilerKind.Zig ? ["cc", .. compile] : compile, TimeSpan.FromMinutes(2));
+        var built = ProcessRunner.Run(compiler.Path, compiler.Kind == CCompilerKind.Zig ? ["cc", .. compile] : compile, TimeSpan.FromMinutes(10));
         Assert.True(built.ExitCode == 0, built.Stderr);
 
         var cache = TestDirectories.Fresh("lyric5-slow-cache-");

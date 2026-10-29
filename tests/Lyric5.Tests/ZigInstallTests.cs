@@ -183,7 +183,7 @@ public class ZigInstallTests
         var binary = LyricHome.ZigBinary(home.Root, LyricHome.ZigVersion);
         Directory.CreateDirectory(Path.GetDirectoryName(binary)!);
         string[] compile = [source, "-o", binary];
-        var built = ProcessRunner.Run(compiler.Path, compiler.Kind == CCompilerKind.Zig ? ["cc", .. compile] : compile, TimeSpan.FromMinutes(2));
+        var built = ProcessRunner.Run(compiler.Path, compiler.Kind == CCompilerKind.Zig ? ["cc", .. compile] : compile, TimeSpan.FromMinutes(10));
         Assert.True(built.ExitCode == 0, built.Stderr);
 
         var installed = CCompiler.Locate(null, home.Root);
