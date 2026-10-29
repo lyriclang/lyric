@@ -86,7 +86,8 @@ jobs:
           src/Lyric5/bin/Release/net10.0/lyric5 fmt --check \
             $(find stdlib5 tests/std -name '*.lyr' | sort) \
             examples/inventory.lyr examples/stats.lyr examples/stack.lyr \
-            examples/jsonserver/src/*.lyr examples/logfilter/src/*.lyr examples/macros/src/*.lyr
+            examples/jsonserver/src/*.lyr examples/logfilter/src/*.lyr examples/macros/src/*.lyr \
+            examples/native-prebuilt/src/*.lyr examples/raylib/src/*.lyr examples/raylib/build.lyr
 
       # WHICH TESTS (tooling/affected.toml; the maintainer's decision of 2026-10-11): a pull
       # request runs the tests its diff reaches and a fixed regression group — the goldens, the

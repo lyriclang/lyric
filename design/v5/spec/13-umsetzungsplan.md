@@ -1579,6 +1579,44 @@ ihren bekannten Texten.
 | L7-6 | **Konformanz**: ein `run`-Fall mit `error:` erwartet Exit 2 (der Bau nach dem Frontend), drei Fälle in 15-project; der Runner unterschied bisher nur Exit 1 | die Befunde nur in den Werkzeugtests |
 | L7-7 | **Ein fehlender Header** (N6) nennt die durchsuchten Verzeichnisse der Einheit — im Text von `BLD0001`, kein eigener Code | ein eigener Code (der Fehler ist der C-Quelle, nicht des Links) |
 
+### Nachtrag 2026-10-29 — L8 und der Abschluss von M14b
+
+**Gemessen** (zig 0.16):
+- **Reproduzierbare Archive**: `zig cc -O2` schreibt Debug-Information mit dem Verzeichnis des Aufrufs (`.debug_str`),
+  und ein COFF-Objekt trägt den Namen von zigs temporärer Datei (CodeView `S_OBJNAME`, zufällig je Lauf). Mit
+  relativen Pfaden, `-g0` und für Windows `-Xclang -object-file-name=crc32.obj` sind die fünf Archive von
+  `examples/native-prebuilt` aus jedem Verzeichnis und mit leerem zig-Cache dieselben Bytes.
+- **raylib 5.5** (Release-Archiv, 42 MB, SHA-256 `aea98ecf…e258e`) baut aus dem Quellbaum mit einer `cLibrary`:
+  Linux auf dem Wirt (`_GLFW_X11`, wie raylibs Makefile es setzt; X11 und GL aus dem System), Windows cross von
+  Linux ohne irgendetwas des Wirts, macOS auf dem Mac (`rglfw.c` als Objective-C, sechs Frameworks); ein Mac-Ziel von
+  Linux ist `BLD0004`. Unter WSLg öffnet das Programm sein Fenster. **Keine freien Linker-Flags nötig** — E7 ist
+  damit entschieden (11, E7: nicht in 5.0).
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| L8-1 | **`examples/native-prebuilt`**: CRC-32 als Archiv je Tier-1-Tripel mit Quelle und `native/make-archives.sh`; `ExampleTests` baut die Archive neu und vergleicht die Bytes (Cross-Lauf, Linux x64). Auf macOS zählt CoreFoundation (Framework), sonst C — dieselbe `extern`-Signatur, die Wahl liegt in den Tabellen je OS | die Archive ungeprüft einchecken; das Framework nur in einem Test |
+| L8-2 | **`examples/raylib`**: der Baum als URL mit Hash (das Archiv, nicht der Git-Verlauf: ein Download statt eines Klons), die Bindungen aus `raylib.h`, der Bau im Skript; gebaut (Wirt, Windows cross), nicht gefahren — die Runner haben kein Display | raylib als Git-Baum (der volle Verlauf); vorgebaute raylib-Archive |
+| L8-3 | **Gefunden: Zeilen einer Meldung**: der Renderer machte jedes Steuerzeichen einer Meldung sichtbar, auch `\n` — seit M12a S4 kam die Ausgabe von C-Compiler und Linker in `BLD0001` als eine Zeile mit `␊`. Eine Meldung behält jetzt ihre Zeilen (`PrintableLines`), alles andere bleibt ersetzt | die Werkzeugausgabe als Notes je Zeile (zerreißt Compilerausgaben) |
+
+**Für den Maintainer, je „entscheiden oder Tür“** (gefunden beim Schreiben der Beispiele):
+- **L8-a** Ein Struct aus `lyric bindgen` hat keine `var`-Felder: `pos.x += 1` geht nicht, das Beispiel baut je Bild
+  einen neuen `Vector2`. In C ist jedes Feld schreibbar.
+- **L8-b** `return unsafe { … };` — `unsafe` ist nur Anweisung; der Fehler kommt als `unknown identifier 'unsafe'` und
+  zwei Folgefehler über ein Lambda `it`.
+- **L8-c** `lyric fmt` bricht eine Builder-Kette (`cLibrary(…).include(…).define(…)`) Argument für Argument um; das
+  Beispiel schreibt die Aufrufe als Anweisungen.
+- **L8-d** Die eigenen C-Einheiten für Windows tragen denselben zufälligen `S_OBJNAME` wie oben; ein `--lib`-Archiv
+  für Windows ist darum nicht bytegleich (der gelinkte PE wird normalisiert, das Archiv nicht).
+
+**Der Abschluss von M14b.** Die Zeile hält: `examples/native-prebuilt` linkt sein Archiv je Tripel und auf macOS
+CoreFoundation, `examples/raylib` baut raylib aus seinem Release und ruft es über erzeugte Bindungen — beide in
+`ExampleTests`, im vollen Plattformlauf. Gebaut in L1–L8 (#597, #602, #604, #608, #611, #614, #622, #623 und dieser
+Slice; Spec #372, #375, #376, #378, #381, #385, #387, #390): SDKs über das Skript, der native Teil mit Archiven,
+`dylibs`, Definitionen und Tripeln, Quellbäume aus Git und von URLs, Bindungen aus Headern, `std.build` neu mit
+`cLibrary`, `pkgConfig` und Frameworks, `--lib` mit gebündelten Archiven und genannter Link-Zeile, die Befunde des
+Links und `-v`. Anders als geplant: Frameworks nur im Bau für den eigenen Mac (L5-1); `lyric bindgen` kam in M14b
+statt als Tür (N2); E7 entschieden. **Nächster Schritt: die Halte von M15, dann M16.**
+
 ## Nachtrag 2026-10-28 — der Plan für M15
 
 M15 nach seiner Zeile oben, 11 W9 (T1–T8), 11 C4/C9/C10, 14 C9 und den Uhren, die auf M15 zeigen: **Distribution** —
