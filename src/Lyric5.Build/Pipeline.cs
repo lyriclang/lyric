@@ -165,7 +165,23 @@ public static class Pipeline
     }
 
     /// <summary>The binary's path, or the exit code of the failure.</summary>
-    public static (int Exit, string? Executable) Build(BuildRequest request, TextWriter error)
+    public static (int Exit, string? Executable) Build(BuildRequest request, TextWriter error) => Build(request, error, null);
+
+    /// <summary>
+    /// <c>build --lib</c>: the library's path, or the exit code of the failure, and what a C program
+    /// links beside a static library, after it, as a C compiler's arguments (spec 13 §4 rule 9) — the
+    /// shared libraries of the packages where they lie beside it, the libraries by name and their
+    /// directories, the flags and frameworks, the runtime's. Empty for a shared library, which is
+    /// linked against them itself.
+    /// </summary>
+    public static (int Exit, string? Library, IReadOnlyList<string> LinkArgs) BuildLibrary(BuildRequest request, TextWriter error)
+    {
+        var linkArgs = new List<string>();
+        var (exit, built) = Build(request, error, linkArgs);
+        return (exit, built, linkArgs);
+    }
+
+    private static (int Exit, string? Executable) Build(BuildRequest request, TextWriter error, List<string>? linkArgs)
     {
         var project = request.Project;
         // One build at a time writes into out/; a second one waits here.
@@ -279,19 +295,34 @@ public static class Pipeline
             string[] prebuilt = [.. native.Archives, .. native.Dylibs.Select(d => d.Linked)];
             if (project.Library is { } libraryKind)
             {
-                // The archive holds the runtime too: a C program links one file and the libraries the
-                // packages' native parts ask for. A shared library is linked against them itself.
+                // The archive holds the runtime and the packages' archives too: a C program links one
+                // file and what the build says beside it (spec 13 §4 rule 9). A shared library is
+                // linked against all of it itself.
                 var file = project.LibraryFile(request.Profile, request.Target);
                 Directory.CreateDirectory(Path.GetDirectoryName(file)!);
                 if (libraryKind == LibraryKind.Static)
                 {
                     var runtime = RuntimeArchive.Objects(request.Compiler, request.Target, profile, request.ToolchainVersion);
-                    File.Copy(build.Archive([.. objects, .. runtime], Path.Combine(project.CacheDir, "lib", $"lib{project.Name}.a")), file, overwrite: true);
+                    File.Copy(build.Archive([.. objects, .. runtime], Path.Combine(project.CacheDir, "lib", $"lib{project.Name}.a"), native.Archives),
+                        file, overwrite: true);
                 }
                 else build.LinkShared([.. objects, .. prebuilt, archive], file, libraries, linkPaths);
                 File.Copy(header, project.HeaderFile(request.Profile, request.Target), overwrite: true);
-                // what the library needs when it runs lies beside it, as beside a program
+                // what the library needs when it runs lies beside it, as beside a program; beside an
+                // archive also what a C program links a shared library by, its import library on Windows
                 PutBeside(native.Beside, file);
+                if (libraryKind == LibraryKind.Static)
+                {
+                    PutBeside([.. native.Dylibs.Select(d => d.ImportLibrary).OfType<string>()], file);
+                    var dir = Path.GetDirectoryName(Path.GetFullPath(file))!;
+                    linkArgs?.AddRange([
+                        .. native.Dylibs.Select(d => Path.Combine(dir, Path.GetFileName(d.Linked))),
+                        .. linkPaths.SearchDirs.Select(d => "-L" + d),
+                        .. libraries.Select(l => "-l" + l),
+                        .. native.Args,
+                        .. native.Frameworks.SelectMany(f => new[] { "-framework", f }),
+                        .. build.RuntimeLinkArgs]);
+                }
                 return (0, file);
             }
             var executable = project.Executable(request.Profile, request.Target);

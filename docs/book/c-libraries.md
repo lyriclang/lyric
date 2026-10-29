@@ -343,6 +343,37 @@ then link what it made with `linkArchive`. **`vendorDir("name")`** is where a so
 the tree is fetched when the script first asks, and the script runs again from its start, so ask
 before doing anything you would not do twice.
 
+## A library for C
+
+The other way round: **`lyric build --lib`** builds a package's `src/lib.lyr` as a library a C
+program links. Its `@Export` functions are C functions, declared in the header beside it. Under
+`out/<profile>/<target>/` it writes `lib<name>.a` and `<name>.h`, and with `--shared` a shared library
+instead of the archive. [`examples/embedded-host`](../../examples/embedded-host) is such a C program.
+
+The archive holds the library, the runtime and the **archives of the packages' native parts**, so a C
+program links one file. What it links beside that file, the build says once the archive is written:
+
+```text
+note: link out/debug/x86_64-linux-gnu/libcalc.a with out/debug/x86_64-linux-gnu/libgreet.so -lrt -lpthread -lm -ldl -lunwind
+```
+
+That covers the packages' shared libraries (`dylibs`), which lie beside the archive, and their
+libraries by name with the directories they are searched in. It also covers what `pkg-config` gave,
+the frameworks, and the system's libraries the runtime calls. Hand those words to the C compiler after the
+archive, in that order. They are the target's: a build for Windows says `-lshell32 -lws2_32`, and one
+for macOS often says nothing. `--json` gives the same words as the artifact's `linkArgs`, for a
+script or a build system to take:
+
+```text
+{"type":"artifact","version":1,"kind":"library","name":"calc","path":"…/libcalc.a","linkArgs":["…/libgreet.so","-lrt","-lpthread","-lm","-ldl","-lunwind"]}
+```
+
+Where the C program finds a shared library while it runs is the program's own choice. Put the
+files beside it and give it a run path of its own directory (`-Wl,-rpath,$ORIGIN`, on macOS
+`-Wl,-rpath,@executable_path`); Windows looks there first anyway. A shared library made with
+`--shared` is linked against all of this itself, so nothing is said beside it, and only the packages'
+shared libraries lie beside it.
+
 ## Loading a library while the program runs
 
 A library the program picks while it runs — a plugin — is not linked at all: `std.ffi`'s `Library`

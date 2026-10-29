@@ -28,7 +28,20 @@ public static partial class Bindgen
     /// <summary>The generator's own version: a module it made is made anew when it changes.</summary>
     public const string Version = "1";
 
-    private static readonly TimeSpan CompileTime = TimeSpan.FromMinutes(2);
+    /// <summary>As long as the build gives one run of the C compiler (<see cref="CBuild.Limit"/>): zig's
+    /// first look at another target's headers, on a machine under load, took more than two minutes.</summary>
+    private static readonly TimeSpan CompileTime = TimeSpan.FromMinutes(5);
+
+    /// <summary>The C compiler within <see cref="CompileTime"/>; one that does not finish is the
+    /// environment's failure, said as the header's finding is — never the toolchain's own.</summary>
+    private static ProcessRunner.Result Compiler(CCompiler compiler, IReadOnlyList<string> arguments, string header)
+    {
+        try { return ProcessRunner.Run(compiler.Path, arguments, CompileTime); }
+        catch (TimeoutException)
+        {
+            throw new BindgenException($"{compiler.Name} did not read {header} within {CompileTime.TotalMinutes:0} minutes");
+        }
+    }
 
     /// <summary>The words of Lyric a C name cannot be (spec 01 §2 rule 2); such a name gets a <c>_</c>.</summary>
     private static readonly HashSet<string> Words =
@@ -59,7 +72,7 @@ public static partial class Bindgen
         foreach (var define in defines) flags.Add("-D" + define);
         foreach (var directory in include) { flags.Add("-I"); flags.Add(Path.GetFullPath(directory)); }
 
-        var tree = ProcessRunner.Run(compiler.Path, [.. flags, "-Xclang", "-ast-dump=json", "-fsyntax-only", header], CompileTime);
+        var tree = Compiler(compiler, [.. flags, "-Xclang", "-ast-dump=json", "-fsyntax-only", header], header);
         // zig's driver ends a syntax-only run with "FileNotFound" and exit 1 after the tree is out;
         // what else is an error is the header's
         var errors = tree.Stderr.Split('\n').Where(l => l.Contains("error", StringComparison.Ordinal) && !l.Contains("FileNotFound", StringComparison.Ordinal)
@@ -72,7 +85,7 @@ public static partial class Bindgen
         List<string> read;
         try
         {
-            var pre = ProcessRunner.Run(compiler.Path, [.. flags, "-E", "-dM", "-MD", "-MF", depends, header], CompileTime);
+            var pre = Compiler(compiler, [.. flags, "-E", "-dM", "-MD", "-MF", depends, header], header);
             if (pre.ExitCode != 0) throw new BindgenException(pre.Stderr.Trim());
             macros = pre.Stdout;
             read = File.Exists(depends) ? Dependencies(File.ReadAllText(depends)) : [header];

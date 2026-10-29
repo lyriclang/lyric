@@ -1549,6 +1549,18 @@ Frameworks des SDK nur für den Mac, auf dem es läuft, und nur, wo es kein Ziel
 | L5-6 | **pkg-config sortiert**: `-I`/`-D` an die C-Quellen und die Bindungen des Pakets, `-L`/`-l` wie `libs` (zig bekommt die Bibliothek über ihren Pfad, kein Lauf-Pfad im Binary), `-framework` wie `frameworks`, der Rest an den Link; `PKG_CONFIG` nennt ein anderes. Die Antwort ist je Programm und Namen einmal gefragt | den Rest roh an den Compiler (`-L` schriebe zig als Lauf-Pfad ins Binary) |
 | L5-7 | **`compileC` und `cFlags` entfallen** (N4): eine C-Bibliothek trägt ihre Flags; der Test aus M8b S13 ist auf `cLibrary` umgestellt | beide als Kurzform behalten (zwei Wege) |
 
+### Nachtrag 2026-10-29 — L6: `--lib` gebaut
+
+**Gemessen** (zig 0.16, Linux): `zig ar qcsL out.a a.o lib.a` übernimmt die Glieder von `lib.a` für ELF, Mach-O und
+COFF; `L` geht nur mit `q` („the 'L' modifier is only applicable to the 'q' operation“).
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| L6-1 | **Bündeln über `ar qcsL`**: die Archive der nativen Teile gehen als Glieder in `lib<name>.a`; ihr Inhalt (Hash) ist Teil des Archivschlüssels. Ein Bau mit gcc/clang braucht `llvm-ar` dafür, GNU `ar` wird mit Grund abgelehnt | auspacken und neu packen (Namenskollisionen der Glieder); ein MRI-Skript (Pfade mit Leerzeichen) |
+| L6-2 | **Die Zeile**: Kopien der `dylibs` neben dem Archiv (unter Windows die Importbibliothek), `-L`/`-l`, der Rest von pkg-config, `-framework`, die Laufzeit (`CBuild.RuntimeLinkArgs`, dieselbe Liste wie der eigene Link) — als Note `note: link <archiv> with …` und als `linkArgs`; nichts, wo nichts ist; bei `--shared` keine | ein Lauf-Pfad in der Zeile (`-rpath`): wo das C-Programm sucht, entscheidet es selbst |
+| L6-3 | **Die Export-Tests linken mit der genannten Zeile** statt einer Liste im Test: die Zeile ist damit auf jedem Plattformlauf geprüft | die Testliste behalten (zwei Wahrheiten) |
+| L6-4 | **Gefunden im Plattformlauf** (L4): `bindgen` für Windows auf dem Mac-Runner lief über die zwei Minuten des Generators, und die `TimeoutException` kam als ICE (101). Jetzt gilt die Grenze eines C-Laufs des Baus (fünf Minuten), und eine Überschreitung ist `BLD0005` wie ein Fehler des Headers | die Grenze nur anheben (bliebe ein ICE) |
+
 ## Nachtrag 2026-10-28 — der Plan für M15
 
 M15 nach seiner Zeile oben, 11 W9 (T1–T8), 11 C4/C9/C10, 14 C9 und den Uhren, die auf M15 zeigen: **Distribution** —

@@ -226,9 +226,15 @@ public static partial class Program
             return Unknown($"unknown target '{values["--target"]}': {string.Join(", ", Target.Tier1.Select(t => t.Triple))}");
         }
         if (CompilerFor(profile) is not { } compiler) return 2;
-        var (exit, built) = Pipeline.Build(new BuildRequest(project with { LintArgs = lints }, profile, target, compiler, DisplayVersion()), Console.Error);
+        var (exit, built, linkArgs) = Pipeline.BuildLibrary(
+            new BuildRequest(project with { LintArgs = lints }, profile, target, compiler, DisplayVersion()), Console.Error);
         if (exit != 0 || built is null) return exit;
-        Lyric.Core.Rendering.RenderStyle.Current.Events?.Artifact("library", project.Name, built);
+        // what a C program links beside the archive, the target's (spec 13 §4 rule 9)
+        var shared = project.Library == LibraryKind.Shared;
+        if (Lyric.Core.Rendering.RenderStyle.Current.Events is { } events)
+            events.Artifact("library", project.Name, built, shared ? null : linkArgs);
+        else if (!shared && linkArgs.Count > 0)
+            Console.Error.WriteLine($"note: link {built} with {string.Join(' ', linkArgs)}");
         return 0;
     }
 
