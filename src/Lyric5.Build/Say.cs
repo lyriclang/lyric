@@ -45,6 +45,10 @@ public static class Say
         Emit(error, sources, new Diagnostic(refused.Code, Severity.Error, at, refused.Message, notes));
     }
 
+    /// <summary>A finding with its place in <paramref name="sources"/> — a declaration the front end
+    /// read, a manifest's line.</summary>
+    public static void At(TextWriter error, SourceManager sources, Diagnostic d) => Emit(error, sources, d);
+
     private static DiagnosticNote[]? Helps(string[] help) =>
         help.Length == 0 ? null : [.. help.Select(h => new DiagnosticNote(h) { Kind = NoteKind.Help })];
 

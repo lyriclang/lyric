@@ -312,7 +312,8 @@ public class BuildScriptTests
 
         var (exit, _, error) = Run("build", "-C", dir);
         Assert.Equal(2, exit);
-        Assert.Contains("error[LYR-BLD0001]", error);
+        Assert.Contains("error[LYR-LNK0002]", error);
+        Assert.Contains("app's build script named it", error);
 
         File.WriteAllText(Path.Combine(dir, "build.lyr"), GreetScript(lib, null));
         (exit, _, error) = Run("build", "-C", dir);

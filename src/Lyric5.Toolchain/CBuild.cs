@@ -14,7 +14,12 @@ public sealed record CUnit(
     bool Instrument = true,
     IReadOnlyList<string>? ExtraFlags = null);
 
-public sealed class CBuildException(string message) : Exception(message);
+public sealed class CBuildException(string message) : Exception(message)
+{
+    /// <summary>For a link that failed: what the linker wrote, which the build reads for the
+    /// findings it knows (spec 15 §5.2 rule 12); <c>null</c> for every other failure.</summary>
+    public string? LinkerOutput { get; init; }
+}
 
 /// <summary>Where a link finds libraries beyond the linker's own directories, and whether the
 /// binary searches its own directory for shared libraries first — where files lie beside it. With
@@ -32,7 +37,7 @@ public sealed record LinkPaths(IReadOnlyList<string> SearchDirs, bool OwnDirFirs
 /// identity, the target, every flag, the source and every header in the unit's include
 /// directories — a changed header rebuilds every unit that could see it.
 /// </summary>
-public sealed class CBuild
+public sealed partial class CBuild
 {
     private readonly string _cacheDir;
 
@@ -155,7 +160,11 @@ public sealed class CBuild
         if (result.ExitCode != 0)
         {
             File.Delete(partial);
-            throw new CBuildException($"compiling {unit.Source} for {Target} ({Profile.Name}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
+            // a header nothing holds: where it was looked for (the toolchain's own directories aside)
+            var searched = MissingHeader().IsMatch(result.Stderr) && unit.IncludeDirs.Count > 0
+                ? "\nthe directories searched for headers: " + string.Join(", ", unit.IncludeDirs)
+                : "";
+            throw new CBuildException($"compiling {unit.Source} for {Target} ({Profile.Name}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}{searched}");
         }
         Publish(partial, target);
         return target;
@@ -340,7 +349,10 @@ public sealed class CBuild
         var result = RunLong(arguments, Path.GetDirectoryName(Path.GetFullPath(output))!, $"linking {output}");
         if (result.ExitCode != 0)
         {
-            throw new CBuildException($"linking {output} for {Target} ({Profile.Name}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}");
+            throw new CBuildException($"linking {output} for {Target} ({Profile.Name}) failed:\n{Command(arguments)}\n{result.Stderr}{result.Stdout}")
+            {
+                LinkerOutput = result.Stderr + result.Stdout,
+            };
         }
     }
 
@@ -453,10 +465,30 @@ public sealed class CBuild
     /// <summary>Runs <paramref name="tool"/> within <see cref="Limit"/>: one that does not finish is
     /// the environment's failure (a machine under load, a unit too large), said with what it did and
     /// the limit — never the toolchain's own. Its half-written <paramref name="partial"/> goes.</summary>
+    /// <summary>Where <c>lyric build -v</c> has every command of the C compiler, the archiver and the
+    /// linker said as it starts (spec 14 §1.1); <c>null</c>: nowhere. The driver's, for one command:
+    /// set before the build and cleared after it.</summary>
+    public static TextWriter? Echo { get; set; }
+
+    private static readonly object EchoGate = new();
+
+    /// <summary>A command as <c>-v</c> says it — units compile side by side, so one line at a time.</summary>
+    public static void Said(string tool, IEnumerable<string> arguments)
+    {
+        if (Echo is not { } echo) return;
+        var line = "running: " + tool + " " + string.Join(' ', arguments.Select(a => a.Contains(' ') ? $"\"{a}\"" : a));
+        lock (EchoGate) echo.WriteLine(line);
+    }
+
+    /// <summary>clang's and gcc's word for an <c>#include</c> no directory holds.</summary>
+    [System.Text.RegularExpressions.GeneratedRegex(@"fatal error: ('[^']+' file not found|[^:\n]+: No such file or directory)")]
+    private static partial System.Text.RegularExpressions.Regex MissingHeader();
+
     private ProcessRunner.Result Run(string tool, IEnumerable<string> arguments, string what, string? partial)
     {
         try
         {
+            Said(tool, arguments);
             return ProcessRunner.Run(tool, arguments, Limit);
         }
         catch (TimeoutException)

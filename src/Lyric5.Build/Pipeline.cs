@@ -224,6 +224,8 @@ public static class Pipeline
         // A library's header: the runtime's API, the types its exports name, its exports.
         var header = manifest + ".h";
         List<string> sources;
+        // the front end's answer where it ran: a failed link points at the declarations it read
+        CompileResult? compiled = null;
         if (File.Exists(manifest))
         {
             DiagnosticStore.Replay(said, error);
@@ -233,6 +235,7 @@ public static class Pipeline
         {
             var result = Compile(project, error, request.Profile, request.Target);
             if (result is null) return (1, null);
+            compiled = result;
             var read = result.Embedded.Select(file => $"{FileKey(file)} {file}").ToList();
             var unitKey = read.Count == 0 ? key : Key(key, string.Join("\n", read));
             var paths = new List<string>();
@@ -257,6 +260,7 @@ public static class Pipeline
             sources = paths;
         }
 
+        LinkSite? site = null;
         try
         {
             // a library's code, the runtime's too, as a library's must be (LinkageOf)
@@ -288,6 +292,10 @@ public static class Pipeline
             if (read is not { } native) return (1, null);
             var libraries = native.Libraries;
             var objects = build.Compile([.. units, .. native.Units]);
+            // whose each input of the link is, for a link that fails (spec 15 §5.2 rule 12)
+            var owners = new Dictionary<string, string>(native.FileOwners) { [archive] = "the runtime" };
+            for (var i = 0; i < objects.Count; i++) owners[objects[i]] = i < units.Count ? "the program" : native.UnitOwners[i - units.Count];
+            site = new LinkSite(owners, native.LibraryOrigins, native.FrameworkOrigins);
             var linkPaths = new LinkPaths([.. directives.SearchDirs, .. native.SearchDirs], OwnDirFirst: native.Beside.Count > 0,
                 Args: native.Args, Frameworks: native.Frameworks);
             // The packages' archives and shared libraries after the objects that call them, by their
@@ -342,7 +350,11 @@ public static class Pipeline
         }
         catch (CBuildException failure)
         {
-            Say.Error(error, "LYR-BLD0001", failure.Message);
+            // a link whose failure the build can read is said as its findings; the rest as it is
+            if (failure.LinkerOutput is { } linker && site is not null)
+                LinkReport.Say(linker, failure.Message, request.Target, site,
+                    () => compiled ?? Compile(project, TextWriter.Null, request.Profile, request.Target), error);
+            else Say.Error(error, "LYR-BLD0001", failure.Message);
             return (2, null);
         }
     }
@@ -369,6 +381,15 @@ public static class Pipeline
         public List<string> SearchDirs { get; } = [];
         public List<string> Args { get; } = [];
         public List<string> Frameworks { get; } = [];
+
+        /// <summary>The package each of <see cref="Units"/> is, in their order; the package each
+        /// archive and shared library is, by its path.</summary>
+        public List<string> UnitOwners { get; } = [];
+        public Dictionary<string, string> FileOwners { get; } = [];
+
+        /// <summary>Where each library by name and each framework was first named.</summary>
+        public Dictionary<string, LinkOrigin> LibraryOrigins { get; } = [];
+        public Dictionary<string, LinkOrigin> FrameworkOrigins { get; } = [];
     }
 
     /// <summary>A native part the build cannot link for its target — a framework or a library of
@@ -414,6 +435,7 @@ public static class Pipeline
                 List<string> defines = [.. part.Defines, .. system.Defines];
                 link.Units.AddRange(part.SourceFiles(manifest.Root, name => Tree(manifest, name))
                     .Select(file => new CUnit(file, defines, include, ExtraFlags: paths)));
+                var written = manifest.NativeFor(target);
                 // a script's C library: its own include first, its own definitions and flags alone
                 foreach (var library in directives.LibrariesOf(manifest.Name))
                 {
@@ -422,6 +444,12 @@ public static class Pipeline
                     link.Units.AddRange(sources.Select(file => new CUnit(file, [.. defines, .. library.Defines], own,
                         ExtraFlags: [.. paths, .. library.Flags])));
                 }
+                while (link.UnitOwners.Count < link.Units.Count) link.UnitOwners.Add(manifest.Name);
+                LinkOrigin From(IReadOnlyList<string> manifestKey, string key, string name) =>
+                    new(manifest, manifestKey.Contains(name) ? key : system.Libraries.Contains(name) || system.Frameworks.Contains(name) ? "pkgConfig" : "script");
+                foreach (var library in part.Libs.Concat(system.Libraries)) link.LibraryOrigins.TryAdd(library, From(written.Libs, "libs", library));
+                foreach (var framework in part.Frameworks.Concat(system.Frameworks))
+                    link.FrameworkOrigins.TryAdd(framework, From(written.Frameworks, "frameworks", framework));
                 foreach (var dir in system.SearchDirs)
                     if (!link.SearchDirs.Contains(dir)) link.SearchDirs.Add(dir);
                 foreach (var arg in system.Args)
@@ -432,6 +460,7 @@ public static class Pipeline
                 {
                     if (Prebuilt(manifest, archive, Full(manifest, archive), "archives", error) is not { } full) return null;
                     if (!link.Archives.Contains(full)) link.Archives.Add(full);
+                    link.FileOwners.TryAdd(full, manifest.Name);
                 }
                 foreach (var dylib in part.Dylibs)
                 {
@@ -454,6 +483,7 @@ public static class Pipeline
                     }
                     var full = new Dylib(file, import);
                     if (!link.Dylibs.Contains(full)) link.Dylibs.Add(full);
+                    link.FileOwners.TryAdd(full.Linked, manifest.Name);
                 }
                 foreach (var library in part.Libs.Concat(system.Libraries))
                     if (!link.Libraries.Contains(library)) link.Libraries.Add(library);

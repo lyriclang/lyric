@@ -195,6 +195,7 @@ public static class ModuleLowerer
                                     CReturn = CFormOf(cReturn, typeTable, compilation),
                                     CVariadic = function.CVariadic is not null,
                                     StdName = compilation.IsNative(module) ? NameMangling.ForFunction(module, function.Name) : null,
+                                    Declared = compilation.IsNative(module) ? null : function.Span,
                                 },
                                 new ImportShape([.. cTypes.Select(t => new ImportParam(t, null, []))], null));
                             continue;

@@ -1561,6 +1561,24 @@ COFF; `L` geht nur mit `q` („the 'L' modifier is only applicable to the 'q' op
 | L6-3 | **Die Export-Tests linken mit der genannten Zeile** statt einer Liste im Test: die Zeile ist damit auf jedem Plattformlauf geprüft | die Testliste behalten (zwei Wahrheiten) |
 | L6-4 | **Gefunden im Plattformlauf** (L4): `bindgen` für Windows auf dem Mac-Runner lief über die zwei Minuten des Generators, und die `TimeoutException` kam als ICE (101). Jetzt gilt die Grenze eines C-Laufs des Baus (fünf Minuten), und eine Überschreitung ist `BLD0005` wie ein Fehler des Headers | die Grenze nur anheben (bliebe ein ICE) |
 
+### Nachtrag 2026-10-29 — L7: die Diagnosen des Links
+
+**Gemessen** (zig 0.16, von Linux): ELF und COFF linkt lld (`ld.lld: error: undefined symbol: x` /
+`duplicate symbol: x`, darunter `>>>`-Zeilen mit Quelle und Objekt), Mach-O zigs eigener Linker (`error: undefined
+symbol: _x`, `duplicate symbol definition: _x`, darunter `note: defined by <objekt>`); eine fehlende Bibliothek sagt
+zig selbst, für alle drei gleich (`unable to find dynamic system library 'x'`). ld64 und GNU ld (clang, gcc) nach
+ihren bekannten Texten.
+
+| # | Entscheidung | Verworfen |
+|---|---|---|
+| L7-1 | **Die Lesart ist eine Funktion über den Text** (`LinkerText`, je Dialekt eine Regel), getrennt von der Zuordnung (`LinkReport`); was keine Regel liest, bleibt `BLD0001` mit dem rohen Text — auch neben erkannten Befunden | jeden Linkerfehler als `BLD0001` (rustc); eine Lesart, die rät |
+| L7-2 | **Die `extern`-Stelle trägt der IR-Import** (`IrImport.Declared`), nicht eine Textsuche; ist das Frontend aktuell (keine IR), läuft es für die Stelle noch einmal — nur im Fehlerfall | die Quellen nach `extern "C" fn x` durchsuchen (Blöcke, Aliase, erzeugte Bindungen) |
+| L7-3 | **Wem eine Eingabe gehört, weiß der Bau beim Link** (Objekt → Paket über die Einheit, Archiv/dylib → Paket, Laufzeit); der Linker nennt Pfade, die Quellen nennt er über die Präfixabbildung schon `paket/…` | die Pakete aus Pfaden raten |
+| L7-4 | **Eine Bibliothek zeigt auf ihre Manifestzeile**, wo `libs`/`frameworks` sie nennen; sonst nennt der Befund das Build-Skript oder `pkgConfig` | immer die Manifestdatei ohne Zeile |
+| L7-5 | **`-v` sagt die Befehle beim Start** (`running: …`) — nur, was läuft; mit `--json` abgelehnt, weil der Strom nur Ereignisse trägt | ein Ereignis `command` im JSON (neues Schema für eine Hilfe zum Lesen) |
+| L7-6 | **Konformanz**: ein `run`-Fall mit `error:` erwartet Exit 2 (der Bau nach dem Frontend), drei Fälle in 15-project; der Runner unterschied bisher nur Exit 1 | die Befunde nur in den Werkzeugtests |
+| L7-7 | **Ein fehlender Header** (N6) nennt die durchsuchten Verzeichnisse der Einheit — im Text von `BLD0001`, kein eigener Code | ein eigener Code (der Fehler ist der C-Quelle, nicht des Links) |
+
 ## Nachtrag 2026-10-28 — der Plan für M15
 
 M15 nach seiner Zeile oben, 11 W9 (T1–T8), 11 C4/C9/C10, 14 C9 und den Uhren, die auf M15 zeigen: **Distribution** —
