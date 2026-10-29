@@ -1,0 +1,44 @@
+// Coroutines.
+//
+// A coroutine PAUSES and later continues where it left off. Its local variables survive the
+// 'yield', which is what separates it from a function that starts from the beginning on every call.
+//
+// Deliberately without 'for-in', so it needs nothing but the coroutine itself.
+import std.io.console;
+
+// Endless: the caller decides how many values it collects.
+fn counter(): Coroutine<int> {
+    var n = 0;
+    while (true) {
+        yield n;
+        n += 1;
+    }
+}
+
+// Finite: once the body runs through, the coroutine is done.
+fn three(): Coroutine<int> {
+    yield 10;
+    yield 20;
+    yield 30;
+}
+
+fn main(): int {
+    let c = counter();
+    var sum = 0;
+
+    // 0 + 1 + 2 + 3 + 4 = 10. Without preserved state it would be 0 five times.
+    var i = 0;
+    while (i < 5) {
+        sum = sum + resume c;
+        i += 1;
+    }
+    console.println(f"counter: {sum}");
+
+    let t = three();
+    let a = resume t;
+    let b = resume t;
+    console.println(f"three: {a}, {b}");
+
+    // 10 + 10 + 20 = 40
+    return sum + a + b;
+}

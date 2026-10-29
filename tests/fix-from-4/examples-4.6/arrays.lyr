@@ -1,0 +1,36 @@
+// arrays.lyr — complexity: simple
+// Shows: T[] as a real array, the literal, repetition, concatenation, indexing and .length.
+//
+// Uses `while` rather than `for-in`, which needs the `Iterator` interface. `stats.lyr` is the same
+// subject fully built out, with optionals, `params` and format specs.
+
+import std.io.console { println };
+
+// The length of an array is fixed at creation. Only `std.collections.List<T>` grows.
+fn sum(xs: int[]): int {
+    var total = 0;
+    var i = 0;
+    while (i < xs.length) {
+        total += xs[i];
+        i += 1;
+    }
+    return total;
+}
+
+// `[0] * n` is the default array: n elements, all 0. n may be a runtime value.
+fn zeros(n: int): int[] {
+    return [0] * n;
+}
+
+fn main(): int {
+    let xs = [3, 7, 1, 9, 4];
+    println(f"Summe von {xs.length} Werten: {sum(xs)}");
+
+    // Concatenation yields a NEW array; xs stays unchanged.
+    var padded = xs + zeros(3);
+    padded[5] = 100;
+    padded[6] += 20;
+
+    println(f"Nach dem Auffuellen: {padded.length} Werte, Summe {sum(padded)}");
+    return sum(padded);
+}

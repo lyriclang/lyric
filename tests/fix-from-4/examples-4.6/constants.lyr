@@ -1,0 +1,68 @@
+// Constants as global slots.
+//
+// A module 'let' and a 'static let' are the SAME mechanism. Both are filled once before the program
+// starts by a synthetic '<globals>' function; the only difference is where the name is visible. An
+// initializer may therefore do everything a body may do: compute, call, allocate objects.
+import std.io.console;
+
+let VERSION = "1.0";
+
+let BANNER = "lyric " + VERSION;
+
+// The order is the declaration order: BASE reads LEVELS because LEVELS stands above it. The other
+// way round is LYR-SEM0057, since it would read a value nobody has written.
+let LEVELS = 4;
+
+let BASE = LEVELS * 10;
+
+pub struct Vector2 {
+    x: int,
+    y: int,
+
+    // A type-bound constant that is an object. This case is why the globals section references an
+    // init FUNCTION rather than holding values: 'Vector2 { … }' is an expression, not a literal.
+    static let ORIGIN: Vector2 = Vector2 { x = 0, y = 0 };
+
+    fn sum(): int {
+        return this.x + this.y;
+    }
+}
+
+pub class Enemy {
+    name: string,
+    hp: int,
+
+    static let BASE_HP: int = 10;
+
+    static fn new(level: int): Enemy {
+        return Enemy { name = "goblin", hp = Enemy.BASE_HP * level };
+    }
+}
+
+// From a body every constant is readable wherever it stands, because the init phase is long over.
+// TAIL is declared at the very bottom.
+fn describe(): string {
+    return BANNER + TAIL;
+}
+
+fn main(): int {
+    console.println(describe());
+    console.println(f"origin sum: {Vector2.ORIGIN.sum()}");
+
+    var total = 0;
+    var level = 1;
+    while (level <= LEVELS) {
+        let e = Enemy.new(level);
+        console.println(f"{e.name} lvl {level}: {e.hp} hp");
+        total = total + e.hp;
+        level = level + 1;
+    }
+
+    console.println(f"total: {total}");
+    console.println(f"base: {BASE}");
+
+    // 10 + 20 + 30 + 40 = 100, plus BASE 40 => 140.
+    return total + BASE;
+}
+
+let TAIL = " (constants)";

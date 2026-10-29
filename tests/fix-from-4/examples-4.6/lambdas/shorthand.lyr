@@ -1,0 +1,79 @@
+// Closure shorthand (4.5): three ways to write the same lambda, and when each reads best.
+//
+//   (n: int) => n * 2      the long form: parameters, optional annotations, optional return type
+//   n => n * 2             ONE parameter, no parentheses — the type comes from the context
+//   f { it * 2 }           a trailing lambda: a block right after a call is its LAST argument,
+//                          and its one parameter is called 'it'
+//
+// The trailing form is told apart from a struct initializer by its body: 'Name { }' and
+// 'Name { field = … }' stay initializers (§6.8), everything else in braces after a callee is a
+// lambda. A statement that ends in a trailing lambda's '}' needs no ';', like a block arm of a
+// match needs no ','.
+import std.io.console { println };
+import std.iter { over, fold, collectArray };
+
+fn apply(f: fn(int) -> int, v: int): int {
+    return f(v);
+}
+
+fn applyTo(v: int, f: fn(int) -> int): int {
+    return f(v);
+}
+
+fn run(f: fn() -> int): int {
+    return f();
+}
+
+fn each(xs: int[], f: fn(int) -> void): void {
+    for (x in xs) {
+        f(x);
+    }
+}
+
+fn twice<T>(f: fn(T) -> T, v: T): T {
+    return f(f(v));
+}
+
+struct P {
+    x: int,
+    y: int,
+}
+
+fn main(): int {
+    // (1) bare: one parameter, no parentheses, no annotation
+    println(f"{apply(x => x * 2, 21)}");
+
+    // (2) trailing: the block is the last argument, 'it' is its parameter
+    println(f"{applyTo(41) { it + 1 }}");
+
+    // (3) trailing with nothing before it: the parentheses disappear entirely
+    let seven = run { 7 };
+    println(f"{seven}");
+
+    // (4) trailing with statements: no ';' after the closing brace
+    var sum = 0;
+    each([1, 2, 3]) {
+        sum = sum + it;
+    }
+    println(f"{sum}");
+
+    // (5) a generic parameter is still bound by the other argument
+    println(f"{twice(n => n * 3, 2)}");
+
+    // (6) chained over an iterator
+    let doubled = collectArray(over([1, 2, 3]).map { it * 2 });
+    println(f"{fold(over(doubled), 0, (acc, n) => acc + n)}");
+
+    // (7) a struct initializer is NOT a trailing lambda
+    let p = P { x = 1, y = 2 };
+    println(f"{p.x + p.y}");
+    return 0;
+}
+// Output:
+// 42
+// 42
+// 7
+// 6
+// 18
+// 12
+// 3

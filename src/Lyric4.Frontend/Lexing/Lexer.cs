@@ -1,0 +1,1046 @@
+// Frozen from release/v4.6.0 (002b7a4b) by tooling/from4/freeze.py: Lyric 4.6 as it was. Do not edit.
+using Lyric4.Core;
+
+namespace Lyric4.Lexing;
+
+public sealed class Lexer
+{
+    private enum SuffixCategory
+    {
+        None,
+        Invalid,
+        Int,
+        Float
+    }
+
+    private enum LexMode
+    {
+        Normal,
+        FStringText,
+        FStringInterp,
+        FStringFormatSpec
+    }
+
+    private sealed class ModeFrame
+    {
+        public required LexMode Mode { get; init; }
+
+        // All three are used only for FStringInterp. The interpolated expression ends at '}' and
+        // switches to the format specifier at ':', but only when no bracket is open.
+        //
+        // Round and square brackets are counted as well as braces, because a lambda inside an
+        // interpolation brings them: `f"{map(o, (n: int) => …)}"` would otherwise read the ':' of
+        // the parameter annotation as the specifier separator.
+        public int BraceDepth { get; set; }
+        public int ParenDepth { get; set; }
+        public int BracketDepth { get; set; }
+
+        /// <summary>Is the expression at the top level — does a '}' here really end the
+        /// interpolation, and does a ':' really separate the format specifier?</summary>
+        public bool AtTopLevel => BraceDepth == 0 && ParenDepth == 0 && BracketDepth == 0;
+    }
+
+    private readonly Stack<ModeFrame> _modeStack = new();
+    private readonly SourceManager _sources;
+    private readonly DiagnosticEngine _diagnostics;
+    private readonly FileId _file;
+    private readonly string _source;
+    private readonly List<Trivia>? _trivia;
+    private int _pos;
+
+    /// <summary>The comments this lexer skipped, in source order — empty unless the lexer was
+    /// created with <c>collectTrivia</c>. The formatter is the consumer: it prints from the AST,
+    /// and the AST does not carry comments.</summary>
+    public IReadOnlyList<Trivia> CollectedTrivia => _trivia ?? (IReadOnlyList<Trivia>)[];
+
+    private ModeFrame CurrentFrame => _modeStack.Peek();
+    private LexMode CurrentMode => _modeStack.Peek().Mode;
+    private char Current => _pos < _source.Length ? _source[_pos] : '\0';
+    private char PeekAt(int offset) => _pos + offset < _source.Length ? _source[_pos + offset] : '\0';
+
+    #region Is-Helpers
+
+    private static bool IsWhitespace(char c) => (c == ' ' || c == '\t' || c == '\r' || c == '\n');
+    private static bool IsIdentifierStart(char c) => c is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or '_';
+    private static bool IsIdentifierCont(char c) => IsIdentifierStart(c) || c is >= '0' and <= '9';
+
+    private static bool IsHexDigit(char c) =>
+        (c is >= '0' and <= '9') || (c is >= 'a' and <= 'f') || (c is >= 'A' and <= 'F');
+
+    private static bool IsDecDigit(char c) => c is >= '0' and <= '9';
+    private static bool IsOctalDigit(char c) => c is >= '0' and <= '7';
+    private static bool IsBinaryDigit(char c) => c is '0' or '1';
+
+    #endregion
+
+    private static readonly Dictionary<string, TokenKind> Keywords = new()
+    {
+        { "module", TokenKind.Module },
+        { "import", TokenKind.Import },
+        { "as", TokenKind.As },
+        { "pub", TokenKind.Pub },
+
+        { "struct", TokenKind.Struct },
+        { "class", TokenKind.Class },
+        { "enum", TokenKind.Enum },
+        { "interface", TokenKind.Interface },
+        { "extend", TokenKind.Extend },
+
+        { "fn", TokenKind.Fn },
+        { "mut", TokenKind.Mut },
+        { "static", TokenKind.Static },
+        { "let", TokenKind.Let },
+        { "var", TokenKind.Var },
+        { "params", TokenKind.Params },
+
+        { "if", TokenKind.If },
+        { "else", TokenKind.Else },
+        { "while", TokenKind.While },
+        { "do", TokenKind.Do },
+        { "for", TokenKind.For },
+        { "in", TokenKind.In },
+        { "match", TokenKind.Match },
+
+        { "break", TokenKind.Break },
+        { "continue", TokenKind.Continue },
+        { "return", TokenKind.Return },
+        { "yield", TokenKind.Yield },
+        { "resume", TokenKind.Resume },
+        { "defer", TokenKind.Defer },
+
+        { "try", TokenKind.Try },
+        { "catch", TokenKind.Catch },
+        { "throw", TokenKind.Throw },
+
+        { "true", TokenKind.True },
+        { "false", TokenKind.False },
+        { "null", TokenKind.Null },
+
+        { "this", TokenKind.This }
+    };
+
+    /// <summary>The reverse of <see cref="Keywords"/>: how a keyword kind was written, or null for
+    /// every other kind. Built from the same table, because a second list of the words would be a
+    /// second answer to one question and would drift the day a keyword is added.</summary>
+    private static readonly Dictionary<TokenKind, string> KeywordSpellings =
+        Keywords.ToDictionary(entry => entry.Value, entry => entry.Key);
+
+    /// <summary>The source word behind a keyword token, or null when the kind is not a keyword.
+    /// The parser uses it to say WHY a name was refused: a token kind on its own ("got Resume")
+    /// reads like a typo, which is how a reader spends two round trips on a reserved word.</summary>
+    public static string? KeywordSpelling(TokenKind kind) =>
+        KeywordSpellings.GetValueOrDefault(kind);
+
+    private static readonly HashSet<string> ValidIntSuffixes =
+        ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64"];
+
+    private static readonly HashSet<string> ValidFloatSuffixes =
+        ["f32", "f64"];
+
+
+    /// <param name="collectTrivia">Keep the comments <see cref="SkipTrivia"/> consumes, for a
+    /// consumer that reproduces source rather than compiling it. Off by default: every token of
+    /// the compile path stays byte-identical, and nothing is allocated for a list nobody
+    /// reads.</param>
+    public Lexer(SourceManager pSourceManager, FileId fileId, DiagnosticEngine pDiagnosticEngine,
+        bool collectTrivia = false)
+    {
+        _modeStack.Push(new ModeFrame { Mode = LexMode.Normal });
+        _sources = pSourceManager ?? throw new ArgumentNullException(nameof(pSourceManager));
+        _diagnostics = pDiagnosticEngine ?? throw new ArgumentNullException(nameof(pDiagnosticEngine));
+        _file = fileId;
+        _source = _sources.GetText(_file);
+        _trivia = collectTrivia ? [] : null;
+        _pos = 0;
+    }
+
+    public Token Next()
+    {
+        if (CurrentMode == LexMode.FStringText) return ScanFStringText();
+        if (CurrentMode == LexMode.FStringFormatSpec) return ScanFStringFormatSpec();
+
+        SkipTrivia();
+
+        if (CurrentMode == LexMode.FStringInterp)
+        {
+            if (Current is '\0' or '\n')
+                return HandleUnterminatedFString();
+            if (Current == '{')
+            {
+                _pos++;
+                CurrentFrame.BraceDepth++;
+                return new Token(TokenKind.LBrace, new Span(_file, _pos - 1, _pos));
+            }
+
+            if (Current == '}' && CurrentFrame.BraceDepth > 0)
+            {
+                _pos++;
+                CurrentFrame.BraceDepth--;
+                return new Token(TokenKind.RBrace, new Span(_file, _pos - 1, _pos));
+            }
+
+            if (Current == '}' && CurrentFrame.BraceDepth == 0)
+            {
+                _pos++;
+                _modeStack.Pop();
+                return new Token(TokenKind.FStringInterpEnd, new Span(_file, _pos - 1, _pos));
+            }
+
+            // Round and square brackets are counted too, so '}' and ':' answer the same question
+            // here and above: is this the top level of the interpolated expression?
+            //
+            // A closing bracket without an opening one does NOT count negative; it is a syntax error the
+            // parser reports rather than a lexer error somewhere else.
+            if (Current is '(' or '[')
+            {
+                var opened = Current;
+                _pos++;
+                if (opened == '(') CurrentFrame.ParenDepth++; else CurrentFrame.BracketDepth++;
+                return new Token(opened == '(' ? TokenKind.LParen : TokenKind.LBracket,
+                    new Span(_file, _pos - 1, _pos));
+            }
+
+            if (Current is ')' or ']')
+            {
+                var closed = Current;
+                _pos++;
+                if (closed == ')') { if (CurrentFrame.ParenDepth > 0) CurrentFrame.ParenDepth--; }
+                else { if (CurrentFrame.BracketDepth > 0) CurrentFrame.BracketDepth--; }
+                return new Token(closed == ')' ? TokenKind.RParen : TokenKind.RBracket,
+                    new Span(_file, _pos - 1, _pos));
+            }
+
+            if (Current == ':' && CurrentFrame.AtTopLevel)
+            {
+                _pos++;
+                _modeStack.Push(new ModeFrame { Mode = LexMode.FStringFormatSpec });
+                return ScanFStringFormatSpec();
+            }
+        }
+
+        if (Current == 'f' && PeekAt(1) == '"')
+        {
+            return ScanFStringStart();
+        }
+
+        if (Current == '\0')
+        {
+            return new Token(TokenKind.Eof, new Span(_file, _pos, _pos));
+        }
+
+        if (Current == '/' && PeekAt(1) == '/' && PeekAt(2) == '/')
+        {
+            return ScanDocComment(_pos);
+        }
+
+        if (Current == '@')
+        {
+            return ScanAtIdentifier(_pos);
+        }
+
+        if (IsIdentifierStart(Current))
+        {
+            return ScanIdentifier(_pos);
+        }
+
+        if (IsDecDigit(Current))
+        {
+            return ScanNumber(_pos);
+        }
+
+        if (Current == '"')
+        {
+            return ScanString(_pos);
+        }
+
+        if (Current == '\'')
+        {
+            return ScanChar(_pos);
+        }
+
+        var opTk = TryScanOperator(_pos);
+        if (opTk is null)
+        {
+            Span span = new(_file, _pos, _pos + 1);
+            ReportBadCharacter(Current, span);
+            _pos++;
+            return new Token(TokenKind.BadChar, span);
+        }
+
+        return (Token)opTk;
+    }
+
+    #region Comments & Identifiers
+
+    private void SkipTrivia()
+    {
+        while (true)
+        {
+            while (IsWhitespace(Current))
+            {
+                _pos++;
+            }
+
+            if (Current == '/' && PeekAt(1) == '/' && PeekAt(2) != '/')
+            {
+                var commentStart = _pos;
+                _pos += 2; // Consume '//'
+                while (Current != '\n' && Current != '\0')
+                {
+                    _pos++;
+                }
+
+                _trivia?.Add(new Trivia(TriviaKind.LineComment, new Span(_file, commentStart, _pos)));
+                continue;
+            }
+
+            if (Current == '/' && PeekAt(1) == '*')
+            {
+                var commentStart = _pos;
+                _pos += 2;
+                var depth = 1;
+                while (depth > 0 && Current != '\0')
+                {
+                    if (Current == '/' && PeekAt(1) == '*')
+                    {
+                        _pos += 2;
+                        depth++;
+                    }
+                    else if (Current == '*' && PeekAt(1) == '/')
+                    {
+                        _pos += 2;
+                        depth--;
+                    }
+                    else
+                    {
+                        _pos++;
+                    }
+                }
+
+                if (depth > 0)
+                {
+                    _diagnostics.Report(new Diagnostic("LYR-LEX0002", Severity.Error,
+                        new Span(_file, commentStart, _pos), "unterminated block comment"));
+                }
+
+                _trivia?.Add(new Trivia(TriviaKind.BlockComment, new Span(_file, commentStart, _pos)));
+                continue;
+            }
+
+            break;
+        }
+    }
+
+    private Token ScanDocComment(int start)
+    {
+        _pos += 3; //Consume '///'
+        while (Current != '\n' && Current != '\0')
+        {
+            _pos++;
+        }
+
+        return new Token(TokenKind.DocComment, new Span(_file, start, _pos));
+    }
+
+    private Token ScanIdentifier(int identifierStart)
+    {
+        while (IsIdentifierCont(Current))
+        {
+            _pos++;
+        }
+
+        var lexme = _source.Substring(identifierStart, _pos - identifierStart);
+        if (Keywords.TryGetValue(lexme, out var kind))
+            return new Token(kind, new Span(_file, identifierStart, _pos));
+
+        return new Token(TokenKind.Identifier, new Span(_file, identifierStart, _pos));
+    }
+
+    private Token ScanAtIdentifier(int start)
+    {
+        _pos++; //Consume '@'
+        if (Current == '[')
+        {
+            _pos++; // '@[' is one token: it opens an attribute group
+            return new Token(TokenKind.AtLBracket, new Span(_file, start, _pos));
+        }
+        if (!IsIdentifierStart(Current))
+        {
+            _diagnostics.Report((new Diagnostic("LYR-LEX0012", Severity.Error, new Span(_file, start, _pos),
+                "expected identifier after '@'")));
+            return new Token(TokenKind.BadChar, new Span(_file, start, _pos));
+        }
+        while (IsIdentifierCont(Current))
+        {
+            _pos++;
+        }
+        return new Token(TokenKind.AtIdentifier, new Span(_file, start, _pos));
+    }
+
+    #endregion
+
+    #region Numeric Literals
+
+    private Token ScanNumber(int numberStart)
+    {
+        var next = PeekAt(1);
+        if (Current == '0' && (next == 'x' || next == 'X'))
+            return ScanHexLiteral(numberStart);
+        if (Current == '0' && (next == 'o' || next == 'O'))
+            return ScanOctLiteral(numberStart);
+
+        if (Current == '0' && (next == 'b' || next == 'B'))
+            return ScanBinLiteral(numberStart);
+        return ScanDecLiteral(numberStart);
+    }
+
+    private Token ScanHexLiteral(int numberStart)
+    {
+        return ScanNonDecLiteral(numberStart, IsHexDigit);
+    }
+
+    private Token ScanOctLiteral(int numberStart)
+    {
+        return ScanNonDecLiteral(numberStart, IsOctalDigit);
+    }
+
+    private Token ScanBinLiteral(int numberStart)
+    {
+        return ScanNonDecLiteral(numberStart, IsBinaryDigit);
+    }
+
+    private Token ScanNonDecLiteral(int numberStart, Func<char, bool> digitCheck)
+    {
+        _pos += 2; // Consume '0x' or '0X'
+        if (Current == '_')
+        {
+            _pos++;
+            while (digitCheck(Current)) _pos++;
+            _diagnostics.Report(new Diagnostic("LYR-LEX0005", Severity.Error,
+                new Span(_file, numberStart, _pos),
+                "numeric literal separator '_' is not allowed to follow after a prefix"));
+            return new Token(TokenKind.IntLiteral, new Span(_file, numberStart, _pos));
+        }
+
+        if (!digitCheck(Current))
+        {
+            _diagnostics.Report(new Diagnostic("LYR-LEX0004", Severity.Error,
+                new Span(_file, numberStart, _pos), "empty integer literal after prefix"));
+            return new Token(TokenKind.IntLiteral, new Span(_file, numberStart, _pos));
+        }
+
+        while (digitCheck(Current) || Current == '_')
+        {
+            _pos++;
+        }
+
+        switch (TryReadSuffix(out var suffixSpan))
+        {
+            case SuffixCategory.Invalid:
+            case SuffixCategory.Float:
+                var message =
+                    $"invalid suffix '{_source.Substring(suffixSpan.Start, suffixSpan.Length)}' on prefixed integer literal";
+                _diagnostics.Report(new Diagnostic("LYR-LEX0003", Severity.Error, new Span(_file, numberStart, _pos),
+                    message));
+                return new Token(TokenKind.IntLiteral, new Span(_file, numberStart, _pos));
+            default:
+                return new Token(TokenKind.IntLiteral, new Span(_file, numberStart, _pos));
+        }
+    }
+
+    private Token ScanDecLiteral(int numberStart)
+    {
+        var isFloat = false;
+        while (IsDecDigit(Current) || Current == '_') _pos++;
+        if (Current == '.' && IsDecDigit(PeekAt(1)))
+        {
+            _pos++; //Consume '.'
+            while (IsDecDigit(Current) || Current == '_') _pos++;
+            isFloat = true;
+        }
+
+        if (Current is 'e' or 'E')
+        {
+            _pos++; //Consume 'e' or 'E'
+            if (Current == '+' || Current == '-')
+            {
+                _pos++; //Consume '+' or '-'
+            }
+
+            if (!IsDecDigit(Current))
+            {
+                _diagnostics.Report(new Diagnostic("LYR-LEX0006", Severity.Error,
+                    new Span(_file, numberStart, _pos), "expected exponent part to be a decimal number"));
+                return new Token(TokenKind.IntLiteral, new Span(_file, numberStart, _pos));
+            }
+
+            while (IsDecDigit(Current) || Current == '_') _pos++;
+            isFloat = true;
+        }
+
+        var message = "";
+        switch (TryReadSuffix(out var span))
+        {
+            case SuffixCategory.Invalid:
+                message = $"invalid suffix '{_source.Substring(span.Start, span.Length)}' on decimal literal";
+                _diagnostics.Report(new Diagnostic("LYR-LEX0003", Severity.Error, new Span(_file, numberStart, _pos),
+                    message));
+                return new Token(TokenKind.IntLiteral, new Span(_file, numberStart, _pos));
+            case SuffixCategory.Int:
+                if (isFloat)
+                {
+                    message =
+                        $"integer suffix '{_source.Substring(span.Start, span.Length)}' is not allowed on float literal";
+                    _diagnostics.Report(new Diagnostic("LYR-LEX0003", Severity.Error,
+                        new Span(_file, numberStart, _pos), message));
+                    return new Token(TokenKind.FloatLiteral, new Span(_file, numberStart, _pos));
+                }
+
+                return new Token(TokenKind.IntLiteral, new Span(_file, numberStart, _pos));
+            case SuffixCategory.Float:
+                return new Token(TokenKind.FloatLiteral, new Span(_file, numberStart, _pos));
+            default:
+                var tk = isFloat ? TokenKind.FloatLiteral : TokenKind.IntLiteral;
+                return new Token(tk, new Span(_file, numberStart, _pos));
+        }
+    }
+
+    private SuffixCategory TryReadSuffix(out Span suffixSpan)
+    {
+        var start = _pos;
+        if (Current is not ('i' or 'f' or 'u'))
+        {
+            suffixSpan = new Span(_file, start, _pos);
+            return SuffixCategory.None;
+        }
+
+        _pos++;
+        while (IsDecDigit(Current))
+        {
+            _pos++;
+        }
+
+        var suffix = _source.Substring(start, _pos - start);
+        if (ValidIntSuffixes.Contains(suffix))
+        {
+            suffixSpan = new Span(_file, start, _pos);
+            return SuffixCategory.Int;
+        }
+
+        if (ValidFloatSuffixes.Contains(suffix))
+        {
+            suffixSpan = new Span(_file, start, _pos);
+            return SuffixCategory.Float;
+        }
+
+        suffixSpan = new Span(_file, start, _pos);
+        return SuffixCategory.Invalid;
+    }
+
+    #endregion
+
+    #region String/Char Literals
+
+    private Token ScanString(int stringStart)
+    {
+        _pos++; // Consume '"'
+        while (Current is not ('\0' or '\n'))
+        {
+            if (Current == '"')
+            {
+                _pos++; // Consume closing '"'
+                return new Token(TokenKind.StringLiteral, new Span(_file, stringStart, _pos));
+            }
+
+            if (Current == '\\')
+                ConsumeEscapeSequence();
+            else
+                _pos++;
+        }
+
+        _diagnostics.Report(new Diagnostic("LYR-LEX0009", Severity.Error,
+            new Span(_file, stringStart, _pos), "unterminated string literal"));
+        return new Token(TokenKind.StringLiteral, new Span(_file, stringStart, _pos));
+    }
+
+    private Token ScanChar(int charStart)
+    {
+        _pos++; //Consume '''
+        var contentCount = 0;
+        while (true)
+        {
+            if (Current == '\0' || Current == '\n')
+            {
+                _diagnostics.Report(new Diagnostic("LYR-LEX0010", Severity.Error,
+                    new Span(_file, charStart, _pos), "unterminated character literal"));
+                return new Token(TokenKind.CharLiteral, new Span(_file, charStart, _pos));
+            }
+
+            if (Current == '\'')
+            {
+                _pos++; // Consume closing '''
+                if (contentCount != 1)
+                {
+                    _diagnostics.Report(new Diagnostic("LYR-LEX0008", Severity.Error, new Span(_file, charStart, _pos),
+                        $"expected only 1 character in character literal, got {contentCount}"));
+                    return new Token(TokenKind.CharLiteral, new Span(_file, charStart, _pos));
+                }
+
+                return new Token(TokenKind.CharLiteral, new Span(_file, charStart, _pos));
+            }
+
+            if (Current == '\\')
+            {
+                ConsumeEscapeSequence();
+                contentCount++;
+            }
+            else
+            {
+                contentCount++;
+                _pos++;
+            }
+        }
+    }
+
+    private void ConsumeEscapeSequence()
+    {
+        _pos++; //Consume '\'
+        if (Current is '\0' or '\n') return;
+        switch (Current)
+        {
+            case 'n':
+            case 't':
+            case 'r':
+            case '\\':
+            case '"':
+            case '\'':
+            case '0':
+                _pos++;
+                return;
+            case 'x':
+                ConsumeHexEscape(_pos);
+                return;
+            case 'u':
+                ConsumeUnicodeEscape(_pos);
+                return;
+            default:
+                var message = $"invalid escape sequence '\\{Current}'";
+                _diagnostics.Report(new Diagnostic("LYR-LEX0007", Severity.Error,
+                    new Span(_file, _pos - 1, _pos), message));
+                _pos++;
+                return;
+        }
+    }
+
+    private void ConsumeHexEscape(int hexStart)
+    {
+        _pos++; //Consume 'x'
+        var hexCount = 0;
+        while (2 > hexCount && IsHexDigit(Current) && Current != '\0' && Current != '\n')
+        {
+            _pos++;
+            hexCount++;
+        }
+
+        if (hexCount != 2)
+        {
+            _diagnostics.Report(new Diagnostic("LYR-LEX0007", Severity.Error, new Span(_file, hexStart - 1, _pos),
+                "expected 2 hex digits after '\\x' escape"));
+        }
+    }
+
+    private void ConsumeUnicodeEscape(int unicodeStart)
+    {
+        _pos++; //Consume 'u'
+        if (Current != '{')
+        {
+            _diagnostics.Report(new Diagnostic("LYR-LEX0007", Severity.Error, new Span(_file, unicodeStart - 1, _pos),
+                "expected '{' after '\\u' escape"));
+            return;
+        }
+
+        _pos++; //Consume '{'
+        var hexCount = 0;
+        while (8 > hexCount && IsHexDigit(Current) && Current != '\0' && Current != '\n')
+        {
+            _pos++;
+            hexCount++;
+        }
+
+        if (hexCount == 0)
+        {
+            _diagnostics.Report(new Diagnostic("LYR-LEX0007", Severity.Error, new Span(_file, unicodeStart - 1, _pos),
+                "expected hex digits after '\\u{' escape"));
+        }
+
+        if (Current != '}')
+        {
+            _diagnostics.Report(new Diagnostic("LYR-LEX0007", Severity.Error, new Span(_file, unicodeStart - 1, _pos),
+                "expected closing '}' in '\\u' escape"));
+            return;
+        }
+
+        if (hexCount > 0)
+        {
+            // UInt32, not Int32: eight hex digits with the high bit set would wrap to a
+            // negative number under HexNumber parsing and slip past the range check.
+            var hexVal = UInt32.Parse(_source.Substring(unicodeStart + 2, hexCount),
+                System.Globalization.NumberStyles.AllowHexSpecifier);
+            if (hexVal > 0x10FFFF)
+            {
+                _diagnostics.Report(new Diagnostic("LYR-LEX0007", Severity.Error,
+                    new Span(_file, unicodeStart - 1, _pos),
+                    "unicode value out of range (max: 0x10FFFF)"));
+            }
+            else if (hexVal is >= 0xD800 and <= 0xDFFF)
+            {
+                _diagnostics.Report(new Diagnostic("LYR-LEX0007", Severity.Error,
+                    new Span(_file, unicodeStart - 1, _pos),
+                    "unicode value is a surrogate (0xD800-0xDFFF), not a scalar value"));
+            }
+        }
+
+        _pos++; // Consume '}'
+    }
+
+    #endregion
+
+    #region FStrings
+
+    private Token ScanFStringStart()
+    {
+        _pos += 2; //Consume 'f"'
+        _modeStack.Push(new ModeFrame { Mode = LexMode.FStringText });
+        return new Token(TokenKind.FStringStart, new Span(_file, _pos - 2, _pos));
+    }
+
+    private Token ScanFStringText()
+    {
+        if (Current is '\0' or '\n') return HandleUnterminatedFString();
+        if (Current == '"')
+        {
+            _pos++;
+            _modeStack.Pop();
+            return new Token(TokenKind.FStringEnd, new Span(_file, _pos - 1, _pos));
+        }
+
+        // '{{' is a literal brace and belongs to the CHUNK (the lowering folds the pair); a
+        // single '{' opens an interpolation. The grammar has promised the escape since 1.0 —
+        // the lexer honoring it arrived with the spec draft, which is what specs are for.
+        if (Current == '{' && PeekAt(1) != '{')
+        {
+            _pos++;
+            _modeStack.Push(new ModeFrame { Mode = LexMode.FStringInterp, BraceDepth = 0 });
+            return new Token(TokenKind.FStringInterpStart, new Span(_file, _pos - 1, _pos));
+        }
+
+        var chunkStart = _pos;
+        while (Current is not ('"' or '\0' or '\n'))
+        {
+            if (Current == '{')
+            {
+                if (PeekAt(1) == '{') { _pos += 2; continue; }
+                break;
+            }
+            if (Current == '\\') ConsumeEscapeSequence();
+            else _pos++;
+        }
+
+        return new Token(TokenKind.FStringChunk, new Span(_file, chunkStart, _pos));
+    }
+
+    private Token ScanFStringFormatSpec()
+    {
+        // The spec runs to the MATCHING '}' (grammar §1.5): a '}' closing a nested brace, or
+        // standing inside open parentheses or brackets, belongs to the spec text. A closing
+        // bracket without an opening one does not count negative, as in the interpolation.
+        var specStart = _pos;
+        var braceDepth = 0;
+        var parenDepth = 0;
+        var bracketDepth = 0;
+        while (Current is not ('\0' or '\n'))
+        {
+            if (Current == '}' && braceDepth == 0 && parenDepth == 0 && bracketDepth == 0)
+                break;
+            switch (Current)
+            {
+                case '{': braceDepth++; break;
+                case '}': if (braceDepth > 0) braceDepth--; break;
+                case '(': parenDepth++; break;
+                case ')': if (parenDepth > 0) parenDepth--; break;
+                case '[': bracketDepth++; break;
+                case ']': if (bracketDepth > 0) bracketDepth--; break;
+            }
+            _pos++;
+        }
+        if (Current is '\0' or '\n') return HandleUnterminatedFString();
+        _modeStack.Pop();
+        return new Token(TokenKind.FStringFormatSpec, new Span(_file, specStart, _pos));
+    }
+
+    private Token HandleUnterminatedFString()
+    {
+        _diagnostics.Report(new Diagnostic("LYR-LEX0011", Severity.Error, new Span(_file, _pos, _pos),
+            "unterminated f-string"));
+        while (CurrentMode != LexMode.Normal) _modeStack.Pop();
+        return new Token(TokenKind.FStringEnd, new Span(_file, _pos, _pos));
+    }
+
+    #endregion
+
+    #region Operators
+
+    private Token? TryScanOperator(int operatorStart)
+    {
+        switch (Current)
+        {
+            case '(':
+                _pos++;
+                return new Token(TokenKind.LParen, new Span(_file, operatorStart, _pos));
+            case ')':
+                _pos++;
+                return new Token(TokenKind.RParen, new Span(_file, operatorStart, _pos));
+            case '[':
+                _pos++;
+                return new Token(TokenKind.LBracket, new Span(_file, operatorStart, _pos));
+            case ']':
+                _pos++;
+                return new Token(TokenKind.RBracket, new Span(_file, operatorStart, _pos));
+            case '{':
+                _pos++;
+                return new Token(TokenKind.LBrace, new Span(_file, operatorStart, _pos));
+            case '}':
+                _pos++;
+                return new Token(TokenKind.RBrace, new Span(_file, operatorStart, _pos));
+            case ',':
+                _pos++;
+                return new Token(TokenKind.Comma, new Span(_file, operatorStart, _pos));
+            case ';':
+                _pos++;
+                return new Token(TokenKind.Semicolon, new Span(_file, operatorStart, _pos));
+            case '~':
+                _pos++;
+                return new Token(TokenKind.Tilde, new Span(_file, operatorStart, _pos));
+            case '.':
+                if (PeekAt(1) == '.' && PeekAt(2) == '=')
+                {
+                    _pos += 3;
+                    return new Token(TokenKind.DotDotEqual, new Span(_file, operatorStart, _pos));
+                }
+
+                if (PeekAt(1) == '.')
+                {
+                    _pos+=2;
+                    return new Token(TokenKind.DotDot, new Span(_file, operatorStart, _pos));
+                }
+
+                _pos++;
+                return new Token(TokenKind.Dot, new Span(_file, operatorStart, _pos));
+            case ':':
+                if (PeekAt(1) == ':')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.ColonColon, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Colon, new Span(_file, operatorStart, _pos));
+            case '-':
+                if (PeekAt(1) == '>')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.Arrow, new Span(_file, operatorStart, _pos));
+                }
+
+                if (PeekAt(1) == '=')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.MinusEqual, new Span(_file, operatorStart, _pos));
+                }
+
+                if (PeekAt(1) == '-')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.Dec, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Minus, new Span(_file, operatorStart, _pos));
+            case '+':
+                if (PeekAt(1) == '=')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.PlusEqual, new Span(_file, operatorStart, _pos));
+                }
+
+                if (PeekAt(1) == '+')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.Inc, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Plus, new Span(_file, operatorStart, _pos));
+            case '*':
+                if (PeekAt(1) == '=')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.StarEqual, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Star, new Span(_file, operatorStart, _pos));
+            case '/':
+                if (PeekAt(1) == '=')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.SlashEqual, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Slash, new Span(_file, operatorStart, _pos));
+            case '%':
+                if (PeekAt(1) == '=')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.PercentEqual, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Percent, new Span(_file, operatorStart, _pos));
+            case '=':
+                if (PeekAt(1) == '>')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.FatArrow, new Span(_file, operatorStart, _pos));
+                }
+
+                if (PeekAt(1) == '=')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.EqualEqual, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Equal, new Span(_file, operatorStart, _pos));
+            case '^':
+                if (PeekAt(1) == '=')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.CaretEqual, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Caret, new Span(_file, operatorStart, _pos));
+            case '!':
+                if (PeekAt(1) == '=')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.ExclamationEqual, new Span(_file, operatorStart, _pos));
+                }
+
+                _pos++;
+                return new Token(TokenKind.Exclamation, new Span(_file, operatorStart, _pos));
+            case '?':
+                if (PeekAt(1) == '?' && PeekAt(2) == '=')
+                {
+                    _pos += 3;
+                    return new Token(TokenKind.QuestionQuestionEqual, new Span(_file, operatorStart, _pos));
+                }
+                if (PeekAt(1) == '?')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.QuestionQuestion, new Span(_file, operatorStart, _pos));
+                }
+
+                if (PeekAt(1) == '.')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.QuestionDot, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Question, new Span(_file, operatorStart, _pos)); 
+            case '&':
+                if (PeekAt(1) == '&' && PeekAt(2) == '=')
+                {
+                    _pos += 3;
+                    return new Token(TokenKind.AmpAmpEqual, new Span(_file, operatorStart, _pos));
+                }
+                if (PeekAt(1) == '&')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.AmpAmp, new Span(_file, operatorStart, _pos));
+                }
+
+                if (PeekAt(1) == '=')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.AmpEqual, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Amp, new Span(_file, operatorStart, _pos));
+            case '|':
+                if (PeekAt(1) == '|' && PeekAt(2) == '=')
+                {
+                    _pos += 3;
+                    return new Token(TokenKind.PipePipeEqual, new Span(_file, operatorStart, _pos));
+                }
+                if (PeekAt(1) == '|')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.PipePipe, new Span(_file, operatorStart, _pos));
+                }
+
+                if (PeekAt(1) == '=')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.PipeEqual, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Pipe, new Span(_file, operatorStart, _pos));
+            case '<':
+                if (PeekAt(1) == '<' && PeekAt(2) == '=')
+                {
+                    _pos += 3;
+                    return new Token(TokenKind.ShlEqual, new Span(_file, operatorStart, _pos));
+                }
+
+                if (PeekAt(1) == '<')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.Shl, new Span(_file, operatorStart, _pos));
+                }
+
+                if (PeekAt(1) == '=')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.LessEqual, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Less, new Span(_file, operatorStart, _pos));
+            case '>':
+                if (PeekAt(1) == '>' && PeekAt(2) == '=')
+                {
+                    _pos += 3;
+                    return new Token(TokenKind.ShrEqual, new Span(_file, operatorStart, _pos));
+                }
+
+                if (PeekAt(1) == '>')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.Shr, new Span(_file, operatorStart, _pos));
+                }
+                if (PeekAt(1) == '=')
+                {
+                    _pos += 2;
+                    return new Token(TokenKind.GreaterEqual, new Span(_file, operatorStart, _pos));
+                }
+                _pos++;
+                return new Token(TokenKind.Greater, new Span(_file, operatorStart, _pos));
+            default:
+                return null;
+        }
+    }
+
+    #endregion
+
+    private void ReportBadCharacter(char badChar, Span span)
+    {
+        var message = (badChar >= 0x20)
+            ? $"unexpected character '{badChar}'"
+            : $"unexpected character U+{(int)badChar:x4}";
+        _diagnostics.Report(new Diagnostic("LYR-LEX0001", Severity.Error, span, message));
+    }
+}

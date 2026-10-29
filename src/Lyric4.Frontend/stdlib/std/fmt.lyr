@@ -1,0 +1,211 @@
+// std.fmt — format specifiers for f-strings.
+//
+// `f"{avg:N2}"` becomes `formatFloat(avg, "N2")`. Without a specifier the `fromXxx` converters of
+// `std.string` apply.
+//
+// The specifier language is .NET's: `N2` (thousands separators, two decimals), `F3` (fixed), `D5`
+// (zero-padded), `X` (hex), `E2` (scientific), `P1` (percent). It is passed to the runtime
+// unchanged; there is no second notation beside it.
+//
+// Always invariant, never culture-dependent: the same program produces the same output on every
+// machine. Localizing is an explicit choice, not something the environment decides.
+//
+// The names distinguish by source type (`formatInt`, `formatFloat`, …) rather than being
+// overloads, as in `std.string.fromXxx`.
+
+module std.fmt;
+
+/// An `int` through a .NET numeric specifier (`N0`, `D5`, `X`, ...). An invalid specifier is a
+/// panic rather than an error value: it is a literal in the source and does not depend on the
+/// input.
+///
+/// `X` renders the BITS: `formatInt(-255, "X")` is the two's complement
+/// `FFFFFFFFFFFFFF01`, as `{:x}` in Rust and `%x` in Go write it. `formatHex` renders the
+/// VALUE with a sign, `-ff`, as Python's `hex` does; which one a program wants depends on
+/// whether the number is a quantity or a bit pattern, and each name says which it gives.
+pub fn formatInt(value: int, spec: string): string;
+/// A `uint` through a .NET numeric specifier; large values stay positive.
+pub fn formatUint(value: uint, spec: string): string;
+/// A `float` through a .NET numeric specifier (`N2`, `F3`, `E2`, `P1`, ...).
+pub fn formatFloat(value: float, spec: string): string;
+/// A `bool` through a .NET specifier.
+pub fn formatBool(value: bool, spec: string): string;
+/// A `char` through a .NET specifier.
+pub fn formatChar(value: char, spec: string): string;
+
+/// A string at a width: padding on the right (`{name:10}`) or, with a leading minus, on the
+/// left (`{name:-10}`).
+pub fn formatString(value: string, spec: string): string;
+
+// ================================================================== written in Lyric
+//
+// Number bases and alignment. Neither needs a native edge: a base conversion is division with
+// remainder, and alignment is padding.
+
+import std.string { repeat, fromChar, digitToChar };
+
+// ------------------------------------------------------------------------ number bases
+
+/// To a base from 2 to 36. Letters from `a` for digit values above 9.
+///
+/// The inverse of `std.string.parseIntRadix`. They live in different modules because parsing is
+/// text processing and formatting is output, and `std.string` must not import `std.fmt`.
+pub fn formatRadix(value: int, radix: int): string {
+    if (radix < 2 || radix > 36) {
+        return "";
+    }
+    if (value == 0) {
+        return "0";
+    }
+
+    // The magnitude is taken first and the sign appended at the end: `%` follows the sign of
+    // the dividend, so a negative number would produce negative digits.
+    let negative = value < 0;
+    var remaining = if (negative) 0 - value else value;
+
+    var digits = "";
+    while (remaining > 0) {
+        let digit = remaining % radix;
+        digits = digitChar(digit) + digits;
+        remaining = remaining / radix;
+    }
+
+    return if (negative) "-" + digits else digits;
+}
+
+// 0..9 becomes '0'..'9', from 10 on 'a'..'z'.
+fn digitChar(value: int): string {
+    if (value < 10) {
+        let c = digitToChar(value);
+        // The short form works because the `if` expression narrows `c` in the else branch.
+        return if (c == null) "?" else fromChar(c);
+    }
+    return fromChar(('a' as int + value - 10) as char);
+}
+
+/// Hexadecimal, lower case, no prefix — the VALUE, so a negative number carries a sign:
+/// `formatHex(-255)` is `-ff`. The bit pattern is `formatInt(value, "x")`.
+pub fn formatHex(value: int): string {
+    return formatRadix(value, 16);
+}
+
+/// Binary, no prefix.
+pub fn formatBinary(value: int): string {
+    return formatRadix(value, 2);
+}
+
+/// Octal, no prefix.
+pub fn formatOctal(value: int): string {
+    return formatRadix(value, 8);
+}
+
+/// Hexadecimal with a fixed number of digits and leading zeros: `formatHexPadded(255, 4)` is
+/// `"00ff"`, for addresses and colour values where the width carries meaning.
+pub fn formatHexPadded(value: int, width: int): string {
+    return formatHex(value).padStart(width, '0');
+}
+
+// ------------------------------------------------------------------ alignment
+
+/// Pads with spaces at the FRONT until `width` is reached; longer strings stay unchanged.
+pub fn padLeft(value: string, width: int): string {
+    return value.padStart(width, ' ');
+}
+
+/// Pads with spaces at the END until `width` is reached; longer strings stay unchanged.
+pub fn padRight(value: string, width: int): string {
+    return value.padEnd(width, ' ');
+}
+
+/// Centres. On an odd remainder the extra character goes to the RIGHT.
+/// A decision rather than a matter of course, but without it the same input yields two different
+/// results depending on the implementation.
+pub fn center(value: string, width: int): string {
+    let missing = width - value.length();
+    if (missing <= 0) {
+        return value;
+    }
+    let left = missing / 2;
+    return repeat(" ", left) + value + repeat(" ", missing - left);
+}
+
+// ------------------------------------------------------------------ sizes
+
+/// Bytes in readable form: `1536` becomes `"1.5 KB"`.
+///
+/// Base 1024 with the prefixes without `i` (`KB` rather than `KiB`), the spelling operating
+/// systems and tools actually use.
+pub fn formatBytes(bytes: int): string {
+    if (bytes < 1024) {
+        return formatInt(bytes, "") + " B";
+    }
+
+    let units = ["KB", "MB", "GB", "TB", "PB"];
+    var value = bytes as float;
+    var level = -1;
+
+    // Divide while a larger unit exists and the value fills it.
+    while (value >= 1024.0 && level + 1 < units.length) {
+        value = value / 1024.0;
+        level = level + 1;
+    }
+
+    return formatFloat(value, "N1") + " " + units[level];
+}
+
+// ------------------------------------------------------------------ tables
+
+/// Aligns columns. Each row is a `string[]`; short rows are padded with empty cells.
+///
+/// No borders and no header handling: what a table means is the caller's business. This does the
+/// tedious part — two passes over the data, to know the column widths before printing.
+pub fn table(rows: string[][], separator: string): string {
+    if (rows.length == 0) {
+        return "";
+    }
+
+    // First pass: the widest cell per column.
+    var columns = 0;
+    var i = 0;
+    while (i < rows.length) {
+        if (rows[i].length > columns) {
+            columns = rows[i].length;
+        }
+        i = i + 1;
+    }
+
+    var widths = [0] * columns;
+    i = 0;
+    while (i < rows.length) {
+        var j = 0;
+        while (j < rows[i].length) {
+            let l = rows[i][j].length();
+            if (l > widths[j]) {
+                widths[j] = l;
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+
+    // Second pass: pad and join.
+    var result = "";
+    i = 0;
+    while (i < rows.length) {
+        if (i > 0) {
+            result = result + "\n";
+        }
+        var j = 0;
+        while (j < columns) {
+            if (j > 0) {
+                result = result + separator;
+            }
+            let cell = if (j < rows[i].length) rows[i][j] else "";
+            // The last column is NOT padded, or invisible trailing spaces would remain.
+            result = result + (if (j == columns - 1) cell else cell.padEnd(widths[j], ' '));
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return result;
+}

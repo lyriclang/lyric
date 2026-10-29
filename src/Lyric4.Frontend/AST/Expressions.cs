@@ -1,0 +1,148 @@
+// Frozen from release/v4.6.0 (002b7a4b) by tooling/from4/freeze.py: Lyric 4.6 as it was. Do not edit.
+using Lyric4.Core;
+
+namespace Lyric4.AST;
+
+// Expressions. Every node carries its own span, the union of its children's spans, so
+// diagnostics and later stages point precisely at the source.
+
+public enum IntSuffix
+{
+    I8, I16, I32, I64, U8, U16, U32, U64
+}
+
+public enum FloatSuffix
+{
+    F32, F64
+}
+
+public abstract record Expr(Span Span) : Node(Span);
+
+// --- literals ---
+public sealed record IntLiteralExpr(ulong Value, IntSuffix? Suffix, Span Span) : Expr(Span);
+public sealed record FloatLiteralExpr(double Value, FloatSuffix? Suffix, Span Span) : Expr(Span);
+public sealed record StringLiteralExpr(string Value, Span Span) : Expr(Span);
+public sealed record CharLiteralExpr(int CodePoint, Span Span) : Expr(Span);
+public sealed record BoolLiteralExpr(bool Value, Span Span) : Expr(Span);
+public sealed record NullLiteralExpr(Span Span) : Expr(Span);
+
+// --- names ---
+public sealed record IdentifierExpr(string Name, Span Span) : Expr(Span);
+public sealed record AtIdentifierExpr(string Name, Expr[]? Arguments, Span Span) : Expr(Span); // Name INCLUDING the leading '@' (for example "@test"); Arguments == null when none were written
+public sealed record ThisExpr(Span Span) : Expr(Span);
+
+// --- operators ---
+public sealed record UnaryExpr(UnaryOp Operator, Expr Operand, Span Span) : Expr(Span);
+// 'resume co': a prefix expression at the unary level, yielding the value of the coroutine's next
+// yield. Send values do not exist.
+public sealed record ResumeExpr(Expr Coroutine, Span Span) : Expr(Span);
+/// <summary>
+/// <c>comptime e</c>: the value of <c>e</c>, computed by the compiler. Semantically the same
+/// value <c>e</c> has at run time — the prefix says WHEN it is computed and what <c>e</c> may
+/// therefore reach: no local, no parameter, no <c>this</c>, no capability. The lowering replaces
+/// the expression by the literal the evaluator produced.
+/// </summary>
+public sealed record ComptimeExpr(Expr Inner, Span Span) : Expr(Span);
+// 'throw e' in expression position: the type never (§6.9, §9.4). 'throw e;' at statement start stays a
+// ThrowStmt — one form per position, and the statement form has always been the one the flow rules name.
+public sealed record ThrowExpr(Expr Value, Span Span) : Expr(Span);
+public sealed record PostfixExpr(Expr Operand, PostfixOp Operator, Span Span) : Expr(Span);
+public sealed record BinaryExpr(Expr Left, BinaryOp Operator, Expr Right, Span Span) : Expr(Span);
+public sealed record AssignExpr(Expr Target, BinaryOp? Operator, Expr Value, Span Span) : Expr(Span); // Operator == null means '='; otherwise a compound assignment
+public sealed record RangeExpr(Expr Low, Expr High, bool IsInclusive, Span Span) : Expr(Span);
+public sealed record CastExpr(Expr Operand, TypeNode Type, Span Span) : Expr(Span);
+
+// --- nodes produced by postfix ---
+/// <param name="TypeArguments">Explicitly written type arguments: <c>f&lt;int&gt;()</c>. Empty
+/// when none were written; the sema then infers them from the arguments. They are needed where
+/// the arguments give nothing: a factory <c>empty&lt;T&gt;(): List&lt;T&gt;</c> has none.</param>
+public sealed record CallExpr(Expr Callee, Expr[] Arguments, Span Span,
+    TypeNode[]? TypeArguments = null) : Expr(Span);
+public sealed record IndexExpr(Expr Target, Expr Index, Span Span) : Expr(Span);
+/// <remarks>IsOptional means '?.' rather than '.'.</remarks>
+public sealed record MemberExpr(Expr Target, string Member, bool IsOptional, Span Span) : Expr(Span)
+{
+    /// <summary>Where the member name alone stands — what a consumer that must edit exactly the
+    /// name reads, where <see cref="Node.Span"/> covers the whole access. INVALID (default) on a
+    /// node the sema synthesized: an operator use carries no member name in the text, so there is
+    /// nothing to edit.</summary>
+    public required Span MemberSpan { get; init; }
+}
+
+// --- composite literals ---
+public sealed record ArrayLitExpr(Expr[] Elements, Span Span) : Expr(Span);
+public sealed record TupleLitExpr(Expr[] Elements, Span Span) : Expr(Span);
+
+// --- f-strings ---
+public sealed record InterpolatedStringExpr(InterpSegment[] Segments, Span Span) : Expr(Span);
+public abstract record InterpSegment(Span Span) : Node(Span);
+public sealed record InterpText(string Text, Span Span) : InterpSegment(Span);                     // raw text, escapes NOT resolved
+public sealed record InterpHole(Expr Expr, string? FormatSpec, Span Span) : InterpSegment(Span);   // {expr} and {expr:spec}
+
+// --- lambdas ---
+public sealed record LambdaExpr(LambdaParam[] Parameters, TypeNode? ReturnType, Node Body, Span Span) : Expr(Span) // Body is an Expr or a Block
+{
+    /// <summary>How the lambda was written: with a parenthesized parameter list, as a bare
+    /// <c>x =&gt; …</c>, or as a trailing block <c>f { … }</c> whose single parameter is the
+    /// implicit <c>it</c>. The formatter prints the form back; the meaning is the same.</summary>
+    public LambdaForm Form { get; init; } = LambdaForm.Parenthesized;
+}
+
+public enum LambdaForm { Parenthesized, Bare, Trailing }
+
+/// <summary>A lambda parameter: a name, or an irrefutable pattern (<c>((k, v)) =&gt; …</c>), in
+/// which case <see cref="Name"/> is <c>_</c> and the pattern binds the names. A trailing lambda's
+/// implicit <c>it</c> is a parameter with <see cref="Implicit"/> set; the checker drops it when
+/// the expected function type takes nothing.</summary>
+
+/// <summary><c>let Pattern = Expr</c> as the condition of an <c>if</c> or a <c>while</c>: true
+/// when the pattern matches, and the names it binds are in scope in the branch or the body.
+/// Only there — anywhere else it is <c>LYR-SEM0098</c>.</summary>
+public sealed record LetCondExpr(Pattern Pattern, Expr Initializer, Span Span) : Expr(Span);
+public sealed record LambdaParam(string Name, TypeNode? Type, Span Span) : Node(Span), INamedDecl
+{
+    public required Span NameSpan { get; init; }
+    public Pattern? Pattern { get; init; }
+    public bool Implicit { get; init; }
+}
+
+// --- control flow as an expression ---
+// IfExpr branches are EXPRESSIONS rather than blocks, so a value is guaranteed. For statement blocks
+// there is IfStmt. The else is mandatory; 'else if' is a nested IfExpr.
+public sealed record IfExpr(Expr Condition, Expr Then, Expr Else, Span Span) : Expr(Span);
+public sealed record MatchExpr(Expr Scrutinee, MatchArm[] Arms, Span Span) : Expr(Span);
+
+// --- struct initializers: TypePath '{' field = expr, … '}' ---
+// Recognised in value position only, not at the start of an ExprStmt, where it would be ambiguous
+// with a block. The field separator is '='; ':' is reserved for types.
+public sealed record StructInitExpr(string[] Path, TypeNode[] TypeArguments, StructInitField[] Fields, Span Span) : Expr(Span)
+{
+    /// <summary>The span of the LAST path segment — the name the initializer's symbol answers for.
+    /// The segments before it qualify; only this one is the type's own name.</summary>
+    public required Span NameSpan { get; init; }
+}
+
+// --- a type path in value position: 'Pair<int>.of(3)' ---
+//
+// The non-generic case does not need this node: 'P.neu()' is an IdentifierExpr whose symbol is a
+// type, and CheckMember works through the symbol anyway. Only type arguments carry something an
+// identifier cannot express.
+//
+// It always stands as the target of a MemberExpr; alone it is a type rather than a value, and
+// CheckExpr reports it there as LYR-SEM0052, like any other type name.
+public sealed record TypePathExpr(string[] Path, TypeNode[] TypeArguments, Span Span) : Expr(Span)
+{
+    /// <summary>The span of the LAST path segment, as on <see cref="StructInitExpr.NameSpan"/>.
+    /// </summary>
+    public required Span NameSpan { get; init; }
+}
+
+public sealed record StructInitField(string Name, Expr Value, Span Span) : Node(Span)
+{
+    /// <summary>Where the field name alone stands; <see cref="Node.Span"/> covers
+    /// <c>name = value</c>.</summary>
+    public required Span NameSpan { get; init; }
+}
+
+// --- recovery ---
+public sealed record ErrorExpr(Span Span) : Expr(Span);

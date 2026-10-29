@@ -1,0 +1,28 @@
+// Frozen from release/v4.6.0 (002b7a4b) by tooling/from4/freeze.py: Lyric 4.6 as it was. Do not edit.
+using Lyric4.Core;
+using Lyric4.Resolver;
+
+namespace Lyric4.Sema;
+
+/// <summary>The overall sema entry point: type checking and the flow analyses through the
+/// TypeChecker, plus the structural rules. The resolver runs before it and supplies the
+/// <see cref="BindingResult"/>.</summary>
+public static class Semantics
+{
+    /// <param name="singleProgram">Whether this compilation is one executable. The entry contract
+    /// allows exactly one 'main' per executable; a workspace compilation holds several programs at
+    /// once, and there a second 'main' is another program rather than a duplicate. The shape rule
+    /// for 'main' applies either way.</param>
+    public static TypeResult Analyze(Compilation compilation, BindingResult binding,
+        DiagnosticEngine de, bool singleProgram = true)
+    {
+        var types = new TypeChecker(compilation, binding, de).Check();
+        new SemaRules(compilation, binding, types, de, singleProgram).Run();
+        new ExceptionAnalyzer(compilation, binding, types, de).Run(); // throws propagation
+
+        // Warnings describe a program that compiles. Over a broken one the reference tables are
+        // partial, and a warning computed from half a table is a guess with a confident tone.
+        if (!de.HasErrors) new WarningAnalyzer(compilation, binding, types, de).Run();
+        return types;
+    }
+}

@@ -1807,3 +1807,16 @@ Die Ersetzung über Spans statt Neudruck folgt `cargo fix`: wer migriert, will s
 
 **Nicht in M16**: die 4.x-`stdlib/` und der 4.x-Modus des geteilten Frontends (M17); Lyric-Script (`.lyrs`) hat
 sein eigenes Repo; ein Migrator für Erato (Lyricpp, Z-Reihe); `--edition` (mit der ersten Edition).
+
+**S1, beim Bauen entschieden** (2026-10-29):
+
+- **Was eingefroren ist**: 4.6s `Lexing`, `Parsing`, `AST`, `Resolver`, `Sema`, dazu die eine Datei der IR, die der
+  Checker fragt (`Ir/Lowering/HostTypes.cs`: welche leere Klasse ein Host-Typ ist), 18 Dateien von `Lyric.Core`
+  (Spans, Quellen, Diagnosen, Escapes, `ProjectFile`, `CliDiagnostics`) und 4.6s `stdlib/` als Ressourcen — 122
+  Dateien mit den 30 Beispielen. Die einzige Änderung ist der Namensraum `Lyric.` → `Lyric4.` und eine Kopfzeile je
+  Datei; gebaut hat es beim ersten Mal bis auf zwei fehlende Dateien, die jetzt in der Liste stehen.
+- **Die Beispiele von 4.6 sind mit eingefroren** (`tests/fix-from-4/examples-4.6/`, nur `.lyr`; `embedded-host/` war
+  C#) — die Eingabe der Abnahme (S7) liegt damit im Baum, nicht nur in einem Zweig.
+- **`From4/` ist eigener Code** neben der Kopie: `CheckFile`, `CheckProject` (über `lyric.json`) mit 4.6s Lader, die
+  Bibliothek aus den Ressourcen über das Overlay des alten `StdlibLoader` — kein Byte der Kopie geändert.
+- `CatalogTests` lässt die eingefrorenen Verzeichnisse aus: ihre Codes sind 4.6s, nicht die dieses Katalogs.

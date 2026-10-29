@@ -1,0 +1,19 @@
+// Frozen from release/v4.6.0 (002b7a4b) by tooling/from4/freeze.py: Lyric 4.6 as it was. Do not edit.
+namespace Lyric4.Core;
+
+/// <summary>
+/// Opaque identifier for a source file managed by <see cref="SourceManager"/>.
+/// </summary>
+/// <remarks>
+/// File IDs are assigned by the SourceManager when a file is registered.
+/// They are stable for the lifetime of the SourceManager instance.
+/// FileId(0) is reserved as "no file" / invalid.
+/// </remarks>
+public readonly record struct FileId(int Value)
+{
+    public static readonly FileId None = new(0);
+
+    public bool IsValid => Value > 0;
+
+    public override string ToString() => $"FileId({Value})";
+}

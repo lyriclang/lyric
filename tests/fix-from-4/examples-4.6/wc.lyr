@@ -1,0 +1,110 @@
+// wc.lyr — counts the lines, words and characters of a file.
+//
+//     lyric run examples/wc.lyr -- file.txt [file2.txt ...]
+//
+// It uses the standard library ACROSS rather than in depth: reading files (`fileAccess`), splitting
+// lines and words, counting in a list, formatted output, and the entry point with arguments.
+//
+// It has no `-l`/`-w`/`-c` flags and does not read stdin.
+//
+// A deliberate deviation from POSIX: `wc -l` counts LINE BREAKS rather than lines, so a file with
+// text but without a trailing break has zero lines for POSIX. Here it has one.
+
+import std.io.file { text };
+// For the string METHODS alone: the extensions come with the module, and the alias
+// avoids shadowing the builtin type name.
+import std.string as strings;
+import std.io.console { println, eprintln };
+import std.collections { List };
+
+// The three numbers of a file. A `struct`, because it is a value: two counts with the same numbers
+// are the same result, and nobody mutates it afterwards.
+struct Counts {
+    lines: int,
+    words: int,
+    chars: int,
+}
+
+// Words are separated by whitespace, and several separators in a row count as one; otherwise
+// "a  b" would have three words. `split` yields the empty pieces along with the rest, and they are
+// discarded here.
+fn countWords(line: string): int {
+    var n = 0;
+    for (part in line.split(" ")) {
+        if (part.trim().length() > 0) {
+            n = n + 1;
+        }
+    }
+    return n;
+}
+
+fn count(content: string): Counts {
+    // Walking the lines rather than taking `lines`: the characters have to count the FILE,
+    // including the line breaks. `lines` throws them away, and `chars` would then be smaller
+    // than the file is.
+    let lines = content.split("\n");
+
+    var lineCount = 0;
+    var wordCount = 0;
+
+    for (line in lines) {
+        wordCount = wordCount + countWords(line);
+    }
+
+    // A file ending in a break has no empty last line after it. `split` yields one anyway, the same
+    // rule as in `std.io.file.lines`.
+    lineCount = lines.length;
+    if (lines.length > 0 && lines[lines.length - 1].length() == 0) {
+        lineCount = lineCount - 1;
+    }
+
+    return Counts { lines = lineCount, words = wordCount, chars = content.length() };
+}
+
+fn report(name: string, c: Counts): void {
+    // Right-aligned to eight places, as `wc` does it; that is what the width form of the format
+    // spec is for.
+    println(f"{c.lines:-8} {c.words:-8} {c.chars:-8} {name}");
+}
+
+fn main(args: string[]): int {
+    if (args.length == 0) {
+        eprintln("usage: wc <file> [file ...]");
+        return 2;
+    }
+
+    let results = List<Counts>.empty();
+    var missing = 0;
+
+    for (path in args) {
+        let content = text(path);
+        if (content == null) {
+            eprintln(f"wc: {path}: cannot read");
+            missing = missing + 1;
+            continue;
+        }
+
+        let c = count(content);
+        results.push(c);
+        report(path, c);
+    }
+
+    // A total line only when there is something to total; with one file it would be a repetition.
+    if (results.length() > 1) {
+        var lines = 0;
+        var words = 0;
+        var chars = 0;
+        for (c in results) {
+            lines = lines + c.lines;
+            words = words + c.words;
+            chars = chars + c.chars;
+        }
+        report("total", Counts { lines = lines, words = words, chars = chars });
+    }
+
+    // Like the real `wc`: an unreadable file is an error, but no reason not to count the others.
+    if (missing > 0) {
+        return 1;
+    }
+    return 0;
+}

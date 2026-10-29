@@ -1,0 +1,54 @@
+// objects.lyr — complexity: simple
+// Shows: class as a reference type, field access, methods and a `static` factory. Without
+// interfaces and exceptions; `bank.lyr` is the same subject fully built out.
+
+import std.io.console { println };
+
+class Counter {
+    value: int,
+    step: int,
+
+    // A factory: no receiver, hence `static`. The name `new` is only a convention.
+    static fn new(step: int): Counter {
+        return Counter { value = 0, step = step };
+    }
+
+    // An instance method: `this` is the receiver and is passed as parameter 0.
+    fn advance() {
+        this.value += this.step;
+    }
+
+    fn get(): int {
+        return this.value;
+    }
+}
+
+// The argument is the reference rather than a copy, so the mutation is visible at the caller.
+fn bump(c: Counter) {
+    c.advance();
+}
+
+class Inner {
+    label: string,
+}
+
+class Outer {
+    inner: Inner,
+    count: int,
+}
+
+fn main(): int {
+    let c = Counter.new(5);
+    c.value = 10;
+    bump(c);
+    bump(c);
+
+    // Two names, one object.
+    let alias = c;
+    alias.value += 1;
+
+    let outer = Outer { inner = Inner { label = "verschachtelt" }, count = c.get() };
+    println(f"{outer.inner.label}: {outer.count}");
+
+    return c.get();
+}

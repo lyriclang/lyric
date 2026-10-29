@@ -32,9 +32,13 @@ public partial class CatalogTests
     internal static Dictionary<string, List<string>> CodesInSources()
     {
         var found = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        // Lyric 4.6's frozen front end reports 4.6's codes, which are not this catalogue's; the
+        // migration's own code beside it (From4/) is read like the rest
+        var frozen = Path.Combine(Root, "src", "Lyric4.Frontend") + Path.DirectorySeparatorChar;
         var files = Directory.EnumerateFiles(Path.Combine(Root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
-                        && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+                        && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
+                        && !(f.StartsWith(frozen, StringComparison.Ordinal) && !f.StartsWith(frozen + "From4" + Path.DirectorySeparatorChar, StringComparison.Ordinal)))
             .Concat(Directory.EnumerateFiles(Path.Combine(Root, "runtime"), "*.*", SearchOption.AllDirectories)
                 .Where(f => f.EndsWith(".c", StringComparison.Ordinal) || f.EndsWith(".h", StringComparison.Ordinal)));
         foreach (var file in files)
