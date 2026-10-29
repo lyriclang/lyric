@@ -1,0 +1,26 @@
+// A C library the package brings prebuilt — native/lib/<triple>/libcrc32.a, one archive for each
+// target, made by native/make-archives.sh — and, on macOS, a framework of the SDK: CoreFoundation
+// counts a text's UTF-16 units there, a few lines of C elsewhere (see lyric.toml).
+import std.ffi { CStr, Ptr };
+import std.io { println };
+
+extern "C" {
+    fn crc32_update(crc: uint32, bytes: Ptr<uint8>, length: uint): uint32;
+    fn text_units(text: CStr): int;
+    fn text_counter(): CStr;
+}
+
+/// The CRC-32 of a text's UTF-8 bytes, by the prebuilt library.
+fn crc32(text: string): uint32 {
+    let bytes = text.toBytes();
+    return crc32_update(0, bytes.asPtr(), bytes.length() as uint);
+}
+
+fn main(): void throws Error {
+    let text = "The quick brown fox jumps over the lazy dog";
+    println(f"crc32 {crc32(text):08x}");
+    let greeting = "grüß dich 👋";
+    println(
+        f"{greeting}: {text_units(greeting)} UTF-16 units, counted by {try text_counter().toString()}"
+    );
+}

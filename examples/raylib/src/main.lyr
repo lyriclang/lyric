@@ -1,0 +1,52 @@
+// A window through raylib: a ball that bounces off its edges until the window is closed or Escape
+// is pressed. raylib is built from its source with the program (build.lyr); bounce.rl is made from
+// raylib.h by the build — its structs, enums and functions, as C declares them.
+import bounce.rl {
+    BeginDrawing,
+    ClearBackground,
+    CloseWindow,
+    Color,
+    DrawCircleV,
+    DrawText,
+    EndDrawing,
+    GetFrameTime,
+    GetScreenHeight,
+    GetScreenWidth,
+    InitWindow,
+    SetTargetFPS,
+    Vector2,
+    WindowShouldClose,
+};
+
+// raylib's colours are macros, which no binding holds: written out here
+let paper = Color { r = 245, g = 245, b = 245, a = 255 };
+
+let red = Color { r = 230, g = 41, b = 55, a = 255 };
+
+let gray = Color { r = 80, g = 80, b = 80, a = 255 };
+
+fn main(): void {
+    InitWindow(800, 450, "Lyric and raylib");
+    SetTargetFPS(60);
+    let radius: float32 = 30.0;
+    var at = Vector2 { x = 400.0, y = 225.0 };
+    var dx: float32 = 240.0;
+    var dy: float32 = 180.0;
+    while (!WindowShouldClose()) {
+        let dt = GetFrameTime();
+        // a binding's struct is a value: a new one each frame
+        at = Vector2 { x = at.x + dx * dt, y = at.y + dy * dt };
+        if (at.x < radius || at.x > GetScreenWidth() as float32 - radius) {
+            dx = -dx;
+        }
+        if (at.y < radius || at.y > GetScreenHeight() as float32 - radius) {
+            dy = -dy;
+        }
+        BeginDrawing();
+        ClearBackground(paper);
+        DrawCircleV(at, radius, red);
+        DrawText("Lyric draws through raylib", 20, 20, 20, gray);
+        EndDrawing();
+    }
+    CloseWindow();
+}

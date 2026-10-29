@@ -271,6 +271,18 @@ promise. This entry fills with the milestones.
   the one form, with no options to change it; comments and the parentheses a program writes stay, and
   a file that does not parse is left as it is. `--check` writes nothing and fails where a file would
   change; `--diff` shows how. The standard library is in the form.
+- **C libraries (M14b** — `design/v5/spec/11` and `07` "Review 2026-10-28"; spec chapters 13 §4, 14, 15 §5,
+  §8, 16**):** a package's `[native]` part names `archives` and `dylibs` it brings prebuilt, `defines`, `include`,
+  `libs`, macOS `frameworks` and `pkgConfig`, in tables per system and per triple; `[native.vendor]` names C source
+  trees from git or from a URL checked by its SHA-256, fetched when a target needs them and kept in the lock
+  (`lyric add --vendor`); `bindings` make a module from a C header for each target, and `lyric bindgen` prints one.
+  `std.build` is new: `target()`, `cLibrary(name)` with its own definitions and flags, `linkArchive`,
+  `linkFramework`, `pkgConfig`, `linkSearch`, `besideBinary`, `vendorDir`, `cEnv` for CMake or configure;
+  `compileC` and `cFlags` are gone. Shared libraries lie beside the binary, which finds them there. `lyric build
+  --lib` puts the packages' archives into `lib<name>.a` and says the rest of the link (`linkArgs` under `--json`). A
+  failed link is said where the fix belongs — `LYR-LNK0001` at the `extern` line, `LNK0002` at the manifest's line,
+  `LNK0003` with the packages that define a symbol twice —, and `-v` shows each command of the C compiler and the
+  linker. A finding's message keeps its lines. `examples/native-prebuilt` and `examples/raylib` show it.
 - **FFI and embedding (M14** — `design/v5/spec/11` X1–X8, H1–H7, 01 K4; spec chapter 13 §2–§6**):**
   `extern "C"` takes C's types: `std.ffi`'s `Ptr<T>`, `?Ptr<T>` and `CStr` — a `string` passes as one without a
   copy —, `@Layout(C)` structs by value and behind a pointer, `@Layout` enums, `char`, C function pointers

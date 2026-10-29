@@ -2,8 +2,10 @@
 
 Lyric compiles through C, and C is the one language it talks to directly. This chapter shows how a
 package calls C, brings C of its own, compiles a C library from its source, and links one — prebuilt,
-from the system, or from an SDK that lies somewhere on your machine. A complete package that does all of it is
-[`examples/ffi`](../../examples/ffi).
+from the system, or from an SDK that lies somewhere on your machine. Three complete packages go
+along: [`examples/ffi`](../../examples/ffi) calls C of its own, [`examples/native-prebuilt`](../../examples/native-prebuilt)
+links prebuilt archives and a macOS framework, and [`examples/raylib`](../../examples/raylib) builds a real library
+from its source and calls it through bindings made from its header.
 
 ## Calling C
 
@@ -409,3 +411,31 @@ nothing.
 A library the program picks while it runs — a plugin — is not linked at all: `std.ffi`'s `Library`
 opens it by its path and looks up its functions by name. [`examples/ffi`](../../examples/ffi) shows
 both, a library linked into the program and one loaded while it runs.
+
+## Two packages to read
+
+**[`examples/native-prebuilt`](../../examples/native-prebuilt)** brings a CRC-32 library prebuilt: one archive for
+each target under `native/lib/<triple>/`, named in the table of its triple, and the script that made them,
+`native/make-archives.sh` — the same zig makes the same bytes on any machine, so an archive in the package is one
+anybody can make again. On macOS it counts a text with CoreFoundation, a framework; elsewhere a few lines of C do
+it. The Lyric side declares one `extern` and never asks which.
+
+**[`examples/raylib`](../../examples/raylib)** is a window with a bouncing ball. Its whole C side is a manifest and
+a short build script:
+
+```toml
+[native.vendor]
+raylib = { url = "https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz", hash = "sha256:aea98ecf…" }
+
+[native]
+bindings = [{ header = "@raylib/src/raylib.h", module = "rl" }]
+
+[native.linux]
+libs = ["GL", "X11", "m", "pthread", "dl", "rt"]
+```
+
+The build fetches raylib's release once, checks its hash, compiles its sources as a `cLibrary` with the
+definitions raylib's own Makefile uses, and makes `bounce.rl` from `raylib.h` — `import bounce.rl { InitWindow,
+DrawCircleV, Color, Vector2 }`, and the program draws. raylib's colours are macros, which no binding holds: the
+example writes them out. It builds for Linux on Linux (X11 and OpenGL come from the system), for Windows from any
+machine, and for macOS on a Mac.

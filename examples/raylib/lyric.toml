@@ -1,0 +1,22 @@
+[package]
+name = "bounce"
+version = "0.1.0"
+description = "raylib built from its source with the program, called through bindings made from its header (design/v5/spec/13 M14b L8)"
+
+# raylib's source, fetched once and checked against its hash; build.lyr compiles it.
+[native.vendor]
+raylib = { url = "https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz", hash = "sha256:aea98ecf5bc5c5e0b789a76de0083a21a70457050ea4cc2aec7566935f5e258e" }
+
+# The module bounce.rl, made from raylib.h for the build's target.
+[native]
+bindings = [{ header = "@raylib/src/raylib.h", module = "rl" }]
+
+# What raylib's window and OpenGL need of each system.
+[native.linux]
+libs = ["GL", "X11", "m", "pthread", "dl", "rt"]
+
+[native.windows]
+libs = ["opengl32", "gdi32", "winmm"]
+
+[native.macos]
+frameworks = ["OpenGL", "Cocoa", "IOKit", "CoreVideo", "CoreAudio", "CoreFoundation"]

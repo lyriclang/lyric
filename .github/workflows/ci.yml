@@ -86,7 +86,8 @@ jobs:
           src/Lyric5/bin/Release/net10.0/lyric5 fmt --check \
             $(find stdlib5 tests/std -name '*.lyr' | sort) \
             examples/inventory.lyr examples/stats.lyr examples/stack.lyr \
-            examples/jsonserver/src/*.lyr examples/logfilter/src/*.lyr examples/macros/src/*.lyr
+            examples/jsonserver/src/*.lyr examples/logfilter/src/*.lyr examples/macros/src/*.lyr \
+            examples/native-prebuilt/src/*.lyr examples/raylib/src/*.lyr examples/raylib/build.lyr
 
       # WHICH TESTS (tooling/affected.toml; the maintainer's decision of 2026-10-11): a pull
       # request runs the tests its diff reaches and a fixed regression group — the goldens, the
@@ -113,6 +114,13 @@ jobs:
           if [ -z "$dap" ]; then sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends lldb; dap=$(find_dap); fi
           echo "lldb-dap: $dap"
           echo "LYRIC_LLDB_DAP=$dap" >> "$GITHUB_ENV"
+
+      # examples/raylib builds raylib for Linux with the system's X11 and OpenGL, as its users do —
+      # the packages raylib's own instructions name; the runner has none of their development files. macOS has them in its SDK, Windows needs none.
+      - name: X11 and OpenGL for the raylib example
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libgl-dev
 
       - name: Test
         shell: bash
@@ -227,6 +235,13 @@ jobs:
           if [ -z "$dap" ]; then sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends lldb; dap=$(find_dap); fi
           echo "lldb-dap: $dap"
           echo "LYRIC_LLDB_DAP=$dap" >> "$GITHUB_ENV"
+
+      # examples/raylib builds raylib for Linux with the system's X11 and OpenGL, as its users do —
+      # the packages raylib's own instructions name; the runner has none of their development files. macOS has them in its SDK, Windows needs none.
+      - name: X11 and OpenGL for the raylib example
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libgl-dev
 
       - name: Runtime tests
         shell: bash
