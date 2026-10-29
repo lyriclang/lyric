@@ -186,11 +186,16 @@ public sealed class CBuild
     /// written under a temporary name and published — a builder never replaces an archive another
     /// one may be linking against. Answers the archive's path.
     /// </summary>
-    public string Archive(IReadOnlyList<string> objects, string output)
+    /// <param name="bundled">Archives whose members go into this one as they are — a library's
+    /// packages' prebuilt archives, so that C links one file. They are named by their bytes in the key:
+    /// their names say nothing of what is in them.</param>
+    public string Archive(IReadOnlyList<string> objects, string output, IReadOnlyList<string>? bundled = null)
     {
+        bundled ??= [];
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
         var key = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
-            string.Join('\n', objects.Select(Path.GetFileName)))));
+            string.Join('\n', objects.Select(Path.GetFileName)
+                .Concat(bundled.Select(archive => Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(archive)))))))));
         var keyed = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(output))!,
             $"{Path.GetFileNameWithoutExtension(output)}-{key[..16]}{Path.GetExtension(output)}");
         if (File.Exists(keyed)) return keyed;
@@ -207,10 +212,15 @@ public sealed class CBuild
         {
             tool = CCompiler.FindOnPath("llvm-ar") ?? CCompiler.FindOnPath("ar")
                 ?? throw new CBuildException("no archiver found (llvm-ar or ar)");
+            if (bundled.Count > 0 && !Path.GetFileNameWithoutExtension(tool).StartsWith("llvm-ar", StringComparison.Ordinal))
+                throw new CBuildException($"putting the packages' archives into {output} needs llvm-ar, which takes an archive's members in (L); {tool} does not");
         }
-        arguments.Add("rcs");
+        // llvm-ar takes an archive's members in only on a quick append ('L' after 'q'); the
+        // partial file is new, so appending to it is writing it
+        arguments.Add(bundled.Count > 0 ? "qcsL" : "rcs");
         arguments.Add(partial);
         arguments.AddRange(objects);
+        arguments.AddRange(bundled);
         var result = Run(tool, arguments, $"archiving {keyed}", partial);
         if (result.ExitCode != 0)
         {
@@ -263,6 +273,24 @@ public sealed class CBuild
         return output;
     }
 
+    /// <summary>The system's libraries the runtime calls, by name. Windows: shell32 for
+    /// CommandLineToArgvW, the arguments as UTF-16 (runtime/src/os.c), and ws2_32 for Winsock
+    /// (runtime/src/net.c) — ntdll's AFD calls are looked up at run time (runtime/src/poll.c), as
+    /// wepoll does. Linux: libdl for std.ffi's Library, where the C library keeps dlopen apart (glibc
+    /// before 2.34). macOS has them all in libSystem.</summary>
+    private IReadOnlyList<string> SystemLibraries => Target.Os switch
+    {
+        TargetOs.MacOs => [],
+        TargetOs.Windows => ["-lshell32", "-lws2_32"],
+        _ => ["-lpthread", "-lm", "-ldl"],
+    };
+
+    /// <summary>What a C program links beside an archive of Lyric code and the runtime, after it
+    /// (spec 13 §4 rule 9): the system's libraries the runtime calls, and on Linux with zig cc the
+    /// unwinder its backtraces need, which zig cc does not link by itself.</summary>
+    public IReadOnlyList<string> RuntimeLinkArgs =>
+        Target.Os == TargetOs.Linux && Compiler.Kind == CCompilerKind.Zig ? [.. SystemLibraries, "-lunwind"] : SystemLibraries;
+
     /// <summary>One link. A Mach-O image keeps its debug map only when asked: <c>-S</c> leaves out
     /// what would name every object by its path and time.</summary>
     private void Link(IReadOnlyList<string> inputs, string output, IReadOnlyList<string>? libraries, LinkPaths paths, bool debugMap,
@@ -293,16 +321,13 @@ public sealed class CBuild
         {
             TargetOs.MacOs => ["-Wl,-dead_strip"],
             // A library's thread is its host's, with the host's stack.
-            TargetOs.Windows when shared => ["-Wl,--gc-sections", "-lshell32", "-lws2_32"],
+            TargetOs.Windows when shared => ["-Wl,--gc-sections", .. SystemLibraries],
             // The thread's stack as large as the main task's (runtime/include/lyr/task.h,
             // LYR_MAIN_TASK_STACK): what main has as a task it has on the thread. zig's
             // default for a Windows image is 16 MiB (MSVC's 1 MiB); a POSIX thread's comes from
-            // the system's limit, 8 MiB as a rule. shell32 for CommandLineToArgvW: the arguments as
-            // UTF-16 (runtime/src/os.c); ws2_32 for Winsock (runtime/src/net.c).
-            // ntdll's AFD calls are looked up at run time (runtime/src/poll.c), as wepoll does.
-            TargetOs.Windows => ["-Wl,--gc-sections", "-Wl,--stack," + MainThreadStack, "-lshell32", "-lws2_32"],
-            // libdl for std.ffi's Library, where the C library keeps dlopen apart (glibc before 2.34)
-            _ => ["-Wl,--gc-sections", "-lpthread", "-lm", "-ldl"],
+            // the system's limit, 8 MiB as a rule.
+            TargetOs.Windows => ["-Wl,--gc-sections", "-Wl,--stack," + MainThreadStack, .. SystemLibraries],
+            _ => ["-Wl,--gc-sections", .. SystemLibraries],
         });
         // the name the loader records in what links the library, not the path it was built at
         if (shared && Target.Os == TargetOs.MacOs) arguments.Add("-Wl,-install_name,@rpath/" + Path.GetFileName(output));

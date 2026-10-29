@@ -48,7 +48,7 @@ public class EmbeddingTests
         var (exit, _, error) = Run("build", "-C", dir, "--lib");
         Assert.True(exit == 0, error);
         var o = ExportTests.OutOf(dir);
-        var ran = ExportTests.BuildHost(dir, [Path.Combine(o, "libtally.a"), .. ExportTests.SystemLibraries()]);
+        var ran = ExportTests.BuildHost(dir, [Path.Combine(o, "libtally.a"), .. ExportTests.LinkArgs(dir)]);
         Assert.True(ran.ExitCode == 0, ran.Stderr);
         Assert.Equal(Expected.Replace("\r\n", "\n"), ran.Stdout.Replace("\r\n", "\n"));
     }
@@ -65,7 +65,7 @@ public class EmbeddingTests
                        + "    printf(\"%lld\\n\", (long long)geo_boom(0));\n    fflush(stdout);\n    geo_boom(1);\n    printf(\"after\\n\");\n    return 0;\n}\n"));
         var (exit, _, error) = Run("build", "-C", dir, "--lib");
         Assert.True(exit == 0, error);
-        var ran = ExportTests.BuildHost(dir, [Path.Combine(ExportTests.OutOf(dir), "libgeo.a"), .. ExportTests.SystemLibraries()]);
+        var ran = ExportTests.BuildHost(dir, [Path.Combine(ExportTests.OutOf(dir), "libgeo.a"), .. ExportTests.LinkArgs(dir)]);
         Assert.Equal(101, ran.ExitCode);
         Assert.Equal("0\n", ran.Stdout.Replace("\r\n", "\n"));
         Assert.Contains("panic [LYR-RT0008]: boom", ran.Stderr);
