@@ -1589,7 +1589,8 @@ ihren bekannten Texten.
   ziglang.org, das `tooling/zig-version` pinnt. Archs zig 0.16.0 (gegen das System-LLVM 21 gebaut) erzeugt für
   Linux und Windows andere Bytes; der Plattformlauf fand es, die Archive kommen jetzt aus dem offiziellen Build.
 - **Die Linux-Runner** haben weder X11 noch OpenGL als Entwicklungsdateien: die Linux-Jobs installieren
-  `libx11-dev` und `libgl-dev` (Maintainer, 2026-10-29), wie schon `lldb`.
+  X11 (`libx11-dev`, `libxcursor-dev`, `libxrandr-dev`, `libxinerama-dev`, `libxi-dev` — die GLFW nimmt) und
+  `libgl-dev` (Maintainer, 2026-10-29), wie schon `lldb`.
 - **raylib 5.5** (Release-Archiv, 42 MB, SHA-256 `aea98ecf…e258e`) baut aus dem Quellbaum mit einer `cLibrary`:
   Linux auf dem Wirt (`_GLFW_X11`, wie raylibs Makefile es setzt; X11 und GL aus dem System), Windows cross von
   Linux ohne irgendetwas des Wirts, macOS auf dem Mac (`rglfw.c` als Objective-C, sechs Frameworks); ein Mac-Ziel von
