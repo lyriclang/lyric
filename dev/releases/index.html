@@ -380,6 +380,18 @@ the one form, with no options to change it; comments and the parentheses a progr
 a file that does not parse is left as it is. <code>--check</code> writes nothing and fails where a file would
 change; <code>--diff</code> shows how. The standard library is in the form.</p>
 </li>
+<li><p><strong>C libraries (M14b</strong> — <code>design/v5/spec/11</code> and <code>07</code> &quot;Review 2026-10-28&quot;; spec chapters 13 §4, 14, 15 §5,
+§8, 16**):** a package's <code>[native]</code> part names <code>archives</code> and <code>dylibs</code> it brings prebuilt, <code>defines</code>, <code>include</code>,
+<code>libs</code>, macOS <code>frameworks</code> and <code>pkgConfig</code>, in tables per system and per triple; <code>[native.vendor]</code> names C source
+trees from git or from a URL checked by its SHA-256, fetched when a target needs them and kept in the lock
+(<code>lyric add --vendor</code>); <code>bindings</code> make a module from a C header for each target, and <code>lyric bindgen</code> prints one.
+<code>std.build</code> is new: <code>target()</code>, <code>cLibrary(name)</code> with its own definitions and flags, <code>linkArchive</code>,
+<code>linkFramework</code>, <code>pkgConfig</code>, <code>linkSearch</code>, <code>besideBinary</code>, <code>vendorDir</code>, <code>cEnv</code> for CMake or configure;
+<code>compileC</code> and <code>cFlags</code> are gone. Shared libraries lie beside the binary, which finds them there. <code>lyric build --lib</code> puts the packages' archives into <code>lib&lt;name&gt;.a</code> and says the rest of the link (<code>linkArgs</code> under <code>--json</code>). A
+failed link is said where the fix belongs — <code>LYR-LNK0001</code> at the <code>extern</code> line, <code>LNK0002</code> at the manifest's line,
+<code>LNK0003</code> with the packages that define a symbol twice —, and <code>-v</code> shows each command of the C compiler and the
+linker. A finding's message keeps its lines. <code>examples/native-prebuilt</code> and <code>examples/raylib</code> show it.</p>
+</li>
 <li><p><strong>FFI and embedding (M14</strong> — <code>design/v5/spec/11</code> X1–X8, H1–H7, 01 K4; spec chapter 13 §2–§6**):**
 <code>extern &quot;C&quot;</code> takes C's types: <code>std.ffi</code>'s <code>Ptr&lt;T&gt;</code>, <code>?Ptr&lt;T&gt;</code> and <code>CStr</code> — a <code>string</code> passes as one without a
 copy —, <code>@Layout(C)</code> structs by value and behind a pointer, <code>@Layout</code> enums, <code>char</code>, C function pointers

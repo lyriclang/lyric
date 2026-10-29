@@ -30,8 +30,10 @@
 <h1>C libraries</h1>
 <p>Lyric compiles through C, and C is the one language it talks to directly. This chapter shows how a
 package calls C, brings C of its own, compiles a C library from its source, and links one — prebuilt,
-from the system, or from an SDK that lies somewhere on your machine. A complete package that does all of it is
-<a href="https://github.com/lyriclang/lyric/blob/main/examples/ffi"><code>examples/ffi</code></a>.</p>
+from the system, or from an SDK that lies somewhere on your machine. Three complete packages go
+along: <a href="https://github.com/lyriclang/lyric/blob/main/examples/ffi"><code>examples/ffi</code></a> calls C of its own, <a href="https://github.com/lyriclang/lyric/blob/main/examples/native-prebuilt"><code>examples/native-prebuilt</code></a>
+links prebuilt archives and a macOS framework, and <a href="https://github.com/lyriclang/lyric/blob/main/examples/raylib"><code>examples/raylib</code></a> builds a real library
+from its source and calls it through bindings made from its header.</p>
 <h2 id="calling-c">Calling C</h2>
 <p>A C function is declared with <code>extern &quot;C&quot;</code> and called like any other. The C library is always
 there, so a program can call <code>abs</code> right away:</p>
@@ -319,6 +321,26 @@ nothing.</p>
 <p>A library the program picks while it runs — a plugin — is not linked at all: <code>std.ffi</code>'s <code>Library</code>
 opens it by its path and looks up its functions by name. <a href="https://github.com/lyriclang/lyric/blob/main/examples/ffi"><code>examples/ffi</code></a> shows
 both, a library linked into the program and one loaded while it runs.</p>
+<h2 id="two-packages-to-read">Two packages to read</h2>
+<p><strong><a href="https://github.com/lyriclang/lyric/blob/main/examples/native-prebuilt"><code>examples/native-prebuilt</code></a></strong> brings a CRC-32 library prebuilt: one archive for
+each target under <code>native/lib/&lt;triple&gt;/</code>, named in the table of its triple, and the script that made them,
+<code>native/make-archives.sh</code> — the same zig makes the same bytes on any machine, so an archive in the package is one
+anybody can make again. On macOS it counts a text with CoreFoundation, a framework; elsewhere a few lines of C do
+it. The Lyric side declares one <code>extern</code> and never asks which.</p>
+<p><strong><a href="https://github.com/lyriclang/lyric/blob/main/examples/raylib"><code>examples/raylib</code></a></strong> is a window with a bouncing ball. Its whole C side is a manifest and
+a short build script:</p>
+<pre><code class="language-toml">[native.vendor]
+raylib = { url = "https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz", hash = "sha256:aea98ecf…" }
+
+[native]
+bindings = [{ header = "@raylib/src/raylib.h", module = "rl" }]
+
+[native.linux]
+libs = ["GL", "X11", "m", "pthread", "dl", "rt"]</code></pre>
+<p>The build fetches raylib's release once, checks its hash, compiles its sources as a <code>cLibrary</code> with the
+definitions raylib's own Makefile uses, and makes <code>bounce.rl</code> from <code>raylib.h</code> — <code>import bounce.rl { InitWindow, DrawCircleV, Color, Vector2 }</code>, and the program draws. raylib's colours are macros, which no binding holds: the
+example writes them out. It builds for Linux on Linux (X11 and OpenGL come from the system), for Windows from any
+machine, and for macOS on a Mac.</p>
 <nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/diagnostics/">← What the compiler tells you</a></nav>
 </main>
 </div>
