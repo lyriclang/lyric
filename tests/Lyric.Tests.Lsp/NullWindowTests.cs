@@ -114,9 +114,18 @@ public sealed class NullWindowTests
         await harness.InitializeAsync(WorkDoneProgress);
 
         await harness.NotifyAsync(LspMethods.DidOpen, DidOpen(uri, Program));
-        while (await harness.ReceiveAsync() is var message && Method(message) != LspMethods.PublishDiagnostics)
+
+        // The first analysis to its end: its token is asked for on a task of its own, and may
+        // arrive after its diagnostics.
+        while (true)
+        {
+            var message = await harness.ReceiveAsync();
             if (Method(message) == LspMethods.WorkDoneProgressCreate)
                 await harness.SendAsync($$"""{"jsonrpc":"2.0","id":{{message.GetProperty("id").GetInt32()}},"result":null}""");
+            else if (Method(message) == LspMethods.Progress
+                     && message.GetProperty("params").GetProperty("value").GetProperty("kind").GetString() == "end")
+                break;
+        }
 
         await harness.NotifyAsync(LspMethods.DidChange, JsonSerializer.Serialize(new
         {
