@@ -246,7 +246,7 @@
 <p class="meta">error · <a href="../../spec/03-types/">spec 03-types</a></p>
 <p>'^n' stands outside '[…]' as a value of its own, indexes a string directly, or indexes a value that has no length.</p>
 <h2 id="explanation">Explanation</h2>
-<p><code>^n</code> counts from the end of what is being indexed, so it is sugar inside the brackets only: <code>xs[^1]</code>, <code>xs[1..^1]</code>. On its own (<code>let i = ^1;</code>) it has no length to count from. A string's index is a byte offset where a character begins, which from the end is rarely the case, so on a string <code>^n</code> bounds a range only (<code>s[^3..]</code>). And a value without a length has no end to count from.</p>
+<p><code>^n</code> counts from the end of what is being indexed, so it is sugar inside the brackets only: <code>xs[^1]</code>, <code>xs[1..^1]</code>. On its own (<code>let i = ^1;</code>) it has no length to count from. A string's index is a byte offset where a character begins, which from the end is rarely the case, so on a string <code>^n</code> bounds a range only (<code>s[^3..]</code>). And a value without a length has no end to count from. A type with its own <code>index</code>, such as <code>List&lt;T&gt;</code>, takes the index as written, so <code>list[^1]</code> is refused too; a range on it, <code>list[^2..]</code>, goes through its view and counts from the end.</p>
 <p>Write <code>^n</code> inside the index, compute the position as <code>xs.length() - n</code>, or slice a string with a range.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">fn</span> last(xs: <span class="ty">int</span>[]): <span class="ty">int</span> {
