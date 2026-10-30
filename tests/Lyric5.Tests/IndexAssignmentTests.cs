@@ -393,22 +393,83 @@ public class IndexAssignmentTests
         Assert.Contains(reason, error);
     }
 
-    /// <summary><c>^n</c> counts from the end of an array, a view or a string; a type's own index
-    /// takes the index as written. Read, written or in a field of a literal, it is refused once,
-    /// where it stands, with the subtraction it meant — the message said it stood outside
+    /// <summary><c>x[^n]</c> on a type with its own index and a <c>Length</c> is
+    /// <c>x.index(x.length() - n)</c>, read, written, compound and <c>++</c> — <c>x</c> evaluated
+    /// once for the two calls, as the counter shows (each line one call of <c>through</c>). It was
+    /// refused (lyriclang/lyric#625).</summary>
+    [Fact]
+    public void From_the_end_on_a_types_own_index_counts_from_its_length_once()
+    {
+        Assert.Equal("3 2 12 30 | 4\n", Output("""
+            fn through(c: Counter, xs: List<int>): List<int> {
+                let _ = c.next();
+                return xs;
+            }
+
+            fn main(): void {
+                let xs = List<int>.of([1, 2, 3]);
+                let c = Counter { };
+                let last = through(c, xs)[^1];
+                through(c, xs)[^1] = 30;
+                through(c, xs)[^2] += 10;
+                through(c, xs)[^3]++;
+                println(f"{last} {xs[0]} {xs[1]} {xs[2]} | {c.calls}");
+            }
+            """));
+    }
+
+    /// <summary>A struct with its own index and a <c>Length</c> is written in place from its end:
+    /// the receiver is the variable, not a copy.</summary>
+    [Fact]
+    public void From_the_end_writes_a_struct_in_place()
+    {
+        Assert.Equal("1 9 | 9 1\n", Output("""
+            struct Pair :: [IndexSet<int>, Length] {
+                type Output = int;
+                var a: int,
+                var b: int,
+
+                fn index(k: int): int {
+                    return if (k == 0) this.a else this.b;
+                }
+
+                mut fn setIndex(k: int, v: int): void {
+                    if (k == 0) {
+                        this.a = v;
+                    } else {
+                        this.b = v;
+                    }
+                }
+
+                fn length(): int {
+                    return 2;
+                }
+            }
+
+            fn main(): void {
+                var p = Pair { a = 1, b = 2 };
+                p[^1] = 9;
+                println(f"{p[^2]} {p[^1]} | {p.b} {p.a}");
+            }
+            """));
+    }
+
+    /// <summary>Without a <c>Length</c> a type's own index takes the index as written: refused
+    /// once, where it stands, with the subtraction it meant — the message said it stood outside
     /// <c>[…]</c>.</summary>
     [Theory]
-    [InlineData("let n = xs[^1];")]
-    [InlineData("xs[^1] = 4;")]
-    [InlineData("xs[^1] += 4;")]
-    [InlineData("xs[^1]++;")]
-    [InlineData("let v = V { x = xs[^1] };")]
-    public void From_the_end_on_a_types_own_index_is_refused_with_its_length(string statement)
+    [InlineData("let n = r[^1];")]
+    [InlineData("r[^1] = 4;")]
+    [InlineData("r[^1] += 4;")]
+    [InlineData("r[^1]++;")]
+    [InlineData("let v = V { x = r[^1] };")]
+    public void From_the_end_on_a_types_own_index_without_a_length_is_refused(string statement)
     {
-        var error = Refused("fn main(): void {\n    let xs = List<int>.of([1, 2, 3]);\n    " + statement + "\n}\n",
+        var error = Refused("fn main(): void {\n    var r = Row { a = 1, b = 2 };\n    " + statement + "\n}\n",
             "LYR-SEM0114");
-        Assert.Contains("'List<int>' is indexed through its own 'index'", error);
-        Assert.Contains("count from its length: 'xs.length() - 1'", error);
+        Assert.Contains("'Row' is indexed through its own 'index'", error);
+        Assert.Contains("a type that conforms to 'Length'", error);
+        Assert.Contains("count from its length: 'r.length() - 1'", error);
         Assert.DoesNotContain("inside '[…]' only", error);
     }
 

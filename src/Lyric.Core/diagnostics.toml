@@ -7333,9 +7333,9 @@ severity = "error"
 area = "03-types"
 summary = "'^n' stands outside '[…]' as a value of its own, indexes a string directly, or indexes a value that has no length."
 explanation = '''
-`^n` counts from the end of what is being indexed, so it is sugar inside the brackets only: `xs[^1]`, `xs[1..^1]`. On its own (`let i = ^1;`) it has no length to count from. A string's index is a byte offset where a character begins, which from the end is rarely the case, so on a string `^n` bounds a range only (`s[^3..]`). And a value without a length has no end to count from. A type with its own `index`, such as `List<T>`, takes the index as written, so `list[^1]` is refused too; a range on it, `list[^2..]`, goes through its view and counts from the end.
+`^n` counts from the end of what is being indexed, so it is sugar inside the brackets only: `xs[^1]`, `xs[1..^1]`. On its own (`let i = ^1;`) it has no length to count from. A string's index is a byte offset where a character begins, which from the end is rarely the case, so on a string `^n` bounds a range only (`s[^3..]`). And a value without a length has no end to count from. A type with its own `index` counts from its end where it conforms to `Length` — `list[^1]` on a `List<T>` is `list.index(list.length() - 1)`, `list` evaluated once —; one without `Length` takes the index as written, so `^n` is refused there.
 
-Write `^n` inside the index, compute the position as `xs.length() - n`, or slice a string with a range.
+Write `^n` inside the index, compute the position as `xs.length() - n`, give the type `Length`, or slice a string with a range.
 '''
 wrong = '''
 fn last(xs: int[]): int {

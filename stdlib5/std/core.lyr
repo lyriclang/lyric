@@ -956,6 +956,14 @@ pub interface IndexSet<K> :: [Index<K>] {
     mut fn setIndex(k: K, v: Self.Output): void;
 }
 
+/// How many elements a value holds: with its own `Index<int>`, `x[^n]` counts from its end.
+///
+/// `x[^1]` is `x.index(x.length() - 1)`, `x` evaluated once; a write and `x[^1] += 1` go through
+/// `setIndex` the same way. An array's, a view's and a string's `^n` are built in.
+pub interface Length {
+    fn length(): int;
+}
+
 /// Gives a view of the elements, which makes `x[a..b]` the range of that view.
 ///
 /// `list[a..b]` is `list.asSlice()[a..b]`, a `Slice<T>` over the elements, no copy. An array's,

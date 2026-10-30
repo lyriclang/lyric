@@ -12,6 +12,7 @@ std.collections.Deque :: FromArrayLiteral<T>
 std.collections.Deque :: FromIterator<T>
 std.collections.Deque :: Index<int>
 std.collections.Deque :: Iterable
+std.collections.Deque :: Length
 fn std.collections.Deque.clone(): Deque<T>
 fn std.collections.Deque.debug(): string
 fn std.collections.Deque.debugTo(out: StringBuilder): void
@@ -73,6 +74,7 @@ std.collections.List :: FromArrayLiteral<T>
 std.collections.List :: FromIterator<T>
 std.collections.List :: IndexSet<int>
 std.collections.List :: Iterable
+std.collections.List :: Length
 pub fn std.collections.List.asSlice(): Slice<T>
 pub mut fn std.collections.List.clear(): void
 fn std.collections.List.clone(): List<T>
