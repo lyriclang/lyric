@@ -393,6 +393,25 @@ public class IndexAssignmentTests
         Assert.Contains(reason, error);
     }
 
+    /// <summary><c>^n</c> counts from the end of an array, a view or a string; a type's own index
+    /// takes the index as written. Read, written or in a field of a literal, it is refused once,
+    /// where it stands, with the subtraction it meant — the message said it stood outside
+    /// <c>[…]</c>.</summary>
+    [Theory]
+    [InlineData("let n = xs[^1];")]
+    [InlineData("xs[^1] = 4;")]
+    [InlineData("xs[^1] += 4;")]
+    [InlineData("xs[^1]++;")]
+    [InlineData("let v = V { x = xs[^1] };")]
+    public void From_the_end_on_a_types_own_index_is_refused_with_its_length(string statement)
+    {
+        var error = Refused("fn main(): void {\n    let xs = List<int>.of([1, 2, 3]);\n    " + statement + "\n}\n",
+            "LYR-SEM0114");
+        Assert.Contains("'List<int>' is indexed through its own 'index'", error);
+        Assert.Contains("count from its length: 'xs.length() - 1'", error);
+        Assert.DoesNotContain("inside '[…]' only", error);
+    }
+
     /// <summary>The operator is the element's: one it has not is refused once, as on a
     /// variable.</summary>
     [Theory]
