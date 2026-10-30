@@ -1261,11 +1261,72 @@ public sealed class AstFormatter
             ExprDoc(expr.Value, Assign));
     }
 
-    private Doc CallDoc(CallExpr call)
-    {
-        var head = Doc.Of(ExprDoc(call.Callee, Postfix),
-            TypeArgsDoc(call.TypeArguments ?? []));
+    private Doc CallDoc(CallExpr call) =>
+        ChainDoc(call) ?? CallTail(call, Doc.Of(ExprDoc(call.Callee, Postfix), TypeArgsDoc(call.TypeArguments ?? [])));
 
+    /// <summary>
+    /// A chain of member calls, <c>build.cLibrary("x").sources(…).define(…)</c>: on one line where it
+    /// fits; else each call on a line of its own, one level in, its dot first. The receiver stays on
+    /// the opening line with the fields read off it, and after a bare name or <c>this</c> its first
+    /// call too. With fewer than two calls after that it is laid out as any call — broken, only its
+    /// arguments would have broken, each call's in turn.
+    /// </summary>
+    private Doc? ChainDoc(CallExpr call)
+    {
+        // The links from the outermost in; written parentheses around an inner link end the walk,
+        // so they stay where they were.
+        var links = new List<Expr>();
+        Expr at = call;
+        while (true)
+        {
+            if (at is CallExpr { Callee: MemberExpr callee } c && (ReferenceEquals(c, call) || WrittenParentheses(c) == 0)
+                && WrittenParentheses(callee) == 0)
+            {
+                links.Add(c);
+                at = callee.Target;
+            }
+            else if (at is MemberExpr m && WrittenParentheses(m) == 0)
+            {
+                links.Add(m);
+                at = m.Target;
+            }
+            else break;
+        }
+        if (links.Count == 0) return null;
+        links.Reverse();
+
+        Doc LinkDoc(Expr link) => link switch
+        {
+            CallExpr { Callee: MemberExpr m } c => CallTail(c,
+                Doc.Of(Doc.From((m.IsOptional ? "?." : ".") + m.Member), TypeArgsDoc(c.TypeArguments ?? []))),
+            MemberExpr m => Doc.From((m.IsOptional ? "?." : ".") + m.Member),
+            _ => throw new InternalCompilationException($"unreachable: a chain link {link.GetType().Name}"),
+        };
+
+        var head = new List<Doc> { ExprDoc(at, Postfix) };
+        var next = 0;
+        while (next < links.Count && links[next] is MemberExpr) head.Add(LinkDoc(links[next++]));
+        if (next == 0 && at is IdentifierExpr or ThisExpr && links[0] is CallExpr) head.Add(LinkDoc(links[next++]));
+
+        // A segment ends at a call; fields after the last call go with it.
+        var segments = new List<List<Doc>>();
+        var open = new List<Doc>();
+        for (; next < links.Count; next++)
+        {
+            open.Add(LinkDoc(links[next]));
+            if (links[next] is CallExpr) { segments.Add(open); open = []; }
+        }
+        if (segments.Count < 2) return null;
+        if (open.Count > 0) segments[^1].AddRange(open);
+
+        return Doc.GroupOf(Doc.Of([.. head]),
+            Doc.IndentOf([.. segments.SelectMany(s => s.Prepend(Doc.LineOrNothing))]));
+    }
+
+    /// <summary>A call after its callee: the arguments in parentheses that break as a group, and
+    /// a trailing lambda outside them.</summary>
+    private Doc CallTail(CallExpr call, Doc head)
+    {
         // 'xs.map { it * 2 }' / 'fold(0) { acc + it }': the trailing lambda stays outside the
         // parentheses, and the parentheses vanish when it was the only argument.
         var arguments = call.Arguments;

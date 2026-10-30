@@ -766,6 +766,8 @@ public sealed partial class Parser
                     return ParseStructInitFields([text], [], span, name.Span, implicitMember: true);
                 return new ImplicitMemberExpr(text, span);
             }
+            case TokenKind.Identifier when _sm.Lyric5 && AtContextual("unsafe") && _buffer.Peek(1).TokenKind == TokenKind.LBrace:
+                return ParseUnsafeAsValue();
             case TokenKind.Identifier:
                 // 'loop { … }' and 'outer: loop { … }' as an expression:
                 // 'let found = loop { …; break x; };'. A call reads 'name:' as a named argument
@@ -1334,6 +1336,22 @@ public sealed partial class Parser
             $"'{word}' is a statement — where a value stands it goes in a block, '{{ {written}; }}'",
             [DiagnosticNote.Suggest("write it as a block", new Replacement(span, $"{{ {written}; }}", Applicability.Safe))]));
         return new BlockExpr(new Block([jump], span), span);
+    }
+
+    /// <summary>
+    /// 'unsafe { … }' where a value stands: a statement, with no value. Said once, at the word —
+    /// read as a name, it was an unknown identifier with a trailing lambda, and its block's memory
+    /// operations each said they wanted an 'unsafe' block. The block is read and dropped; the
+    /// value is an error, so what binds it says nothing more.
+    /// </summary>
+    private Expr ParseUnsafeAsValue()
+    {
+        // read as a value block, so a value at its end, as written here, is no missing ';'
+        var word = _buffer.Advance().Span;
+        var block = ParseValueBlock();
+        _de.Report("LYR-PAR0067", Severity.Error, word,
+            "'unsafe { … }' is a statement and gives no value — declare the variable before it and assign it inside, 'var p: T; unsafe { p = …; }'");
+        return new ErrorExpr(Span.Union(word, block.Span));
     }
 
     /// <summary>'[f] = e': the field the info names, and its value.</summary>

@@ -3128,6 +3128,34 @@ fn main(): void {
 }
 '''
 
+[LYR-PAR0067]
+title = "an 'unsafe' block where a value stands"
+severity = "error"
+area = "13-abi"
+summary = "`unsafe { … }` stands where an expression is wanted — after `=`, after `return`, as an argument —; it is a statement and gives no value."
+explanation = '''
+`unsafe { … }` is a block statement: the memory operations of `std.ffi` (`alloc`, `read`, `write`, `offset`, `cast`, `free`) may be called inside it, and nothing else about it differs. Like any block statement it gives no value, so `let p = unsafe { alloc<int>(1) };` has nothing to bind.
+
+Declare the variable before the block and assign it inside: `var p: Ptr<int>; unsafe { p = alloc<int>(1); }`. Or put the work in a function that returns the value from inside its block. Keep the block around the memory operations only — that is where the reader looks for what the compiler cannot check.
+'''
+wrong = '''
+import std.ffi { alloc, free, Ptr };
+
+fn main(): void {
+    let p: Ptr<int> = unsafe { alloc<int>(1) };
+    unsafe { free(p); }
+}
+'''
+right = '''
+import std.ffi { alloc, free, Ptr };
+
+fn main(): void {
+    var p: Ptr<int>;
+    unsafe { p = alloc<int>(1); }
+    unsafe { free(p); }
+}
+'''
+
 [LYR-PKG0001]
 title = "`lyric.toml` or `lyric.lock` is not valid TOML"
 severity = "error"
