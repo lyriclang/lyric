@@ -432,6 +432,17 @@ header, <code>Compiling</code> the program, the runtime and <code>3 of 14 C unit
 profile and the time; on a terminal the C units are counted as they finish. What is up to date says nothing;
 <code>-q</code> says none of it, and <code>--json</code> none.</p>
 </li>
+<li><p><strong><code>unsafe { … }</code> where a value stands is one error</strong> (<code>LYR-PAR0067</code>, spec chapter 13 §3 rule 8): it was read as
+a call of a name <code>unsafe</code> and said three things, none of them the cause. A value made in the block goes to a
+variable declared before it.</p>
+</li>
+<li><p><strong><code>lyric fmt</code> breaks a long chain of calls before each dot</strong>, one call to a line, instead of breaking every call's
+arguments; a chain that fits, or that has one call after its receiver, keeps its line.</p>
+</li>
+<li><p><strong>A Windows object names its own file</strong>: the toolchain's C units for Windows were each a different file every
+build (CodeView named a temporary file), so a <code>--lib</code> archive and the prebuilt runtime for Windows were never the
+same twice.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>

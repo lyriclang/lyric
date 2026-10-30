@@ -443,7 +443,10 @@ not <code>%d</code>.)</em></li>
 within which <code>std.ffi</code>'s memory operations may be called: a pointer's <code>read()</code>, <code>write(v)</code>,
 <code>offset(n)</code> and <code>cast&lt;U&gt;()</code>, <code>alloc&lt;T&gt;(n)</code> and <code>free(p)</code>. Called outside one, each is refused
 (<code>LYR-SEM0233</code>), as <code>GcHandle.from</code> is (rule 12); the block is lexical, a lambda written within it is within it. Nothing else
-about the block differs, and calling a C function is not unsafe.
+about the block differs, and calling a C function is not unsafe. As a statement it gives no
+value: <code>unsafe {</code> where an expression stands — after <code>=</code>, after <code>return</code>, as an operand — is
+refused (<code>LYR-PAR0067</code>), not read as a call of a name <code>unsafe</code> with a trailing lambda; a value
+made inside goes to a variable declared before the block.
 <ul>
 <li><code>read()</code> is the <code>T</code> at the pointer's address, <code>write(v)</code> puts one there; <code>T</code> is what a field
 of a <code>@Layout(C)</code> struct may be (rule 4, <code>LYR-SEM0099</code>), and the memory's layout is C's.</li>
