@@ -158,10 +158,14 @@ type, its typedefs as aliases, its pointers to functions as <code>extern &quot;C
 <code>string</code> is <code>string_</code> — and no lint looks at the module, since you did not write it.</p>
 <p>The types are what each C type is <strong>on your target</strong>: a <code>long</code> is <code>int</code> on Linux and macOS and
 <code>int32</code> on Windows, a <code>char</code> is <code>uint8</code> on Linux for Arm, so the module is made for every target
-you build for. A pointer you hand to C may be null, so a parameter <code>const char *</code> is <code>?CStr</code> — a
-string goes in as it is — and <code>T *</code> is <code>?Ptr&lt;T&gt;</code>; in a struct's field, where Lyric takes no
-optional, they are <code>CStr</code> and <code>Ptr&lt;T&gt;</code>, and a null there is yours to look for. A struct the header
-names without its fields is a <code>Ptr&lt;void&gt;</code> behind its pointer.</p>
+you build for. A pointer may be null, so <code>const char *</code> is <code>?CStr</code> — a string goes in as it is —
+and <code>T *</code> is <code>?Ptr&lt;T&gt;</code>, as a parameter, as a result and as a struct's field: a <code>?Ptr</code> is one word,
+C's pointer, and a null C left in a struct reads as <code>null</code>. A pointer to a function is its type in a
+field, never optional, and a null there is yours to look for. A struct the header names without its
+fields is a <code>Ptr&lt;void&gt;</code> behind its pointer.</p>
+<p>A struct's fields are <code>var</code>, as C's are: write them in place.</p>
+<pre><code class="language-text">var at = Vector2 { x = 400.0, y = 225.0 };
+at.x += 240.0 * GetFrameTime();</code></pre>
 <p>What the module cannot hold is left out and listed at its end, with the place in the header and why:</p>
 <pre><code class="language-text">// Left out:
 // - union Any (geo.h:16): a union does not cross

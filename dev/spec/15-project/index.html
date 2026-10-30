@@ -101,7 +101,7 @@ is refused (<code>LYR-PKG0002</code>).</li>
 <p>The packages a package imports from (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V7</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases that hold their dependencies in
 their own directories, and the git repositories they read as their versions
-(<a href="https://github.com/lyriclang/lyric-spec/blob/0e6e03d3c2b99d034e82535de55c413da06710e0/conformance/README.md">the suite's README</a>); the toolchain's own tests
+(<a href="https://github.com/lyriclang/lyric-spec/blob/a2778b1beb82b8d6f9b6593688923125ba219d04/conformance/README.md">the suite's README</a>); the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>: <code>DependencyTests</code>, <code>GitDependencyTests</code>, <code>PackageContentTests</code>).</p>
 <ol>
 <li><code>[dependencies]</code> names them, each where it is read from: a directory,
@@ -380,8 +380,9 @@ declarations of the header and of the headers beside and below it, in the order 
 the system's:</p>
 <ul>
 <li>a function as <code>extern &quot;C&quot; fn</code> (<a href="../../spec/13-abi/">13 §2</a>), with <code>...</code> where it is variadic;</li>
-<li>a struct as a <code>@Layout(C)</code> struct of the same fields (<a href="../../spec/13-abi/">13 §3</a> rule 4); a struct
-C declares without its fields as <code>Ptr&lt;void&gt;</code> where a pointer names it;</li>
+<li>a struct as a <code>@Layout(C)</code> struct of the same fields (<a href="../../spec/13-abi/">13 §3</a> rule 4), each <code>var</code>
+— C writes any of them —; a struct C declares without its fields as <code>Ptr&lt;void&gt;</code> where a
+pointer names it;</li>
 <li>an enum's constants as module-level constants of its integer type, and the enum's name as an
 alias of that type;</li>
 <li>a <code>typedef</code> as an alias (<a href="../../spec/03-types/">03 §10</a>), a pointer to a C function as its type
@@ -391,9 +392,9 @@ alias of that type;</li>
 <p>The C types as <a href="../../spec/13-abi/">13 §2–§3</a> cross them: the integers by their width on the target —
 <code>char</code> as the target's <code>int8</code> or <code>uint8</code>, <code>size_t</code> as <code>uint</code>, <code>ptrdiff_t</code> as <code>int</code> —, <code>float</code>
 and <code>double</code>, <code>bool</code>; <code>const char *</code> as <code>?CStr</code>; any other <code>T *</code> as <code>?Ptr&lt;T&gt;</code>, <code>void *</code> as
-<code>?Ptr&lt;void&gt;</code>; an array parameter as the pointer it is. In a <strong>field</strong>, where 13 §3 rule 4 takes
-no optional, a pointer is <code>Ptr&lt;T&gt;</code>, <code>CStr</code> or the function pointer's type — a null there is the
-program's to look for —, and an array of arrays is one array of all their elements,
+<code>?Ptr&lt;void&gt;</code>; an array parameter as the pointer it is. In a <strong>field</strong> a pointer is <code>?Ptr&lt;T&gt;</code> or
+<code>?CStr</code> as well; a C function's pointer is its type, not optional — 13 §3 rule 4 takes none —,
+so a null there is the program's to look for; and an array of arrays is one array of all their elements,
 <code>float m[4][4]</code> as <code>float32[16]</code>, laid out alike. A constant is a <code>pub let</code>: an enum's of its
 integer type; a <code>#define</code>'s integer of the type C gives the literal — the first of <code>int32</code> and
 <code>int</code> it fits, unsigned with a <code>u</code> suffix or where a hexadecimal or octal one needs it, <code>int</code>

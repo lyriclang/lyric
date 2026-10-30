@@ -443,6 +443,12 @@ arguments; a chain that fits, or that has one call after its receiver, keeps its
 build (CodeView named a temporary file), so a <code>--lib</code> archive and the prebuilt runtime for Windows were never the
 same twice.</p>
 </li>
+<li><p><strong>A C struct's pointer field may be null</strong> (spec chapter 13 §3 rules 1 and 4): a <code>@Layout(C)</code> struct takes
+<code>?Ptr&lt;T&gt;</code> and <code>?CStr</code> fields, one word as C's pointer — a <code>?Ptr</code> is now its address everywhere, 0 for none.
+<code>lyric bindgen</code> writes a struct's pointer fields optional and every field <code>var</code>, so <code>pos.x += 1</code> writes a bound
+struct in place (spec chapter 15 rule 18). An array's <code>asPtr</code> says how to keep the array for a C function that
+keeps the pointer.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>

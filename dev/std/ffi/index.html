@@ -94,6 +94,9 @@ program's word says so.</p>
 <p>Returns a pointer to the first element: the elements lie one after the other, as C's
 array does. It holds the array no longer than the array is otherwise held, and it is no
 pointer to anything where the array is empty.</p>
+<p>A C function that keeps the pointer past its return needs the array held as long: by a
+field of an object a <a href="../../std/ffi/GcHandle/">GcHandle</a> pins, until C is done with it. The collector moves
+nothing, so the pointer stays good while the array lives.</p>
 </section>
 <section class="member" id="ext.SliceT">
 <pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span>&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
@@ -102,7 +105,8 @@ pointer to anything where the array is empty.</p>
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> asPtr(): <span class="ty">Ptr</span>&lt;<span class="ty">T</span>&gt;</code></pre>
 <p>Returns a pointer to the slice's first element, in the memory of its array. It holds the
 array no longer than the array is otherwise held, and it is no pointer to anything where
-the slice is empty.</p>
+the slice is empty. A pointer C keeps past its call needs the array held as long, as an
+array's <code>asPtr</code> says.</p>
 </section>
 </main>
 <aside class="on-this-page" aria-label="On this page">

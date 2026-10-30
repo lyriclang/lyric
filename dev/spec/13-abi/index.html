@@ -405,7 +405,7 @@ The pointer types are <code>std.ffi</code>'s; <code>@Layout</code> is a compiler
 <li><strong><code>Ptr&lt;T&gt;</code></strong> is an address C gave, never null: C's <code>T *</code>. Lyric does not read or write through
 it here, and makes none of its own; <code>T</code> says what it points at, which C alone holds to.
 <strong><code>?Ptr&lt;T&gt;</code></strong> is a pointer that may be null: <code>null</code> crosses as C's null, and a null pointer C
-returns comes back as <code>null</code>.</li>
+returns comes back as <code>null</code>. It is one word, as C's pointer: the address, null for none.</li>
 <li><strong><code>CStr</code></strong> is C's <code>const char *</code>: bytes up to a NUL, which C owns. Its <code>length()</code> counts the
 bytes before the NUL; its <code>toString()</code> copies them into a <code>string</code>, and throws <code>Utf8Error</code>
 where they are no well-formed UTF-8. <strong><code>?CStr</code></strong> may be null, as <code>?Ptr&lt;T&gt;</code>.</li>
@@ -415,9 +415,11 @@ without a copy. They are C's for the call: C does not
 keep the address past its return.</li>
 <li>A struct with <strong><code>@Layout(C)</code></strong> is laid out as C lays out a struct of the same fields in the same
 order on the target platform, and crosses by value, as a parameter and as a result. Its fields
-are what C holds: the scalars of §2, <code>char</code>, <code>Ptr&lt;T&gt;</code>, <code>CStr</code>, another <code>@Layout(C)</code> struct, and an
-inline array <code>T[N]</code> of one of them. A field of another type — an optional, an enum, a string —
-is refused (<code>LYR-SEM0099</code>). A struct without <code>@Layout(C)</code> is the compiler's to lay out and does
+are what C holds: the scalars of §2, <code>char</code>, <code>Ptr&lt;T&gt;</code>, <code>CStr</code> and their optionals <code>?Ptr&lt;T&gt;</code> and
+<code>?CStr</code> — a pointer field that may be null, one word as C's (rule 1) —, a C function's pointer,
+another <code>@Layout(C)</code> struct, and an inline array <code>T[N]</code> of one of them. A field of another type —
+another optional, a C function's pointer that may be null among them (wider than C's), an enum, a
+string — is refused (<code>LYR-SEM0099</code>). A field may be <code>var</code>, written in place as any struct's. A struct without <code>@Layout(C)</code> is the compiler's to lay out and does
 not cross (<code>LYR-SEM0099</code>).</li>
 <li>An enum with <strong><code>@Layout(C)</code></strong> is C's <code>enum</code>, an <code>int</code>; with <strong><code>@Layout(uint8)</code></strong> — or any other
 integer type of §2 — it is that integer. Its variants carry no payload (<code>LYR-SEM0099</code>). The
