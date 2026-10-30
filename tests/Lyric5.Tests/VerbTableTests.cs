@@ -83,7 +83,8 @@ public class VerbTableTests
         var second = RunRaw("build", "-C", root, "--color", "never");
         Assert.Equal(0, second.Exit);
         Assert.Contains("warning[LYR-SEM0071]: 'unused' is never used", first.Err);
-        Assert.Equal(first.Err, second.Err);
+        // the findings again; the status lines say what each build did, and the second compiled nothing
+        Assert.Equal(WithoutStatus(first.Err), WithoutStatus(second.Err));
         var (_, json, _) = RunRaw("build", "-C", root, "--json");
         Assert.Contains("{\"type\":\"summary\",\"version\":1,\"errors\":0,\"warnings\":1}", json);
     }

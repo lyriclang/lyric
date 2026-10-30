@@ -80,12 +80,17 @@ public sealed class EventWriter(TextWriter output)
         }
     }
 
-    /// <summary>What a build wrote: a program's binary, a library's archive.</summary>
-    public void Artifact(string kind, string name, string path) => Line("artifact", w =>
+    /// <summary>What a build wrote: a program's binary, a library's archive — with what a C program
+    /// links beside a static library (16 §4 rule 4).</summary>
+    public void Artifact(string kind, string name, string path, IReadOnlyList<string>? linkArgs = null) => Line("artifact", w =>
     {
         w.WriteString("kind", kind);
         w.WriteString("name", name);
         w.WriteString("path", path);
+        if (linkArgs is null) return;
+        w.WriteStartArray("linkArgs");
+        foreach (var arg in linkArgs) w.WriteStringValue(arg);
+        w.WriteEndArray();
     });
 
     /// <summary>A change <c>lyric fix</c> made (16 §6): the file, where the change begins, the code of

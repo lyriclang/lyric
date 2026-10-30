@@ -112,6 +112,10 @@ public record struct IrImport(string Name, IrType[] ParamTypes, IrType ReturnTyp
     /// every other import, whose <see cref="Name"/> is the Lyric name.</summary>
     public string? StdName { get; init; }
 
+    /// <summary>For a C function the program declares: its declaration, which a link that finds no
+    /// definition of the symbol points at (spec 15 §5.2 rule 12); <c>null</c> for every other import.</summary>
+    public Span? Declared { get; init; }
+
     /// <summary>Whether this is std's native <paramref name="lyricName"/>, whichever way it
     /// crosses.</summary>
     public readonly bool Is(string lyricName) => (StdName ?? Name) == lyricName;

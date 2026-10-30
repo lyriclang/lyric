@@ -35,6 +35,8 @@ internal static class Verbs
     private static readonly Opt Profile = new("--profile", "<name>", "the build profile: debug, release, asan, tsan, or one of the manifest's (default: LYRIC_PROFILE, else debug)");
     private static readonly Opt Target = new("--target", "<triple>", "a Tier 1 target (default: this machine)");
     private static readonly Opt Bin = new("--bin", "<name>", "the package's program");
+    private static readonly Opt Verbose = new("-v", null, "say each command of the C compiler, the archiver and the linker as it starts", Alias: "--verbose");
+    private static readonly Opt Quiet = new("-q", null, "say no status lines: what is compiled, linked and run", Alias: "--quiet");
 
     /// <summary>The profile's fields, for one build (spec 15 §4).</summary>
     public static readonly Opt[] Fields =
@@ -48,23 +50,23 @@ internal static class Verbs
         new("--fast-math", null, "floating point without strict IEEE order", Negatable: true),
     ];
 
-    private static readonly Opt[] Building = [Profile, .. Fields, Target, Dir, Bin, Offline, Locked];
+    private static readonly Opt[] Building = [Profile, .. Fields, Target, Dir, Bin, Offline, Locked, Verbose, Quiet];
 
     public static readonly VerbSpec[] All =
     [
         new("build", "[<file.lyr>]", "compile the package here — its src/main.lyr and its [[bin]] programs —, or the file, to binaries under out/",
             [.. Building, new("--emit", "<ir|c>", "print the IR or the C instead of building"),
-             new("--lib", null, "build the package's src/lib.lyr as a library C links: lib<name>.a and its header <name>.h"),
+             new("--lib", null, "build the package's src/lib.lyr as a library C links: lib<name>.a and its header <name>.h, and say what C links beside it"),
              new("--shared", null, "with --lib: a shared library — lib<name>.so, lib<name>.dylib, <name>.dll — instead of the archive")],
             Lints: true, Json: true),
         new("run", "[<file.lyr>] [-- <args>…]", "build, then run the binary with the arguments after --", Building, Lints: true, Json: true),
         new("check", "[<file.lyr>]", "what build says of the package or the file, without making C or a binary", Building, Lints: true, Json: true),
         new("expand", "[<file.lyr>]", "print the program's entry module with its macros expanded", Building, Lints: true),
         new("test", "", "build the package's tests and run them, each in a task of its own",
-            [Profile, .. Fields, Target, Dir, Offline, Locked, new("-f", "<text>", "only the tests whose name holds <text>", Alias: "--filter"),
+            [Profile, .. Fields, Target, Dir, Offline, Locked, Verbose, Quiet, new("-f", "<text>", "only the tests whose name holds <text>", Alias: "--filter"),
              new("--no-run", null, "build the tests and run none: the binary's path is printed")], Lints: true, Json: true),
         new("bench", "", "build the package's benchmarks in the release profile and run them",
-            [Profile, .. Fields, Target, Dir, Offline, Locked, new("-f", "<text>", "only the benchmarks whose name holds <text>", Alias: "--filter"),
+            [Profile, .. Fields, Target, Dir, Offline, Locked, Verbose, Quiet, new("-f", "<text>", "only the benchmarks whose name holds <text>", Alias: "--filter"),
              new("--save", "<file>", "write the times to <file>"), new("--compare", "<file>", "read the times of <file> and say how they changed")], Lints: true),
         new("fix", "[<file.lyr>]", "make the safe changes the findings suggest in the package's own files, then say what is left",
             [Dir, Offline, new("--dry-run", null, "print the changes as a diff and write nothing")], Lints: true, Json: true),

@@ -92,8 +92,8 @@ public class NativeTests
             ("src/main.lyr", "fn main(): void {\n}\n"));
         var (exit, _, error) = Run("build", "-C", dir);
         Assert.Equal(2, exit);
-        Assert.Contains("error[LYR-BLD0001]", error);
-        Assert.Contains("-llyric_no_such_library", error);
+        // the link took it, and the linker did not find it (spec 15 §5.2 rule 12)
+        Assert.Contains("error[LYR-LNK0002]: the linker finds no library 'lyric_no_such_library'", error);
     }
 
     [Theory]

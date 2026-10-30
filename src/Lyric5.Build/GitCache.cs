@@ -146,6 +146,7 @@ public sealed partial class GitCache(string root, bool offline, Func<string, boo
         _fetched.Add(db);
         Directory.CreateDirectory(Path.GetDirectoryName(db)!);
         var partial = $"{db}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
+        BuildStatus.Say("Fetching", $"{dependency.Name} ({dependency.Git!.Url})");
         Run(dependency, declaring, ["clone", "--bare", "--quiet", "--", dependency.Git!.Url, partial], FetchTime);
         try { Directory.Move(partial, db); }
         catch (IOException) when (Directory.Exists(db)) { DeleteTree(partial); }
@@ -156,6 +157,7 @@ public sealed partial class GitCache(string root, bool offline, Func<string, boo
     private void Fetch(Dependency dependency, string db, string declaring)
     {
         if (!_fetched.Add(db)) return;
+        BuildStatus.Say("Updating", $"{dependency.Name} ({dependency.Git!.Url})");
         Run(dependency, declaring, ["--git-dir", db, "fetch", "--quiet", "--force", "--", dependency.Git!.Url,
             "+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*"], FetchTime);
     }
