@@ -1,0 +1,7 @@
+import std.io { println };
+import app.util { shout };
+
+fn main(): int {
+    println(shout("hi"));
+    return 0;
+}

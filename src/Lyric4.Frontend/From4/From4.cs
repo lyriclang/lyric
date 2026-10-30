@@ -95,7 +95,7 @@ public static class From4
         };
     }
 
-    private static string ModuleNameUnder(string root, string path)
+    internal static string ModuleNameUnder(string root, string path)
     {
         var relative = Path.GetRelativePath(root, path);
         var stem = relative.EndsWith(".lyr", StringComparison.OrdinalIgnoreCase) ? relative[..^".lyr".Length] : relative;

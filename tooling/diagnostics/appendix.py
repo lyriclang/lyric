@@ -19,6 +19,7 @@ GROUPS = [
     ("RES", "Names and modules", "The resolver's: what a name, an import or a module path refers to."),
     ("SEM", "Semantic errors and warnings", "The checker's: types, interfaces, errors, patterns, and the warnings."),
     ("MAC", "Macros", "A macro's own refusal, at its site."),
+    ("MIG", "The migration", "`lyric fix --from-4`: a Lyric 4 program it does not read, and what it leaves to a person."),
     ("CT", "Compile-time evaluation", "The evaluation of `comptime`, a macro or a synthesis at build time."),
     ("CG", "Code generation", "What the C backend does not take."),
     ("PKG", "Packages and manifests", "`lyric.toml`, the lock file, dependencies."),

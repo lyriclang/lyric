@@ -24,6 +24,7 @@ public static class CatalogPages
         ("SEM", "Checking"),
         ("CT", "Compile-time evaluation"),
         ("MAC", "Macros"),
+        ("MIG", "The migration"),
         ("IR", "Lowering"),
         ("CG", "C generation"),
         ("PKG", "Packages"),

@@ -56,11 +56,14 @@ fn getThrowsTheErrorAgain(): void throws Odd {
 
 @Test
 fn resultsAreValuesToCollect(): void {
-    let all = [2, 5, 6].iter().map(
-        (n: int) => Result.of {
-            try half(n)
-        }
-    ).toArray();
+    let all = [2, 5, 6]
+        .iter()
+        .map(
+            (n: int) => Result.of {
+                try half(n)
+            }
+        )
+        .toArray();
     assertEq(all.iter().filter(isOk).count(), 2);
 }
 

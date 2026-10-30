@@ -608,6 +608,16 @@ public sealed record ClientCapabilities
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public WorkspaceClientCapabilities? Workspace { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WindowClientCapabilities? Window { get; init; }
+}
+
+public sealed record WindowClientCapabilities
+{
+    /// <summary>Whether the client draws progress the server reports
+    /// (<c>window/workDoneProgress/create</c>, <c>$/progress</c>).</summary>
+    public bool WorkDoneProgress { get; init; }
 }
 
 public sealed record WorkspaceClientCapabilities
@@ -818,6 +828,40 @@ public sealed record LogMessageParams
     public required string Message { get; init; }
 }
 
+/// <summary>The id of a request the client no longer wants answered: a number or a string.</summary>
+public sealed record CancelParams
+{
+    public System.Text.Json.JsonElement Id { get; init; }
+}
+
+/// <summary>Asks the client to create a progress token the server then reports on.</summary>
+public sealed record WorkDoneProgressCreateParams
+{
+    public required string Token { get; init; }
+}
+
+/// <summary>A report on a progress token: <see cref="WorkDoneProgressBegin"/> or
+/// <see cref="WorkDoneProgressEnd"/> as <see cref="Value"/>.</summary>
+public sealed record ProgressParams
+{
+    public required string Token { get; init; }
+    public required System.Text.Json.JsonElement Value { get; init; }
+}
+
+public sealed record WorkDoneProgressBegin
+{
+    public string Kind => "begin";
+    public required string Title { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Message { get; init; }
+}
+
+public sealed record WorkDoneProgressEnd
+{
+    public string Kind => "end";
+}
+
 /// <summary>The method names this server reacts to, so a typo is a compile error rather than a
 /// message that is silently never dispatched.</summary>
 public static class LspMethods
@@ -868,4 +912,6 @@ public static class LspMethods
     public const string PublishDiagnostics = "textDocument/publishDiagnostics";
     public const string LogMessage = "window/logMessage";
     public const string RegisterCapability = "client/registerCapability";
+    public const string WorkDoneProgressCreate = "window/workDoneProgress/create";
+    public const string Progress = "$/progress";
 }
