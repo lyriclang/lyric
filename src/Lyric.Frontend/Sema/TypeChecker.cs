@@ -3380,14 +3380,30 @@ public sealed class TypeChecker
         var scope = new SymbolTable(parent);
         var savedNarrowed = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
         _walked.Add(new Dictionary<Symbol, Span>(ReferenceEqualityComparer.Instance));
-        if (block.Unsafe is not null) _unsafeDepth++;
+        if (block.Unsafe is { } word)
+        {
+            // within another, the word says nothing the outer one does not
+            if (_unsafeDepth > 0)
+                _de.Report("LYR-SEM0234", Severity.Warning, word,
+                    "this block stands within an 'unsafe' block already, which covers what it holds; drop the word");
+            _unsafeDepth++;
+            _unsafeOperations.Add(0);
+        }
         try
         {
             foreach (var stmt in block.Statements) CheckStmt(stmt, scope);
         }
         finally
         {
-            if (block.Unsafe is not null) _unsafeDepth--;
+            if (block.Unsafe is { } closing)
+            {
+                _unsafeDepth--;
+                var operations = _unsafeOperations[^1];
+                _unsafeOperations.RemoveAt(_unsafeOperations.Count - 1);
+                if (operations == 0 && _unsafeDepth == 0)
+                    _de.Report("LYR-SEM0234", Severity.Warning, closing,
+                        "this 'unsafe' block calls none of std.ffi's memory operations, so the word says nothing; drop it");
+            }
         }
         _walked.RemoveAt(_walked.Count - 1); // a loop inside ran or did not: it speaks for no statement after the block
         EndScope(savedNarrowed); // narrowings established inside the block by an early exit end here
@@ -3396,6 +3412,10 @@ public sealed class TypeChecker
     /// <summary>How many <c>unsafe { … }</c> blocks enclose what is checked: within one,
     /// <c>std.ffi</c>'s memory operations may be called.</summary>
     private int _unsafeDepth;
+
+    /// <summary>Per enclosing <c>unsafe</c> block, innermost last, how many memory operations it
+    /// holds so far — one in an inner block counts for every block around it.</summary>
+    private readonly List<int> _unsafeOperations = [];
 
     /// <summary>
     /// <c>Callback&lt;C&gt;.new(closure)</c>: <c>C</c> is a C function's type whose first or last
@@ -3473,6 +3493,7 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0099", Severity.Error, call.Span,
                 $"a GcHandle holds an object of a class, which the collector keeps by its handle — not a '{TypeFacts.Display(held)}'");
         if (operation is null) return;
+        for (var i = 0; i < _unsafeOperations.Count; i++) _unsafeOperations[i]++;
         if (_unsafeDepth == 0)
             _de.Report(Lyric5Code("LYR-SEM0233"), Severity.Error, call.Span,
                 $"'{operation}' holds to what the compiler cannot see — that the memory is there and of its type: "

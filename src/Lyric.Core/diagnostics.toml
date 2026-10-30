@@ -11501,3 +11501,33 @@ fn main(): void {
     }
 }
 '''
+
+[LYR-SEM0234]
+title = "an unsafe block that holds no memory operation"
+severity = "warning"
+lint = "unused-unsafe"
+group = "unused"
+level = "warn"
+area = "13-abi"
+summary = "An `unsafe { … }` block calls none of `std.ffi`'s memory operations, or stands within another `unsafe` block, which covers what it holds already."
+explanation = '''
+An `unsafe` block marks where the program holds to what the compiler cannot see — the reader looks there and nowhere else. A block that holds no memory operation (a pointer's `read`, `write`, `offset` or `cast`, `alloc`, `free`, `GcHandle.from`) marks nothing, and one within another says again what the outer one says. Calling a C function is not unsafe.
+
+Drop the word, or move the block to the memory operations it was meant for, as small as it can be.
+'''
+wrong = '''
+extern "C" fn abs(n: int32): int32;
+
+fn main(): void {
+    unsafe {
+        let _ = abs(-3);
+    }
+}
+'''
+right = '''
+extern "C" fn abs(n: int32): int32;
+
+fn main(): void {
+    let _ = abs(-3);
+}
+'''

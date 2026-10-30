@@ -327,6 +327,9 @@ promise. This entry fills with the milestones.
 - **A Windows object names its own file**: the toolchain's C units for Windows were each a different file every
   build (CodeView named a temporary file), so a `--lib` archive and the prebuilt runtime for Windows were never the
   same twice.
+- **An `unsafe` block that needs no `unsafe` is said** (lint `unused-unsafe`, `LYR-SEM0234`, group `unused`, spec
+  chapter 13 §3 rule 8): a block that calls none of `std.ffi`'s memory operations, or one within another `unsafe`
+  block, which already allows them.
 
 ---
 
