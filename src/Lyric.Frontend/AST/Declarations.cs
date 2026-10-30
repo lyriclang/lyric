@@ -287,6 +287,10 @@ public sealed record EnumVariant(string Name, TypeNode[]? TupleFields, FieldDecl
     /// <summary>Its attributes (every declaration carries them in Lyric 5;
     /// the 4.x parser refuses them here).</summary>
     public AttributeNode[] Attributes { get; init; } = [];
+
+    /// <summary>The integer written after <c>=</c>, <c>Read = 4</c>: the value C holds for a unit
+    /// variant of an enum with <c>@Layout</c>.</summary>
+    public Expr? Value { get; init; }
 }
 
 public sealed record InterfaceDecl(VisibilityWord Visibility, string Name, GenericParam[] Generics, TypeNode[] Interfaces, FunctionDecl[] Members, Span Span) : Decl(Span), INamedDecl

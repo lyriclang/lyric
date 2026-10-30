@@ -31,6 +31,20 @@ Lyric's 64-bit `int`. The compiler checks that every type of an `extern "C"` fun
 C — integers by their width, `float`, `bool`, `Ptr<T>`, `CStr`, structs marked `@Layout(C)` — and
 refuses the others. `std.ffi` has the types for pointers, C strings and callbacks.
 
+An enum C knows is marked `@Layout(C)` — C's `int` — or with its integer type, `@Layout(uint8)`.
+Its variants are the integers C gives its constants: written after `=`, else one more than the
+variant before, the first 0, as C counts them:
+
+```text
+@Layout(C)
+enum Mode :: [CEnum] { Read = 1, Write = 2, Exec = 4, After }
+```
+
+Such an enum crosses as its integer, both ways; an integer C hands back that no variant is gives a
+panic, `LYR-RT0021`, before any `match` could miss it. Where C keeps the integer as a plain `int` —
+a struct's field, a constant of a binding —, `std.ffi`'s `CEnum` reads it: `Mode.from(n)` is the
+variant or `null`, and `m.value()` gives the integer back.
+
 ## C in the package
 
 C sources of your own go into the package and are named in the manifest's `[native]` section:

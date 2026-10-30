@@ -946,7 +946,10 @@ public static class ModuleLowerer
                 "uint" => "uint64_t",
                 _ => form + "_t",
             };
-            return new IrCForm(IrCKind.Enum, integer, declared.Variants.Length, typeTable.ModuleNameOf(symbol) + "." + symbol.Name);
+            // C's integers where the variants are given them, numbered as C numbers its constants
+            var values = TypeChecker.LayoutValues(declared).Select(v => TypeChecker.AsInt64(v ?? 0)).ToArray();
+            return new IrCForm(IrCKind.Enum, integer, declared.Variants.Length, typeTable.ModuleNameOf(symbol) + "." + symbol.Name,
+                values.Where((v, i) => v != i).Any() ? values : null);
         }
         return IrCForm.Value;
     }

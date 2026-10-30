@@ -106,6 +106,14 @@ public class NativeTests
     [InlineData("@Layout(C)\nstruct P { f: ?extern \"C\" fn(int) -> int }", "field 'f' of '@Layout(C)' struct 'P' has type '?extern \"C\" fn(int) -> int', which C does not hold — an optional C function's pointer is wider")]
     [InlineData("@Layout(uint8)\nstruct P { x: int }", "'@Layout(uint8)' makes an enum an integer")]
     [InlineData("@Layout(C)\nenum E { A(int), B }", "variant 'A' carries a payload")]
+    // C's integers for the variants: given only where C holds the enum, each its own, each in range
+    [InlineData("enum E { A = 1, B }", "variant 'A' is given an integer, which C holds for it — only an enum with '@Layout' is C's integer")]
+    [InlineData("@Layout(C)\nenum E { A = 2, B = 2 }", "variant 'B' is 2, as 'A' is")]
+    [InlineData("@Layout(C)\nenum E { A = 1, B = 0, C }", "variant 'C' is 1, as 'A' is")]
+    [InlineData("@Layout(uint8)\nenum E { A = 256 }", "variant 'A' is 256, and 'uint8' holds 0 to 255")]
+    [InlineData("@Layout(uint8)\nenum E { A = 255, B }", "variant 'B' is 256, one more than the variant before, and 'uint8' holds 0 to 255")]
+    [InlineData("@Layout(int8)\nenum E { A = -129 }", "variant 'A' is -129, and 'int8' holds -128 to 127")]
+    [InlineData("@Layout(C)\nenum E { A = 1 + 1 }", "variant 'A' is given no integer literal")]
     [InlineData("@Layout(C)\nclass K { }", "'K' is a class")]
     [InlineData("@Layout(C)\nstruct G<T> { x: int }", "'G' is generic")]
     [InlineData("@Layout(packed)\nstruct P { x: int }", "'@Layout' takes C's layout or an enum's integer type")]
@@ -175,6 +183,49 @@ public class NativeTests
         ("lyric.toml", AppManifest + "\n[native]\nsources = [\"native/*.c\"]\n"),
         ("native/boundary.c", "#include <string.h>\n" + BoundaryC),
         ("src/main.lyr", BoundaryLyric + "fn main(): void throws Utf8Error {\n" + body + "}\n"));
+
+    /// <summary>Variants given C's integers cross as those integers, out and back, the ones not
+    /// given one numbered on from the one before; <c>CEnum</c> reads an integer as its variant and
+    /// gives it back; an integer no variant is given is the panic. C is the oracle: it answers on
+    /// the integers, never on Lyric's tags.</summary>
+    [Fact]
+    public void Variants_given_cs_integers_cross_as_them()
+    {
+        var dir = Package(
+            ("lyric.toml", AppManifest + "\n[native]\nsources = [\"native/*.c\"]\n"),
+            ("native/mode.c", "int next_mode(int m) { return m == 1 ? 2 : m == 2 ? 4 : m == 4 ? 5 : m == 5 ? 1 : 99; }\n"
+                              + "long long as_int(int m) { return m; }\nint bad_mode(void) { return 3; }\n"),
+            ("src/main.lyr", """
+                import std.io { println };
+                import std.ffi { CEnum };
+
+                @Layout(C)
+                enum Mode :: [CEnum] { Read = 1, Write = 2, Exec = 4, After }
+
+                extern "C" {
+                    fn next_mode(m: Mode): Mode;
+                    fn as_int(m: Mode): int;
+                    fn bad_mode(): Mode;
+                }
+
+                fn main(): void {
+                    println(f"{next_mode(Mode.Read).name()} {next_mode(Mode.Exec).name()} {next_mode(Mode.After).name()}");
+                    println(f"{as_int(Mode.Write)} {as_int(Mode.After)} {Mode.Exec.value()}");
+                    println(f"{Mode.from(4)!.name()} {Mode.from(3) == null} {Mode.from(5)!.name()}");
+                    let _ = bad_mode();
+                    println("unreached");
+                }
+
+                """));
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.True(exit == 0, error);
+        var host = Lyric5.Toolchain.Target.Host;
+        var ran = Lyric5.Toolchain.ProcessRunner.Run(Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix),
+            [], TimeSpan.FromMinutes(1));
+        Assert.Equal("Write After Read\n2 5 4\nExec true After\n", ran.Stdout.Replace("\r\n", "\n"));
+        Assert.Equal(101, ran.ExitCode);
+        Assert.Contains("C returned 3, which is no variant of app.main.Mode (it has 4)", ran.Stderr);
+    }
 
     /// <summary>A string into a <c>CStr</c>, a <c>@Layout(C)</c> struct by value both ways, a
     /// pointer out of C and back, a C string and a null one back, an enum as its integer.</summary>

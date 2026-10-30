@@ -971,6 +971,14 @@ public sealed partial class Parser
                 { NameSpan = nameTok.Span };
         }
 
+        // 'Read = 4': the integer C holds for it; the checker says where one may stand
+        if (_sm.Lyric5 && _buffer.Match(TokenKind.Equal))
+        {
+            var value = ParseExpr(0);
+            return new EnumVariant(name, null, null, Span.Union(nameTok.Span, value.Span))
+                { NameSpan = nameTok.Span, Value = value };
+        }
+
         return new EnumVariant(name, null, null, nameTok.Span) { NameSpan = nameTok.Span }; // Unit
     }
 

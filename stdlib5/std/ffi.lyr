@@ -27,7 +27,7 @@
 //! ```output
 //! 5
 //! ```
-import std.core { Utf8Error, dataAddress, sliceAddress };
+import std.core { Utf8Error, dataAddress, sliceAddress, variants };
 import std.task { stashForeign, takeForeign };
 import std.io { IoError };
 
@@ -183,6 +183,34 @@ pub fn alloc<T>(count: int): Ptr<T> {
 /// program's word says so.
 pub fn free<T>(p: Ptr<T>): void {
     lyr_ffi_free(p.address);
+}
+
+/// An enum C holds as its integer: [CEnum.from] reads the integer C left in a struct's field or
+/// handed over as a plain integer, and [CEnum.value] gives the integer back.
+///
+/// Taken on request by an enum with `@Layout`, whose variants are units and may be given the
+/// integers C gives them: `@Layout(C) enum Mode :: [CEnum] { Read = 1, Write = 2, Both = 3 }`.
+@SeesConformer
+pub interface CEnum :: [Variants] {
+    /// Returns the variant C's integer `n` stands for, or `null` where none does.
+    static fn from(n: int): ?Self {
+        comptime for (v in variants<Self>()) {
+            if (n == v.value) {
+                return Self.[v];
+            }
+        }
+        return null;
+    }
+
+    /// Returns the integer C holds for this variant.
+    fn value(): int {
+        comptime for (v in variants<Self>()) {
+            if (this is v) {
+                return v.value;
+            }
+        }
+        return unreachable("an enum value holds one of its variants");
+    }
 }
 
 extend<T> T[] {
