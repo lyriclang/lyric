@@ -1,0 +1,6 @@
+{
+  // the project
+  "name": "shapes",
+  "sourceRoot": "src",
+  "toolchain": "4.0",
+}

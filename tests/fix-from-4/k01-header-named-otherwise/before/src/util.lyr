@@ -1,0 +1,5 @@
+module helpers;
+
+pub fn greeting(): string {
+    return "hi";
+}

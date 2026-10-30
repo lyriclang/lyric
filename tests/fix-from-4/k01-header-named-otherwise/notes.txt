@@ -1,0 +1,1 @@
+proposal[LYR-MIG0101] src/util.lyr:1:1: the module was named 'helpers' by its header; Lyric 5 names it by its path, 'util' — the package's own imports of it are rewritten; another package that imports it names it anew

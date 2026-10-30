@@ -1,0 +1,1 @@
+by hand[LYR-MIG0104] lyric.json:1:1: the toolchain line '4.0' names a version of Lyric 4 — [package] toolchain names the least Lyric 5 a package needs, where it needs one

@@ -1,0 +1,6 @@
+import std.build { executable };
+
+fn main(): int {
+    executable("app", "src/main.lyr");
+    return 0;
+}

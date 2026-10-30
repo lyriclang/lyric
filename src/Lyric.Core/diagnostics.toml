@@ -1383,6 +1383,135 @@ pub macro positive(n: Expr): Expr {
 }
 '''
 
+[LYR-MIG0001]
+title = "a program Lyric 4.6 refuses is not migrated"
+severity = "error"
+area = "14-cli"
+summary = "`lyric fix --from-4` reads the program with Lyric 4.6's own front end, and 4.6 refuses it. Nothing is written; 4.6's findings are said before this error. The exit code is 1."
+explanation = '''
+The migration reads a Lyric 4 program with the types 4.6 gave it — which `abs` a call meant, which field is written — and so it only reads a program 4.6 accepted. A program that did not check with 4.6 has no such answers, and a rewrite of it would be a guess.
+
+Put the program right as Lyric 4.6 sees it — the findings above this error are 4.6's own —, then migrate it.
+'''
+example = '''
+$ lyric5 fix --from-4 main.lyr
+  4.6: main.lyr:2:12: error[LYR-SEM0001]: cannot return 'string' from a function returning 'int'
+error[LYR-MIG0001]: Lyric 4.6 refuses the program, and it is not migrated
+  = help: make it check with Lyric 4.6 first: the migration reads what 4.6 accepted
+'''
+
+[LYR-MIG0002]
+title = "a lyric.json the migration cannot read"
+severity = "error"
+area = "14-cli"
+summary = "`lyric fix --from-4` finds a `lyric.json` that Lyric 4.6 would not have read either: not JSON, a key of the wrong kind, a path that is not there. The exit code is 2."
+explanation = '''
+The migration reads a Lyric 4 project as 4.6 did, from its `lyric.json`: the name, the source root, the dependencies and the native roots. A file 4.6 refused names none of them.
+
+Put the `lyric.json` right as the message says, then migrate.
+'''
+example = '''
+$ lyric5 fix --from-4
+error[LYR-MIG0002]: /home/ada/app/lyric.json: 'name' has to be a string
+  = help: the migration reads a lyric.json as Lyric 4.6 did
+'''
+
+[LYR-MIG0101]
+title = "a module named otherwise by its header"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a Lyric 4 module's `module` header gave it a name other than its path does. The header goes; Lyric 5 names the module by its path, and the package's own imports of it are rewritten to that name."
+explanation = '''
+In Lyric 4 a module could be called what its header said; in Lyric 5 a module is named by its package and its path under `src/` — `app.util` for `src/util.lyr` in the package `app`. The migration removes every header and rewrites the package's own imports. Another package that imported the module by its old name has to name it anew.
+
+Rename the file where the old name was the better one, or change the imports elsewhere.
+'''
+example = '''
+proposal[LYR-MIG0101] src/util.lyr:1:1: the module was named 'helpers' by its header; Lyric 5 names it by its path, 'util' — the package's own imports of it are rewritten; another package that imports it names it anew
+'''
+
+[LYR-MIG0102]
+title = "a native root without a counterpart"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: the `lyric.json` names a native root (`nativeRoots`), whose modules Lyric 4 took from a host. Lyric 5 has no host and no native roots; a library of C is described under `[native]` and called through `extern \"C\"`."
+explanation = '''
+Lyric 4's native roots let a host supply modules without bodies. Lyric 5 compiles to a native binary and calls C directly: the functions are declared `extern "C"`, and the C sources or libraries are named under `[native]` in `lyric.toml`.
+
+Write the declarations the host's modules held as `extern "C"` functions, and name the library under `[native]`.
+'''
+example = '''
+proposal[LYR-MIG0102] lyric.json:1:1: the native root 'host' (host/) has no counterpart in lyric.toml — a library of C goes under [native]; Lyric 5 calls C through extern "C" declarations
+'''
+
+[LYR-MIG0103]
+title = "a source root other than src/"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: the Lyric 4 project keeps its modules somewhere other than `src/` — its own directory, or the `sourceRoot` it names. A Lyric 5 package keeps them under `src/`; the migration does not move files."
+explanation = '''
+A Lyric 5 package's modules lie under `src/`, its program in `src/main.lyr`. Lyric 4 let `lyric.json` name any source root. The migration leaves the files where they are — moving them is a change best made with the version control that tracks them.
+
+Move the modules under `src/` (with `git mv`, so their history follows).
+'''
+example = '''
+proposal[LYR-MIG0103] lyric.json:1:1: the modules lie under 'the package's directory'; a Lyric 5 package keeps them under src/ — move the .lyr files into src/
+'''
+
+[LYR-MIG0104]
+title = "a toolchain line of Lyric 4"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: the `lyric.json` names a version of Lyric 4 under `toolchain`. It goes; `[package] toolchain` in `lyric.toml` names the least Lyric 5 a package needs, where one is needed."
+explanation = '''
+A version of Lyric 4 says nothing about Lyric 5, so the migrated `lyric.toml` carries no toolchain line. A package that needs a feature of a later Lyric 5 names that version under `[package] toolchain`.
+'''
+example = '''
+by hand[LYR-MIG0104] lyric.json:1:1: the toolchain line '4.0' names a version of Lyric 4 — [package] toolchain names the least Lyric 5 a package needs, where it needs one
+'''
+
+[LYR-MIG0106]
+title = "declarations the whole package now sees"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`, once a module: declarations without `pub` were private to their module in Lyric 4 and are seen by the whole package in Lyric 5. `main` is left aside."
+explanation = '''
+In Lyric 4 a declaration without `pub` was the module's alone. In Lyric 5 it is `internal`: every module of the package sees it, and only `pub` reaches other packages. The program still compiles; what changes is who may use the declaration.
+
+Write `private` before a declaration only its module may see.
+'''
+example = '''
+proposal[LYR-MIG0106] src/util.lyr:5:1: 1 declaration without 'pub' were private to the module in Lyric 4; in Lyric 5 the whole package sees them — write 'private' where only the module may see one
+'''
+
+[LYR-MIG0107]
+title = "a build script of Lyric 4"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: the project has a `build.lyr` written for Lyric 4, which defined the build. In Lyric 5 `lyric.toml` does — `[[bin]]`, `[profile.*]` —, and a build script only prepares sources."
+explanation = '''
+Lyric 4's `build.lyr` called `executable(…)`, `option`, `flag` and the profiles. Lyric 5 reads the programs and the profiles from `lyric.toml`; a `build.lyr` there generates sources or compiles C before the build, and runs only when it has something to do.
+
+Move the programs and the profiles into `lyric.toml`; `packed` has no counterpart. Keep the script only for what it prepares.
+'''
+example = '''
+proposal[LYR-MIG0107] build.lyr:1:1: a Lyric 4 build.lyr defines the build; in Lyric 5 lyric.toml does ([[bin]], [profile.*]), and build.lyr only prepares sources — move executable(…) and the profiles into lyric.toml; packed goes
+'''
+
+[LYR-MIG0108]
+title = "tests compiled apart"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: the `lyric.json` names a `testRoot`, whose files Lyric 4 compiled apart from the program. Lyric 5 runs a package's `tests/` with `lyric test`; each test is an `@Test` function."
+explanation = '''
+Lyric 5 compiles the tests of a package with it: `@Test` functions in `src/` and in `tests/`, run by `lyric test`. The migration does not move them.
+
+Move the test files to `tests/` and make each test an `@Test` function.
+'''
+example = '''
+by hand[LYR-MIG0108] lyric.json:1:1: the tests under 'tests' are compiled apart in Lyric 4; Lyric 5 runs a package's tests/ with lyric test — move them to tests/ and make each test an @Test function
+'''
+
 [LYR-PAR0001]
 title = "a token after one whole expression, pattern or statement"
 severity = "error"
