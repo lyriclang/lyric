@@ -106,6 +106,19 @@ public record struct IrImport(string Name, IrType[] ParamTypes, IrType ReturnTyp
     /// <summary>For a C function: whether C's variadic arguments follow its parameters — a call
     /// may hand more arguments than <see cref="ParamTypes"/> has.</summary>
     public bool CVariadic { get; init; }
+
+    /// <summary>For a C function of std: its Lyric name (<c>std.string.concat</c>), by which the
+    /// lowering asks for a helper and the compile-time interpreter computes it; <c>null</c> for
+    /// every other import, whose <see cref="Name"/> is the Lyric name.</summary>
+    public string? StdName { get; init; }
+
+    /// <summary>For a C function the program declares: its declaration, which a link that finds no
+    /// definition of the symbol points at (spec 15 §5.2 rule 12); <c>null</c> for every other import.</summary>
+    public Span? Declared { get; init; }
+
+    /// <summary>Whether this is std's native <paramref name="lyricName"/>, whichever way it
+    /// crosses.</summary>
+    public readonly bool Is(string lyricName) => (StdName ?? Name) == lyricName;
 }
 
 /// <summary>What a value is at C's boundary.</summary>
@@ -125,6 +138,9 @@ public enum IrCKind
 
     /// <summary><c>?CStr</c>: a C string, null for <c>none</c>.</summary>
     OptionalCString,
+
+    /// <summary><c>?extern "C" fn(…)</c>: a C function's pointer, null for <c>none</c>.</summary>
+    OptionalFunction,
 
     /// <summary>An enum with <c>@Layout</c>: the integer of its variant.</summary>
     Enum,
@@ -310,6 +326,15 @@ public class IrModule(List<IrFunction> Functions)
     /// </summary>
     public FunctionId? TaskMain { get; set; }
 
+    /// <summary>
+    /// std.task's side of the embedding where a library's exports wait, or <c>null</c>.
+    ///
+    /// <para>Set as <see cref="TaskMain"/> is, for a library: then each export C calls runs as a
+    /// task under these functions, and the host pumps what an export left running. A library that
+    /// never waits runs an export's task once, and needs no scheduler.</para>
+    /// </summary>
+    public IrEmbedding? Embedding { get; set; }
+
     /// <summary>The vtable rows. They land as the Impls section in the bytecode; the runtime builds its
     /// dispatch table from them at load time, so <c>callvirt</c> is a lookup rather than a
     /// search.</summary>
@@ -338,4 +363,29 @@ public class IrModule(List<IrFunction> Functions)
     /// bare snippets (tests), whose functions would otherwise vanish.</para>
     /// </summary>
     public List<FunctionId> ExportRoots { get; init; } = new();
+
+    /// <summary>The functions C calls by a symbol (<c>@Export</c>), each a root of
+    /// <see cref="ExportRoots"/> too.</summary>
+    public List<IrExport> Exports { get; init; } = new();
+
+    /// <summary>What the library's header declares beside the runtime's own API: the
+    /// <c>@Layout</c> types the exports name, then the exports, each a C declaration.</summary>
+    public IrHeader Header { get; set; } = IrHeader.Empty;
+}
+
+/// <summary>A Lyric function C calls as <see cref="Symbol"/>: each parameter comes in from its C
+/// form, the result goes back in its own; one that <see cref="Throws"/> answers C's
+/// <c>LyrStatus</c> and hands its result through a last pointer.</summary>
+public sealed record IrExport(FunctionId Function, string Symbol, IrCForm[] Params, IrCForm Return, bool Throws);
+
+/// <summary>std.task's functions the runtime calls for a library (<c>LyrEmbedding</c>): an
+/// export's context run to its end, a turn of the pump, the pump to the end, the thread's
+/// scheduler stopped.</summary>
+public sealed record IrEmbedding(FunctionId Run, FunctionId Step, FunctionId Pump, FunctionId End);
+
+/// <summary>The library's header beyond the runtime's API: the types' definitions in the
+/// order C needs them, and each export's declaration.</summary>
+public sealed record IrHeader(string[] Types, string[] Declarations)
+{
+    public static readonly IrHeader Empty = new([], []);
 }

@@ -60,7 +60,41 @@ public sealed record Project(string Source, string Name, string Module, string R
         : Path.Combine(OutDir, profile.Name, target.Triple, "test", BinaryName + target.ExecutableSuffix);
 
     public string BinaryName =>
-        Binary ?? (Manifest is null || Module == $"{Name}.main" ? Name : Module[(Module.LastIndexOf('.') + 1)..]);
+        Library is not null ? "lib" + Name
+        : Binary ?? (Manifest is null || Module == $"{Name}.main" ? Name : Module[(Module.LastIndexOf('.') + 1)..]);
+
+    /// <summary>For a library C links (<c>lyric build --lib</c>), which kind; <c>null</c> for a
+    /// program. Its entry is the package's root module, <c>src/lib.lyr</c>.</summary>
+    public LibraryKind? Library { get; init; }
+
+    /// <summary>The library C links, beside where the package's binaries go: <c>lib&lt;name&gt;.a</c>,
+    /// or shared — <c>lib&lt;name&gt;.so</c>, <c>lib&lt;name&gt;.dylib</c>, <c>&lt;name&gt;.dll</c>.</summary>
+    public string LibraryFile(BuildProfile profile, Target target) =>
+        Path.Combine(OutDir, profile.Name, target.Triple, Library != LibraryKind.Shared ? $"lib{Name}.a" : target.Os switch
+        {
+            TargetOs.Windows => $"{Name}.dll",
+            TargetOs.MacOs => $"lib{Name}.dylib",
+            _ => $"lib{Name}.so",
+        });
+
+    /// <summary>The library's header, <c>&lt;name&gt;.h</c>, beside it.</summary>
+    public string HeaderFile(BuildProfile profile, Target target) => Path.Combine(OutDir, profile.Name, target.Triple, $"{Name}.h");
+
+    /// <summary>The library of the package of a directory — the nearest manifest at or above it
+    /// —: its root module, <c>src/lib.lyr</c>, which may be missing. <c>null</c> where there is no
+    /// manifest.</summary>
+    /// <exception cref="ManifestException">The manifest, or one of the graph's, is refused.</exception>
+    public static Project? LibraryOf(string directory, LibraryKind kind, bool offline = false, bool locked = false)
+    {
+        if (FindManifest(Path.GetFullPath(directory)) is not { } manifestFile) return null;
+        var manifest = Manifest.Read(manifestFile);
+        var root = Path.Combine(manifest.SourceRoot, "lib.lyr");
+        return new Project(root, manifest.Name, manifest.Name, manifest.Root, manifest)
+        {
+            Graph = Resolve(manifest, offline, locked: locked),
+            Library = kind,
+        };
+    }
 
     /// <summary>Every package's source root by name, for the module loader — none for a single file,
     /// whose only module is its own.</summary>
@@ -175,13 +209,15 @@ public sealed record Project(string Source, string Name, string Module, string R
     /// <summary>The graph of <paramref name="manifest"/>'s program, read at the commits its
     /// <c>lyric.lock</c> holds; the lock is written afterwards with what the graph read —
     /// or, <paramref name="locked"/>, taken as it is and not written; not <paramref name="write"/>,
-    /// left as it is.</summary>
+    /// left as it is. The source trees are read later, by the build that needs them
+    /// (<see cref="PackageGraph.Trees"/>); the lock keeps those a manifest of the graph still names so.</summary>
     /// <exception cref="ManifestException">The graph, or the lock, is refused.</exception>
     public static PackageGraph Resolve(Manifest manifest, bool offline, Func<string, bool>? refresh = null,
         Func<Locked, bool>? keep = null, bool locked = false, bool write = true)
     {
         var lockFile = LockFile.For(manifest);
-        var held = LockFile.Read(lockFile).Where(keep ?? (_ => true)).ToList();
+        var all = LockFile.Read(lockFile).Where(keep ?? (_ => true)).ToList();
+        var held = all.Where(l => !l.IsTree).ToList();
         var git = GitCache.ForUser(offline, refresh);
         var graph = PackageGraph.Resolve(manifest, git, held, frozen: locked);
         // Each build script with dependencies of its own: a graph of its own, read
@@ -190,10 +226,18 @@ public sealed record Project(string Source, string Name, string Module, string R
         foreach (var package in graph.Packages.Values.OrderBy(p => p.Name, StringComparer.Ordinal))
             if (package.BuildScript is not null && package.BuildDependencies.Count > 0)
                 scripts[package.Name] = PackageGraph.Resolve(package.ScriptRoot(manifest), git, held, frozen: locked);
-        var entries = LockFile.Sorted(graph.Locked.Concat(scripts.Values.SelectMany(s => s.Locked)).Distinct()).ToList();
+        var owners = scripts.Values.Prepend(graph).SelectMany(g => g.Packages.Values).GroupBy(p => p.Name)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        var trees = all.Where(l => l.IsTree && owners.TryGetValue(l.Of!, out var owner)
+                                   && owner.Vendor.Any(t => t.Name == l.Name && t.Git == l.Git)).ToList();
+        var entries = LockFile.Sorted(graph.Locked.Concat(scripts.Values.SelectMany(s => s.Locked)).Distinct().Concat(trees)).ToList();
         if (locked) LockFile.RefuseChange(lockFile, entries);
         else if (write) LockFile.Write(lockFile, entries);
-        return graph with { Scripts = scripts };
+        return graph with
+        {
+            Scripts = scripts,
+            Trees = new SourceTrees(lockFile, git, Lyric5.Toolchain.UserCache.Root, offline, frozen: locked, write, trees),
+        };
     }
 
     /// <summary>The module path of a file under a package's <c>src/</c>, or <c>null</c>
@@ -240,3 +284,7 @@ public sealed record Project(string Source, string Name, string Module, string R
         return start;
     }
 }
+
+/// <summary>What <c>lyric build --lib</c> makes: an archive C links into its program, or a library
+/// the system's loader loads.</summary>
+public enum LibraryKind { Static, Shared }

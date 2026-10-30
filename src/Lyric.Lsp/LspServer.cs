@@ -75,9 +75,26 @@ public sealed class LspServer : IDisposable
     /// hears about changes behind the editor and the diagnostics of closed files go stale.</summary>
     private bool _watchedFilesSupport;
 
-    /// <summary>The id of the next request THIS side issues. Distinct from the client's ids by
-    /// construction: each side numbers its own requests.</summary>
-    private int _nextRequestId = 1;
+    /// <summary>The id of the last request THIS side issued. Distinct from the client's ids by
+    /// construction: each side numbers its own requests. Taken with <see cref="Interlocked"/>,
+    /// because a progress token is asked for from an analysis, off the read loop.</summary>
+    private int _lastRequestId;
+
+    /// <summary>Whether the client draws progress the server reports (E20).</summary>
+    private bool _workDoneProgress;
+
+    /// <summary>The number of the last progress token: each analysis reports on a token of its own.
+    /// </summary>
+    private int _progressCount;
+
+    /// <summary>The requests of this side that wait for their answer, by id: what a progress token
+    /// needs before it is used. Completed with whether the client accepted.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, TaskCompletionSource<bool>> _awaitingAnswer = new();
+
+    /// <summary>The client's requests held for a first analysis (E20), by the raw text of their id:
+    /// what <c>$/cancelRequest</c> withdraws.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CancellationTokenSource> _held =
+        new(StringComparer.Ordinal);
 
     /// <summary>Whether the client asks for an open document's diagnostics itself
     /// (<c>textDocument/diagnostic</c>), and whether it asks again when told to.</summary>
@@ -98,7 +115,8 @@ public sealed class LspServer : IDisposable
             LogAsync,
             _options.Debounce,
             _options.StdlibRoot,
-            _options.Version);
+            _options.Version,
+            BeginProgress);
     }
 
     /// <summary>
@@ -121,9 +139,10 @@ public sealed class LspServer : IDisposable
                 await HandlePayloadAsync(payload, cancellationToken).ConfigureAwait(false);
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // The host is shutting us down. Not a protocol fault.
+            // The host is shutting us down. Not a protocol fault. A cancellation from anywhere else
+            // is a fault of the server and leaves as one, rather than as a client that went away.
         }
         catch (LspProtocolException exception)
         {
@@ -154,9 +173,12 @@ public sealed class LspServer : IDisposable
 
         if (message is not null && message.IsResponse)
         {
-            // The answer to a request this side sent — the watch registration is the only one.
-            // Nothing waits on it; a refusal is only worth a line in the log, because the server
-            // works without the watches, just with staler answers about closed files.
+            // The answer to a request this side sent. The watch registration and the refresh wait
+            // for nothing; a progress token's reports wait for its answer. A refusal is only worth a
+            // line in the log: the server works without any of them.
+            if (message.Id is { ValueKind: JsonValueKind.Number } answered && answered.TryGetInt32(out var number)
+                && _awaitingAnswer.TryRemove(number, out var waiting))
+                waiting.TrySetResult(message.Error is null);
             if (message.Error is { } error)
                 await SafeLogAsync($"the client refused a request: {error.Message}")
                     .ConfigureAwait(false);
@@ -198,6 +220,7 @@ public sealed class LspServer : IDisposable
                     capabilities?.Workspace?.DidChangeWatchedFiles?.DynamicRegistration ?? false;
                 _pullDiagnostics = client?.Diagnostic is { ValueKind: JsonValueKind.Object };
                 _diagnosticRefresh = capabilities?.Workspace?.Diagnostics?.RefreshSupport ?? false;
+                _workDoneProgress = capabilities?.Window?.WorkDoneProgress ?? false;
 
                 await SendResultAsync(id, BuildInitializeResult(),
                     LspJson.Default.InitializeResult, cancellationToken).ConfigureAwait(false);
@@ -209,6 +232,7 @@ public sealed class LspServer : IDisposable
                 return;
 
             case LspMethods.Hover when _state == State.Running:
+                if (HoldUntilAnalysed(message, id)) return;
                 await SendHoverAsync(message, id, cancellationToken).ConfigureAwait(false);
                 return;
 
@@ -353,9 +377,14 @@ public sealed class LspServer : IDisposable
                 return;
 
             case LspMethods.CancelRequest:
-                // Accepted and ignored, deliberately: this server has no long-running REQUEST to
-                // cancel. Diagnostics are pushed rather than asked for, and their staleness is
-                // handled by the version guard in AnalysisService instead.
+                // Only a request held for a first analysis is still unanswered when its withdrawal
+                // arrives; every other one was answered before the next message was read.
+                if (LspJson.ReadParams(message.Params, LspJson.Default.CancelParams) is { } cancel
+                    && _held.TryRemove(cancel.Id.GetRawText(), out var held))
+                {
+                    try { held.Cancel(); }
+                    catch (ObjectDisposedException) { /* answered meanwhile */ }
+                }
                 return;
 
             default:
@@ -442,8 +471,8 @@ public sealed class LspServer : IDisposable
     /// Asks the client to watch what the analysis reads from disk: the sources, and the project
     /// file that says what belongs together.
     ///
-    /// <para>A REQUEST, the only one this server sends. The response carries nothing; it is read
-    /// only so a refusal lands in the log rather than nowhere.</para>
+    /// <para>A REQUEST, like the refresh and a progress token. The response carries nothing; it is
+    /// read only so a refusal lands in the log rather than nowhere.</para>
     /// </summary>
     private Task RegisterFileWatchesAsync(CancellationToken cancellationToken)
     {
@@ -470,10 +499,136 @@ public sealed class LspServer : IDisposable
 
         return SendAsync(new JsonRpcRequest
         {
-            Id = _nextRequestId++,
+            Id = Interlocked.Increment(ref _lastRequestId),
             Method = LspMethods.RegisterCapability,
             Params = LspJson.ToElement(registration, LspJson.Default.RegistrationParams),
         }, LspJson.Default.JsonRpcRequest, cancellationToken);
+    }
+
+    /// <summary>
+    /// Holds a hover on an open file that has no analysis yet until its first one (E20), and
+    /// answers it off the read loop, which must go on reading: the edit that makes the analysis
+    /// obsolete may be the next message. Answered at once, the hover would be null, which reads as
+    /// "nothing here" — and a client does not ask again.
+    /// </summary>
+    private bool HoldUntilAnalysed(JsonRpcMessage message, JsonElement id)
+    {
+        if (LspJson.ReadParams(message.Params, LspJson.Default.TextDocumentPositionParams) is not { } parameters
+            || !DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
+            || _documents.ByPath(path) is null
+            || _analysis.LastGood(path) is not null)
+            return false;
+
+        var key = id.GetRawText();
+        var cancel = new CancellationTokenSource();
+        _held[key] = cancel;
+        _ = AnswerWhenAnalysedAsync(message, id, path, key, cancel);
+        return true;
+    }
+
+    private async Task AnswerWhenAnalysedAsync(
+        JsonRpcMessage message, JsonElement id, string path, string key, CancellationTokenSource cancel)
+    {
+        try
+        {
+            await _analysis.FirstAsync(path, cancel.Token).ConfigureAwait(false);
+            await SendHoverAsync(message, id, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+        {
+            await SafeSendAsync(() => SendErrorAsync(id, JsonRpcErrorCodes.RequestCancelled,
+                "the client withdrew the request", CancellationToken.None)).ConfigureAwait(false);
+        }
+        catch
+        {
+            // The connection is gone; there is no one left to answer.
+        }
+        finally
+        {
+            _held.TryRemove(key, out _);
+            cancel.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Shows that an analysis runs (E20), where the client draws progress: a token the client is
+    /// asked to create, then <c>begin</c>, and <c>end</c> when the returned handle is disposed.
+    /// <c>null</c> for a client that draws none.
+    ///
+    /// <para>Never awaited by the analysis. A token is the client's once it answered the create
+    /// request, and the answer arrives on the read loop — which may itself be waiting on this very
+    /// analysis (a pull). The messages go out in order on a task of their own.</para>
+    /// </summary>
+    private IDisposable? BeginProgress(string what)
+    {
+        if (!_workDoneProgress || _state != State.Running) return null;
+
+        var token = $"lyric/analysis/{Interlocked.Increment(ref _progressCount)}";
+        var id = Interlocked.Increment(ref _lastRequestId);
+        var created = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _awaitingAnswer[id] = created;
+
+        var begun = Task.Run(async () =>
+        {
+            await SendAsync(new JsonRpcRequest
+            {
+                Id = id,
+                Method = LspMethods.WorkDoneProgressCreate,
+                Params = LspJson.ToElement(new WorkDoneProgressCreateParams { Token = token },
+                    LspJson.Default.WorkDoneProgressCreateParams),
+            }, LspJson.Default.JsonRpcRequest, CancellationToken.None).ConfigureAwait(false);
+
+            if (!await created.Task.ConfigureAwait(false)) return false;
+
+            await SendProgressAsync(token, LspJson.ToElement(
+                new WorkDoneProgressBegin { Title = "Analysing", Message = what },
+                LspJson.Default.WorkDoneProgressBegin)).ConfigureAwait(false);
+            return true;
+        });
+
+        return new ProgressHandle(() => _ = EndProgressAsync(begun, token));
+    }
+
+    private async Task EndProgressAsync(Task<bool> begun, string token)
+    {
+        try
+        {
+            if (await begun.ConfigureAwait(false))
+                await SendProgressAsync(token, LspJson.ToElement(new WorkDoneProgressEnd(),
+                    LspJson.Default.WorkDoneProgressEnd)).ConfigureAwait(false);
+        }
+        catch
+        {
+            // The connection is gone, and with it the bar.
+        }
+    }
+
+    private Task SendProgressAsync(string token, JsonElement value) =>
+        SendNotificationAsync(LspMethods.Progress,
+            LspJson.ToElement(new ProgressParams { Token = token, Value = value }, LspJson.Default.ProgressParams),
+            CancellationToken.None);
+
+    private static async Task SafeSendAsync(Func<Task> send)
+    {
+        try
+        {
+            await send().ConfigureAwait(false);
+        }
+        catch
+        {
+            // The connection is gone; there is no one left to answer.
+        }
+    }
+
+    /// <summary>Ends a progress report once, when the analysis it stands for ends.</summary>
+    private sealed class ProgressHandle(Action end) : IDisposable
+    {
+        private int _ended;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _ended, 1) == 0) end();
+        }
     }
 
     /// <summary>
@@ -1128,7 +1283,7 @@ public sealed class LspServer : IDisposable
             return;
         }
         if (_diagnosticRefresh)
-            await SendAsync(new JsonRpcRequest { Id = _nextRequestId++, Method = LspMethods.DiagnosticRefresh },
+            await SendAsync(new JsonRpcRequest { Id = Interlocked.Increment(ref _lastRequestId), Method = LspMethods.DiagnosticRefresh },
                 LspJson.Default.JsonRpcRequest, cancellationToken).ConfigureAwait(false);
     }
 
@@ -1231,7 +1386,31 @@ public sealed class LspServer : IDisposable
         var uri = parameters.TextDocument.Uri;
         if (_documents.ByUri(uri) is { } document
             && !(_lastDiagnostics.TryGetValue(uri, out var said) && said.Version == document.Version))
-            await _analysis.AnalyzeAsync(document, cancellationToken).ConfigureAwait(false);
+        {
+            try
+            {
+                await _analysis.AnalyzeAsync(document, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // A newer run of the same package withdrew this one — the open's own, after its
+                // debounce, is the usual one. What it finds is not known yet; the client asks again.
+                await SendAsync(
+                    new JsonRpcFailure
+                    {
+                        Id = id,
+                        Error = new JsonRpcError
+                        {
+                            Code = JsonRpcErrorCodes.ServerCancelled,
+                            Message = "a newer analysis of the package replaced this one",
+                            Data = LspJson.ToElement(new DiagnosticServerCancellationData { RetriggerRequest = true },
+                                LspJson.Default.DiagnosticServerCancellationData),
+                        },
+                    },
+                    LspJson.Default.JsonRpcFailure, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+        }
 
         var items = _lastDiagnostics.TryGetValue(uri, out var known) ? known.Diagnostics : [];
         await SendResultAsync(id, new FullDocumentDiagnosticReport { Items = items },
@@ -1283,6 +1462,11 @@ public sealed class LspServer : IDisposable
     public void Dispose()
     {
         _analysis.Dispose();
+        foreach (var held in _held.Values)
+        {
+            try { held.Cancel(); }
+            catch (ObjectDisposedException) { /* answered meanwhile */ }
+        }
         _connection.Dispose();
     }
 }

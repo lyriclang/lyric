@@ -45,6 +45,10 @@ public sealed record PackageGraph(Manifest Root, IReadOnlyDictionary<string, Man
     /// <summary>The revision each package read from git is, by name — the chosen one.</summary>
     public IReadOnlyDictionary<string, Locked> Revisions { get; init; } = new Dictionary<string, Locked>();
 
+    /// <summary>The packages' source trees, read where a build needs them; <c>null</c> for a graph
+    /// read without a lock — none of its trees can be read.</summary>
+    public SourceTrees? Trees { get; init; }
+
     /// <summary>One source of a package, as read: where from, and what was found there.</summary>
     private sealed record Node(Dependency At, Manifest Manifest, Locked? Revision);
 

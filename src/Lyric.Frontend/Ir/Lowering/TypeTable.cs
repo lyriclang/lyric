@@ -1105,6 +1105,9 @@ internal sealed class TypeTable
         // A coroutine is the runtime's object around a body: what it yields, what it returns.
         CoroutineOf c => new IrCoroutineType(Lower(c.Yield, span), Lower(c.Result, span)),
 
+        // a C function's pointer is an address, as C holds it
+        FnType { IsC: true } => new IrScalarType(IrScalar.U64),
+
         FnType f => new IrFunctionType(
             f.Parameters.Select((p, i) => f.PlaceAt(i) ? new IrPlaceType(LowerValue(p, span)) : LowerValue(p, span)).ToArray(),
             Lower(f.Return, span)),
@@ -1190,6 +1193,10 @@ internal sealed class TypeTable
         // '(A, B)' — a tuple written as a field, parameter or return type.
         if (node is AST.TupleType written)
             return TupleOf(written.Elements.Select(e => ValueOf(Lower(e, e.Span))).ToArray());
+
+        // 'extern "C" fn(A) -> R': the address of a C function, as C holds it.
+        if (node is FunctionType { Abi: not null })
+            return new IrScalarType(IrScalar.U64);
 
         // 'fn(A, B) -> R' — written in parameter and return positions. It needs no table entry: the type
         // carries its signature itself.
@@ -1555,6 +1562,7 @@ internal sealed class TypeTable
                 Resolve(fn.ReturnType, span))
             {
                 Places = fn.Places,
+                IsC = fn.Abi is not null,
                 Throws = fn.Throws is not { } thrown ? []
                     : thrown.Types.Length > 0 ? TypeChecker.ThrownAfter(thrown.Types.Select(t => Resolve(t, span)))
                     : Compilation.FindModule(["std", "core"])?.Members.LookupLocal("Error") is TypeSymbol root ? [new NamedRef(root)] : [],

@@ -1,0 +1,105 @@
+// A C library bound from Lyric: native/geometry.c, compiled into the program as the package's
+// native part — a struct by value and behind a pointer, strings both ways, a callback with its
+// state, a handle C owns. Then a shared library loaded while the program runs, its path the
+// first argument: plugin/plugin.c, built apart (see there).
+import std.io { println };
+import std.ffi { Ptr, CStr, Callback, Library, alloc, free };
+import std.os { args };
+
+@Layout(C)
+struct Vec {
+    x: float,
+    y: float,
+}
+
+extern "C" {
+    fn vec_length(v: Vec): float;
+    fn vec_scale(v: Ptr<Vec>, k: float): void;
+    fn vec_label(name: CStr, v: Vec): CStr;
+    fn each_corner(w: float, h: float, f: extern "C" fn(Ptr<void>, float, float) -> void, userdata: Ptr<void>): void;
+    fn path_new(): Ptr<void>;
+    fn path_add(p: Ptr<void>, x: float, y: float): void;
+    fn path_length(p: Ptr<void>): float;
+    fn path_free(p: Ptr<void>): void;
+}
+
+/// A path C keeps: the handle in a Lyric object, given back once.
+class Path :: [Closeable] {
+    handle: Ptr<void>,
+    var closed: bool = false,
+
+    static fn new(): Path {
+        return Path { handle = path_new() };
+    }
+
+    fn add(x: float, y: float): void {
+        path_add(this.handle, x, y);
+    }
+
+    fn length(): float {
+        return path_length(this.handle);
+    }
+
+    fn close(): void {
+        // through the reference: 'Closeable.close' is not a 'mut fn'
+        let me = this;
+        if (!me.closed) {
+            me.closed = true;
+            path_free(me.handle);
+        }
+    }
+}
+
+fn main(): void throws Error {
+    // a struct by value, and through a pointer C writes
+    let v = Vec { x = 3.0, y = 4.0 };
+    println(f"length {vec_length(v)}");
+    unsafe {
+        let p = alloc<Vec>(1);
+        p.write(v);
+        vec_scale(p, 2.0);
+        let scaled = p.read();
+        free(p);
+        // a string in, C's string back
+        println(try vec_label("scaled", scaled).toString());
+    }
+
+    // a callback with its state: the closure counts and sums what C hands it
+    var corners = 0;
+    var sum = 0.0;
+    let visit = Callback<extern "C" fn(Ptr<void>, float, float) -> void>.new((x, y) => {
+        corners += 1;
+        sum += x + y;
+    });
+    each_corner(2.0, 1.0, visit.function, visit.userdata);
+    visit.release();
+    println(f"corners {corners}, coordinates summed {sum}");
+
+    // a handle C owns, closed at the end of its block
+    {
+        using let path = Path.new();
+        path.add(0.0, 0.0);
+        path.add(3.0, 4.0);
+        path.add(3.0, 0.0);
+        println(f"path {path.length()}");
+    }
+
+    // a shared library loaded now
+    let given = args();
+    if (given.length() < 2) {
+        println("no plugin given");
+        return;
+    }
+    using let plugin = try Library.open(given[1]);
+    if (let name = plugin.symbol<extern "C" fn() -> CStr>("plugin_name")) {
+        if (let apply = plugin.symbol<extern "C" fn(int) -> int>("plugin_apply")) {
+            println(f"plugin {try name().toString()}: 14 -> {apply(14)}");
+        }
+    }
+    println(f"plugin_missing found: {plugin.symbol<extern "C" fn() -> void>("plugin_missing") != null}");
+    try {
+        let _ = Library.open("no-such-library");
+    } catch (_: Error) {
+        println("no-such-library: not loaded");
+    }
+}

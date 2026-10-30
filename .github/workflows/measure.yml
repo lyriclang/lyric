@@ -1,0 +1,108 @@
+# Measurements the plan asks for before a decision (design/v5/spec/13, M15 S8), run by hand or by
+# pushing a branch 'measure/…' (a workflow runs by hand only once it is on main): what they print
+# is the record, and nothing here fails a build. Each job says what it found in the run's summary.
+name: Measure
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['measure/**']
+
+permissions:
+  contents: read
+
+jobs:
+  # Open point 286: LLVM's lldb-dap.exe on the Windows runner printed nothing for --version, and
+  # 'lyric dap' ended before it answered. The exit code says why a process does not start
+  # (0xC0000135: a DLL it links is not found), and the DLLs it links say which one.
+  lldb-dap-windows:
+    name: lldb-dap.exe on Windows
+    runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - name: Start lldb-dap.exe and list what it links
+        shell: pwsh
+        run: |
+          $llvm = 'C:\Program Files\LLVM\bin'
+          $dap = Join-Path $llvm 'lldb-dap.exe'
+          $lines = @()
+          if (-not (Test-Path $dap)) { $lines += "lldb-dap.exe: not at $dap" }
+          else {
+            $lines += "lldb-dap.exe: $dap"
+            $lines += "clang: $((& (Join-Path $llvm 'clang.exe') --version | Select-Object -First 1))"
+            $started = Start-Process -FilePath $dap -ArgumentList '--version' -Wait -PassThru -NoNewWindow -RedirectStandardOutput out.txt -RedirectStandardError err.txt
+            $lines += ('exit: {0} (0x{1:X8})' -f $started.ExitCode, $started.ExitCode)
+            $lines += "stdout: $(Get-Content out.txt -Raw)"
+            $lines += "stderr: $(Get-Content err.txt -Raw)"
+            foreach ($binary in @($dap, (Join-Path $llvm 'liblldb.dll'))) {
+              if (-not (Test-Path $binary)) { $lines += "$binary`: not there"; continue }
+              $lines += "links of $(Split-Path $binary -Leaf):"
+              foreach ($dll in (& (Join-Path $llvm 'llvm-objdump.exe') -p $binary | Select-String 'DLL Name: (.+)$' | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() })) {
+                $found = Get-Command $dll -ErrorAction SilentlyContinue | Select-Object -First 1
+                $beside = Test-Path (Join-Path $llvm $dll)
+                $lines += "  $dll -> $(if ($beside) { 'beside it' } elseif ($found) { $found.Source } else { 'NOT FOUND' })"
+              }
+            }
+            $lines += "python on the PATH: $((Get-Command python -ErrorAction SilentlyContinue).Source)"
+          }
+          $lines | ForEach-Object { Write-Output $_ }
+          "## lldb-dap.exe on Windows`n``````text`n$($lines -join "`n")`n``````" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: The Python LLVM 20's lldb links
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.10'
+
+      - name: Start lldb-dap.exe again, with that Python on the PATH
+        shell: pwsh
+        run: |
+          $dap = 'C:\Program Files\LLVM\bin\lldb-dap.exe'
+          $started = Start-Process -FilePath $dap -ArgumentList '--version' -Wait -PassThru -NoNewWindow -RedirectStandardOutput out.txt -RedirectStandardError err.txt
+          $lines = @("python: $((Get-Command python).Source)", ('exit: {0} (0x{1:X8})' -f $started.ExitCode, $started.ExitCode), "stdout: $(Get-Content out.txt -Raw)", "stderr: $(Get-Content err.txt -Raw)")
+          # an embedded Python that does not find its standard library ends at once (0xC0000409)
+          $env:PYTHONHOME = $env:pythonLocation
+          $started = Start-Process -FilePath $dap -ArgumentList '--version' -Wait -PassThru -NoNewWindow -RedirectStandardOutput out2.txt -RedirectStandardError err2.txt
+          $lines += @("with PYTHONHOME=$env:PYTHONHOME", ('exit: {0} (0x{1:X8})' -f $started.ExitCode, $started.ExitCode), "stdout: $(Get-Content out2.txt -Raw)", "stderr: $(Get-Content err2.txt -Raw)")
+          $lines | ForEach-Object { Write-Output $_ }
+          "## with Python 3.10`n``````text`n$($lines -join "`n")`n``````" >> $env:GITHUB_STEP_SUMMARY
+
+  # 11 N7: Objective-C sources (.m) in a package's native part on macOS, through the toolchain's
+  # C compiler. Measured: whether zig cc compiles one against Foundation and the program runs.
+  objective-c-macos:
+    name: Objective-C with zig cc on macOS
+    runs-on: macos-latest
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up zig
+        uses: ./.github/actions/setup-zig
+        with:
+          cache: 'false'
+
+      - name: Compile and run a .m with zig cc
+        shell: bash
+        run: |
+          cat > hello.m <<'M'
+          #import <Foundation/Foundation.h>
+
+          int main(void) {
+              @autoreleasepool {
+                  NSString *text = [NSString stringWithFormat:@"objective-c %d", 42];
+                  printf("%s\n", [text UTF8String]);
+              }
+              return 0;
+          }
+          M
+          {
+            echo "zig: $(zig version)"
+            echo "sdk: $(xcrun --show-sdk-path 2>&1)"
+            for flags in "" "-fobjc-arc"; do
+              echo "--- zig cc $flags -framework Foundation"
+              if zig cc $flags hello.m -framework Foundation -o hello 2>&1; then echo "compiled"; ./hello 2>&1; echo "exit $?"; else echo "did not compile"; fi
+            done
+          } | tee result.txt
+          { echo '## Objective-C with zig cc on macOS'; echo '```text'; cat result.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

@@ -27,7 +27,9 @@
 //! ```output
 //! 5
 //! ```
-import std.core { Utf8Error };
+import std.core { Utf8Error, dataAddress, sliceAddress };
+import std.task { stashForeign, takeForeign };
+import std.io { IoError };
 
 /// A pointer to a `T` in memory C manages, never null: `T *` where a C function takes or returns
 /// one.
@@ -59,6 +61,113 @@ pub struct Ptr<T> {
     pub fn cast<U>(): Ptr<U> {
         return Ptr<U> { address = this.address };
     }
+}
+
+/// A Lyric closure C calls, with its state: C's `void *userdata` beside a function pointer.
+///
+/// `C` is the C function's type as C calls it, `extern "C" fn(…) -> T`; its first or its last
+/// parameter is the `Ptr<void>` that C hands back, and the closure takes the others —
+/// `Callback<extern "C" fn(Ptr<void>, int) -> void>.new((event) => { seen += event; })`, handed
+/// to C as `on_event(cb.function, cb.userdata)`.
+///
+/// The closure stays alive until [Callback.release] — C may call it as long. C calls it on the
+/// thread Lyric runs on, as any function C calls; one that returns nothing may be called on a
+/// thread of C's own too, and goes to the thread that made it, which runs it in its scheduler's
+/// next turn — with what C passed, while C's thread goes on.
+pub class Callback<C> {
+    /// The pointer C calls: it finds the closure through [Callback.userdata].
+    pub function: C,
+    /// What C hands back to [Callback.function]: the closure's handle.
+    pub userdata: Ptr<void>,
+    root: uint,
+    var released: bool = false,
+
+    /// Returns the callback for the closure it is given, a function of the parameters of `C` but
+    /// its userdata. The compiler writes the function C calls; this body never runs.
+    pub static fn new(_closure: C): Callback<C> {
+        unreachable("std.ffi's Callback.new is the compiler's");
+    }
+
+    /// Lets the closure go: after it C must not call [Callback.function] again.
+    ///
+    /// # Panics
+    /// Where the callback was released already.
+    pub mut fn release(): void {
+        if (this.released) {
+            panic("a Callback released twice: C may still hold it, and the closure is gone");
+        }
+        this.released = true;
+        lyr_ffi_callback_release(this.root);
+    }
+}
+
+/// An object of a class held for C: the collector keeps it while the handle does, and
+/// [GcHandle.asPtr] is the `void *` C keeps and hands back — the userdata of a C API that holds
+/// a Lyric object across its calls.
+///
+/// A handle made again from that pointer, with [GcHandle.from], reads the same object; one
+/// [GcHandle.release] lets it go, after which no handle of it is read again.
+pub class GcHandle<T> {
+    root: uint,
+    var released: bool = false,
+
+    /// Returns a handle that holds `object` until [GcHandle.release].
+    pub static fn pin(object: T): GcHandle<T> {
+        return GcHandle<T> { root = rootObject(object) };
+    }
+
+    /// Returns the handle a pointer [GcHandle.asPtr] gave stands for. Unsafe: the pointer must be
+    /// a handle's that is not released.
+    ///
+    /// # Panics
+    /// Where it holds an object of another class than `T` — when it is read.
+    pub static fn from(pointer: Ptr<void>): GcHandle<T> {
+        return GcHandle<T> { root = pointer.address };
+    }
+
+    /// Returns the object it holds.
+    ///
+    /// # Panics
+    /// Where this handle was released.
+    pub fn get(): T {
+        if (this.released) {
+            panic("a GcHandle read after its release");
+        }
+        return rootedObject<T>(this.root);
+    }
+
+    /// Returns the pointer C keeps for it: the same for every handle of the object.
+    pub fn asPtr(): Ptr<void> {
+        return Ptr<void> { address = this.root };
+    }
+
+    /// Lets the object go: the collector may take it once nothing else holds it.
+    ///
+    /// # Panics
+    /// Where this handle was released already.
+    pub mut fn release(): void {
+        if (this.released) {
+            panic("a GcHandle released twice");
+        }
+        this.released = true;
+        lyr_ffi_closure_release(this.root);
+    }
+}
+
+/// Keeps `e` for the code around the C call that called this function: a function C calls
+/// throws nothing, since C would not know what to do with it, and this is how its error crosses.
+/// The code that called C takes it with [takeStashed] when C returns.
+///
+/// One error waits at a time, the running task's: a second, before the first is taken, is
+/// dropped — the first went wrong first.
+pub fn stash(e: Error): void {
+    stashForeign(e);
+}
+
+/// Returns the error a function C called kept with [stash], and forgets it; `null` where none
+/// waits.
+pub fn takeStashed(): ?Error {
+    return takeForeign();
 }
 
 /// Returns `count` values of `T` from C's heap, each set to zero — what C's `calloc` gives, to
@@ -111,13 +220,74 @@ fn sizeOf<T>(): uint {
 }
 
 @Allow("unused")
-fn dataAddress<T>(xs: T[]): uint {
-    unreachable("std.ffi's dataAddress is the compiler's");
+fn rootObject<T>(object: T): uint {
+    unreachable("std.ffi's rootObject is the compiler's");
 }
 
 @Allow("unused")
-fn sliceAddress<T>(xs: Slice<T>): uint {
-    unreachable("std.ffi's sliceAddress is the compiler's");
+fn rootedObject<T>(root: uint): T {
+    unreachable("std.ffi's rootedObject is the compiler's");
+}
+
+/// A shared library loaded while the program runs — a `.so`, `.dylib` or `.dll` — and the C
+/// functions in it, found by their names.
+///
+/// `let lib = try Library.open("libm.so.6");`, then
+/// `lib.symbol<extern "C" fn(float) -> float>("cos")` is the function `cos` as a value C's type
+/// says, `null` where the library has no such symbol. The type is the program's word: the loader
+/// knows a name, not a signature. A function of the library is called while the library is open;
+/// [Library.close] gives it back.
+pub class Library :: [Closeable] {
+    handle: uint,
+    var closed: bool = false,
+
+    /// Loads the library at `path`; a name without a directory goes where the system's loader
+    /// looks.
+    ///
+    /// # Errors
+    /// Throws [IoError] with the path and the loader's words where it cannot load it.
+    pub static fn open(path: string): Library throws IoError {
+        let handle = lyr_ffi_library_open(path);
+        if (handle == 0) {
+            throw IoError {
+                kind = .NotFound,
+                path = path,
+                detail = lyr_ffi_library_error(),
+                inner = null,
+            };
+        }
+        return Library { handle = handle };
+    }
+
+    /// Returns the C function `name` of the library as a value of `F`, a C function's type
+    /// (`extern "C" fn(…) -> …`); `null` where the library has no such symbol. The compiler reads
+    /// the address; this body never runs.
+    ///
+    /// # Panics
+    /// Where the library was closed.
+    pub fn symbol<F>(_name: string): ?F {
+        unreachable("std.ffi's Library.symbol is the compiler's");
+    }
+
+    /// The address of the symbol `name`, null where there is none: what [Library.symbol] is.
+    fn address(name: string): ?uint {
+        if (this.closed) {
+            panic(f"the symbol '{name}' of a library closed already");
+        }
+        let at = lyr_ffi_library_symbol(this.handle, name);
+        return if (at == 0) null else at;
+    }
+
+    /// Gives the library back to the system; its functions are not called again. A second close
+    /// does nothing.
+    pub fn close(): void {
+        // through the reference: 'Closeable.close' is not a 'mut fn'
+        let me = this;
+        if (!me.closed) {
+            me.closed = true;
+            lyr_ffi_library_close(me.handle);
+        }
+    }
 }
 
 /// A C string: the address of bytes a NUL ends, `const char *` at a C function's boundary.
@@ -160,3 +330,9 @@ extern "C" fn lyr_ffi_cstr_string(address: uint): string;
 extern "C" fn lyr_ffi_string_address(s: string): uint;
 extern "C" fn lyr_ffi_alloc(count: int, size: uint): uint;
 extern "C" fn lyr_ffi_free(address: uint): void;
+extern "C" fn lyr_ffi_library_open(path: string): uint;
+extern "C" fn lyr_ffi_library_error(): string;
+extern "C" fn lyr_ffi_library_symbol(handle: uint, name: string): uint;
+extern "C" fn lyr_ffi_library_close(handle: uint): void;
+extern "C" fn lyr_ffi_closure_release(root: uint): void;
+extern "C" fn lyr_ffi_callback_release(root: uint): void;

@@ -1,10 +1,10 @@
 //! The build script's view of its build.
 //!
 //! A package's `build.lyr` is an ordinary program that `lyric5` runs before it compiles the
-//! package: it does things — writes modules into `gen/`, names C to compile and libraries to
-//! link — and defines nothing. What it asks of the toolchain goes back as directives, a line
-//! each, into the file the toolchain names; what the build is comes from the environment the
-//! toolchain sets.
+//! package: it does things — writes modules into `gen/`, names C to compile, libraries to link
+//! and where to find them, and files to put beside the program — and defines nothing. What it
+//! asks of the toolchain goes back as directives, a line each, into the file the toolchain names;
+//! what the build is comes from the environment the toolchain sets.
 //!
 //! # Panics
 //!
@@ -16,19 +16,70 @@
 //! ```lyric,no_run
 //! import std.build;
 //!
-//! build.compileC("native/fast.c");
+//! build.cLibrary("fast").sources("native/fast.c").define("LEVEL", "2").flags("-O3").compile();
 //! build.linkLib("m");
+//! if (build.target().os == .MacOS) {
+//!     build.linkFramework("Accelerate");
+//! }
 //! build.rerunIfChanged("native/fast.c");
 //! ```
+//!
+//! A library from an SDK outside the package — SDL3 on Windows, its directory in `SDL3_DIR` —
+//! is linked from where the SDK lies, and its DLL goes beside the program:
+//!
+//! ```lyric,no_run
+//! import std.build;
+//! import std.os;
+//!
+//! build.rerunIfEnvChanged("SDL3_DIR");
+//! if (let sdk = os.env("SDL3_DIR")) {
+//!     build.linkSearch(f"{sdk}/x86_64-w64-mingw32/lib");
+//!     build.linkLib("SDL3");
+//!     build.besideBinary(f"{sdk}/x86_64-w64-mingw32/bin/SDL3.dll");
+//! } else {
+//!     build.warn("set SDL3_DIR to the SDL3 SDK");
+//! }
+//! ```
+import std.collections { List };
+import std.core { Arch, Platform };
 import std.fs;
 import std.io { IoError };
 import std.os;
 
-/// Returns the target triple the package is built for, such as `x86_64-linux-gnu`.
+/// What a package is built for: its triple, such as `x86_64-linux-gnu`, its system and its machine
+/// as the prelude names them, and whether it is the machine the script runs on.
+pub struct BuildTarget :: [Equatable, Debug] {
+    pub triple: string,
+    pub os: Platform,
+    pub arch: Arch,
+    pub isHost: bool,
+}
+
+/// Returns the target the package is built for: `build.target().os == .Windows`.
 ///
-/// The script itself runs on the host.
-pub fn target(): string {
-    return given("LYRIC_BUILD_TARGET");
+/// The script itself runs on the host; `isHost` says whether the build is for it too.
+pub fn target(): BuildTarget {
+    let triple = given("LYRIC_BUILD_TARGET");
+    var os: Platform = .Other;
+    if (triple.contains("-windows")) {
+        os = .Windows;
+    } else if (triple.contains("-macos")) {
+        os = .MacOS;
+    } else if (triple.contains("-linux")) {
+        os = .Linux;
+    }
+    var arch: Arch = .Other;
+    if (triple.startsWith("x86_64-")) {
+        arch = .X86_64;
+    } else if (triple.startsWith("aarch64-")) {
+        arch = .Aarch64;
+    }
+    return BuildTarget {
+        triple = triple,
+        os = os,
+        arch = arch,
+        isHost = triple == given("LYRIC_BUILD_HOST"),
+    };
 }
 
 /// Returns the profile the package is built in: `debug`, `release`, or one of the manifest's.
@@ -59,26 +110,164 @@ pub fn rerunIfChanged(paths: string...): void {
     }
 }
 
+/// Asks the toolchain to run the script again when one of these environment variables has another
+/// value than in the script's last run, or is set where it was not, or not where it was.
+///
+/// A script that reads where a library lies from the environment names the variable here: else
+/// a changed value keeps what the last run asked.
+pub fn rerunIfEnvChanged(names: string...): void {
+    for (i in 0..names.length()) {
+        direct("rerun-if-env-changed", names[i]);
+    }
+}
+
 /// Links the C library `name` into the program: `linkLib("m")` is `-lm`.
 pub fn linkLib(name: string): void {
     direct("link-lib", name);
 }
 
-/// Adds flags for the C sources this script names with [compileC]:
-/// `cFlags("-DLEVEL=2", "-Iinclude")`.
-pub fn cFlags(flags: string...): void {
-    for (i in 0..flags.length()) {
-        direct("c-flag", flags[i]);
+/// Adds a directory the link searches for the libraries of [linkLib] and of `[native]`, before the
+/// linker's own: `linkSearch("C:/Libs/SDL3/x86_64-w64-mingw32/lib")` is `-L` with it.
+///
+/// The path is relative to the package's root, or absolute. The directory is never written into
+/// the binary: a shared library found there is found again when the program starts where the
+/// system looks, or beside the program — name it with [besideBinary]. For a Windows target a
+/// MinGW SDK's import library `libX.dll.a` is found as well.
+pub fn linkSearch(dir: string): void {
+    direct("link-search", dir);
+}
+
+/// Puts files beside every binary the build makes of the program — of `build`, `run`, `test` and
+/// `bench`, and a library `--lib` makes — when it has linked it: a shared library the program
+/// loads when it starts, most of all. Such a binary searches its own directory for shared
+/// libraries first. A file is copied only where the bytes beside the binary differ.
+///
+/// The paths are relative to the package's root, or absolute. A file that is not there when the
+/// script has ended, and two files of one name, stop the build (`LYR-BLD0006`).
+pub fn besideBinary(paths: string...): void {
+    for (i in 0..paths.length()) {
+        direct("beside-binary", paths[i]);
     }
 }
 
-/// Compiles C sources with the program and links them into it.
+/// Links a prebuilt static library by its path, as `[native]`'s `archives` does: a path of the
+/// package, or of a source tree (`@name/…`).
+pub fn linkArchive(path: string): void {
+    direct("link-archive", path);
+}
+
+/// Links the macOS framework `name`, as `[native.macos]`'s `frameworks` does: `-framework Cocoa`.
 ///
-/// The paths are relative to the package's root.
-pub fn compileC(sources: string...): void {
-    for (i in 0..sources.length()) {
-        direct("compile-c", sources[i]);
+/// A framework comes from the macOS SDK: a build for macOS from another system stops (`LYR-BLD0004`).
+pub fn linkFramework(name: string): void {
+    direct("link-framework", name);
+}
+
+/// Links a library of the system as `pkg-config` knows it, as `[native]`'s `pkgConfig` does: its
+/// include directories and definitions go to the package's C sources, the rest to the link.
+///
+/// The system is the host's: a build for another target stops (`LYR-BLD0004`).
+pub fn pkgConfig(name: string): void {
+    direct("pkg-config", name);
+}
+
+/// Returns the directory of the package's source tree `name` (`[native.vendor]`), fetched where it
+/// is not yet.
+///
+/// The tree is read when the script asks for it: the script stops, the build fetches the tree, and
+/// the script runs again from its start with the tree there — so a script that asks for a tree
+/// asks before it does anything it would not do twice.
+pub fn vendorDir(name: string): string {
+    if (let dir = os.env(f"LYRIC_BUILD_VENDOR_{name.toUpper().replace("-", "_")}")) {
+        return dir;
     }
+    direct("vendor-dir", name);
+    os.exit(75);
+}
+
+/// Returns a C library this script compiles with the program: its sources, its include
+/// directories, its definitions and its own flags, added by [CLibrary.compile].
+///
+/// `build.cLibrary("lua").sources("@lua/src/*.c").include("@lua/src").define("LUA_USE_POSIX").compile();`
+pub fn cLibrary(name: string): CLibrary {
+    return CLibrary { name = name };
+}
+
+/// A C library a build script compiles with the program (see [cLibrary]). Its sources see the
+/// package's `include`, `<lyric.h>`, the `include` of the packages it declares, and its own
+/// [CLibrary.include]; its definitions and flags are its own, no other source's.
+pub class CLibrary {
+    name: string,
+    var sourceList: List<string> = List.new(),
+    var includeList: List<string> = List.new(),
+    var defineList: List<string> = List.new(),
+    var flagList: List<string> = List.new(),
+
+    /// Adds sources: paths or patterns of the package (`native/*.c`) or of a source tree
+    /// (`@lua/src/*.c`), as `[native]`'s `sources`.
+    pub fn sources(paths: string...): CLibrary {
+        for (p in paths) {
+            this.sourceList.push(p);
+        }
+        return this;
+    }
+
+    /// Adds directories its sources find their includes in: of the package, or of a source tree.
+    pub fn include(dirs: string...): CLibrary {
+        for (d in dirs) {
+            this.includeList.push(d);
+        }
+        return this;
+    }
+
+    /// Defines `name` for its sources: `-Dname`.
+    pub fn define(name: string): CLibrary {
+        this.defineList.push(name);
+        return this;
+    }
+
+    /// Defines `name` as `value` for its sources: `-Dname=value`.
+    pub fn define(name: string, value: string): CLibrary {
+        this.defineList.push(f"{name}={value}");
+        return this;
+    }
+
+    /// Adds flags for the C compiler, its sources' alone: `flags("-O3", "-Wno-unused")`.
+    pub fn flags(given: string...): CLibrary {
+        for (f in given) {
+            this.flagList.push(f);
+        }
+        return this;
+    }
+
+    /// Compiles it with the program and links it in.
+    pub fn compile(): void {
+        direct("c-library", this.name);
+        for (p in this.sourceList.iter()) {
+            direct("c-source", p);
+        }
+        for (d in this.includeList.iter()) {
+            direct("c-include", d);
+        }
+        for (d in this.defineList.iter()) {
+            direct("c-define", d);
+        }
+        for (f in this.flagList.iter()) {
+            direct("c-flag", f);
+        }
+        direct("c-end", this.name);
+    }
+}
+
+/// Returns the environment under which another build system — CMake, a configure script, make —
+/// compiles C for the build's target with the toolchain's C compiler: `CC`, `AR` and `CFLAGS`, to
+/// hand to a `std.process.Command` as its `env`.
+pub fn cEnv(): (string, string)[] {
+    return [
+        ("CC", given("LYRIC_BUILD_CC")),
+        ("AR", given("LYRIC_BUILD_AR")),
+        ("CFLAGS", given("LYRIC_BUILD_CFLAGS")),
+    ];
 }
 
 /// Emits a warning the toolchain shows with the build's diagnostics.

@@ -2662,6 +2662,7 @@ internal sealed class FunctionLowerer
     private TempId? LowerExprOrVoid(Expr expr) =>
         _chainReceivers.TryGetValue(expr, out var alreadyUnwrapped) ? alreadyUnwrapped
         : _types.RewriteOf(expr) is { } rewritten ? LowerExprOrVoid(rewritten) // what the checker set in its place
+        : _types.IsCCallback(expr) ? LowerCCallback(expr) // a function where C's pointer to one is expected
         : expr switch
     {
         IntLiteralExpr e => LowerIntLiteral(e),
@@ -2679,6 +2680,10 @@ internal sealed class FunctionLowerer
         AssignExpr e => LowerAssign(e),
         CastExpr e => LowerCast(e),
         TypeTestExpr typeTest => LowerTypeTest(typeTest),
+        // std.ffi's 'Callback<C>.new(closure)': the closure behind a root, C's function to it
+        CallExpr e when _types.CallbackUserdataOf(e) is { } userdata => LowerCallbackNew(e, userdata),
+        // std.ffi's 'lib.symbol<F>(name)': the symbol's address, which a C function's value is
+        CallExpr e when _types.IsLibrarySymbol(e) => LowerLibrarySymbol(e),
         CallExpr e => LowerCall(e),
         IfExpr e => LowerIfExpr(e),
         BlockExpr e => LowerBlockExpr(e),
@@ -7456,6 +7461,7 @@ internal sealed class FunctionLowerer
 
     private TempId? LowerIndirectCall(CallExpr expr)
     {
+        if (_types.TypeOf(expr.Callee) is FnType { IsC: true } cFunction) return LowerCPointerCall(expr, cFunction);
         if (LowerType(_types.TypeOf(expr.Callee), expr.Callee.Span) is not IrFunctionType signature)
             throw Bug("indirect call on a non-function value");
 
@@ -8507,10 +8513,14 @@ internal sealed class FunctionLowerer
                 args.Add(passed);
                 continue;
             }
-            // a string handed to a C function's 'CStr': its bytes, for the call
+            // a string handed to a C function's 'CStr': its bytes, for the call — a '?CStr' takes
+            // them as the 'CStr' they are
             if (_types.IsCStrArgument(arguments[i]))
             {
-                args.Add(StringAsCStr(arguments[i], import.ParamTypes[args.Count], span));
+                var parameter = import.ParamTypes[args.Count];
+                var cstrType = parameter is IrOptionalType optional ? optional.Inner : parameter;
+                var cstr = StringAsCStr(arguments[i], cstrType, span);
+                args.Add(parameter is IrOptionalType ? Coerce(cstr, cstrType, parameter, span) : cstr);
                 continue;
             }
             if (shape?.Params[i + offset] is not { Struct: { } structType } flat)
@@ -8578,8 +8588,13 @@ internal sealed class FunctionLowerer
     {
         result = null;
         var ffi = _typeTable.Compilation?.FindModule(["std", "ffi"])?.Members;
-        if (ffi is null || symbol.Name is not ("load" or "store" or "sizeOf" or "dataAddress" or "sliceAddress")
-            || !ReferenceEquals(ffi.LookupLocal(symbol.Name), symbol))
+        // where elements begin is std.core's, which every module of std may ask without std.ffi
+        var host = symbol.Name is "dataAddress" or "sliceAddress"
+            ? _typeTable.Compilation?.FindModule(["std", "core"])?.Members
+            : ffi;
+        if (host is null || symbol.Name is not ("load" or "store" or "sizeOf" or "dataAddress" or "sliceAddress"
+                or "rootObject" or "rootedObject")
+            || !ReferenceEquals(host.LookupLocal(symbol.Name), symbol))
             return false;
         result = FfiMemory(symbol.Name, expr);
         return true;
@@ -8608,6 +8623,20 @@ internal sealed class FunctionLowerer
                 _b.Emit(new StorePlace(place, LowerExprAs(expr.Arguments[1], type), span));
                 return null;
             }
+            case "rootObject":
+            {
+                var root = _slots.NewTemp(u64);
+                _b.Emit(new RootObject(root, LowerExpr(expr.Arguments[0]), span));
+                return root;
+            }
+            case "rootedObject":
+            {
+                if (TypeOfExpr(expr) is not IrRefType type)
+                    throw Bug($"a GcHandle of no object, for {span}");
+                var held = _slots.NewTemp(type);
+                _b.Emit(new RootedObject(held, LowerExprAs(expr.Arguments[0], u64), type, span));
+                return held;
+            }
             case "sizeOf":
             {
                 var size = _slots.NewTemp(u64);
@@ -8628,6 +8657,100 @@ internal sealed class FunctionLowerer
                 return address;
             }
         }
+    }
+
+    /// <summary>
+    /// A function where a C function's pointer is expected: a named one, or a lambda that captures
+    /// nothing, lifted as any lambda is. The value is the address of the trampoline the emitter
+    /// writes for it, which takes C's values and hands them on as Lyric's.
+    /// </summary>
+    private TempId LowerCCallback(Expr source)
+    {
+        if (LowerType(_types.TypeOf(source), source.Span) is not IrFunctionType signature)
+            throw Bug($"a callback without a function type, for {source.Span}");
+        FunctionId function;
+        if (source is LambdaExpr lambda)
+            function = _lambdas.Register(lambda, _name, [], false, VoidType, ReceiverForLambda(), _substitution);
+        else if (_types.RefOf(source) is not FunctionSymbol named || !TryResolveFunction(named, out function))
+            throw Bug($"a callback that names no lowered function, for {source.Span}");
+        var compilation = _typeTable.Compilation!;
+        var address = _slots.NewTemp(new IrScalarType(IrScalar.U64));
+        _b.Emit(new CCallback(address, function,
+            [.. signature.Parameters.Select(p => ModuleLowerer.CFormOf(p, _typeTable, compilation))],
+            ModuleLowerer.CFormOf(signature.Return, _typeTable, compilation), source.Span));
+        return address;
+    }
+
+    /// <summary>
+    /// <c>Callback&lt;C&gt;.new(closure)</c>: the closure's code and environment in an object a root
+    /// keeps alive, the root's address as the userdata, a trampoline of <c>C</c>'s type that finds
+    /// the closure through it — and the <c>Callback</c> that holds all three.
+    /// </summary>
+    private TempId LowerCallbackNew(CallExpr expr, int userdata)
+    {
+        if (_types.TypeOf(expr) is not GenericInstance { Arguments: [FnType { IsC: true } cFunction] }
+            || LowerType(_types.TypeOf(expr), expr.Span) is not IrRefType callbackType)
+            throw Bug($"a Callback.new without its C function's type, for {expr.Span}");
+        var compilation = _typeTable.Compilation!;
+        var closure = LowerExpr(expr.Arguments[0]);
+        if (_slots.TypeOfTemp(closure) is not IrFunctionType closureType)
+            throw Bug($"a Callback.new of no function value, for {expr.Span}");
+        var u64 = new IrScalarType(IrScalar.U64);
+        var root = _slots.NewTemp(u64);
+        _b.Emit(new RootClosure(root, closure, expr.Span));
+        var parameters = cFunction.Parameters.Select(p => LowerType(p, expr.Span)).ToArray();
+        var returned = LowerType(cFunction.Return, expr.Span);
+        var function = _slots.NewTemp(u64);
+        _b.Emit(new CClosureCallback(function, closureType, userdata, parameters, returned,
+            [.. parameters.Select(p => ModuleLowerer.CFormOf(p, _typeTable, compilation))],
+            ModuleLowerer.CFormOf(returned, _typeTable, compilation), expr.Span));
+
+        var layout = _typeTable.Defs[callbackType.Type.Value];
+        int Field(string name) => Array.IndexOf(layout.FieldNames, name);
+        if (layout.FieldTypes[Field("userdata")] is not IrStructType pointer)
+            throw Bug($"a Callback whose userdata is no Ptr, for {expr.Span}");
+        var handle = _slots.NewTemp(pointer);
+        _b.Emit(new NewObject(handle, pointer.Type, pointer, expr.Span));
+        _b.Emit(new StoreField(handle, pointer.Type, new FieldId(0), root, expr.Span));
+
+        var made = _slots.NewTemp(callbackType);
+        _b.Emit(new NewObject(made, callbackType.Type, callbackType, expr.Span));
+        _b.Emit(new StoreField(made, callbackType.Type, new FieldId(Field("function")), function, expr.Span));
+        _b.Emit(new StoreField(made, callbackType.Type, new FieldId(Field("userdata")), handle, expr.Span));
+        _b.Emit(new StoreField(made, callbackType.Type, new FieldId(Field("root")), root, expr.Span));
+        return made;
+    }
+
+    /// <summary><c>lib.symbol&lt;F&gt;(name)</c>: the library's <c>address(name)</c>, a <c>?uint</c> —
+    /// what a <c>?F</c> of a C function's type is.</summary>
+    private TempId LowerLibrarySymbol(CallExpr expr)
+    {
+        if (FfiType("Library", expr.Span).Members.LookupLocal("address") is not FunctionSymbol address
+            || !TryResolveFunction(address, out var target) || expr.Callee is not MemberExpr member)
+            throw Bug($"std.ffi's Library.address was not lowered, for {expr.Span}");
+        var library = LowerExpr(member.Target);
+        var name = LowerExpr(expr.Arguments[0]);
+        var dest = _slots.NewTemp(LowerType(_types.TypeOf(expr), expr.Span));
+        _b.Emit(new Call(dest, target, [library, name], expr.Span));
+        return dest;
+    }
+
+    /// <summary>A call through a C function's pointer: as a call of an <c>extern "C"</c>
+    /// function, each value in the form it crosses in.</summary>
+    private TempId? LowerCPointerCall(CallExpr expr, FnType cFunction)
+    {
+        var compilation = _typeTable.Compilation!;
+        var callee = LowerExpr(expr.Callee);
+        var parameters = cFunction.Parameters.Select(p => LowerType(p, expr.Span)).ToArray();
+        var returned = LowerType(cFunction.Return, expr.Span);
+        var args = new TempId[expr.Arguments.Length];
+        for (var i = 0; i < args.Length; i++)
+            args[i] = LowerExprAs(expr.Arguments[i], parameters[i]);
+        var forms = parameters.Select(p => ModuleLowerer.CFormOf(p, _typeTable, compilation)).ToArray();
+        var form = ModuleLowerer.CFormOf(returned, _typeTable, compilation);
+        var dest = IsVoid(returned) ? (TempId?)null : _slots.NewTemp(returned);
+        _b.Emit(new CallCPointer(dest, callee, args, parameters, returned, forms, form, expr.Span));
+        return dest;
     }
 
     /// <summary>A string handed to a C function as a <c>CStr</c>: its bytes, for the call.</summary>
@@ -9019,7 +9142,7 @@ internal sealed class FunctionLowerer
         Optional o => new Optional(SubstituteType(o.Inner)),
         Sema.TupleOf t => new Sema.TupleOf(t.Elements.Select(SubstituteType).ToArray()) { Labels = t.Labels },
         FnType f => new FnType(
-            f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)) { Throws = ThrownHere(f.Throws), Places = f.Places },
+            f.Parameters.Select(SubstituteType).ToArray(), SubstituteType(f.Return)) { Throws = ThrownHere(f.Throws), Places = f.Places, IsC = f.IsC },
         CoroutineOf c => c with
         {
             Yield = SubstituteType(c.Yield),

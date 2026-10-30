@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Finishes a published toolchain into what its archive holds: the runtime prebuilt for the
+    toolchain's own target, and toolchain.json. A tool of the release pipeline; nothing ships it.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Version>5.0.0</Version>
+    <AssemblyName>package</AssemblyName>
+    <RootNamespace>Lyric5.Package</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Lyric5.Toolchain\Lyric5.Toolchain.csproj" />
+    <ProjectReference Include="..\..\src\Lyric5.Build\Lyric5.Build.csproj" />
+  </ItemGroup>
+
+</Project>

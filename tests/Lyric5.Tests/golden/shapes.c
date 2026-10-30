@@ -21,21 +21,21 @@ struct lyr_vt_ty_app_main_Shape {
     int64_t (*s1)(LyrIface);
 };
 struct lyr_ty_app_main_Circle {
-    int64_t f_r;
+    int64_t r;
 };
 struct lyr_ty_app_main_Rect {
     LyrObj header;
-    int64_t f_w;
-    int64_t f_h;
+    int64_t w;
+    int64_t h;
 };
 _Static_assert(sizeof(lyr_ty_app_main_Rect) == 24, "layout of lyr_ty_app_main_Rect");
-_Static_assert(offsetof(lyr_ty_app_main_Rect, f_w) == 8, "layout of lyr_ty_app_main_Rect");
-_Static_assert(offsetof(lyr_ty_app_main_Rect, f_h) == 16, "layout of lyr_ty_app_main_Rect");
+_Static_assert(offsetof(lyr_ty_app_main_Rect, w) == 8, "layout of lyr_ty_app_main_Rect");
+_Static_assert(offsetof(lyr_ty_app_main_Rect, h) == 16, "layout of lyr_ty_app_main_Rect");
 extern const LyrItable lyr_itab_ty_app_main_Rect[];
 const LyrDesc lyr_desc_ty_app_main_Rect = { sizeof(lyr_ty_app_main_Rect), 0, 0, 0, NULL, "app.main.Rect", lyr_itab_ty_app_main_Rect };
 struct lyr_ty_app_main_Tri {
-    int64_t f_b;
-    int64_t f_h;
+    int64_t b;
+    int64_t h;
 };
 struct lyr_vt_ty_app_main_Display {
     const LyrDesc *desc;
@@ -43,12 +43,12 @@ struct lyr_vt_ty_app_main_Display {
 };
 struct lyr_ty_std_core_StringBuilder {
     LyrObj header;
-    LyrArr *f_bytes;
-    int64_t f_count;
+    LyrArr *bytes;
+    int64_t count;
 };
 _Static_assert(sizeof(lyr_ty_std_core_StringBuilder) == 24, "layout of lyr_ty_std_core_StringBuilder");
-_Static_assert(offsetof(lyr_ty_std_core_StringBuilder, f_bytes) == 8, "layout of lyr_ty_std_core_StringBuilder");
-_Static_assert(offsetof(lyr_ty_std_core_StringBuilder, f_count) == 16, "layout of lyr_ty_std_core_StringBuilder");
+_Static_assert(offsetof(lyr_ty_std_core_StringBuilder, bytes) == 8, "layout of lyr_ty_std_core_StringBuilder");
+_Static_assert(offsetof(lyr_ty_std_core_StringBuilder, count) == 16, "layout of lyr_ty_std_core_StringBuilder");
 static const uint64_t lyr_refmap_ty_std_core_StringBuilder[] = { UINT64_C(0x2) };
 const LyrDesc lyr_desc_ty_std_core_StringBuilder = { sizeof(lyr_ty_std_core_StringBuilder), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_ty_std_core_StringBuilder, "std.core.StringBuilder", NULL };
 struct lyr_vt_ty_std_core_Debug {
@@ -58,10 +58,10 @@ struct lyr_vt_ty_std_core_Debug {
 };
 struct lyr_ty_0_env_std_io_flushed__86bc19d2 {
     LyrObj header;
-    int64_t f_stream;
+    int64_t stream;
 };
 _Static_assert(sizeof(lyr_ty_0_env_std_io_flushed__86bc19d2) == 16, "layout of lyr_ty_0_env_std_io_flushed__86bc19d2");
-_Static_assert(offsetof(lyr_ty_0_env_std_io_flushed__86bc19d2, f_stream) == 8, "layout of lyr_ty_0_env_std_io_flushed__86bc19d2");
+_Static_assert(offsetof(lyr_ty_0_env_std_io_flushed__86bc19d2, stream) == 8, "layout of lyr_ty_0_env_std_io_flushed__86bc19d2");
 const LyrDesc lyr_desc_ty_0_env_std_io_flushed__86bc19d2 = { sizeof(lyr_ty_0_env_std_io_flushed__86bc19d2), 0, 0, 0, NULL, "<env:std.io.flushed>", NULL };
 typedef struct { uint8_t *ptr; int64_t len; } lyr_slice_u8;
 _Static_assert(sizeof(lyr_slice_u8) == 16, "layout of lyr_slice_u8");
@@ -83,6 +83,15 @@ _Static_assert(offsetof(lyr_box_ty_app_main_Tri, value) == 8, "layout of lyr_box
 extern const LyrItable lyr_itab_ty_app_main_Tri[];
 const LyrDesc lyr_desc_box_ty_app_main_Tri = { sizeof(lyr_box_ty_app_main_Tri), 0, 0, 0, NULL, "box<app.main.Tri>", lyr_itab_ty_app_main_Tri };
 
+extern void lyr_c_lyr_bytes_put(LyrArr *, int64_t, uint64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_bytes_put"));
+extern LyrStr * lyr_c_lyr_str_concat(LyrStr *, LyrStr *) __asm__(LYR_C_SYMBOL("lyr_str_concat"));
+extern LyrStr * lyr_c_lyr_str_from_byte_array(LyrArr *, int64_t) __asm__(LYR_C_SYMBOL("lyr_str_from_byte_array"));
+extern int64_t lyr_c_lyr_bytes_put_int(LyrArr *, int64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_bytes_put_int"));
+extern void lyr_c_lyr_bytes_copy(LyrArr *, LyrArr *, int64_t) __asm__(LYR_C_SYMBOL("lyr_bytes_copy"));
+extern int64_t lyr_c_lyr_console_put(int64_t, uint64_t, int64_t) __asm__(LYR_C_SYMBOL("lyr_console_put"));
+extern void lyr_c_lyr_console_gone(void) __asm__(LYR_C_SYMBOL("lyr_console_gone"));
+extern int64_t lyr_c_lyr_console_flush(int64_t) __asm__(LYR_C_SYMBOL("lyr_console_flush"));
+
 /* string literals */
 static const LyrStaticStr(7) lyr_lit0 = LYR_STR_INIT("circle");
 static const LyrStaticStr(5) lyr_lit1 = LYR_STR_INIT("rect");
@@ -102,40 +111,40 @@ static const LyrStaticStr(7) lyr_lit14 = LYR_STR_INIT("Tri { ");
 static const LyrStaticStr(5) lyr_lit15 = LYR_STR_INIT("b = ");
 
 /* prototypes */
-LyrStr * lyr_app_main_name(LyrIface l0_s);
-int64_t lyr_app_main_kind(LyrIface l0_s);
-LyrStr * lyr_app_main_shown(LyrIface l0_d);
+LyrStr * lyr_app_main_name(LyrIface s);
+int64_t lyr_app_main_kind(LyrIface s);
+LyrStr * lyr_app_main_shown(LyrIface d);
 LYR_NOINLINE int64_t lyr_app_main_main(void);
-int64_t lyr_app_main_Circle_area(lyr_ty_app_main_Circle *l0_this);
-LyrStr * lyr_app_main_Circle_show(lyr_ty_app_main_Circle *l0_this);
-int64_t lyr_app_main_Rect_area(lyr_ty_app_main_Rect *l0_this);
-LyrStr * lyr_app_main_Rect_show(lyr_ty_app_main_Rect *l0_this);
-lyr_ty_std_core_StringBuilder * lyr_std_core_fstringStart(int64_t l0_room);
-LyrStr * lyr_std_core_fstringEnd(lyr_ty_std_core_StringBuilder *l0_out);
-void lyr_std_core_fstringText(lyr_ty_std_core_StringBuilder *l0_out, lyr_slice_u8 l1_text);
-void lyr_std_core_fstringInt(lyr_ty_std_core_StringBuilder *l0_out, int64_t l1_value);
-void lyr_std_core_Debug_debugTo(LyrIface l0_this, lyr_ty_std_core_StringBuilder *l1_out);
-void lyr_std_core_StringBuilder_appendStr(lyr_ty_std_core_StringBuilder *l0_this, lyr_slice_u8 l1_s);
-void lyr_std_core_StringBuilder_putInt(lyr_ty_std_core_StringBuilder *l0_this, int64_t l1_v);
-lyr_ty_std_core_StringBuilder * lyr_std_core_StringBuilder_sized(int64_t l0_room);
-LyrStr * lyr_std_core_StringBuilder_toString(lyr_ty_std_core_StringBuilder *l0_this);
-void lyr_std_core_StringBuilder_reserve(lyr_ty_std_core_StringBuilder *l0_this, int64_t l1_n);
-void lyr_std_core_StringBuilder_grow(lyr_ty_std_core_StringBuilder *l0_this, int64_t l1_need);
-void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text);
-void lyr_std_io_drop(int64_t l0_stream);
-int64_t lyr_std_io_flushed(int64_t l0_stream);
-int64_t lyr_std_io_onPool(lyr_fn_to_i64 l0_call);
-void lyr_std_io_println_string__d598c8ee(LyrStr *l0_v);
-uint8_t lyr_std_core__extend__Slice_uint8__isEmpty_6b51423e(lyr_slice_u8 l0_this);
+int64_t lyr_app_main_Circle_area(lyr_ty_app_main_Circle *this);
+LyrStr * lyr_app_main_Circle_show(lyr_ty_app_main_Circle *this);
+int64_t lyr_app_main_Rect_area(lyr_ty_app_main_Rect *this);
+LyrStr * lyr_app_main_Rect_show(lyr_ty_app_main_Rect *this);
+lyr_ty_std_core_StringBuilder * lyr_std_core_fstringStart(int64_t room);
+LyrStr * lyr_std_core_fstringEnd(lyr_ty_std_core_StringBuilder *out);
+void lyr_std_core_fstringText(lyr_ty_std_core_StringBuilder *out, lyr_slice_u8 text);
+void lyr_std_core_fstringInt(lyr_ty_std_core_StringBuilder *out, int64_t value);
+void lyr_std_core_Debug_debugTo(LyrIface this, lyr_ty_std_core_StringBuilder *out);
+void lyr_std_core_StringBuilder_appendStr(lyr_ty_std_core_StringBuilder *this, lyr_slice_u8 l1_s);
+void lyr_std_core_StringBuilder_putInt(lyr_ty_std_core_StringBuilder *this, int64_t v);
+lyr_ty_std_core_StringBuilder * lyr_std_core_StringBuilder_sized(int64_t room);
+LyrStr * lyr_std_core_StringBuilder_toString(lyr_ty_std_core_StringBuilder *this);
+void lyr_std_core_StringBuilder_reserve(lyr_ty_std_core_StringBuilder *this, int64_t n);
+void lyr_std_core_StringBuilder_grow(lyr_ty_std_core_StringBuilder *this, int64_t need);
+void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 text);
+void lyr_std_io_drop(int64_t stream);
+int64_t lyr_std_io_flushed(int64_t stream);
+int64_t lyr_std_io_onPool(lyr_fn_to_i64 call);
+void lyr_std_io_println_string__d598c8ee(LyrStr *v);
+uint8_t lyr_std_core__extend__Slice_uint8__isEmpty_6b51423e(lyr_slice_u8 this);
 int64_t lyr_std_io_flushed__lambda2__d4dc4b68(void *lyr_env, LyrErr **lyr_err);
 void lyr__globals__9ee5f9b5(void);
-LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *l0_this);
-LyrStr * lyr_app_main__extend__Circle_debug_adbc7504(lyr_ty_app_main_Circle *l0_this);
-LyrStr * lyr_app_main__extend__Rect_debug_ac38250e(lyr_ty_app_main_Rect *l0_this);
-LyrStr * lyr_app_main__extend__Tri_show_270247fd(lyr_ty_app_main_Tri *l0_this);
-int64_t lyr_app_main__extend__Tri_area_b40d8235(lyr_ty_app_main_Tri *l0_this);
-LyrStr * lyr_app_main__extend__Tri_debug_bcf989a3(lyr_ty_app_main_Tri *l0_this);
-LyrStr * lyr_std_core__extend__int_debug_970869d7(int64_t l0_this);
+LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *this);
+LyrStr * lyr_app_main__extend__Circle_debug_adbc7504(lyr_ty_app_main_Circle *this);
+LyrStr * lyr_app_main__extend__Rect_debug_ac38250e(lyr_ty_app_main_Rect *this);
+LyrStr * lyr_app_main__extend__Tri_show_270247fd(lyr_ty_app_main_Tri *this);
+int64_t lyr_app_main__extend__Tri_area_b40d8235(lyr_ty_app_main_Tri *this);
+LyrStr * lyr_app_main__extend__Tri_debug_bcf989a3(lyr_ty_app_main_Tri *this);
+LyrStr * lyr_std_core__extend__int_debug_970869d7(int64_t this);
 
 /* interface tables: the descriptor, then the implementation of every slot */
 static LyrStr * lyr_vt_14_app_main_Shape_15_app_main_Circle_s0(LyrIface self) { return lyr_app_main_Circle_show(&((lyr_box_ty_app_main_Circle *)self.data)->value); }
@@ -162,7 +171,7 @@ const LyrItable lyr_itab_ty_app_main_Rect[] = { { lyr_ifid_ty_app_main_Shape, &l
 const LyrItable lyr_itab_ty_app_main_Tri[] = { { lyr_ifid_ty_app_main_Shape, &lyr_vt_14_app_main_Shape_12_app_main_Tri }, { lyr_ifid_ty_std_core_Debug, &lyr_vt_14_std_core_Debug_12_app_main_Tri } , { NULL, NULL } };
 
 #line 30 "programs/shapes.lyr"
-LyrStr * lyr_app_main_name(LyrIface l0_s) {
+LyrStr * lyr_app_main_name(LyrIface s) {
 #line 30
     LyrStr *l1__match0 = NULL;
 #line 30
@@ -183,7 +192,7 @@ LyrStr * lyr_app_main_name(LyrIface l0_s) {
     uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 30
-    t0 = l0_s;
+    t0 = s;
 #line 30
     t1 = ((*(const LyrDesc *const *)t0.vt) == &lyr_desc_box_ty_app_main_Circle);
 #line 30
@@ -222,15 +231,15 @@ bb5:;
 }
 
 #line 34 "programs/shapes.lyr"
-int64_t lyr_app_main_kind(LyrIface l0_s) {
+int64_t lyr_app_main_kind(LyrIface s) {
 #line 34
     int64_t l1__match0 = 0;
 #line 34
-    lyr_ty_app_main_Circle l2_c = {0};
+    lyr_ty_app_main_Circle c = {0};
 #line 34
-    lyr_ty_app_main_Rect *l3_r = NULL;
+    lyr_ty_app_main_Rect *r = NULL;
 #line 34
-    lyr_ty_app_main_Tri l4_t = {0};
+    lyr_ty_app_main_Tri t = {0};
 #line 34
     LyrIface t0 = {0};
 #line 34
@@ -275,7 +284,7 @@ int64_t lyr_app_main_kind(LyrIface l0_s) {
     uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line 34
-    t0 = l0_s;
+    t0 = s;
 #line 34
     t1 = ((*(const LyrDesc *const *)t0.vt) == &lyr_desc_box_ty_app_main_Circle);
 #line 34
@@ -284,11 +293,11 @@ bb1:;
 #line 34
     t2_s = ((lyr_box_ty_app_main_Circle *)t0.data)->value; t2 = &t2_s;
 #line 34
-    l2_c = *t2;
+    c = *t2;
 #line 34
-    t3 = &l2_c;
+    t3 = &c;
 #line 34
-    t4 = t3->f_r;
+    t4 = t3->r;
 #line 34
     l1__match0 = t4;
 #line 34
@@ -307,15 +316,15 @@ bb4:;
 #line 34
     t6 = (lyr_ty_app_main_Rect *)t0.data;
 #line 34
-    l3_r = t6;
+    r = t6;
 #line 34
-    t7 = l3_r;
+    t7 = r;
 #line 34
-    t8 = t7->f_w;
+    t8 = t7->w;
 #line 34
-    t9 = l3_r;
+    t9 = r;
 #line 34
-    t10 = t9->f_h;
+    t10 = t9->h;
 #line 34
     t11 = LYR_CHECKED_ADD(t8, t10);
 #line 34
@@ -326,11 +335,11 @@ bb5:;
 #line 34
     t12_s = ((lyr_box_ty_app_main_Tri *)t0.data)->value; t12 = &t12_s;
 #line 34
-    l4_t = *t12;
+    t = *t12;
 #line 34
-    t13 = &l4_t;
+    t13 = &t;
 #line 34
-    t14 = t13->f_b;
+    t14 = t13->b;
 #line 34
     l1__match0 = t14;
 #line 34
@@ -338,7 +347,7 @@ bb5:;
 }
 
 #line 37 "programs/shapes.lyr"
-LyrStr * lyr_app_main_shown(LyrIface l0_d) {
+LyrStr * lyr_app_main_shown(LyrIface d) {
 #line 37
     LYR_STACK_CHECK();
 #line 37
@@ -347,7 +356,7 @@ LyrStr * lyr_app_main_shown(LyrIface l0_d) {
     LyrStr *t1 = NULL;
 bb0:;
 #line 37
-    t0 = l0_d;
+    t0 = d;
 #line 37
     t1 = ((const lyr_vt_ty_app_main_Display *)t0.vt)->s0(t0);
 #line 37
@@ -359,13 +368,13 @@ LYR_NOINLINE int64_t lyr_app_main_main(void) {
 #line 40
     LYR_STACK_CHECK();
 #line 40
-    LyrArr *l0_shapes = NULL;
+    LyrArr *shapes = NULL;
 #line 40
     lyr_ty_std_core_StringBuilder *l1__fstring = NULL;
 #line 40
     lyr_ty_std_core_StringBuilder *l2__fstring = NULL;
 #line 40
-    LyrIface l3_d = {0};
+    LyrIface d = {0};
 #line 40
     lyr_ty_std_core_StringBuilder *l4__fstring = NULL;
 #line 40
@@ -694,7 +703,7 @@ bb0:;
 #line 40
     t1_s = (lyr_ty_app_main_Circle){0}; t1 = &t1_s;
 #line 40
-    t1->f_r = t0;
+    t1->r = t0;
 #line 40
     { lyr_box_ty_app_main_Circle *lyr_box = lyr_alloc(&lyr_desc_box_ty_app_main_Circle); lyr_box->value = *t1; t2 = (LyrIface){ lyr_box, &lyr_vt_14_app_main_Shape_15_app_main_Circle }; }
 #line 40
@@ -704,9 +713,9 @@ bb0:;
 #line 40
     t5 = (lyr_ty_app_main_Rect *)lyr_alloc(&lyr_desc_ty_app_main_Rect);
 #line 40
-    t5->f_w = t3;
+    t5->w = t3;
 #line 40
-    t5->f_h = t4;
+    t5->h = t4;
 #line 40
     t6 = (LyrIface){ t5, &lyr_vt_14_app_main_Shape_13_app_main_Rect };
 #line 40
@@ -716,15 +725,15 @@ bb0:;
 #line 40
     t9_s = (lyr_ty_app_main_Tri){0}; t9 = &t9_s;
 #line 40
-    t9->f_b = t7;
+    t9->b = t7;
 #line 40
-    t9->f_h = t8;
+    t9->h = t8;
 #line 40
     { lyr_box_ty_app_main_Tri *lyr_box = lyr_alloc(&lyr_desc_box_ty_app_main_Tri); lyr_box->value = *t9; t10 = (LyrIface){ lyr_box, &lyr_vt_14_app_main_Shape_12_app_main_Tri }; }
 #line 40
     t11 = lyr_alloc_array(&lyr_desc_arr_iface14_app_main_Shape, 3); LYR_ARR_DATA(t11, LyrIface)[0] = t2; LYR_ARR_DATA(t11, LyrIface)[1] = t6; LYR_ARR_DATA(t11, LyrIface)[2] = t10;
 #line 40
-    l0_shapes = t11;
+    shapes = t11;
 #line 41
     t12 = (int64_t)INT64_C(68);
 #line 41
@@ -746,7 +755,7 @@ bb0:;
 #line 41
     t19 = l1__fstring;
 #line 41
-    t20 = l0_shapes;
+    t20 = shapes;
 #line 41
     t21 = (int64_t)INT64_C(0);
 #line 41
@@ -770,7 +779,7 @@ bb0:;
 #line 41
     t29 = l1__fstring;
 #line 41
-    t30 = l0_shapes;
+    t30 = shapes;
 #line 41
     t31 = (int64_t)INT64_C(1);
 #line 41
@@ -794,7 +803,7 @@ bb0:;
 #line 41
     t39 = l1__fstring;
 #line 41
-    t40 = l0_shapes;
+    t40 = shapes;
 #line 41
     t41 = (int64_t)INT64_C(2);
 #line 41
@@ -830,7 +839,7 @@ bb0:;
 #line 42
     t53 = l2__fstring;
 #line 42
-    t54 = l0_shapes;
+    t54 = shapes;
 #line 42
     t55 = (int64_t)INT64_C(0);
 #line 42
@@ -860,7 +869,7 @@ bb0:;
 #line 42
     t66 = l2__fstring;
 #line 42
-    t67 = l0_shapes;
+    t67 = shapes;
 #line 42
     t68 = (int64_t)INT64_C(1);
 #line 42
@@ -890,7 +899,7 @@ bb0:;
 #line 42
     t79 = l2__fstring;
 #line 42
-    t80 = l0_shapes;
+    t80 = shapes;
 #line 42
     t81 = (int64_t)INT64_C(2);
 #line 42
@@ -912,7 +921,7 @@ bb0:;
 #line 42
     lyr_std_io_println_string__d598c8ee(t88);
 #line 43
-    t89 = l0_shapes;
+    t89 = shapes;
 #line 43
     t90 = (int64_t)INT64_C(0);
 #line 43
@@ -920,7 +929,7 @@ bb0:;
 #line 43
     t92 = (LyrIface){ t91.data, lyr_iface_find((*(const LyrDesc *const *)t91.vt), lyr_ifid_ty_app_main_Display) };
 #line 43
-    l3_d = t92;
+    d = t92;
 #line 44
     t93 = (int64_t)INT64_C(49);
 #line 44
@@ -942,7 +951,7 @@ bb0:;
 #line 44
     t100 = l4__fstring;
 #line 44
-    t101 = l3_d;
+    t101 = d;
 #line 44
     t102 = ((const lyr_vt_ty_app_main_Display *)t101.vt)->s0(t101);
 #line 44
@@ -968,7 +977,7 @@ bb0:;
 #line 44
     t111 = l4__fstring;
 #line 44
-    t112 = l0_shapes;
+    t112 = shapes;
 #line 44
     t113 = (int64_t)INT64_C(1);
 #line 44
@@ -1012,7 +1021,7 @@ bb0:;
 #line 45
     t129 = l5__fstring;
 #line 45
-    t130 = l0_shapes;
+    t130 = shapes;
 #line 45
     t131 = (int64_t)INT64_C(0);
 #line 45
@@ -1036,7 +1045,7 @@ bb0:;
 #line 45
     t139 = l5__fstring;
 #line 45
-    t140 = l0_shapes;
+    t140 = shapes;
 #line 45
     t141 = (int64_t)INT64_C(1);
 #line 45
@@ -1060,7 +1069,7 @@ bb0:;
 #line 45
     t149 = l5__fstring;
 #line 45
-    t150 = l0_shapes;
+    t150 = shapes;
 #line 45
     t151 = (int64_t)INT64_C(2);
 #line 45
@@ -1082,7 +1091,7 @@ bb0:;
 }
 
 #line 14 "programs/shapes.lyr"
-int64_t lyr_app_main_Circle_area(lyr_ty_app_main_Circle *l0_this) {
+int64_t lyr_app_main_Circle_area(lyr_ty_app_main_Circle *this) {
 #line 14
     int64_t t0 = 0;
 #line 14
@@ -1105,15 +1114,15 @@ bb0:;
 #line 14
     t0 = (int64_t)INT64_C(3);
 #line 14
-    t1 = l0_this;
+    t1 = this;
 #line 14
-    t2 = t1->f_r;
+    t2 = t1->r;
 #line 14
     t3 = LYR_CHECKED_MUL(t0, t2);
 #line 14
-    t4 = l0_this;
+    t4 = this;
 #line 14
-    t5 = t4->f_r;
+    t5 = t4->r;
 #line 14
     t6 = LYR_CHECKED_MUL(t3, t5);
 #line 14
@@ -1121,7 +1130,7 @@ bb0:;
 }
 
 #line 15 "programs/shapes.lyr"
-LyrStr * lyr_app_main_Circle_show(lyr_ty_app_main_Circle *l0_this) {
+LyrStr * lyr_app_main_Circle_show(lyr_ty_app_main_Circle *this) {
 #line 15
     LyrStr *t0 = NULL;
 bb0:;
@@ -1132,7 +1141,7 @@ bb0:;
 }
 
 #line 20 "programs/shapes.lyr"
-int64_t lyr_app_main_Rect_area(lyr_ty_app_main_Rect *l0_this) {
+int64_t lyr_app_main_Rect_area(lyr_ty_app_main_Rect *this) {
 #line 20
     lyr_ty_app_main_Rect *t0 = NULL;
 #line 20
@@ -1145,13 +1154,13 @@ int64_t lyr_app_main_Rect_area(lyr_ty_app_main_Rect *l0_this) {
     int64_t t4 = 0;
 bb0:;
 #line 20
-    t0 = l0_this;
+    t0 = this;
 #line 20
-    t1 = t0->f_w;
+    t1 = t0->w;
 #line 20
-    t2 = l0_this;
+    t2 = this;
 #line 20
-    t3 = t2->f_h;
+    t3 = t2->h;
 #line 20
     t4 = LYR_CHECKED_MUL(t1, t3);
 #line 20
@@ -1159,7 +1168,7 @@ bb0:;
 }
 
 #line 21 "programs/shapes.lyr"
-LyrStr * lyr_app_main_Rect_show(lyr_ty_app_main_Rect *l0_this) {
+LyrStr * lyr_app_main_Rect_show(lyr_ty_app_main_Rect *this) {
 #line 21
     LyrStr *t0 = NULL;
 bb0:;
@@ -1170,7 +1179,7 @@ bb0:;
 }
 
 #line _ "stdlib5/std/core.lyr"
-lyr_ty_std_core_StringBuilder * lyr_std_core_fstringStart(int64_t l0_room) {
+lyr_ty_std_core_StringBuilder * lyr_std_core_fstringStart(int64_t room) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -1179,7 +1188,7 @@ lyr_ty_std_core_StringBuilder * lyr_std_core_fstringStart(int64_t l0_room) {
     lyr_ty_std_core_StringBuilder *t1 = NULL;
 bb0:;
 #line _
-    t0 = l0_room;
+    t0 = room;
 #line _
     t1 = lyr_std_core_StringBuilder_sized(t0);
 #line _
@@ -1187,7 +1196,7 @@ bb0:;
 }
 
 #line _ "stdlib5/std/core.lyr"
-LyrStr * lyr_std_core_fstringEnd(lyr_ty_std_core_StringBuilder *l0_out) {
+LyrStr * lyr_std_core_fstringEnd(lyr_ty_std_core_StringBuilder *out) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -1196,7 +1205,7 @@ LyrStr * lyr_std_core_fstringEnd(lyr_ty_std_core_StringBuilder *l0_out) {
     LyrStr *t1 = NULL;
 bb0:;
 #line _
-    t0 = l0_out;
+    t0 = out;
 #line _
     t1 = lyr_std_core_StringBuilder_toString(t0);
 #line _
@@ -1204,7 +1213,7 @@ bb0:;
 }
 
 #line _ "stdlib5/std/core.lyr"
-void lyr_std_core_fstringText(lyr_ty_std_core_StringBuilder *l0_out, lyr_slice_u8 l1_text) {
+void lyr_std_core_fstringText(lyr_ty_std_core_StringBuilder *out, lyr_slice_u8 text) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -1213,9 +1222,9 @@ void lyr_std_core_fstringText(lyr_ty_std_core_StringBuilder *l0_out, lyr_slice_u
     lyr_slice_u8 t1 = {0};
 bb0:;
 #line _
-    t0 = l0_out;
+    t0 = out;
 #line _
-    t1 = l1_text;
+    t1 = text;
 #line _
     lyr_std_core_StringBuilder_appendStr(t0, t1);
 #line _
@@ -1223,7 +1232,7 @@ bb0:;
 }
 
 #line _ "stdlib5/std/core.lyr"
-void lyr_std_core_fstringInt(lyr_ty_std_core_StringBuilder *l0_out, int64_t l1_value) {
+void lyr_std_core_fstringInt(lyr_ty_std_core_StringBuilder *out, int64_t value) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -1232,9 +1241,9 @@ void lyr_std_core_fstringInt(lyr_ty_std_core_StringBuilder *l0_out, int64_t l1_v
     int64_t t1 = 0;
 bb0:;
 #line _
-    t0 = l0_out;
+    t0 = out;
 #line _
-    t1 = l1_value;
+    t1 = value;
 #line _
     lyr_std_core_StringBuilder_putInt(t0, t1);
 #line _
@@ -1242,7 +1251,7 @@ bb0:;
 }
 
 #line _ "stdlib5/std/core.lyr"
-void lyr_std_core_Debug_debugTo(LyrIface l0_this, lyr_ty_std_core_StringBuilder *l1_out) {
+void lyr_std_core_Debug_debugTo(LyrIface this, lyr_ty_std_core_StringBuilder *out) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -1259,9 +1268,9 @@ void lyr_std_core_Debug_debugTo(LyrIface l0_this, lyr_ty_std_core_StringBuilder 
     int64_t t5 = 0;
 bb0:;
 #line _
-    t0 = l1_out;
+    t0 = out;
 #line _
-    t1 = l0_this;
+    t1 = this;
 #line _
     t2 = ((const lyr_vt_ty_std_core_Debug *)t1.vt)->s0(t1);
 #line _
@@ -1277,82 +1286,156 @@ bb0:;
 }
 
 #line _ "stdlib5/std/core.lyr"
-void lyr_std_core_StringBuilder_appendStr(lyr_ty_std_core_StringBuilder *l0_this, lyr_slice_u8 l1_s) {
+void lyr_std_core_StringBuilder_appendStr(lyr_ty_std_core_StringBuilder *this, lyr_slice_u8 l1_s) {
 #line _
     LYR_STACK_CHECK();
 #line _
-    int64_t l2_n = 0;
+    int64_t n = 0;
+#line _
+    int64_t l3__inline0 = 0;
+#line _
+    lyr_slice_u8 l4_s = {0};
+#line _
+    LyrArr *bytes = NULL;
+#line _
+    int64_t at = 0;
+#line _
+    lyr_slice_u8 l7_s = {0};
+#line _
+    lyr_slice_u8 from = {0};
 #line _
     lyr_slice_u8 t0 = {0};
 #line _
-    int64_t t1 = 0;
+    lyr_slice_u8 t1 = {0};
 #line _
-    lyr_ty_std_core_StringBuilder *t2 = NULL;
+    lyr_slice_u8 t2 = {0};
 #line _
     int64_t t3 = 0;
 #line _
-    lyr_ty_std_core_StringBuilder *t4 = NULL;
+    int64_t t4 = 0;
 #line _
-    LyrArr *t5 = NULL;
+    lyr_ty_std_core_StringBuilder *t5 = NULL;
 #line _
-    lyr_ty_std_core_StringBuilder *t6 = NULL;
+    int64_t t6 = 0;
 #line _
-    int64_t t7 = 0;
+    lyr_ty_std_core_StringBuilder *t7 = NULL;
 #line _
-    lyr_slice_u8 t8 = {0};
+    LyrArr *t8 = NULL;
 #line _
     lyr_ty_std_core_StringBuilder *t9 = NULL;
 #line _
-    lyr_ty_std_core_StringBuilder *t10 = NULL;
+    int64_t t10 = 0;
 #line _
-    int64_t t11 = 0;
+    lyr_slice_u8 t11 = {0};
 #line _
-    int64_t t12 = 0;
+    lyr_slice_u8 t12 = {0};
 #line _
-    int64_t t13 = 0;
+    lyr_slice_u8 t13 = {0};
+#line _
+    LyrArr *t14 = NULL;
+#line _
+    int64_t t15 = 0;
+#line _
+    lyr_slice_u8 t16 = {0};
+#line _
+    uint64_t t17 = 0;
+#line _
+    lyr_slice_u8 t18 = {0};
+#line _
+    int64_t t19 = 0;
+#line _
+    lyr_ty_std_core_StringBuilder *t20 = NULL;
+#line _
+    lyr_ty_std_core_StringBuilder *t21 = NULL;
+#line _
+    int64_t t22 = 0;
+#line _
+    int64_t t23 = 0;
+#line _
+    int64_t t24 = 0;
 bb0:;
 #line _
     t0 = l1_s;
 #line _
-    t1 = LYR_VIEW_LEN(t0);
+    l4_s = t0;
 #line _
-    l2_n = t1;
+    t1 = l4_s;
 #line _
-    t2 = l0_this;
+    t2 = LYR_VIEW_BYTES(t1);
 #line _
-    t3 = l2_n;
+    t3 = t2.len;
 #line _
-    lyr_std_core_StringBuilder_reserve(t2, t3);
+    l3__inline0 = t3;
 #line _
-    t4 = l0_this;
+    goto bb1;
+bb1:;
 #line _
-    t5 = t4->f_bytes;
+    t4 = l3__inline0;
 #line _
-    t6 = l0_this;
+    n = t4;
 #line _
-    t7 = t6->f_count;
+    t5 = this;
 #line _
-    t8 = l1_s;
+    t6 = n;
 #line _
-    LYR_BYTES_PUT_VIEW(t5, t7, t8);
+    lyr_std_core_StringBuilder_reserve(t5, t6);
 #line _
-    t9 = l0_this;
+    t7 = this;
 #line _
-    t10 = l0_this;
+    t8 = t7->bytes;
 #line _
-    t11 = t10->f_count;
+    t9 = this;
 #line _
-    t12 = l2_n;
+    t10 = t9->count;
 #line _
-    t13 = LYR_CHECKED_ADD(t11, t12);
+    t11 = l1_s;
 #line _
-    t9->f_count = t13;
+    bytes = t8;
+#line _
+    at = t10;
+#line _
+    l7_s = t11;
+#line _
+    t12 = l7_s;
+#line _
+    t13 = LYR_VIEW_BYTES(t12);
+#line _
+    from = t13;
+#line _
+    t14 = bytes;
+#line _
+    t15 = at;
+#line _
+    t16 = from;
+#line _
+    t17 = (uint64_t)(uintptr_t)t16.ptr;
+#line _
+    t18 = from;
+#line _
+    t19 = t18.len;
+#line _
+    lyr_c_lyr_bytes_put(t14, t15, t17, t19);
+#line _
+    goto bb2;
+bb2:;
+#line _
+    t20 = this;
+#line _
+    t21 = this;
+#line _
+    t22 = t21->count;
+#line _
+    t23 = n;
+#line _
+    t24 = LYR_CHECKED_ADD(t22, t23);
+#line _
+    t20->count = t24;
 #line _
     return;
 }
 
 #line _ "stdlib5/std/core.lyr"
-void lyr_std_core_StringBuilder_putInt(lyr_ty_std_core_StringBuilder *l0_this, int64_t l1_v) {
+void lyr_std_core_StringBuilder_putInt(lyr_ty_std_core_StringBuilder *this, int64_t v) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -1381,41 +1464,41 @@ void lyr_std_core_StringBuilder_putInt(lyr_ty_std_core_StringBuilder *l0_this, i
     int64_t t11 = 0;
 bb0:;
 #line _
-    t0 = l0_this;
+    t0 = this;
 #line _
     t1 = (int64_t)INT64_C(20);
 #line _
     lyr_std_core_StringBuilder_reserve(t0, t1);
 #line _
-    t2 = l0_this;
+    t2 = this;
 #line _
-    t3 = l0_this;
+    t3 = this;
 #line _
-    t4 = t3->f_count;
+    t4 = t3->count;
 #line _
-    t5 = l0_this;
+    t5 = this;
 #line _
-    t6 = t5->f_bytes;
+    t6 = t5->bytes;
 #line _
-    t7 = l0_this;
+    t7 = this;
 #line _
-    t8 = t7->f_count;
+    t8 = t7->count;
 #line _
-    t9 = l1_v;
+    t9 = v;
 #line _
-    t10 = lyr_bytes_put_int(t6, t8, t9);
+    t10 = lyr_c_lyr_bytes_put_int(t6, t8, t9);
 #line _
     t11 = LYR_CHECKED_ADD(t4, t10);
 #line _
-    t2->f_count = t11;
+    t2->count = t11;
 #line _
     return;
 }
 
 #line _ "stdlib5/std/core.lyr"
-lyr_ty_std_core_StringBuilder * lyr_std_core_StringBuilder_sized(int64_t l0_room) {
+lyr_ty_std_core_StringBuilder * lyr_std_core_StringBuilder_sized(int64_t room) {
 #line _
-    uint8_t l1_zero = 0;
+    uint8_t zero = 0;
 #line _
     uint8_t t0 = 0;
 #line _
@@ -1434,13 +1517,13 @@ bb0:;
 #line _
     t0 = (uint8_t)UINT64_C(0);
 #line _
-    l1_zero = t0;
+    zero = t0;
 #line _
-    t1 = l1_zero;
+    t1 = zero;
 #line _
     t2 = lyr_alloc_array(&lyr_desc_arr_u8, 1); LYR_ARR_DATA(t2, uint8_t)[0] = t1;
 #line _
-    t3 = l0_room;
+    t3 = room;
 #line _
     t4 = lyr_arr_repeat(&lyr_desc_arr_u8, t2, t3);
 #line _
@@ -1448,15 +1531,15 @@ bb0:;
 #line _
     t6 = (lyr_ty_std_core_StringBuilder *)lyr_alloc(&lyr_desc_ty_std_core_StringBuilder);
 #line _
-    LYR_WRITE_BARRIER(t6, &t6->f_bytes, t4);
+    LYR_WRITE_BARRIER(t6, &t6->bytes, t4);
 #line _
-    t6->f_count = t5;
+    t6->count = t5;
 #line _
     return t6;
 }
 
 #line _ "stdlib5/std/core.lyr"
-LyrStr * lyr_std_core_StringBuilder_toString(lyr_ty_std_core_StringBuilder *l0_this) {
+LyrStr * lyr_std_core_StringBuilder_toString(lyr_ty_std_core_StringBuilder *this) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -1471,21 +1554,21 @@ LyrStr * lyr_std_core_StringBuilder_toString(lyr_ty_std_core_StringBuilder *l0_t
     LyrStr *t4 = NULL;
 bb0:;
 #line _
-    t0 = l0_this;
+    t0 = this;
 #line _
-    t1 = t0->f_bytes;
+    t1 = t0->bytes;
 #line _
-    t2 = l0_this;
+    t2 = this;
 #line _
-    t3 = t2->f_count;
+    t3 = t2->count;
 #line _
-    t4 = lyr_str_from_byte_array(t1, t3);
+    t4 = lyr_c_lyr_str_from_byte_array(t1, t3);
 #line _
     return t4;
 }
 
 #line _ "stdlib5/std/core.lyr"
-void lyr_std_core_StringBuilder_reserve(lyr_ty_std_core_StringBuilder *l0_this, int64_t l1_n) {
+void lyr_std_core_StringBuilder_reserve(lyr_ty_std_core_StringBuilder *this, int64_t n) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -1516,17 +1599,17 @@ void lyr_std_core_StringBuilder_reserve(lyr_ty_std_core_StringBuilder *l0_this, 
     int64_t t12 = 0;
 bb0:;
 #line _
-    t0 = l0_this;
+    t0 = this;
 #line _
-    t1 = t0->f_count;
+    t1 = t0->count;
 #line _
-    t2 = l1_n;
+    t2 = n;
 #line _
     t3 = LYR_CHECKED_ADD(t1, t2);
 #line _
-    t4 = l0_this;
+    t4 = this;
 #line _
-    t5 = t4->f_bytes;
+    t5 = t4->bytes;
 #line _
     t6 = t5->len;
 #line _
@@ -1535,13 +1618,13 @@ bb0:;
     if (t7) goto bb1; else goto bb2;
 bb1:;
 #line _
-    t8 = l0_this;
+    t8 = this;
 #line _
-    t9 = l0_this;
+    t9 = this;
 #line _
-    t10 = t9->f_count;
+    t10 = t9->count;
 #line _
-    t11 = l1_n;
+    t11 = n;
 #line _
     t12 = LYR_CHECKED_ADD(t10, t11);
 #line _
@@ -1554,17 +1637,17 @@ bb2:;
 }
 
 #line _ "stdlib5/std/core.lyr"
-void lyr_std_core_StringBuilder_grow(lyr_ty_std_core_StringBuilder *l0_this, int64_t l1_need) {
+void lyr_std_core_StringBuilder_grow(lyr_ty_std_core_StringBuilder *this, int64_t need) {
 #line _
     LYR_STACK_CHECK();
 #line _
-    int64_t l2_room = 0;
+    int64_t room = 0;
 #line _
     int64_t l3__if0 = 0;
 #line _
-    uint8_t l4_zero = 0;
+    uint8_t zero = 0;
 #line _
-    LyrArr *l5_grown = NULL;
+    LyrArr *grown = NULL;
 #line _
     lyr_ty_std_core_StringBuilder *t0 = NULL;
 #line _
@@ -1629,9 +1712,9 @@ void lyr_std_core_StringBuilder_grow(lyr_ty_std_core_StringBuilder *l0_this, int
     uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
-    t0 = l0_this;
+    t0 = this;
 #line _
-    t1 = t0->f_bytes;
+    t1 = t0->bytes;
 #line _
     t2 = t1->len;
 #line _
@@ -1649,9 +1732,9 @@ bb1:;
     goto bb3;
 bb2:;
 #line _
-    t6 = l0_this;
+    t6 = this;
 #line _
-    t7 = t6->f_bytes;
+    t7 = t6->bytes;
 #line _
     t8 = t7->len;
 #line _
@@ -1666,74 +1749,80 @@ bb3:;
 #line _
     t11 = l3__if0;
 #line _
-    l2_room = t11;
+    room = t11;
 #line _
     goto bb4;
 bb4:; LYR_LOOP_POLL(lyr_poll);
 #line _
-    t12 = l2_room;
+    t12 = room;
 #line _
-    t13 = l1_need;
+    t13 = need;
 #line _
     t14 = (uint8_t)(t12 < t13);
 #line _
     if (t14) goto bb5; else goto bb6;
 bb5:;
 #line _
-    t15 = l2_room;
+    t15 = room;
 #line _
     t16 = (int64_t)INT64_C(2);
 #line _
     t17 = LYR_CHECKED_MUL(t15, t16);
 #line _
-    l2_room = t17;
+    room = t17;
 #line _
     goto bb4;
 bb6:;
 #line _
     t18 = (uint8_t)UINT64_C(0);
 #line _
-    l4_zero = t18;
+    zero = t18;
 #line _
-    t19 = l4_zero;
+    t19 = zero;
 #line _
     t20 = lyr_alloc_array(&lyr_desc_arr_u8, 1); LYR_ARR_DATA(t20, uint8_t)[0] = t19;
 #line _
-    t21 = l2_room;
+    t21 = room;
 #line _
     t22 = lyr_arr_repeat(&lyr_desc_arr_u8, t20, t21);
 #line _
-    l5_grown = t22;
+    grown = t22;
 #line _
-    t23 = l5_grown;
+    t23 = grown;
 #line _
-    t24 = l0_this;
+    t24 = this;
 #line _
-    t25 = t24->f_bytes;
+    t25 = t24->bytes;
 #line _
-    t26 = l0_this;
+    t26 = this;
 #line _
-    t27 = t26->f_count;
+    t27 = t26->count;
 #line _
-    lyr_bytes_copy(t23, t25, t27);
+    lyr_c_lyr_bytes_copy(t23, t25, t27);
 #line _
-    t28 = l0_this;
+    t28 = this;
 #line _
-    t29 = l5_grown;
+    t29 = grown;
 #line _
-    LYR_WRITE_BARRIER(t28, &t28->f_bytes, t29);
+    LYR_WRITE_BARRIER(t28, &t28->bytes, t29);
 #line _
     return;
 }
 
 #line _ "stdlib5/std/io.lyr"
-void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text) {
+void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 text) {
 #line _
     LYR_STACK_CHECK();
 #line _
-    lyr_slice_u8 l2_rest = {0};
+    lyr_slice_u8 rest = {0};
 #line _
-    int64_t l3_answer = 0;
+    int64_t answer = 0;
+#line _
+    int64_t l4__inline0 = 0;
+#line _
+    int64_t l5_stream = 0;
+#line _
+    lyr_slice_u8 from = {0};
 #line _
     lyr_slice_u8 t0 = {0};
 #line _
@@ -1751,19 +1840,19 @@ void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text) {
 #line _
     int64_t t7 = 0;
 #line _
-    int64_t t8 = 0;
+    lyr_slice_u8 t8 = {0};
 #line _
-    int64_t t9 = 0;
+    uint64_t t9 = 0;
 #line _
-    int64_t t10 = 0;
+    lyr_slice_u8 t10 = {0};
 #line _
     int64_t t11 = 0;
 #line _
-    uint8_t t12 = 0;
+    int64_t t12 = 0;
 #line _
     int64_t t13 = 0;
 #line _
-    lyr_slice_u8 t14 = {0};
+    int64_t t14 = 0;
 #line _
     int64_t t15 = 0;
 #line _
@@ -1771,23 +1860,35 @@ void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text) {
 #line _
     int64_t t17 = 0;
 #line _
-    int64_t t18 = 0;
+    uint8_t t18 = 0;
 #line _
-    lyr_slice_u8 t19 = {0};
+    int64_t t19 = 0;
+#line _
+    lyr_slice_u8 t20 = {0};
+#line _
+    int64_t t21 = 0;
+#line _
+    int64_t t22 = 0;
+#line _
+    int64_t t23 = 0;
+#line _
+    int64_t t24 = 0;
+#line _
+    lyr_slice_u8 t25 = {0};
 #line _
     uint32_t lyr_poll = LYR_POLL_EVERY;
 bb0:;
 #line _
-    t0 = l1_text;
+    t0 = text;
 #line _
     t1 = LYR_VIEW_BYTES(t0);
 #line _
-    l2_rest = t1;
+    rest = t1;
 #line _
     goto bb1;
 bb1:; LYR_LOOP_POLL(lyr_poll);
 #line _
-    t2 = l2_rest;
+    t2 = rest;
 #line _
     t3 = lyr_std_core__extend__Slice_uint8__isEmpty_6b51423e(t2);
 #line _
@@ -1798,58 +1899,79 @@ bb2:;
 #line _
     t5 = l0_stream;
 #line _
-    t6 = l2_rest;
+    t6 = rest;
 #line _
-    t7 = LYR_CONSOLE_PUT(t5, t6);
+    l5_stream = t5;
 #line _
-    l3_answer = t7;
+    from = t6;
 #line _
-    t8 = l3_answer;
+    t7 = l5_stream;
 #line _
-    t9 = (int64_t)INT64_C(32);
+    t8 = from;
 #line _
-    t10 = LYR_CHECKED_SHR(int64_t, uint64_t, 64, t8, t9);
+    t9 = (uint64_t)(uintptr_t)t8.ptr;
 #line _
-    t11 = (int64_t)INT64_C(0);
+    t10 = from;
 #line _
-    t12 = (uint8_t)(t10 != t11);
+    t11 = t10.len;
 #line _
-    if (t12) goto bb4; else goto bb5;
+    t12 = lyr_c_lyr_console_put(t7, t9, t11);
+#line _
+    l4__inline0 = t12;
+#line _
+    goto bb4;
 bb3:;
 #line _
     return;
 bb4:;
 #line _
-    t13 = l0_stream;
+    t13 = l4__inline0;
 #line _
-    lyr_std_io_drop(t13);
+    answer = t13;
 #line _
-    goto bb5;
+    t14 = answer;
+#line _
+    t15 = (int64_t)INT64_C(32);
+#line _
+    t16 = LYR_CHECKED_SHR(int64_t, uint64_t, 64, t14, t15);
+#line _
+    t17 = (int64_t)INT64_C(0);
+#line _
+    t18 = (uint8_t)(t16 != t17);
+#line _
+    if (t18) goto bb5; else goto bb6;
 bb5:;
 #line _
-    t14 = l2_rest;
+    t19 = l0_stream;
 #line _
-    t15 = l3_answer;
+    lyr_std_io_drop(t19);
 #line _
-    t16 = (int64_t)INT64_C(4294967295);
+    goto bb6;
+bb6:;
 #line _
-    t17 = (int64_t)(t15 & t16);
+    t20 = rest;
 #line _
-    t18 = t14.len;
+    t21 = answer;
 #line _
-    LYR_CHECK_RANGE(t17, t18, t14.len); t19 = (lyr_slice_u8){ t14.ptr + t17, t18 - t17 };
+    t22 = (int64_t)INT64_C(4294967295);
 #line _
-    l2_rest = t19;
+    t23 = (int64_t)(t21 & t22);
+#line _
+    t24 = t20.len;
+#line _
+    LYR_CHECK_RANGE(t23, t24, t20.len); t25 = (lyr_slice_u8){ t20.ptr + t23, t24 - t23 };
+#line _
+    rest = t25;
 #line _
     goto bb1;
 }
 
 #line _ "stdlib5/std/io.lyr"
-void lyr_std_io_drop(int64_t l0_stream) {
+void lyr_std_io_drop(int64_t stream) {
 #line _
     LYR_STACK_CHECK();
 #line _
-    int64_t l1_answer = 0;
+    int64_t answer = 0;
 #line _
     uint8_t l2__and0 = 0;
 #line _
@@ -1888,13 +2010,13 @@ void lyr_std_io_drop(int64_t l0_stream) {
     uint8_t t15 = 0;
 bb0:;
 #line _
-    t0 = l0_stream;
+    t0 = stream;
 #line _
     t1 = lyr_std_io_flushed(t0);
 #line _
-    l1_answer = t1;
+    answer = t1;
 #line _
-    t2 = l0_stream;
+    t2 = stream;
 #line _
     t3 = (int64_t)INT64_C(1);
 #line _
@@ -1905,7 +2027,7 @@ bb0:;
     if (t4) goto bb1; else goto bb2;
 bb1:;
 #line _
-    t5 = l1_answer;
+    t5 = answer;
 #line _
     t6 = (int64_t)INT64_C(0);
 #line _
@@ -1923,7 +2045,7 @@ bb2:;
     if (t8) goto bb3; else goto bb4;
 bb3:;
 #line _
-    t9 = l1_answer;
+    t9 = answer;
 #line _
     t10 = LYR_CHECKED_SUB((int64_t)0, t9);
 #line _
@@ -1945,7 +2067,7 @@ bb4:;
     if (t15) goto bb5; else goto bb6;
 bb5:;
 #line _
-    lyr_console_gone();
+    lyr_c_lyr_console_gone();
 #line _
     goto bb6;
 bb6:;
@@ -1954,7 +2076,7 @@ bb6:;
 }
 
 #line _ "stdlib5/std/io.lyr"
-int64_t lyr_std_io_flushed(int64_t l0_stream) {
+int64_t lyr_std_io_flushed(int64_t stream) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -1967,11 +2089,11 @@ int64_t lyr_std_io_flushed(int64_t l0_stream) {
     int64_t t3 = 0;
 bb0:;
 #line _
-    t0 = l0_stream;
+    t0 = stream;
 #line _
     t1 = (lyr_ty_0_env_std_io_flushed__86bc19d2 *)lyr_alloc(&lyr_desc_ty_0_env_std_io_flushed__86bc19d2);
 #line _
-    t1->f_stream = t0;
+    t1->stream = t0;
 #line _
     t2 = (lyr_fn_to_i64){ lyr_std_io_flushed__lambda2__d4dc4b68, t1 };
 #line _
@@ -1981,7 +2103,7 @@ bb0:;
 }
 
 #line _ "stdlib5/std/io.lyr"
-int64_t lyr_std_io_onPool(lyr_fn_to_i64 l0_call) {
+int64_t lyr_std_io_onPool(lyr_fn_to_i64 call) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -1997,7 +2119,7 @@ bb0:;
     goto bb1;
 bb1:;
 #line _
-    t1 = l0_call;
+    t1 = call;
 #line _
     t2 = t1.fn(t1.env, NULL);
 #line _
@@ -2022,9 +2144,9 @@ bb0:;
 #line _
     t0 = l0__env_;
 #line _
-    t1 = t0->f_stream;
+    t1 = t0->stream;
 #line _
-    t2 = lyr_console_flush(t1);
+    t2 = lyr_c_lyr_console_flush(t1);
 #line _
     return t2;
 }
@@ -2035,18 +2157,18 @@ bb0:;
 }
 
 #line _ "stdlib5/std/core.lyr"
-LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *l0_this) {
+LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *this) {
 #line _
     LyrStr *t0 = NULL;
 bb0:;
 #line _
-    t0 = l0_this;
+    t0 = this;
 #line _
     return t0;
 }
 
 #line 3 "<synthesized Debug for app.main.Circle>"
-LyrStr * lyr_app_main__extend__Circle_debug_adbc7504(lyr_ty_app_main_Circle *l0_this) {
+LyrStr * lyr_app_main__extend__Circle_debug_adbc7504(lyr_ty_app_main_Circle *this) {
 #line 3
     LYR_STACK_CHECK();
 #line 3
@@ -2075,25 +2197,25 @@ bb0:;
 #line 4
     t1 = (LyrStr *)&lyr_lit9;
 #line 3
-    t2 = lyr_str_concat(t0, t1);
+    t2 = lyr_c_lyr_str_concat(t0, t1);
 #line 4
-    t3 = l0_this;
+    t3 = this;
 #line 4
-    t4 = t3->f_r;
+    t4 = t3->r;
 #line 4
     t5 = lyr_std_core__extend__int_debug_970869d7(t4);
 #line 3
-    t6 = lyr_str_concat(t2, t5);
+    t6 = lyr_c_lyr_str_concat(t2, t5);
 #line 5
     t7 = (LyrStr *)&lyr_lit10;
 #line 3
-    t8 = lyr_str_concat(t6, t7);
+    t8 = lyr_c_lyr_str_concat(t6, t7);
 #line 3
     return t8;
 }
 
 #line 3 "<synthesized Debug for app.main.Rect>"
-LyrStr * lyr_app_main__extend__Rect_debug_ac38250e(lyr_ty_app_main_Rect *l0_this) {
+LyrStr * lyr_app_main__extend__Rect_debug_ac38250e(lyr_ty_app_main_Rect *this) {
 #line 3
     LYR_STACK_CHECK();
 #line 3
@@ -2132,37 +2254,37 @@ bb0:;
 #line 4
     t1 = (LyrStr *)&lyr_lit12;
 #line 3
-    t2 = lyr_str_concat(t0, t1);
+    t2 = lyr_c_lyr_str_concat(t0, t1);
 #line 4
-    t3 = l0_this;
+    t3 = this;
 #line 4
-    t4 = t3->f_w;
+    t4 = t3->w;
 #line 4
     t5 = lyr_std_core__extend__int_debug_970869d7(t4);
 #line 3
-    t6 = lyr_str_concat(t2, t5);
+    t6 = lyr_c_lyr_str_concat(t2, t5);
 #line 5
     t7 = (LyrStr *)&lyr_lit13;
 #line 3
-    t8 = lyr_str_concat(t6, t7);
+    t8 = lyr_c_lyr_str_concat(t6, t7);
 #line 5
-    t9 = l0_this;
+    t9 = this;
 #line 5
-    t10 = t9->f_h;
+    t10 = t9->h;
 #line 5
     t11 = lyr_std_core__extend__int_debug_970869d7(t10);
 #line 3
-    t12 = lyr_str_concat(t8, t11);
+    t12 = lyr_c_lyr_str_concat(t8, t11);
 #line 6
     t13 = (LyrStr *)&lyr_lit10;
 #line 3
-    t14 = lyr_str_concat(t12, t13);
+    t14 = lyr_c_lyr_str_concat(t12, t13);
 #line 3
     return t14;
 }
 
 #line 26 "programs/shapes.lyr"
-LyrStr * lyr_app_main__extend__Tri_show_270247fd(lyr_ty_app_main_Tri *l0_this) {
+LyrStr * lyr_app_main__extend__Tri_show_270247fd(lyr_ty_app_main_Tri *this) {
 #line 26
     LyrStr *t0 = NULL;
 bb0:;
@@ -2173,7 +2295,7 @@ bb0:;
 }
 
 #line 25 "programs/shapes.lyr"
-int64_t lyr_app_main__extend__Tri_area_b40d8235(lyr_ty_app_main_Tri *l0_this) {
+int64_t lyr_app_main__extend__Tri_area_b40d8235(lyr_ty_app_main_Tri *this) {
 #line 25
     lyr_ty_app_main_Tri t0_s = {0};
 #line 25
@@ -2194,13 +2316,13 @@ int64_t lyr_app_main__extend__Tri_area_b40d8235(lyr_ty_app_main_Tri *l0_this) {
     int64_t t6 = 0;
 bb0:;
 #line 25
-    t0 = l0_this;
+    t0 = this;
 #line 25
-    t1 = t0->f_b;
+    t1 = t0->b;
 #line 25
-    t2 = l0_this;
+    t2 = this;
 #line 25
-    t3 = t2->f_h;
+    t3 = t2->h;
 #line 25
     t4 = LYR_CHECKED_MUL(t1, t3);
 #line 25
@@ -2212,7 +2334,7 @@ bb0:;
 }
 
 #line 3 "<synthesized Debug for app.main.Tri>"
-LyrStr * lyr_app_main__extend__Tri_debug_bcf989a3(lyr_ty_app_main_Tri *l0_this) {
+LyrStr * lyr_app_main__extend__Tri_debug_bcf989a3(lyr_ty_app_main_Tri *this) {
 #line 3
     LYR_STACK_CHECK();
 #line 3
@@ -2255,37 +2377,37 @@ bb0:;
 #line 4
     t1 = (LyrStr *)&lyr_lit15;
 #line 3
-    t2 = lyr_str_concat(t0, t1);
+    t2 = lyr_c_lyr_str_concat(t0, t1);
 #line 4
-    t3 = l0_this;
+    t3 = this;
 #line 4
-    t4 = t3->f_b;
+    t4 = t3->b;
 #line 4
     t5 = lyr_std_core__extend__int_debug_970869d7(t4);
 #line 3
-    t6 = lyr_str_concat(t2, t5);
+    t6 = lyr_c_lyr_str_concat(t2, t5);
 #line 5
     t7 = (LyrStr *)&lyr_lit13;
 #line 3
-    t8 = lyr_str_concat(t6, t7);
+    t8 = lyr_c_lyr_str_concat(t6, t7);
 #line 5
-    t9 = l0_this;
+    t9 = this;
 #line 5
-    t10 = t9->f_h;
+    t10 = t9->h;
 #line 5
     t11 = lyr_std_core__extend__int_debug_970869d7(t10);
 #line 3
-    t12 = lyr_str_concat(t8, t11);
+    t12 = lyr_c_lyr_str_concat(t8, t11);
 #line 6
     t13 = (LyrStr *)&lyr_lit10;
 #line 3
-    t14 = lyr_str_concat(t12, t13);
+    t14 = lyr_c_lyr_str_concat(t12, t13);
 #line 3
     return t14;
 }
 
 #line _ "stdlib5/std/core.lyr"
-LyrStr * lyr_std_core__extend__int_debug_970869d7(int64_t l0_this) {
+LyrStr * lyr_std_core__extend__int_debug_970869d7(int64_t this) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -2312,7 +2434,7 @@ bb0:;
 #line _
     t2 = l1__fstring;
 #line _
-    t3 = l0_this;
+    t3 = this;
 #line _
     lyr_std_core_fstringInt(t2, t3);
 #line _
@@ -2340,10 +2462,10 @@ typedef struct { uint8_t *ptr; int64_t len; } lyr_slice_u8;
 _Static_assert(sizeof(lyr_slice_u8) == 16, "layout of lyr_slice_u8");
 
 /* prototypes */
-uint8_t lyr_std_core__extend__Slice_uint8__isEmpty_6b51423e(lyr_slice_u8 l0_this);
+uint8_t lyr_std_core__extend__Slice_uint8__isEmpty_6b51423e(lyr_slice_u8 this);
 
 #line _ "stdlib5/std/core.lyr"
-uint8_t lyr_std_core__extend__Slice_uint8__isEmpty_6b51423e(lyr_slice_u8 l0_this) {
+uint8_t lyr_std_core__extend__Slice_uint8__isEmpty_6b51423e(lyr_slice_u8 this) {
 #line _
     lyr_slice_u8 t0 = {0};
 #line _
@@ -2354,7 +2476,7 @@ uint8_t lyr_std_core__extend__Slice_uint8__isEmpty_6b51423e(lyr_slice_u8 l0_this
     uint8_t t3 = 0;
 bb0:;
 #line _
-    t0 = l0_this;
+    t0 = this;
 #line _
     t1 = t0.len;
 #line _
@@ -2381,12 +2503,12 @@ _Static_assert(sizeof(lyr_slice_u8) == 16, "layout of lyr_slice_u8");
 static const LyrStaticStr(2) lyr_lit0 = LYR_STR_INIT("\012");
 
 /* prototypes */
-void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 l1_text);
-void lyr_std_io_println_string__d598c8ee(LyrStr *l0_v);
-LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *l0_this);
+void lyr_std_io_put(int64_t l0_stream, lyr_slice_u8 text);
+void lyr_std_io_println_string__d598c8ee(LyrStr *v);
+LyrStr * lyr_std_core__extend__string_show_1c50ef57(LyrStr *this);
 
 #line _ "stdlib5/std/io.lyr"
-void lyr_std_io_println_string__d598c8ee(LyrStr *l0_v) {
+void lyr_std_io_println_string__d598c8ee(LyrStr *v) {
 #line _
     LYR_STACK_CHECK();
 #line _
@@ -2415,7 +2537,7 @@ bb0:;
 #line _
     t0 = (int64_t)INT64_C(1);
 #line _
-    t1 = l0_v;
+    t1 = v;
 #line _
     t2 = lyr_std_core__extend__string_show_1c50ef57(t1);
 #line _

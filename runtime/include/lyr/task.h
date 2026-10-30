@@ -35,7 +35,7 @@ uint8_t lyr_task_wait(int64_t timeout_ns);
 /* The scheduler's resume of a task's context: it runs until it parks, ends or panics — and
  * a panic stays the context's, for the scheduler to settle, instead of passing on. 0: it
  * parked; 1: its body returned; 2: it panicked. */
-uint8_t lyr_task_resume(LyrCoro *co);
+int64_t lyr_task_resume(LyrCoro *co);
 
 /* The report a panicked context left: its code, its message, its frames as the report writes them;
  * NULL where it did not panic. */
@@ -64,7 +64,6 @@ void lyr_task_wake(int64_t poller);
 int64_t lyr_task_arm(int64_t fd, int64_t interest, int64_t token);
 void lyr_task_forget(int64_t fd);
 int64_t lyr_task_take(int64_t *into, int64_t n);
-#define LYR_TASK_TAKE(slice) lyr_task_take((slice).ptr, (slice).len)
 
 /* A thread that spins on a lock lets another run: the lock's holder, perhaps. */
 void lyr_task_spin(void);

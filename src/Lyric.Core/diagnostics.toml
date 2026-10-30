@@ -6,11 +6,13 @@
 title = "the C compiler or the linker failed"
 severity = "error"
 area = "14-cli"
-summary = "Reported by `build`, `run`, `test` and `bench` when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails. The message carries the command and what the C compiler wrote; the exit code is 2."
+summary = "Reported by `build`, `run`, `test` and `bench` when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails, or does not finish within five minutes and is stopped. The message carries the command and what the C compiler wrote, or the limit; the exit code is 2. A link whose failure the build can read is said as its findings instead (`LYR-LNK0001`–`LYR-LNK0003`); this error stands for what is left. A header no directory holds adds the directories that were searched."
 explanation = '''
 `lyric5` translates the program to C and hands it to a C compiler (`zig cc`, clang or gcc) together with the runtime and the C sources the packages name in `[native]` or through their build scripts. When that step fails, the build stops with this error and the compiler's own output.
 
-The Lyric program itself was accepted; what failed is C. Look at the quoted output: most often a package's own C source does not compile, a library named with `link-lib` or in `[native]` is missing, or the profile needs clang (`asan`, `tsan`) and another compiler was found. A failure in C the toolchain generated is a defect of the toolchain and worth a report.
+The Lyric program itself was accepted; what failed is C. Look at the quoted output: most often a package's own C source does not compile, a header it includes lies in no directory the package names in `include`, or the profile needs clang (`asan`, `tsan`) and another compiler was found. A failure in C the toolchain generated is a defect of the toolchain and worth a report.
+
+A step that does not finish within five minutes is stopped and said with the limit: a machine under heavy load, or a unit too large for the C compiler. Building again on a quieter machine, or splitting a very large native source, gets past it.
 '''
 example = '''
 $ cat lyric.toml
@@ -94,6 +96,121 @@ fn main(): void {
 }
 '''
 
+[LYR-BLD0004]
+title = "a library of the machine cannot be had for this build"
+severity = "error"
+area = "15-project"
+summary = "Reported when a package's native part, or its build script, names a library of the system through `pkgConfig` and pkg-config is not there, does not know the name, or the build is for another target than the host — or names a macOS framework for a build for macOS on a host that is not macOS. Nothing is built; the exit code is 2: the machine lacks what the package asks of it."
+explanation = '''
+Most of what a package links it brings itself — its sources, a source tree, an archive — and those build for every target from any machine. Two things belong to the machine instead. `pkgConfig = ["sdl2"]` asks the host's `pkg-config` where SDL2 lies and how to link it: that answer is about this machine's libraries, so it holds for a build for this machine only. `frameworks = ["Cocoa"]` links frameworks of the macOS SDK, which only a Mac has.
+
+So a build for another target that needs one stops before anything compiles, and the message names the package and the key. Build on the machine the program is for, or bring the library with the package — as `archives` built for each target, or as a source tree compiled with the program (`[native.vendor]`).
+
+Where pkg-config itself is missing, install it (`pkgconf` on most systems) or set `PKG_CONFIG` to its path; a name it does not know is a library the machine lacks — install its development package.
+'''
+wrong = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+pkgConfig = ["no-such-library-of-this-machine"]
+//- src/main.lyr
+fn main(): void {
+}
+'''
+right = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+libs = ["m"]
+//- src/main.lyr
+fn main(): void {
+}
+'''
+
+[LYR-BLD0005]
+title = "a module cannot be made from a C header"
+severity = "error"
+area = "15-project"
+summary = "Reported when a header a package's `bindings` names does not compile — with what the C compiler said — or when the C compiler writes no syntax tree of it, which only zig cc and clang do. Nothing is built; the exit code is 1."
+explanation = '''
+`bindings = [{ header = "native/geo.h", module = "geo" }]` asks the build to write the module `<package>.geo` from the header: its functions as `extern "C"` declarations, its structs, enums, typedefs and constants, each in the types they have on the build's target. To know them, the build has the C compiler read the header — with the package's `include` and `defines`, for that target — and write its syntax tree. A header that does not compile has no tree, and the message quotes the C compiler.
+
+Make the header compile as the package's own C sources would see it: a missing include directory belongs in `include`, a definition the header expects in `defines`. The tree comes from zig cc or clang; with gcc as the C compiler, the build looks for zig, and where there is none it stops here — set `LYRIC_CC` to zig or clang. `lyric bindgen <header>` makes the same module on the command line, to see what the build would read.
+'''
+wrong = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+bindings = [{ header = "native/geo.h", module = "geo" }]
+//- native/geo.h
+int geo_add(int a, int b)
+//- src/main.lyr
+fn main(): void {
+}
+'''
+right = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+bindings = [{ header = "native/geo.h", module = "geo" }]
+//- native/geo.h
+int geo_add(int a, int b);
+//- src/main.lyr
+fn main(): void {
+}
+'''
+
+[LYR-BLD0006]
+title = "a file the build puts beside the binary is not there, shares its name, or would not be found there"
+severity = "error"
+area = "15-project"
+summary = "Reported when a package's `build.lyr` names a file with `std.build.besideBinary` that is not there when the script has ended, when two such files — or `dylibs` of the native part — have one name, or when a library of `dylibs` would not be found there — a Mach-O library whose install name does not begin with `@rpath/`, an ELF library without a soname. Nothing is built; the exit code is 1."
+explanation = '''
+`build.besideBinary(path)` asks the build to copy a file into the directory of every binary it makes of the program — a shared library the program loads when it starts, most of all, such as `SDL3.dll` beside `app.exe`. The binary looks for shared libraries in its own directory first, so the program starts from wherever it is copied, with the library beside it. The copy goes under the file's own name, so the file must be there when the script ends, and two files with one name — from two packages, or from two directories — would overwrite each other.
+
+A path relative to the package's root is read from there; one from the environment (`SDL3_DIR`) is likely wrong where it is missing. Name the variable with `build.rerunIfEnvChanged`, so the script runs again when it is set right, and check that the file is there before naming it: `build.warn` can say what to set.
+
+The library's own directory goes to the link with `build.linkSearch(dir)`, which is never written into the binary: the program does not depend on where the build found it.
+
+The shared libraries a package names in `dylibs` lie beside the binary too, under the same rule: no two files of one name. And the binary finds such a library there only by the name the library gives itself. A Mach-O library must call itself `@rpath/libfoo.dylib` — `install_name_tool -id @rpath/libfoo.dylib libfoo.dylib` renames one —, an ELF library must have a soname — `patchelf --set-soname libfoo.so libfoo.so`, or `-Wl,-soname,libfoo.so` where you build it. Without one, the binary would record the path the library was linked from, a path of the machine that built it.
+'''
+wrong = '''
+//- build.lyr
+import std.build;
+
+fn main(): void {
+    build.besideBinary("lib/missing.dll");
+}
+//- src/main.lyr
+fn main(): void {
+}
+'''
+right = '''
+//- build.lyr
+import std.build;
+
+fn main(): void {
+    build.besideBinary("data/notes.txt");
+}
+//- data/notes.txt
+beside the binary
+//- src/main.lyr
+fn main(): void {
+}
+'''
+
 [LYR-CG0001]
 title = "a construct the C backend does not translate"
 severity = "error"
@@ -158,15 +275,15 @@ error[LYR-CLI0001]: no such file '/home/ada/app/missing.lyr'
 title = "no C compiler was found"
 severity = "error"
 area = "14-cli"
-summary = "Reported by `build`, `run`, `test` and `bench` when no C compiler is found — `LYRIC_CC`, then `zig`, `clang`, `gcc` on the PATH — or when the profile needs clang (`asan`, `tsan`) and there is none. The exit code is 2."
+summary = "Reported by `build`, `run`, `test` and `bench` when no C compiler is found — `LYRIC_CC`, then the zig `lyric toolchain install zig` installed, then `zig`, `clang`, `gcc` on the PATH — or when the profile needs clang (`asan`, `tsan`) and there is none. The exit code is 2."
 explanation = '''
 `lyric5` builds through C: it needs a C compiler to turn the program and its runtime into a binary. `--emit ir` and `--emit c` print without one; everything that produces a binary needs it.
 
-Install zig (recommended), clang or gcc, or point `LYRIC_CC` at a compiler. The `asan` and `tsan` profiles need clang, whose sanitizer runtimes they link. `lyric5 version` says which compiler was found.
+`lyric5 toolchain install zig` installs the zig this toolchain is built and tested with, under `~/.lyric`, where the search finds it before the PATH. Else put zig, clang or gcc on the PATH, or point `LYRIC_CC` at a compiler. The `asan` and `tsan` profiles need clang, whose sanitizer runtimes they link. `lyric5 version` says which compiler was found.
 '''
 example = '''
 $ lyric5 build
-error[LYR-CLI0002]: no C compiler found — install zig (recommended), clang or gcc, or set LYRIC_CC
+error[LYR-CLI0002]: no C compiler found — 'lyric5 toolchain install zig' installs the one this toolchain is tested with; or put zig, clang or gcc on the PATH, or set LYRIC_CC
 $ lyric5 build --profile asan
 error[LYR-CLI0002]: the asan profile needs clang, and none was found
 '''
@@ -400,6 +517,54 @@ Run it inside the package's repository, name a revision that exists (`git log --
 example = '''
 $ lyric5 api --diff v9.9.9
 error[LYR-CLI0022]: git cannot read 'v9.9.9': fatal: not a valid object name v9.9.9
+'''
+
+[LYR-CLI0023]
+title = "a toolchain cannot be fetched"
+severity = "error"
+area = "14-cli"
+summary = "`lyric toolchain` reaches neither the mirror nor GitHub, the channel has no such version or no archive for this machine, or there is no key to check a signature with. The exit code is 2."
+explanation = '''
+`lyric toolchain install`, `update` and `list --available` read a channel's index — `dev.json` or `stable.json`, signed — from the mirror, and from GitHub where the mirror cannot be reached. `LYRIC_MIRROR` names another mirror in place of both, and `LYRIC_MIRROR_KEY` the key its signatures are made with. A version is one the index lists, with its build part (`+…`) or without; `dev` and `stable` name the newest of each channel.
+
+Check the network, name a version `lyric toolchain list --available` shows, or install on a machine whose target the release has an archive for.
+'''
+example = '''
+$ lyric5 toolchain install 5.9.0
+error[LYR-CLI0023]: the channel 'stable' has no version 5.9.0
+  = help: lyric5 toolchain list --available says which it has
+'''
+
+[LYR-CLI0024]
+title = "a toolchain fetched is not what its index says"
+severity = "error"
+area = "14-cli"
+summary = "A channel's index does not carry a signature the toolchain's key made, or an archive's size, SHA-256 or `toolchain.json` differs from what the index and the archive itself list. Nothing is installed; the exit code is 2."
+explanation = '''
+An install trusts the signature, not the server: the index is signed with the project's key, and it gives each archive's size and SHA-256; the archive lists every file it holds in `toolchain.json`. A difference anywhere stops the install before the toolchain is in place, and the mirror is not routed around — a mirror that serves a forged index is not one to fall back from quietly.
+
+Try again later or from GitHub (`LYRIC_MIRROR` unset); if it persists, the mirror is broken or tampered with.
+'''
+example = '''
+$ lyric5 toolchain install dev
+error[LYR-CLI0024]: lyric-5.0.0-dev.20261028-linux-x64.tar.gz has the SHA-256 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08, and its index gives 4e4c294b331f7a2099a379bec34b9f9fc03dc46ab465d998f4d683da53487e6d
+  = help: nothing was installed
+'''
+
+[LYR-CLI0025]
+title = "the installed toolchains refuse the change"
+severity = "error"
+area = "14-cli"
+summary = "`lyric toolchain default` or `remove`, or `LYRIC_TOOLCHAIN`, names a version that is not installed, `remove` names the default or the toolchain that runs the command, `update` finds no default, an installed toolchain a command is handed to cannot be run, or `config.toml` under `LYRIC_HOME` is not one the toolchain reads. The exit code is 2."
+explanation = '''
+The toolchains live under `~/.lyric` — or the directory `LYRIC_HOME` names —, each in `toolchains/<version>/`; `config.toml` holds the one key `default`, and `bin` is a link to the default's directory. The default cannot be removed before another is made the default, nor can the toolchain a command runs from remove itself.
+
+Install the version first, make another the default (`lyric toolchain default <version>`), or run the removal from another toolchain.
+'''
+example = '''
+$ lyric5 toolchain remove 5.0.0
+error[LYR-CLI0025]: lyric 5.0.0 is the default
+  = help: make another the default first: lyric5 toolchain default <version>
 '''
 
 [LYR-CT0001]
@@ -677,11 +842,11 @@ pub macro again(n: Expr): Expr {
 title = "the toolchain crashed"
 severity = "error"
 area = "16-diagnostics"
-summary = "`lyric5` met an exception it did not expect. It prints the exception, where it was in the program if it knows, and its own stack trace, and exits with 101."
+summary = "`lyric5` met an exception it did not expect. It prints the exception, where it was in the program if it knows, and its own stack trace, writes the same with the version, the command and the machine to a report under `out/` (`lyric5-ice-<time>-<pid>.txt`), and exits with 101."
 explanation = '''
 This is a bug in the toolchain, not in the program. The program may be right or wrong; either way the compiler should have answered with a diagnostic.
 
-Report it with the program that triggered it and the full output. Until it is fixed, changing the construct named in the `while …` line usually avoids it.
+Report it with the program that triggered it and the report the message names — it holds the version, the command, the machine, the place and the trace. Until it is fixed, changing the construct named in the `while …` line usually avoids it.
 '''
 example = '''
 $ cat src/facade.lyr
@@ -694,6 +859,7 @@ $ lyric5 build
 error[LYR-ICE0001]: the toolchain failed: InternalCompilationException: ir: type not lowerable in current version: <error>
   while lowering 'app.main.main' at src/main.lyr:3:1
   = help: this is a bug in lyric5 — please report it with the program that triggered it
+  = note: a report to attach is in /home/ada/app/out/lyric5-ice-20261028-171500-4242.txt
    at …
 $ echo $?
 101
@@ -1095,6 +1261,79 @@ fn main(): void {
     let a = 1.0;
     let _ = a;
 }
+'''
+
+[LYR-LNK0001]
+title = "a C symbol nothing the link takes defines"
+severity = "error"
+area = "15-project"
+summary = "Reported by `build`, `run`, `test` and `bench` when the linker finds no definition of a symbol the program or a package's C calls. The finding stands at the `extern` declaration that names the symbol, where the program declares it; else it says what references it. Nothing is linked; the exit code is 2."
+explanation = '''
+An `extern "C" fn` declaration promises that some C defines the function. The compiler takes the promise; the linker checks it, against everything the link takes: the program, the packages' C sources and archives, the libraries their `[native]` parts and build scripts name, the runtime. When none of them defines the symbol, the link fails, and this finding points at the declaration.
+
+Most often the library that defines it is not named. Name it where the package says what it links: `libs` for a library of the system by name, `archives` for one the package brings prebuilt, `frameworks` on macOS, `pkgConfig` for one pkg-config knows — or let the build script link it. A symbol spelled otherwise than the C header spells it, or a function the header declares only as a macro, is the other common cause: compare the declaration with the header, or have `lyric bindgen` write it.
+'''
+example = '''
+$ cat src/main.lyr
+extern "C" fn sqlite3_libversion(): CStr;
+
+fn main(): void {
+    let _ = sqlite3_libversion();
+}
+$ lyric5 build
+error[LYR-LNK0001]: nothing the link takes defines 'sqlite3_libversion'
+ --> src/main.lyr:1:1
+  |
+1 | extern "C" fn sqlite3_libversion(): CStr;
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ declared here, and defined nowhere the link looks
+  |
+  = help: name the library that defines it in the package's [native] — 'libs', 'archives', 'frameworks' or 'pkgConfig' — or link it from the build script
+'''
+
+[LYR-LNK0002]
+title = "a library the linker does not find"
+severity = "error"
+area = "15-project"
+summary = "Reported by `build`, `run`, `test` and `bench` when the linker finds no library by a name a package's `[native]` part, its build script or pkg-config gave it, or no macOS framework by its name. The finding stands at the line of the manifest that names it, or says who named it. Nothing is linked; the exit code is 2."
+explanation = '''
+A library named in `libs` — or by a build script's `linkLib`, or in what pkg-config answered — is looked for by the linker in the system's directories and those the build was told of. When it is not there, the link fails at once.
+
+On Linux and macOS the library is often installed without what a link needs: install its development package (`libsqlite3-dev`, `sqlite-devel`), or let `pkgConfig` find it, which also says the directory. A library in a directory of its own is named by a build script with `linkSearch`. A misspelt name — `sqlite` for `sqlite3` — fails the same way. A framework is the macOS SDK's; its name is the SDK's, with its capital letters.
+'''
+example = '''
+$ cat lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+libs = ["sqlite"]
+$ lyric5 build
+error[LYR-LNK0002]: the linker finds no library 'sqlite'
+ --> lyric.toml:6:9
+  |
+6 | libs = ["sqlite"]
+  |         ^^^^^^^^ app names it here
+  |
+  = help: install its development package, or name the directory that holds it — pkg-config says both ('pkgConfig'), a build script 'linkSearch'
+'''
+
+[LYR-LNK0003]
+title = "a C symbol two inputs of the link define"
+severity = "error"
+area = "15-project"
+summary = "Reported by `build`, `run`, `test` and `bench` when the linker finds a symbol defined twice — by two packages' C, a package and the program, or one package twice. The finding names who defines it and where. Nothing is linked; the exit code is 2."
+explanation = '''
+C has one namespace for the functions and variables a program links: two definitions of one name are one too many, wherever they come from. Two packages that each carry a copy of the same small C library, or of a helper named the same, meet here.
+
+Rename one of them, make one `static` where only its own file calls it, or leave one package's copy out — a package that depends on another can use that one's C instead of its own.
+'''
+example = '''
+$ lyric5 build
+error[LYR-LNK0003]: 'twice_c' is defined by app and by geo
+  = note: defined at a.c:1 (app/native/a.c:1)
+  = note: defined at b.c:1 (geo/native/b.c:1)
+  = help: a C symbol is defined once in a program: rename one of them, make one 'static', or leave one of the packages out
 '''
 
 [LYR-MAC0001]
@@ -1771,37 +2010,8 @@ fn main(): void {
 title = "a list after '::' without its '['"
 severity = "error"
 area = "05-interfaces"
-summary = "The interfaces after `::` — of a struct, class, enum, interface or extend block, of a type parameter's constraints, of an associated type's bound — do not open with `[`."
-explanation = '''
-What follows `::` is a list, and a list stands in brackets even when it holds one entry: `struct User :: [Named]`, `T :: [Show, Eq]`. Without the `[` the closing `]` is usually missing too, and is refused as well (LYR-PAR0004).
-
-Put the interfaces in brackets.
-'''
-wrong = '''
-interface Named {
-    fn name(): string;
-}
-
-struct User :: Named] {
-    fn name(): string { return "u"; }
-}
-
-fn main(): void {
-}
-'''
-right = '''
-interface Named {
-    fn name(): string;
-}
-
-struct User :: [Named] {
-    fn name(): string { return "u"; }
-}
-
-fn main(): void {
-    let _ = User { }.name();
-}
-'''
+summary = "The interfaces after `::` did not open with `[`."
+retired = "the list rule: one interface after '::' stands without brackets, 'struct S :: I'; several without them are LYR-PAR0066"
 
 [LYR-PAR0031]
 title = "a parameter or field without ':' before its type"
@@ -2742,6 +2952,53 @@ fn main(): void {
 }
 '''
 
+[LYR-PAR0066]
+title = "several interfaces after '::' without brackets"
+severity = "error"
+area = "05-interfaces"
+summary = "Several interfaces follow `::` — of a struct, class, enum, interface or extend block, or of an associated type's bound — without brackets around them. One interface stands without them, several in them."
+explanation = '''
+After `::` one interface may stand alone, `struct User :: Named`, and several stand in brackets, `struct User :: [Named, Shown]` — the list rule, the same as for `throws` and `catch`. Without the brackets the `,` after the first would leave it open what the list holds.
+
+Put the interfaces in brackets. In a type parameter's constraint a `,` after one interface begins the next parameter: `<T :: Named, U>` has the parameters `T` and `U`; `<T :: [Named, Shown]>` constrains `T` twice.
+'''
+wrong = '''
+interface Named {
+    fn name(): string;
+}
+
+interface Shown {
+    fn show(): string;
+}
+
+struct User :: Named, Shown {
+    fn name(): string { return "u"; }
+    fn show(): string { return "U"; }
+}
+
+fn main(): void {
+}
+'''
+right = '''
+interface Named {
+    fn name(): string;
+}
+
+interface Shown {
+    fn show(): string;
+}
+
+struct User :: [Named, Shown] {
+    fn name(): string { return "u"; }
+    fn show(): string { return "U"; }
+}
+
+fn main(): void {
+    let u = User { };
+    let _ = u.name() + u.show();
+}
+'''
+
 [LYR-PKG0001]
 title = "`lyric.toml` or `lyric.lock` is not valid TOML"
 severity = "error"
@@ -2775,11 +3032,13 @@ fn main(): void {
 title = "a manifest or lock field that is missing or malformed"
 severity = "error"
 area = "15-project"
-summary = "Reported when `lyric.toml` or `lyric.lock` parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a `[[bin]]` entry, a profile, `[native]`, `[trust]`, `[lints]`, a toolchain pin, a locked revision."
+summary = "Reported when `lyric.toml` or `lyric.lock` parses as TOML but a field is missing, has the wrong type, or has a value of the wrong form: a package name or version, an edition, a dependency, a `[[bin]]` entry, a profile, `[native]`, `[trust]`, `[lints]`, a toolchain pin, a locked revision, a source tree of `[native.vendor]` or an `@name/` path that names none, a `bindings` entry — and a prebuilt file `[native]` names that is not part of the package or not there, or a URL's tree without its `hash`, when the build needs it."
 explanation = '''
 Every key of a manifest has a type and a form: `name` is a lowercase identifier, `version` a semantic version `MAJOR.MINOR.PATCH`, a dependency `{ path = "…" }` or `{ git = "…", tag = "…" }`, a `[[bin]]` entry a `.lyr` file under `src/`. A value of another type or form is refused rather than guessed at, so a manifest means one thing to every toolchain that reads it.
 
 The message names the field and the form it takes. Write the field in that form.
+
+A source tree loaded from a URL is pinned by its `hash`, the SHA-256 of the file: a URL without one is refused once the build has loaded it, and the message gives the hash to write — `lyric add <name> --vendor --url <url>` writes the line with it.
 '''
 wrong = '''
 //- lyric.toml
@@ -3007,14 +3266,14 @@ error[LYR-PKG0006]: https://example.org/geo has no tag 'v2.0.0' for 'geo'
 '''
 
 [LYR-PKG0007]
-title = "a git dependency cannot be read"
+title = "a git dependency or a source tree cannot be read"
 severity = "error"
 area = "15-project"
-summary = "Reported when a dependency's repository cannot be cloned or fetched, when `git` is not on the PATH, or when under `--offline` the user's cache does not hold the revision. The exit code is 2: the environment failed, not the manifest."
+summary = "Reported when the repository of a dependency or of a source tree cannot be cloned or fetched, when a source tree's URL cannot be loaded, when `git` is not on the PATH, or when under `--offline` the user's cache does not hold the revision or the file. The exit code is 2: the environment failed, not the manifest."
 explanation = '''
-Packages from git are read through the user's cache (`~/.cache/lyric/git` on Linux): fetched when the cache lacks the revision, read from it otherwise. When git cannot reach the repository, or is not installed, or `--offline` forbids the fetch the build needs, there is no package to read.
+Packages from git are read through the user's cache (`~/.cache/lyric/git` on Linux): fetched when the cache lacks the revision, read from it otherwise. The source trees of `[native.vendor]` are read the same way — a tree from git like a package, a tree from a URL as a file kept under its hash (`~/.cache/lyric/vendor`) — and only by a build whose target needs them. When git cannot reach the repository, or is not installed, or the URL does not answer, or `--offline` forbids the fetch the build needs, there is nothing to read.
 
-The message quotes git's own first line. Check the URL and the network, install git, or build once without `--offline` to fill the cache.
+The message quotes git's, or the server's, own first line. Check the URL and the network, install git, or build once without `--offline` to fill the cache.
 '''
 example = '''
 $ lyric5 build
@@ -3026,14 +3285,16 @@ error[LYR-PKG0007]: 'geo' is read from https://example.org/geo at tag 'v1.0.0', 
 '''
 
 [LYR-PKG0008]
-title = "the lock disagrees with the repository"
+title = "the lock or a hash disagrees with what was read"
 severity = "error"
 area = "15-project"
-summary = "Reported when `lyric.lock` holds a commit the dependency's repository does not have, or when the package content at the locked commit is not what the lock's hash says."
+summary = "Reported when `lyric.lock` holds a commit the repository of a dependency or a source tree does not have, when the content at the locked commit is not what the lock's hash says, or when the file a source tree's URL loads is not the one its `hash` names."
 explanation = '''
 `lyric.lock` records, for each revision read from git, the commit it was and a hash of the package content. A build reads that commit and checks the hash, so the program is built from the same sources everywhere. A commit that has gone — a force-push — or content that differs means the lock no longer describes what the repository holds.
 
 Resolve the dependency anew with `lyric5 update <name>`, which writes the lock from what the repository holds now, and check what changed.
+
+A source tree from a URL carries its hash in the manifest: when the server sends another file, the message gives both hashes. A release that was replaced is a new file — check it, then write its hash.
 '''
 example = '''
 $ lyric5 build
@@ -3139,7 +3400,7 @@ fn main(): void {
 title = "`--locked` and a lock that does not match"
 severity = "error"
 area = "15-project"
-summary = "Reported under `--locked` when `lyric.lock` lacks a revision the graph reads from git, holds one it does not read, or is missing although the program reads from git. Nothing is fetched or written."
+summary = "Reported under `--locked` when `lyric.lock` lacks a revision the graph reads from git or a source tree from git the build needs, holds one it does not read, or is missing although the program reads from git. Nothing is fetched or written."
 explanation = '''
 `--locked` takes the lock as it is: a build in CI should be built from exactly what was checked in, and a lock that would change is an error rather than a silent update. Without `--locked`, the build writes the lock to match the manifests.
 
@@ -3729,6 +3990,53 @@ error[LYR-RES0015]: the module 'app.tests.basic' lies under src/tests/ and under
   = help: rename one of the two files
 '''
 
+[LYR-RES0016]
+title = "a module made from a C header lies in the package's source too"
+severity = "error"
+area = "15-project"
+summary = "Reported when the module a `bindings` entry makes — `geo` in `app` is `app.geo` — is also a file under the package's `src/`, `gen/` or `tests/`: one module path would name two modules. Nothing is built; the exit code is 1."
+explanation = '''
+A module made from a header is a module of the package like any other: `bindings = [{ header = "native/geo.h", module = "geo" }]` in the package `app` makes `app.geo`, which `import app.geo { … }` reads. A file `src/geo.lyr` would be `app.geo` too, and the build does not choose between them.
+
+Give one of them another name. A common shape keeps the made module apart — `module = "c.geo"`, or `module = "sys"` — and writes the package's own, friendlier functions in `src/geo.lyr` on top of it.
+'''
+wrong = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+bindings = [{ header = "native/geo.h", module = "geo" }]
+//- native/geo.h
+int geo_add(int a, int b);
+//- src/geo.lyr
+pub fn add(a: int, b: int): int {
+    return a + b;
+}
+//- src/main.lyr
+fn main(): void {
+}
+'''
+right = '''
+//- lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+bindings = [{ header = "native/geo.h", module = "sys" }]
+//- native/geo.h
+int geo_add(int a, int b);
+//- src/geo.lyr
+pub fn add(a: int, b: int): int {
+    return a + b;
+}
+//- src/main.lyr
+fn main(): void {
+}
+'''
+
 [LYR-RT0001]
 title = "integer division by zero"
 severity = "panic"
@@ -3944,7 +4252,7 @@ fn main(): void {
 title = "a coroutine misused"
 severity = "panic"
 area = "10-concurrency"
-summary = "A coroutine is used against its rules: a `yield` where no coroutine runs, or in a task outside every generator; a coroutine resumed while it runs, after it ended, or on another thread; a coroutine closed while it runs or is parked; a yield of another type than the running generator's."
+summary = "A coroutine is used against its rules: a `yield` where no coroutine runs, or in a task outside every generator; a coroutine resumed while it runs, after it ended, or on another thread; a coroutine closed while it runs or is parked, or with C frames on its stack — a callback that yielded in it; a yield of another type than the running generator's."
 program = '''
 import std.task { Cancelled };
 
@@ -4070,6 +4378,36 @@ A `@Layout(C)` or `@Layout(uint8)` enum crosses into C as the integer of its var
 example = '''
 $ ./out/debug/x86_64-linux-gnu/app
 panic [LYR-RT0021]: C returned 7, which is no variant of app.main.Color (it has 3)
+'''
+
+[LYR-RT0022]
+title = "a Lyric function called from a thread Lyric does not run"
+severity = "panic"
+area = "13-abi"
+summary = "C called a Lyric function through its pointer on a thread the runtime does not know: one C started itself, which no collector attached. A Callback that returns nothing goes to the thread that made it; any other call — a function's, a Callback's that returns a value, one whose thread runs no scheduler — has no Lyric to run on, and the process ends. An export called before `lyr_init` started the runtime ends it the same way."
+explanation = '''
+A Lyric function C calls runs on the thread that calls it, with that thread's stack, its collector and its tasks. A thread C started itself has none of them: the runtime never saw it. The callback ends the process with this report rather than run without them.
+
+Call the callback from the thread that handed it to C — the one Lyric runs on.
+'''
+example = '''
+$ ./out/debug/x86_64-linux-gnu/app
+panic [LYR-RT0022]: C called a Lyric function on a thread Lyric does not run
+'''
+
+[LYR-RT0023]
+title = "a GcHandle that holds another class's object"
+severity = "panic"
+area = "13-abi"
+summary = "A GcHandle made again from C's pointer with `GcHandle<T>.from` was read, and the object its root holds is of another class than `T`, or the root holds none."
+explanation = '''
+`GcHandle.from` turns the pointer C kept back into a handle; the type it is read as is the program's word, in an `unsafe` block. Reading checks that word against the object: a handle of one class read as another's stops the program rather than hand out an object of the wrong layout.
+
+Read the handle as the class it was pinned with — the pointer C hands back is the one `asPtr()` of that handle gave.
+'''
+example = '''
+$ ./out/debug/x86_64-linux-gnu/app
+panic [LYR-RT0023]: a GcHandle of app.main.Counter read as a handle of app.main.Other
 '''
 
 [LYR-SEM0001]
@@ -4691,7 +5029,7 @@ summary = "A generic type, alias or function is given more or fewer type argumen
 explanation = '''
 `Cell<T>` takes one type argument and `Pair<A, B>` two; a type parameter with a default may be left out. A function that is not generic takes none.
 
-Write as many type arguments as the declaration has parameters, or leave them out where the context or the arguments determine them.
+Write as many type arguments as the declaration has parameters, or leave them out where the context or the arguments determine them. A call writes them all or none: `_` stands for one the inference is to fill — `arrayOf<string, _>(3, f)` writes `T` and leaves `E`, what `f` throws, to the call. Where a call writes too few, `lyric fix` adds a `_` for each one left out.
 '''
 wrong = '''
 struct Cell<T> { v: T }
@@ -6640,7 +6978,7 @@ fn main(): void {
 title = "an extern declaration that cannot cross into C"
 severity = "error"
 area = "13-abi"
-summary = "An `extern` function names an ABI other than \"C\", a symbol that is no C name, type parameters, `throws`, a place parameter, or a parameter or return type that does not cross into C; a bare `...` with no parameter before it, or a variadic argument of a type that does not cross; or `@Layout` stands where C cannot lay the type out, or in another form than `@Layout(C)` or an integer type."
+summary = "An `extern` function names an ABI other than \"C\", a symbol that is no C name, type parameters, `throws`, a place parameter, or a parameter or return type that does not cross into C; a bare `...` with no parameter before it, or a variadic argument of a type that does not cross; a C function type, `extern \"C\" fn(…)`, whose parameters or result do not cross, that throws, or that names another ABI; a `Callback` whose type is no C function's, or has no userdata `Ptr<void>` as its first or last parameter; a `GcHandle` of a value that is no object of a class; or `@Layout` stands where C cannot lay the type out, or in another form than `@Layout(C)` or an integer type."
 explanation = '''
 Lyric 5's one foreign boundary is C. Integers, floats, `bool` and `char` cross it (and `void` as a return); `std.ffi`'s `Ptr<T>` and `CStr` cross as C's pointers, `?Ptr<T>` and `?CStr` as pointers that may be null; a struct with `@Layout(C)` crosses as C's struct, by value, and an enum with `@Layout` as its integer. A `string` argument crosses into a `CStr` parameter as its bytes. Classes, arrays, other optionals, places, generics and thrown errors do not, so a declaration nobody could bind is refused where it stands, whether or not it is called.
 
@@ -6995,7 +7333,7 @@ severity = "error"
 area = "03-types"
 summary = "'^n' stands outside '[…]' as a value of its own, indexes a string directly, or indexes a value that has no length."
 explanation = '''
-`^n` counts from the end of what is being indexed, so it is sugar inside the brackets only: `xs[^1]`, `xs[1..^1]`. On its own (`let i = ^1;`) it has no length to count from. A string's index is a byte offset where a character begins, which from the end is rarely the case, so on a string `^n` bounds a range only (`s[^3..]`). And a value without a length has no end to count from.
+`^n` counts from the end of what is being indexed, so it is sugar inside the brackets only: `xs[^1]`, `xs[1..^1]`. On its own (`let i = ^1;`) it has no length to count from. A string's index is a byte offset where a character begins, which from the end is rarely the case, so on a string `^n` bounds a range only (`s[^3..]`). And a value without a length has no end to count from. A type with its own `index`, such as `List<T>`, takes the index as written, so `list[^1]` is refused too; a range on it, `list[^2..]`, goes through its view and counts from the end.
 
 Write `^n` inside the index, compute the position as `xs.length() - n`, or slice a string with a range.
 '''
@@ -10980,7 +11318,7 @@ fn main(): void {
 title = "a memory operation outside an unsafe block"
 severity = "error"
 area = "13-abi"
-summary = "A pointer's `read`, `write`, `offset` or `cast`, or `std.ffi`'s `alloc` or `free`, is called outside an `unsafe { … }` block."
+summary = "A pointer's `read`, `write`, `offset` or `cast`, `std.ffi`'s `alloc` or `free`, or `GcHandle.from`, is called outside an `unsafe { … }` block."
 explanation = '''
 These operations hold to what the compiler cannot see: that memory is there, that it holds a value of the type, that nothing else frees it. The `unsafe` block is where the program says it holds to that, and the one place a reader looks for it. Calling a C function is not unsafe, and neither is an array's `asPtr()`; what reads and writes through the pointer is.
 

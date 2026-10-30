@@ -1,0 +1,276 @@
+// std.task — cooperative tasks over coroutine chains.
+//
+// A task is a `Coroutine<Wait>`: every value it yields — from any call depth, §10a — tells the
+// scheduler what it is waiting for. One thread, no preemption: a task runs until it yields, and
+// the scheduler is ordinary Lyric over ONE native (`poll`), which asks the OS about time and
+// readiness. The run queue is a `Deque`, which exists for exactly this seat.
+
+/// Cooperative tasks: `spawn` a `Coroutine<Wait>`, then `run()` drives every task to its end.
+///
+/// A task settles its own errors — `spawn` takes the non-throwing coroutine type, because the
+/// scheduler has nobody to hand an exception to. A panic anywhere ends the program, as panics
+/// do.
+module std.task;
+
+import std.collections { Deque, List };
+
+/// What a yielded value asks the scheduler for.
+pub enum Wait {
+    /// Run me again once everyone before me had a turn — the cooperative "make room".
+    Now,
+    /// Wake me after this many milliseconds. Sleepers wake in deadline order — two deadlines
+    /// that pass in the same poll still wake nearest-first, and a deadline already in the past
+    /// (a zero or negative wait) is due at the very next poll.
+    Sleep(int),
+    /// Wake me when this descriptor has bytes to read. Descriptors come from `std.io.net`.
+    Readable(int),
+    /// Wake me when this descriptor can take bytes.
+    Writable(int),
+    /// Wake me on an interrupt: Ctrl+C in a standalone program, or `interrupt()` from inside.
+    /// The clean-shutdown seat — a server parks a task here, and the wake is its signal to
+    /// close listeners and let `run` drain. Every parked task wakes on one interrupt.
+    Interrupt,
+}
+
+// The one native. `poll([], [], 0, ...)` answers the clock without waiting — which is how the
+// clock stays inside the single-native budget — and a negative timeout means "no deadline":
+// wait for a descriptor or an interrupt alone. `wantInterrupt` says whether a task is parked
+// on `Wait.Interrupt`; while it is true, Ctrl+C is taken by the scheduler instead of killing
+// the process. The answer is `[now, readyFd...]`, the clock monotonic and in milliseconds
+// (whose epoch it is means nothing, only differences do); an interrupt reports as the
+// impossible descriptor `-1`.
+fn poll(read: int[], write: int[], timeoutMillis: int, wantInterrupt: bool): int[];
+
+/// Wakes every task parked on `Wait.Interrupt`, exactly as Ctrl+C does — a server telling
+/// itself to shut down: a task that decides "we are done" interrupts, the parked shutdown
+/// task closes the listeners, and `run` drains. With nobody parked the interrupt is
+/// REMEMBERED and taken by the next task to park — a signal, not a broadcast into the void.
+pub fn interrupt(): void;
+
+// Every poll goes through here: the answer may carry `-1` — an interrupt — whatever the poll
+// was asked for, a plain clock reading included; deciding it centrally means no call site can
+// drop one. The listening flag is recomputed per call, so Ctrl+C kills the process again the
+// moment nobody is parked on Interrupt.
+fn ask(read: int[], write: int[], timeoutMillis: int): int[] {
+    let answer = poll(read, write, timeoutMillis, scheduler.interrupted.length() > 0);
+    var a = 1;
+    while (a < answer.length) {
+        if (answer[a] == 0 - 1) {
+            wakeInterrupted();
+        }
+        a = a + 1;
+    }
+    return answer;
+}
+
+fn now(): int {
+    let empty: int[] = [0] * 0;
+    return ask(empty, empty, 0)[0];
+}
+
+// One scheduler per program. A class rather than loose globals because its fields change;
+// parallel columns rather than pair structs because a waiter is a task PLUS one number, and
+// the removal pattern (swap with last, pop) keeps every wake O(1) per woken task.
+class Scheduler {
+    ready: Deque<Coroutine<Wait>>,
+    sleepers: List<Coroutine<Wait>>,
+    deadlines: List<int>,
+    readers: List<Coroutine<Wait>>,
+    readerFds: List<int>,
+    writers: List<Coroutine<Wait>>,
+    writerFds: List<int>,
+    interrupted: List<Coroutine<Wait>>,
+}
+
+let scheduler = Scheduler {
+    ready = Deque<Coroutine<Wait>>.empty(),
+    sleepers = List<Coroutine<Wait>>.empty(),
+    deadlines = List<int>.empty(),
+    readers = List<Coroutine<Wait>>.empty(),
+    readerFds = List<int>.empty(),
+    writers = List<Coroutine<Wait>>.empty(),
+    writerFds = List<int>.empty(),
+    interrupted = List<Coroutine<Wait>>.empty(),
+};
+
+/// Adds a task to the back of the run queue. Nothing runs before `run` does; spawning from
+/// inside a running task is ordinary and the new task gets its turn in the same round.
+pub fn spawn(task: Coroutine<Wait>): void {
+    scheduler.ready.pushBack(task);
+}
+
+// Everyone the POLL has to answer for. `run` asks it every round rather than only when the
+// run queue empties: the poll is the one place a descriptor or a deadline is looked at, so
+// skipping it while somebody is runnable is what let a `Wait.Now` spinner starve them.
+fn parked(): int {
+    return scheduler.sleepers.length()
+        + scheduler.readers.length()
+        + scheduler.writers.length()
+        + scheduler.interrupted.length();
+}
+
+/// How many tasks the scheduler holds, whatever they are waiting for. Zero after `run`
+/// returns; useful to a host deciding whether another `run` is worth calling.
+pub fn pending(): int {
+    return scheduler.ready.length()
+        + scheduler.sleepers.length()
+        + scheduler.readers.length()
+        + scheduler.writers.length()
+        + scheduler.interrupted.length();
+}
+
+/// Drives every task to its end and returns when none is left.
+///
+/// Ready tasks run round-robin, one step per turn. When none is ready, the scheduler blocks in
+/// `poll` until the nearest deadline passes, a descriptor readies, or — with a task parked on
+/// `Wait.Interrupt` — Ctrl+C arrives; the thread sleeps, it does not spin. A run holding ONLY
+/// Interrupt tasks therefore waits, quietly and indefinitely, for the interrupt that is its
+/// whole purpose.
+pub fn run(): void {
+    while (true) {
+        var turn = scheduler.ready.length();
+        while (turn > 0) {
+            step(scheduler.ready.popFront()!);
+            turn = turn - 1;
+        }
+
+        if (parked() == 0) {
+            if (scheduler.ready.length() > 0) {
+                continue;
+            }
+            // One last clock reading, for its side: `ask` recomputes the listening flag, and
+            // with nothing parked any more it is FALSE — Ctrl+C kills the process again the
+            // moment `run` returns, instead of being swallowed by a scheduler that is done.
+            now();
+            return;
+        }
+        block();
+    }
+}
+
+// One step of one task: pull, then park it where its answer says. Exhaustion — `null` — is
+// the task's end, and nothing holds it any longer.
+fn step(task: Coroutine<Wait>): void {
+    let asked = task.next();
+    if (asked == null) {
+        return;
+    }
+    match (asked) {
+        Now => scheduler.ready.pushBack(task),
+        Sleep(ms) => {
+            scheduler.sleepers.push(task);
+            scheduler.deadlines.push(now() + ms);
+        }
+        Readable(fd) => {
+            scheduler.readers.push(task);
+            scheduler.readerFds.push(fd);
+        }
+        Writable(fd) => {
+            scheduler.writers.push(task);
+            scheduler.writerFds.push(fd);
+        }
+        Interrupt => scheduler.interrupted.push(task),
+    }
+}
+
+// Blocks until something can run: the nearest deadline, a ready descriptor, or an interrupt.
+// Wakes everything the answer covers — deadlines that have passed, descriptors the poll
+// names, and every Interrupt-parked task when the answer says `-1` (that wake happens in
+// `ask`). A run left with ONLY Interrupt tasks blocks with no deadline and no descriptor:
+// waiting for Ctrl+C is what such a task is for.
+fn block(): void {
+    var timeout = -1;
+    if (scheduler.ready.length() > 0) {
+        // Somebody can run, so this poll may not wait — it only asks what has BECOME ready.
+        // Without it a task yielding `Wait.Now` in a loop keeps the run queue non-empty for
+        // ever, and a descriptor or a deadline is never looked at again.
+        timeout = 0;
+    } else if (scheduler.deadlines.length() > 0) {
+        let current = now();
+        let nearest = nearestDeadline();
+        timeout = nearest - current;
+        if (timeout < 0) {
+            timeout = 0;
+        }
+    }
+
+    let answer = ask(scheduler.readerFds.toArray(), scheduler.writerFds.toArray(), timeout);
+    let clock = answer[0];
+
+    wakeSleepers(clock);
+    wakeReady(answer);
+}
+
+// An interrupt wakes EVERY parked task, in park order: one Ctrl+C is one event, and every
+// listener deserves to hear it — a half-woken set would mean the second Ctrl+C kills the
+// process while a shutdown task still believes it is covered.
+fn wakeInterrupted(): void {
+    while (scheduler.interrupted.length() > 0) {
+        scheduler.ready.pushBack(scheduler.interrupted.get(0));
+        scheduler.interrupted.removeAt(0);
+    }
+}
+
+fn nearestDeadline(): int {
+    var nearest = scheduler.deadlines.get(0);
+    var i = 1;
+    while (i < scheduler.deadlines.length()) {
+        let deadline = scheduler.deadlines.get(i);
+        if (deadline < nearest) {
+            nearest = deadline;
+        }
+        i = i + 1;
+    }
+    return nearest;
+}
+
+// Overdue sleepers wake in DEADLINE order, not list order. The clock can cover several at
+// once — a slow first poll, a long-running task — and then the order must still be the one
+// the deadlines name, or wake order would depend on machine load. Ties wake in spawn order:
+// the strict `<` keeps the earliest index. Repeated minimum extraction, quadratic in the
+// number of overdue sleepers — which is small, and only ever paid when several are due.
+fn wakeSleepers(clock: int): void {
+    while (true) {
+        var due = -1;
+        var i = 0;
+        while (i < scheduler.deadlines.length()) {
+            if (scheduler.deadlines.get(i) <= clock
+                && (due < 0 || scheduler.deadlines.get(i) < scheduler.deadlines.get(due))) {
+                due = i;
+            }
+            i = i + 1;
+        }
+        if (due < 0) {
+            return;
+        }
+        scheduler.ready.pushBack(scheduler.sleepers.get(due));
+        scheduler.sleepers.removeAt(due);
+        scheduler.deadlines.removeAt(due);
+    }
+}
+
+// The poll answer names ready descriptors from index 1 on; a descriptor a reader AND a writer
+// wait on wakes both. Waiters are matched by value: two tasks may wait on one descriptor, and
+// both wake when it readies — whoever runs second sees the state the first one left.
+fn wakeReady(answer: int[]): void {
+    var a = 1;
+    while (a < answer.length) {
+        let fd = answer[a];
+        wakeWaiters(scheduler.readers, scheduler.readerFds, fd);
+        wakeWaiters(scheduler.writers, scheduler.writerFds, fd);
+        a = a + 1;
+    }
+}
+
+fn wakeWaiters(waiters: List<Coroutine<Wait>>, fds: List<int>, fd: int): void {
+    var i = 0;
+    while (i < fds.length()) {
+        if (fds.get(i) == fd) {
+            scheduler.ready.pushBack(waiters.get(i));
+            waiters.removeAt(i);
+            fds.removeAt(i);
+        } else {
+            i = i + 1;
+        }
+    }
+}

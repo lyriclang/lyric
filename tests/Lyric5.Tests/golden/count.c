@@ -10,19 +10,19 @@ void lyr__globals__9ee5f9b5(void);
 #line 4 "programs/count.lyr"
 LYR_NOINLINE int64_t lyr_app_main_main(void) {
 #line 4
-    int64_t l0_total = 0;
+    int64_t total = 0;
 #line 4
     int64_t l1__range0 = 0;
 #line 4
     int64_t l2__last1 = 0;
 #line 4
-    int64_t l3_i = 0;
+    int64_t i = 0;
 #line 4
     int64_t l4__range2 = 0;
 #line 4
     int64_t l5__last3 = 0;
 #line 4
-    int64_t l6_j = 0;
+    int64_t j = 0;
 #line 4
     int64_t t0 = 0;
 #line 4
@@ -97,7 +97,7 @@ bb0:;
 #line 4
     t0 = (int64_t)INT64_C(0);
 #line 4
-    l0_total = t0;
+    total = t0;
 #line 5
     t1 = (int64_t)INT64_C(1);
 #line 5
@@ -119,9 +119,9 @@ bb1:; LYR_LOOP_POLL(lyr_poll);
     if (t5) goto bb2; else goto bb4;
 bb2:;
 #line 5
-    l3_i = t3;
+    i = t3;
 #line 6
-    t6 = l3_i;
+    t6 = i;
 #line 6
     t7 = (int64_t)INT64_C(2);
 #line 6
@@ -157,13 +157,13 @@ bb5:;
     goto bb3;
 bb6:;
 #line 7
-    t11 = l0_total;
+    t11 = total;
 #line 7
-    t12 = l3_i;
+    t12 = i;
 #line 7
     t13 = LYR_CHECKED_ADD(t11, t12);
 #line 7
-    l0_total = t13;
+    total = t13;
 #line 5
     goto bb3;
 bb7:;
@@ -186,9 +186,9 @@ bb8:; LYR_LOOP_POLL(lyr_poll);
     if (t23) goto bb9; else goto bb11;
 bb9:;
 #line 9
-    l6_j = t21;
+    j = t21;
 #line 10
-    t24 = l6_j;
+    t24 = j;
 #line 10
     t25 = (int64_t)INT64_C(5);
 #line 10
@@ -208,7 +208,7 @@ bb10:; LYR_LOOP_POLL(lyr_poll);
     goto bb8;
 bb11:; LYR_LOOP_POLL(lyr_poll);
 #line 13
-    t33 = l0_total;
+    t33 = total;
 #line 13
     return t33;
 bb12:;
@@ -216,13 +216,13 @@ bb12:;
     goto bb11;
 bb13:;
 #line 11
-    t27 = l0_total;
+    t27 = total;
 #line 11
     t28 = (int64_t)INT64_C(100);
 #line 11
     t29 = LYR_CHECKED_ADD(t27, t28);
 #line 11
-    l0_total = t29;
+    total = t29;
 #line 9
     goto bb10;
 }

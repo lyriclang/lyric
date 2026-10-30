@@ -4,11 +4,27 @@ using Lyric5.Toolchain;
 
 namespace Lyric5.Build;
 
-/// <summary>What the program's build scripts asked of its build: C to
-/// compile with the program, each with its flags, and libraries to link.</summary>
-public sealed record ScriptDirectives(IReadOnlyList<CUnit> Sources, IReadOnlyList<string> Libraries)
+/// <summary>A C library a build script compiles with the program (<c>std.build.cLibrary</c>): its
+/// sources — patterns of the package or of a tree —, its include directories, definitions and flags,
+/// as the script wrote them.</summary>
+public sealed record ScriptLibrary(string Name, IReadOnlyList<string> Sources, IReadOnlyList<string> Include,
+    IReadOnlyList<string> Defines, IReadOnlyList<string> Flags);
+
+/// <summary>What the program's build scripts asked of its build: by package, what its native part
+/// links besides the manifest's — libraries by name, archives, frameworks, names of
+/// <c>pkg-config</c> — and the C libraries it compiles; the directories the link searches, and the
+/// files that go beside each binary — full paths, each once.</summary>
+public sealed record ScriptDirectives(IReadOnlyDictionary<string, NativePart> Parts,
+    IReadOnlyDictionary<string, IReadOnlyList<ScriptLibrary>> Libraries, IReadOnlyList<string> SearchDirs, IReadOnlyList<string> Beside)
 {
-    public static readonly ScriptDirectives None = new([], []);
+    public static readonly ScriptDirectives None =
+        new(new Dictionary<string, NativePart>(), new Dictionary<string, IReadOnlyList<ScriptLibrary>>(), [], []);
+
+    /// <summary>What the package's script adds to its native part; nothing where it has none.</summary>
+    public NativePart PartOf(string package) => Parts.GetValueOrDefault(package) ?? NativePart.None;
+
+    /// <summary>The C libraries the package's script compiles.</summary>
+    public IReadOnlyList<ScriptLibrary> LibrariesOf(string package) => Libraries.GetValueOrDefault(package) ?? [];
 }
 
 /// <summary>
@@ -27,21 +43,48 @@ public sealed record ScriptDirectives(IReadOnlyList<CUnit> Sources, IReadOnlyLis
 ///
 /// <para>When: before the compile, where the script — <c>build.lyr</c>, <c>build/</c>, std, the
 /// toolchain, the target, the profile — changed, where a file it named with
-/// <c>rerunIfChanged</c> changed, or where <c>gen/</c> is not as it left it; else what its last run
-/// asked stands. Which: the root package's script always; a dependency's only where the root
+/// <c>rerunIfChanged</c> changed, where a variable it named with <c>rerunIfEnvChanged</c> has another
+/// value, or where <c>gen/</c> is not as it left it; else what its last run asked stands. Which: the root package's script always; a dependency's only where the root
 /// manifest's <c>[trust] build-scripts</c> names it (pnpm 10), else the build stops before it.</para>
 /// </summary>
+/// <summary>A script's request the build cannot follow.</summary>
+internal sealed class ScriptRefusal(string message) : Exception(message);
+
 public static class BuildScripts
 {
     /// <summary>The directives of every script of the program's packages — dependencies first, by
-    /// name, the root's last —, or the exit code of a build that stops here, reported.</summary>
+    /// name, the root's last —, or the exit code of a build that stops here, reported. Then the
+    /// packages' bindings for the target, which a script's <c>gen/</c> may feed: what runs before the
+    /// compiler, run where everything that compiles runs it.</summary>
     public static (int Exit, ScriptDirectives? Directives) Run(Project project, Target target, BuildProfile profile,
+        CCompiler compiler, string version, TextWriter error)
+    {
+        var (exit, directives) = RunScripts(project, target, profile, compiler, version, error);
+        if (directives is null) return (exit, null);
+        // what only the host has is refused here, before anything compiles — check and --emit too
+        if (project.Graph is { } graph)
+            foreach (var manifest in graph.Packages.Values.OrderBy(m => m.Name, StringComparer.Ordinal))
+            {
+                try { Pipeline.SystemLibraries(manifest, manifest.NativeFor(target).With(directives.PartOf(manifest.Name)), target); }
+                catch (Pipeline.NativeRefusal refused)
+                {
+                    Say.Error(error, refused.Code, refused.Message);
+                    return (refused.Exit, null);
+                }
+            }
+        var bound = Bindings.Make(project, target, compiler, version, error);
+        return bound == 0 ? (exit, directives) : (bound, null);
+    }
+
+    private static (int Exit, ScriptDirectives? Directives) RunScripts(Project project, Target target, BuildProfile profile,
         CCompiler compiler, string version, TextWriter error)
     {
         if (project.Graph is not { } graph) return (0, ScriptDirectives.None);
         var root = graph.Root;
-        var sources = new List<CUnit>();
-        var libraries = new List<string>();
+        var parts = new Dictionary<string, NativePart>(StringComparer.Ordinal);
+        var cLibraries = new Dictionary<string, IReadOnlyList<ScriptLibrary>>(StringComparer.Ordinal);
+        var searchDirs = new List<string>();
+        var beside = new List<(string Path, string Package)>();
         var order = graph.Packages.Values.Where(m => m.Name != root.Name).OrderBy(m => m.Name, StringComparer.Ordinal).Append(root);
         // a script's 'warn' is the lint 'build-script-warning', at its package's level (spec 16 §5);
         // a dependency's script warns with --warn-deps alone, and never as an error
@@ -58,20 +101,80 @@ public static class BuildScripts
                     $"[trust] build-scripts = [\"{manifest.Name}\"] in {Path.GetFileName(root.File)}"));
                 return (1, null);
             }
-            var (exit, directives) = RunOne(manifest, graph.Scripts.GetValueOrDefault(manifest.Name), target, profile, compiler, version, error);
+            // a tree the script asks for is read then, as one the native part names (spec 15 §5.3)
+            string Vendor(string name) => manifest.Vendor.Any(t => t.Name == name) && graph.Trees is { } trees
+                ? trees.Directory(manifest, name)
+                : throw new ScriptRefusal($"{manifest.Name}'s build.lyr asks for the source tree '{name}', which its [native.vendor] does not hold");
+            int exit;
+            List<(string Word, string Text)>? directives;
+            try { (exit, directives) = RunOne(manifest, graph.Scripts.GetValueOrDefault(manifest.Name), target, profile, compiler, version, Vendor, error); }
+            catch (ScriptRefusal refused)
+            {
+                Say.Error(error, "LYR-BLD0002", refused.Message);
+                return (1, null);
+            }
+            catch (ManifestException refused)
+            {
+                Say.Manifest(error, refused);
+                return (refused.Exit, null);
+            }
             if (directives is null) return (exit, null);
 
-            // compile-c's sources with this package's c-flags; link-lib's libraries once each
-            var flags = directives.Where(d => d.Word == "c-flag").Select(d => d.Text).ToList();
+            // what the script adds to the native part, with the manifest's rules for its paths
+            List<string> libs = [], archives = [], frameworks = [], pkgConfig = [];
+            var compiled = new List<ScriptLibrary>();
+            (string Name, List<string> Sources, List<string> Include, List<string> Defines, List<string> Flags)? library = null;
+            string? Refusal(string what, string path) =>
+                NativePart.ScriptPathRefusal(manifest, path) is { } why ? $"{manifest.Name}'s build.lyr names '{path}' {what}, and it {why}" : null;
             foreach (var (word, text) in directives)
             {
+                string? wrong = null;
                 switch (word)
                 {
-                    case "compile-c":
-                        sources.Add(new CUnit(Path.GetFullPath(text, manifest.Root), [], [manifest.Root], ExtraFlags: flags));
-                        break;
                     case "link-lib":
-                        if (!libraries.Contains(text)) libraries.Add(text);
+                        if (!libs.Contains(text)) libs.Add(text);
+                        break;
+                    case "link-archive":
+                        // an archive the script made — under out/, or anywhere — is its own: by its full
+                        // path, no file of the package's content asked of it
+                        var archive = NativePart.TreePath(text) is not null ? text : Path.GetFullPath(text, manifest.Root);
+                        if (NativePart.TreePath(text) is not null) wrong = Refusal("in linkArchive", text);
+                        if (!archives.Contains(archive)) archives.Add(archive);
+                        break;
+                    case "link-framework":
+                        if (!frameworks.Contains(text)) frameworks.Add(text);
+                        break;
+                    case "pkg-config":
+                        if (!pkgConfig.Contains(text)) pkgConfig.Add(text);
+                        break;
+                    case "c-library":
+                        library = (text, [], [], [], []);
+                        break;
+                    case "c-source" when library is { } open:
+                        wrong = Refusal("as a source of its C library", text);
+                        open.Sources.Add(text);
+                        break;
+                    case "c-include" when library is { } open:
+                        wrong = Refusal("as an include directory of its C library", text);
+                        open.Include.Add(text);
+                        break;
+                    case "c-define" when library is { } open:
+                        open.Defines.Add(text);
+                        break;
+                    case "c-flag" when library is { } open:
+                        open.Flags.Add(text);
+                        break;
+                    case "c-end" when library is { } done:
+                        compiled.Add(new ScriptLibrary(done.Name, done.Sources, done.Include, done.Defines, done.Flags));
+                        library = null;
+                        break;
+                    case "link-search":
+                        var dir = Path.GetFullPath(text, manifest.Root);
+                        if (!searchDirs.Contains(dir)) searchDirs.Add(dir);
+                        break;
+                    case "beside-binary":
+                        var file = Path.GetFullPath(text, manifest.Root);
+                        if (!beside.Any(b => b.Path == file)) beside.Add((file, manifest.Name));
                         break;
                     case "warn":
                         var foreign = manifest.Name != root.Name;
@@ -89,10 +192,35 @@ public static class BuildScripts
                         }
                         break;
                 }
+                if (wrong is not null)
+                {
+                    Say.Error(error, "LYR-BLD0002", wrong);
+                    return (1, null);
+                }
             }
+            parts[manifest.Name] = NativePart.None with { Libs = libs, Archives = archives, Frameworks = frameworks, PkgConfig = pkgConfig };
+            cLibraries[manifest.Name] = compiled;
         }
-        return (0, new ScriptDirectives(sources, libraries));
+        // what goes beside the binary is there, and no two files take one name there
+        foreach (var (file, package) in beside)
+            if (!File.Exists(file))
+            {
+                Say.Error(error, "LYR-BLD0006", $"{package}'s build.lyr puts '{file}' beside the binary, and there is no such file");
+                return (1, null);
+            }
+        foreach (var clash in beside.GroupBy(b => Path.GetFileName(b.Path), FileNames).Where(g => g.Count() > 1))
+        {
+            Say.Error(error, "LYR-BLD0006",
+                $"two files named '{clash.Key}' would lie beside the binary: {string.Join(" and ", clash.Select(b => $"'{b.Path}' ({b.Package})"))}");
+            return (1, null);
+        }
+        return (0, new ScriptDirectives(parts, cLibraries, searchDirs, [.. beside.Select(b => b.Path)]));
     }
+
+    /// <summary>File names as the systems compare them: Windows and macOS's default volumes
+    /// do not tell 'SDL3.dll' from 'sdl3.dll'.</summary>
+    internal static readonly StringComparer FileNames =
+        OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
 
     /// <summary>Where the graph's manifests declare the package — the root's first, for the line a
     /// refusal points at.</summary>
@@ -107,7 +235,7 @@ public static class BuildScripts
     /// <summary>One package's script: what its last run asked where nothing it depends on changed,
     /// else built, run and read anew; <c>null</c> with the exit code after reporting.</summary>
     private static (int Exit, List<(string Word, string Text)>? Directives) RunOne(Manifest manifest, PackageGraph? own,
-        Target target, BuildProfile profile, CCompiler compiler, string version, TextWriter error)
+        Target target, BuildProfile profile, CCompiler compiler, string version, Func<string, string> vendor, TextWriter error)
     {
         var dir = Path.Combine(manifest.Root, "out", "build-script");
         Directory.CreateDirectory(dir);
@@ -131,25 +259,40 @@ public static class BuildScripts
         }
 
         var file = Path.Combine(dir, "directives");
-        File.WriteAllText(file, "");
+        BuildStatus.Say("Running", $"the build script of {manifest.Name} ({Pipeline.Shown(manifest.BuildScript!)})");
+        var (cc, ar, cflags) = CEnv(compiler, target, profile, dir);
         var environment = new Dictionary<string, string>
         {
             ["LYRIC_BUILD_TARGET"] = target.Triple,
+            ["LYRIC_BUILD_HOST"] = Target.Host.Triple,
             ["LYRIC_BUILD_PROFILE"] = profile.Name,
             ["LYRIC_BUILD_OUT_DIR"] = Path.Combine(manifest.Root, "out"),
             ["LYRIC_BUILD_GEN_DIR"] = manifest.GenRoot,
             ["LYRIC_BUILD_DIRECTIVES"] = file,
+            ["LYRIC_BUILD_CC"] = cc,
+            ["LYRIC_BUILD_AR"] = ar,
+            ["LYRIC_BUILD_CFLAGS"] = cflags,
         };
         ProcessRunner.Result ran;
-        try
+        // a script that asks for a source tree not yet read stops; it runs again with the tree there
+        for (var asked = 0; ; asked++)
         {
-            ran = ProcessRunner.Run(executable, [], TimeSpan.FromMinutes(10), manifest.Root, environment);
-        }
-        catch (TimeoutException)
-        {
-            Say.Error(error, "LYR-BLD0002", $"{manifest.Name}'s build.lyr did not end within 10 minutes");
-            // the package's own code failed, as one that does not compile: exit 1, not the environment's 2
-            return (1, null);
+            File.WriteAllText(file, "");
+            try
+            {
+                ran = ProcessRunner.Run(executable, [], TimeSpan.FromMinutes(10), manifest.Root, environment);
+            }
+            catch (TimeoutException)
+            {
+                Say.Error(error, "LYR-BLD0002", $"{manifest.Name}'s build.lyr did not end within 10 minutes");
+                // the package's own code failed, as one that does not compile: exit 1, not the environment's 2
+                return (1, null);
+            }
+            if (ran.ExitCode != VendorExit || asked > manifest.Vendor.Count) break;
+            var wanted = File.ReadAllLines(file).LastOrDefault(l => l.StartsWith("vendor-dir\t", StringComparison.Ordinal));
+            if (wanted is null) break;
+            var name = wanted["vendor-dir\t".Length..];
+            environment[$"LYRIC_BUILD_VENDOR_{name.ToUpperInvariant().Replace('-', '_')}"] = vendor(name);
         }
         File.WriteAllText(Path.Combine(dir, "output.txt"), ran.Stdout + ran.Stderr);
         if (ran.ExitCode != 0)
@@ -176,6 +319,33 @@ public static class BuildScripts
         return (0, directives);
     }
 
+    /// <summary>The exit with which <c>std.build.vendorDir</c> stops a script that asks for a source
+    /// tree not read yet: the build reads it and runs the script again.</summary>
+    private const int VendorExit = 75;
+
+    /// <summary>What <c>std.build.cEnv</c> hands another build system: <c>CC</c> and <c>AR</c> — zig's
+    /// as small scripts beside the build script, a program that takes the arguments a C compiler
+    /// takes, for the target —, and <c>CFLAGS</c>, the profile's optimization.</summary>
+    private static (string CC, string AR, string CFlags) CEnv(CCompiler compiler, Target target, BuildProfile profile, string dir)
+    {
+        var cflags = profile.Opt > 0 ? $"-O{profile.Opt}" : "-O0 -g";
+        if (compiler.Kind != CCompilerKind.Zig) return (compiler.Path, "ar", cflags);
+        string Wrapper(string name, string command)
+        {
+            var windows = OperatingSystem.IsWindows();
+            var path = Path.Combine(dir, windows ? name + ".cmd" : name);
+            var text = windows
+                ? $"@\"{compiler.Path}\" {command} %*\r\n"
+                : $"#!/bin/sh\nexec \"{compiler.Path}\" {command} \"$@\"\n";
+            if (!File.Exists(path) || File.ReadAllText(path) != text) File.WriteAllText(path, text);
+            if (!windows) File.SetUnixFileMode(path, (UnixFileMode)0b111_101_101);
+            return path;
+        }
+        // zig turns UBSan on by itself at -O0, with a runtime the program's link does not bring: off,
+        // as for the build's own C (CBuild.FlagsFor)
+        return (Wrapper("cc", $"cc -target {target.Triple} -fno-sanitize=undefined"), Wrapper("ar", "ar"), cflags);
+    }
+
     /// <summary>What the script is and what it builds for: its files, std, the toolchain, the
     /// compiler that builds it, the target and the profile it is told.</summary>
     private static string ScriptKey(Manifest manifest, PackageGraph? own, Target target, BuildProfile profile, string version)
@@ -199,6 +369,13 @@ public static class BuildScripts
     private static string Content(string path) =>
         File.Exists(path) ? Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))) : "-";
 
+    /// <summary>An environment variable's value as a key, <c>-</c> where it is not set: a hash, so
+    /// that what the variable holds — a token, perhaps — is not written under <c>out/</c>.</summary>
+    private static string EnvValue(string name) =>
+        Environment.GetEnvironmentVariable(name) is { } value
+            ? Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)))
+            : "-";
+
     /// <summary>A directory's tree as a key — what the script left in <c>gen/</c>.</summary>
     private static string Tree(string directory)
     {
@@ -209,15 +386,18 @@ public static class BuildScripts
     }
 
     /// <summary>What the last run left: the script's key, the inputs it named with the content they
-    /// had, the tree of <c>gen/</c>, and its directives — a line each.</summary>
+    /// had, the environment variables it named with the values they had, the tree of <c>gen/</c>,
+    /// and its directives — a line each.</summary>
     private sealed record State(string Key, List<(string Word, string Text)> Directives)
     {
         public Dictionary<string, string> Inputs { get; init; } = new(StringComparer.Ordinal);
+        public Dictionary<string, string> Env { get; init; } = new(StringComparer.Ordinal);
         public string Gen { get; init; } = "-";
 
         public bool Fresh(Manifest manifest) =>
             Gen == Tree(manifest.GenRoot)
-            && Inputs.All(input => Content(Path.GetFullPath(input.Key, manifest.Root)) == input.Value);
+            && Inputs.All(input => Content(Path.GetFullPath(input.Key, manifest.Root)) == input.Value)
+            && Env.All(variable => EnvValue(variable.Key) == variable.Value);
 
         public void Write(string file, Manifest manifest)
         {
@@ -226,6 +406,8 @@ public static class BuildScripts
             text.Append("gen\t").Append(Tree(manifest.GenRoot)).Append('\n');
             foreach (var (word, path) in Directives.Where(d => d.Word == "rerun-if-changed").Distinct())
                 text.Append("input\t").Append(Content(Path.GetFullPath(path, manifest.Root))).Append('\t').Append(path).Append('\n');
+            foreach (var (word, name) in Directives.Where(d => d.Word == "rerun-if-env-changed").Distinct())
+                text.Append("env\t").Append(EnvValue(name)).Append('\t').Append(name).Append('\n');
             foreach (var (word, value) in Directives) text.Append("directive\t").Append(word).Append('\t').Append(value).Append('\n');
             File.WriteAllText(file, text.ToString());
         }
@@ -235,6 +417,7 @@ public static class BuildScripts
             if (!File.Exists(file)) return null;
             string? key = null, gen = null;
             var inputs = new Dictionary<string, string>(StringComparer.Ordinal);
+            var env = new Dictionary<string, string>(StringComparer.Ordinal);
             var directives = new List<(string, string)>();
             foreach (var line in File.ReadAllLines(file))
             {
@@ -244,10 +427,11 @@ public static class BuildScripts
                     case ["key", var k]: key = k; break;
                     case ["gen", var g]: gen = g; break;
                     case ["input", var content, var path]: inputs[path] = content; break;
+                    case ["env", var value, var name]: env[name] = value; break;
                     case ["directive", var word, var text]: directives.Add((word, text)); break;
                 }
             }
-            return key is null ? null : new State(key, directives) { Inputs = inputs, Gen = gen ?? "-" };
+            return key is null ? null : new State(key, directives) { Inputs = inputs, Env = env, Gen = gen ?? "-" };
         }
     }
 }

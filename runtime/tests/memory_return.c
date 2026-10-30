@@ -1,7 +1,13 @@
-/* Memory given back (13 M11 P7, S8): a program builds half a gibibyte — small objects in blocks,
+/* Memory given back (13 M11 P7, S8): a program builds a quarter gibibyte — small objects in blocks,
  * large ones in pages, two huge ones in chunks of their own —, lets it go and collects: the
- * resident set falls back to a fraction of what it was. Under Boehm, which keeps what it took, only
- * the program's run is checked. Prints "memory ok" and, on stderr, the two sizes in MiB. */
+ * memory it holds falls back to a fraction of what it was. Under Boehm, which keeps what it took,
+ * only the program's run is checked. Prints "memory ok" and, on stderr, the two sizes in MiB.
+ *
+ * On macOS the measure is the footprint, not the resident set: the system compresses pages that
+ * sit still, and a compressed page leaves the resident set while the process still holds it — the
+ * half gibibyte it once built read as 318 MiB on a runner short of memory. Half a gibibyte was also
+ * enough to push those runners into swapping, and the program past its two minutes there four
+ * times: a quarter says the same, the gap between built and given back still wide. */
 #include "lyr/lyr.h"
 #include "check.h"
 #include "conservative.h"
@@ -25,10 +31,10 @@ static size_t resident(void) {
     if (!K32GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof counters)) return 0;
     return counters.WorkingSetSize;
 #elif defined(__APPLE__)
-    mach_task_basic_info_data_t info;
-    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
-    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) != KERN_SUCCESS) return 0;
-    return info.resident_size;
+    task_vm_info_data_t info;
+    mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+    if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&info, &count) != KERN_SUCCESS) return 0;
+    return (size_t)info.phys_footprint;
 #else
     FILE *statm = fopen("/proc/self/statm", "r");
     if (statm == NULL) return 0;
@@ -50,7 +56,7 @@ static const LyrDesc refs_desc = { .size = (uint32_t)offsetof(LyrArr, data), .fl
                                    .elem_size = sizeof(void *), .refmap_words = 1, .refmap = element_refs,
                                    .name = "test.Object[]" };
 
-enum { SMALL = 192 << 20, LARGE = 64 << 10, LARGES = (192 << 20) / LARGE, HUGE = 64 << 20 };
+enum { SMALL = 96 << 20, LARGE = 64 << 10, LARGES = (96 << 20) / LARGE, HUGE = 32 << 20 };
 
 static LyrRoot *small_root, *large_root, *huge_root;
 
@@ -91,7 +97,7 @@ static int64_t program(void) {
     lyr_gc_collect();
     size_t after = resident();
     fprintf(stderr, "resident: %zu MiB built, %zu MiB after\n", built >> 20, after >> 20);
-    CHECK(built > (size_t)400 << 20);
+    CHECK(built > (size_t)200 << 20);
 #ifndef LYR_GC_BOEHM
     CHECK(after < built / 4);
 #endif

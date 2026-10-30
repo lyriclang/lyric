@@ -28,7 +28,7 @@ namespace Lyric5.Compiler;
 /// <para>Only what the <see cref="SubsetGate"/> lets through arrives here, so an instruction or a
 /// type this emitter has no case for is a bug, not a diagnostic.</para>
 /// </summary>
-public sealed class CEmitter
+public sealed partial class CEmitter
 {
     /// <summary>What the gate lets through but this emitter cannot translate yet: the
     /// driver reports it like a gate refusal (<see cref="SubsetGate.NotYet"/>).</summary>
@@ -41,7 +41,7 @@ public sealed class CEmitter
 
     /// <summary>Part of every build cache key: a change in emission is a change in the C, and the
     /// cache must not hand out the old C for it. Bump it with the emission.</summary>
-    public const string Version = "r1f";
+    public const string Version = "r1h";
 
     private readonly IrModule _module;
     private readonly SourceManager _sources;
@@ -52,6 +52,7 @@ public sealed class CEmitter
     private int _data;
     private StringBuilder _fn = null!;
     private IrFunction _function = null!;
+    private readonly Dictionary<IrFunction, string[]> _localNames = new(ReferenceEqualityComparer.Instance);
     private FileId? _file;
 
     /// <summary>Which entry of the type table is a variant of which enum, and which number it
@@ -158,6 +159,33 @@ public sealed class CEmitter
     }
 
     /// <summary>
+    /// The header of a library C links (<c>lyric build --lib</c>), <c>&lt;name&gt;.h</c>: the
+    /// runtime's API (<c>runtime/include/lyric.h</c>, <paramref name="api"/>) as it is, then the
+    /// <c>@Layout</c> types the exports name and the exports, as the checker wrote them.
+    /// </summary>
+    public static string Header(IrModule module, string name, string api)
+    {
+        var guard = "LYRIC_LIBRARY_" + new string([.. name.ToUpperInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '_')]) + "_H";
+        var text = new StringBuilder();
+        text.Append($"/* {name}.h: the Lyric library {name} as C calls it — written by lyric build --lib. */\n");
+        text.Append($"#ifndef {guard}\n#define {guard}\n\n");
+        text.Append(api.TrimEnd()).Append("\n\n");
+        text.Append("#ifdef __cplusplus\nextern \"C\" {\n#endif\n");
+        if (module.Header.Types.Length > 0)
+        {
+            text.Append("\n/* the types the exports name */\n");
+            foreach (var type in module.Header.Types) text.Append(type).Append('\n');
+        }
+        if (module.Header.Declarations.Length > 0)
+        {
+            text.Append("\n/* the exports */\n");
+            foreach (var declaration in module.Header.Declarations) text.Append("LYRIC_API ").Append(declaration).Append(";\n");
+        }
+        text.Append("\n#ifdef __cplusplus\n}\n#endif\n\n#endif\n");
+        return text.ToString();
+    }
+
+    /// <summary>
     /// What a debugger shows the program's C as, a line each, tab-separated — beside the binary as
     /// <c>&lt;binary&gt;.lyric-names</c>: a function's C name and its Lyric name; <c>type</c>, a
     /// struct's C name and the type's Lyric name; <c>variant</c>, an enum's C name, a tag, the
@@ -240,8 +268,68 @@ public sealed class CEmitter
         return $"{plain}_{hash:x8}";
     }
 
-    private static string LocalName(IrLocal local) =>
-        $"l{local.Id.Value}_" + new string(local.Name.Select(c => char.IsAsciiLetterOrDigit(c) ? c : '_').ToArray());
+    /// <summary>
+    /// The C name of each local of <paramref name="function"/>, by its id: the Lyric name where C can
+    /// carry it (<see cref="PlainInC"/>) and no other local of the function has it — every local
+    /// is declared at the top of the C function, so two blocks' <c>x</c> would be one —, else
+    /// <c>l&lt;id&gt;_&lt;name&gt;</c>. A debugger then shows the program's own names.
+    /// </summary>
+    private string[] LocalNamesOf(IrFunction function)
+    {
+        if (_localNames.TryGetValue(function, out var known)) return known;
+        var counts = function.Locals.GroupBy(l => l.Name).ToDictionary(g => g.Key, g => g.Count());
+        var names = new string[function.Locals.Count];
+        foreach (var local in function.Locals)
+            names[local.Id.Value] = PlainInC(local.Name) && counts[local.Name] == 1
+                ? local.Name
+                : $"l{local.Id.Value}_" + Identifier(local.Name);
+        _localNames[function] = names;
+        return names;
+    }
+
+    private string LocalName(IrFunction function, IrLocal local) => LocalNamesOf(function)[local.Id.Value];
+
+    /// <summary>A local of the function being emitted.</summary>
+    private string Local(LocalId local) => LocalNamesOf(_function)[local.Value];
+
+    /// <summary>
+    /// Names C keeps for itself, or that the emitted C and its headers write without a prefix: the
+    /// keywords of C11 and C23, the lowercase macros of the standard headers and the ones a GNU
+    /// mode predefines, and the functions the emitter calls bare. A Lyric name among them is
+    /// mangled — a local <c>errno</c> or <c>fmod</c> would be the macro or hide the function.
+    /// </summary>
+    private static readonly HashSet<string> CTaken = new(StringComparer.Ordinal)
+    {
+        "auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern",
+        "float", "for", "goto", "if", "inline", "int", "long", "register", "restrict", "return", "short", "signed",
+        "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while", "asm",
+        "alignas", "alignof", "bool", "constexpr", "false", "nullptr", "static_assert", "thread_local", "true",
+        "typeof", "typeof_unqual",
+        "errno", "stdin", "stdout", "stderr", "assert", "offsetof", "complex", "imaginary", "noreturn", "unreachable",
+        "setjmp", "va_arg", "va_start", "va_end", "va_copy", "linux", "unix", "i386",
+        "fmod", "fmodf", "main",
+    };
+
+    /// <summary>
+    /// Whether C can carry a Lyric name as it is: an ASCII identifier that is none of
+    /// <see cref="CTaken"/>, not reserved to the implementation (a leading underscore, a name ending
+    /// in <c>_t</c>), not a macro's form (capitals, digits and underscores only), and not in a form
+    /// the emitter keeps for its own names — <c>lyr_</c>, <c>Lyr</c>, <c>LYR_</c>, a temp
+    /// (<c>t3</c>, <c>t3_s</c>) or a mangled name (<c>f_…</c>, <c>l2_…</c>), so that a plain name and
+    /// a mangled one never meet.
+    /// </summary>
+    private static bool PlainInC(string name) =>
+        PlainShape().IsMatch(name)
+        && !CTaken.Contains(name)
+        && !name.EndsWith("_t", StringComparison.Ordinal)
+        && !name.All(c => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c) || c == '_')
+        && !OwnShape().IsMatch(name);
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[A-Za-z][A-Za-z0-9_]*$")]
+    private static partial System.Text.RegularExpressions.Regex PlainShape();
+
+    [System.Text.RegularExpressions.GeneratedRegex("^(?:lyr_|Lyr|LYR_|f_|l[0-9]+_|t[0-9]+(?:_s)?$)")]
+    private static partial System.Text.RegularExpressions.Regex OwnShape();
 
     private static string Temp(TempId temp) => $"t{temp.Value}";
 
@@ -467,7 +555,9 @@ public sealed class CEmitter
     private static string Identifier(string name) =>
         new string(name.Select(c => char.IsAsciiLetterOrDigit(c) ? c : '_').ToArray());
 
-    private static string FieldName(string name) => "f_" + Identifier(name);
+    /// <summary>A field's C name: its Lyric name where C can carry it (<see cref="PlainInC"/>) — and
+    /// not <c>header</c>, which a class's struct holds beside its fields —, else <c>f_&lt;name&gt;</c>.</summary>
+    private static string FieldName(string name) => PlainInC(name) && name != "header" ? name : "f_" + Identifier(name);
 
     private string Field(TypeId type, FieldId field) => FieldName(_module.Types[type.Value].FieldNames[field.Value]);
 
@@ -749,6 +839,7 @@ public sealed class CEmitter
                 Call c => c.Target.Value,
                 MakeClosure m => m.Target.Value,
                 MakeCoroutine mc => mc.Body.Value,
+                CCallback cb => cb.Function.Value,
                 _ => -1,
             }).Where(i => i >= 0)).Distinct().Order();
         var prototypes = new StringBuilder();
@@ -769,13 +860,29 @@ public sealed class CEmitter
             {
                 var target = _module.Functions[index];
                 var parameters = target.Locals.Take(target.ParamCount).ToList();
-                var signature = string.Concat(parameters.Select(p => ", " + Declare(p.Type, LocalName(p))));
-                var arguments = parameters.Select(LocalName).Concat(target.Throws ? ["lyr_err"] : []);
+                var signature = string.Concat(parameters.Select(p => ", " + Declare(p.Type, LocalName(target, p))));
+                var arguments = parameters.Select(p => LocalName(target, p)).Concat(target.Throws ? ["lyr_err"] : []);
                 var call = $"{FunctionName(target.Name)}({string.Join(", ", arguments)})";
                 prototypes.AppendLine($"static {CType(target.ReturnType)} {CodeOf(target)}(void *lyr_env{signature}, LyrErr **lyr_err) {{ (void)lyr_env; "
                     + (target.Throws ? "" : "(void)lyr_err; ")
                     + (IsVoid(target.ReturnType) ? $"{call}; }}" : $"return {call}; }}"));
             }
+        }
+
+        // A function C calls gets a trampoline, static in every unit that takes its address.
+        var callbacks = ScopeOps().OfType<CCallback>().DistinctBy(c => c.Function.Value).OrderBy(c => c.Function.Value).ToList();
+        if (callbacks.Count > 0)
+        {
+            prototypes.AppendLine();
+            prototypes.AppendLine("/* trampolines: a Lyric function as C calls it */");
+            foreach (var callback in callbacks) prototypes.AppendLine(Trampoline(callback));
+        }
+        var closures = ScopeOps().OfType<CClosureCallback>().DistinctBy(ClosureTrampolineName).ToList();
+        if (closures.Count > 0)
+        {
+            prototypes.AppendLine();
+            prototypes.AppendLine("/* trampolines: a Lyric closure as C calls it, found through its userdata */");
+            foreach (var callback in closures) prototypes.AppendLine(ClosureTrampoline(callback));
         }
 
         // A coroutine starts from an environment — the arguments it was called with and the
@@ -818,14 +925,15 @@ public sealed class CEmitter
         }
 
         // The members of Error the runtime reports through: defined by the module's
-        // unit wherever an error can end the program, declared by an instance's unit that panics.
-        var adapters = !ErrorsEndTheProgram() ? ""
-            : _main ? ReportAdapters(define: true)
-            : Scope().Any(f => f.Blocks.Any(b => b.Terminator is PanicError)) ? ReportAdapters(define: false) : "";
+        // unit wherever an error can end the program or an export keeps one for C, declared by an
+        // instance's unit that panics.
+        var adapters = _main ? (ErrorsEndTheProgram() || _module.Exports.Any(e => e.Throws) ? ReportAdapters(define: true) : "")
+            : ErrorsEndTheProgram() && Scope().Any(f => f.Blocks.Any(b => b.Terminator is PanicError)) ? ReportAdapters(define: false) : "";
 
         var body = new StringBuilder();
         foreach (var function in Scope()) body.Append(Function(function));
         if (_main && _module.EntryFunction is { } entry) body.Append(Entry(_module.Functions[entry.Value]));
+        if (_main) body.Append(Exports());
 
         if (_constants.Length > 0) _out.AppendLine(_data > 0 ? "/* string literals, comptime data */" : "/* string literals */").Append(_constants).AppendLine();
         _out.Append(prototypes).AppendLine();
@@ -1369,6 +1477,7 @@ public sealed class CEmitter
             else if (op is Downcast dc) Add(dc.Target.Value);
             else if (op is CoroutineClose cc) Add(cc.Cancelled.Value);
             else if (op is SizeOf so) Visit(so.Type);
+            else if (op is RootedObject ro) Add(ro.Type.Type.Value);
 
         if (program)
         {
@@ -1484,10 +1593,10 @@ public sealed class CEmitter
     /// caller's place.</summary>
     private string Parameter(IrFunction function, IrLocal local) =>
         function.ReceiverByRef && local.Id.Value == 0
-            ? $"{CType(local.Type)} *{LocalName(local)}"
+            ? $"{CType(local.Type)} *{LocalName(function, local)}"
             : TakesEnvironment(function) && local.Id.Value == 0
                 ? "void *lyr_env"
-                : Declare(local.Type, LocalName(local));
+                : Declare(local.Type, LocalName(function, local));
 
     private bool IsReceiverPlace(LocalId local) => _function.ReceiverByRef && local.Value == 0;
 
@@ -1554,16 +1663,7 @@ public sealed class CEmitter
         var text = new StringBuilder();
         text.AppendLine();
         text.AppendLine("/* the program */");
-        // The globals are filled first, in declaration order, then the entry runs —
-        // registered with the collector before anything is stored in them.
-        var init = _module.GlobalInit is { } id ? FunctionName(_module.Functions[id.Value].Name) + "(); " : "";
-        if (_module.Globals.Count > 0)
-        {
-            var (words, whole) = GlobalRoots();
-            var register = words.Count > 0 ? $"lyr_gc_add_globals(lyr_global_refs, {words.Count}); " : "";
-            foreach (var global in whole) register += $"lyr_register_stack((void *)&{global}, (void *)(&{global} + 1)); ";
-            init = register + init;
-        }
+        var init = GlobalStart();
         if (entry.Throws)
         {
             // An error that escapes main: its message and its causes on the error
@@ -1584,6 +1684,90 @@ public sealed class CEmitter
             name = "lyr_entry";
         }
         text.AppendLine($"int main(int argc, char **argv) {{ return {RunMain(name)}; }}");
+        return text.ToString();
+    }
+
+    /// <summary>What runs before the program's first own code: the globals registered with the
+    /// collector before anything is stored in them, then filled in declaration order. Statements,
+    /// each with its trailing space; empty where there are none.</summary>
+    private string GlobalStart()
+    {
+        var init = _module.GlobalInit is { } id ? FunctionName(_module.Functions[id.Value].Name) + "(); " : "";
+        if (_module.Globals.Count == 0) return init;
+        var (words, whole) = GlobalRoots();
+        var register = words.Count > 0 ? $"lyr_gc_add_globals(lyr_global_refs, {words.Count}); " : "";
+        foreach (var global in whole) register += $"lyr_register_stack((void *)&{global}, (void *)(&{global} + 1)); ";
+        return register + init;
+    }
+
+    /// <summary>
+    /// The functions C calls by their symbols (<c>@Export</c>): each a wrapper that hands C's values
+    /// to the runtime's call (<c>lyr_export_call</c>), which runs the function as a task where C
+    /// called it — under std.task's loop for the embedding where the library waits — and gives its
+    /// result back as C's. One that throws answers <c>LyrStatus</c>, keeps its error for
+    /// <c>lyr_take_error</c> and writes its result through the last parameter. A library has no
+    /// main to start its globals: the first export's call does.
+    /// </summary>
+    private string Exports()
+    {
+        if (_module.Exports.Count == 0) return "";
+        var text = new StringBuilder();
+        text.AppendLine();
+        text.AppendLine("/* the exports */");
+        var start = "NULL";
+        if (_module.EntryFunction is null)
+        {
+            text.AppendLine($"static void lyr_library_start(void) {{ {GlobalStart()}}}");
+            start = "lyr_library_start";
+        }
+        var embedding = "NULL";
+        if (_module.Embedding is { } e)
+        {
+            string Name(FunctionId f) => FunctionName(_module.Functions[f.Value].Name);
+            text.AppendLine($"static const LyrEmbedding lyr_embedding = {{ {Name(e.Run)}, {Name(e.Step)}, {Name(e.Pump)}, {Name(e.End)} }};");
+            embedding = "&lyr_embedding";
+        }
+        foreach (var export in _module.Exports) text.Append(Export(export, start, embedding));
+        return text.ToString();
+    }
+
+    /// <summary>One export: its frame — C's values in, the function's result and error out —, the
+    /// body its task runs, and the wrapper C calls.</summary>
+    private string Export(IrExport export, string start, string embedding)
+    {
+        var target = _module.Functions[export.Function.Value];
+        var environment = TakesEnvironment(target) ? 1 : 0;
+        var parameters = target.Locals.Skip(environment).Take(target.ParamCount - environment).ToList();
+        var signature = parameters.Select((p, i) => $"{CAbiType(p.Type, export.Params[i])} lyr_a{i}").ToList();
+        var returns = !IsVoid(target.ReturnType);
+        var frame = $"lyr_xf_{export.Symbol}";
+        var fields = string.Concat(parameters.Select((p, i) => $" {CAbiType(p.Type, export.Params[i])} a{i};"))
+                     + (returns ? $" {Declare(target.ReturnType, "r")};" : "")
+                     + (export.Throws ? " LyrErr *e;" : "");
+        var arguments = (environment == 1 ? ["NULL"] : Array.Empty<string>())
+            .Concat(parameters.Select((p, i) => ComingIn($"f->a{i}", p.Type, export.Params[i]))).ToList();
+        if (export.Throws)
+        {
+            if (returns) signature.Add($"{CAbiType(target.ReturnType, export.Return)} *lyr_out");
+            arguments.Add("&f->e");
+        }
+        var call = $"{FunctionName(target.Name)}({string.Join(", ", arguments)})";
+        var text = new StringBuilder();
+        text.AppendLine($"typedef struct {{{(fields.Length == 0 ? " uint8_t none;" : fields)} }} {frame};");
+        var (message, cause) = ReportNames();
+        text.AppendLine($"static void lyr_xb_{export.Symbol}(void *lyr_p) {{ {frame} *f = lyr_p; "
+                        + (returns ? $"f->r = {call}; " : $"{call}; ")
+                        + (export.Throws ? $"if (LYR_UNLIKELY(f->e != NULL)) lyr_export_keep_error(f->e, {message}, {cause}); " : "")
+                        + "}");
+        var body = new StringBuilder($"{frame} f = {{0}}; ");
+        for (var i = 0; i < parameters.Count; i++) body.Append($"f.a{i} = lyr_a{i}; ");
+        body.Append($"LyrStatus lyr_s = lyr_export_call({start}, {embedding}, lyr_xb_{export.Symbol}, &f, {(export.Throws ? 1 : 0)}); ");
+        if (export.Throws)
+            body.Append("if (lyr_s != LYR_OK) return lyr_s; if (LYR_UNLIKELY(f.e != NULL)) return LYR_ERROR; "
+                        + (returns ? $"*lyr_out = {CrossingOut("f.r", export.Return)}; " : "") + "return LYR_OK; ");
+        else body.Append("(void)lyr_s; " + (returns ? $"return {CrossingOut("f.r", export.Return)}; " : ""));
+        var result = export.Throws ? "LyrStatus" : CAbiType(target.ReturnType, export.Return);
+        text.AppendLine($"LYRIC_API {result} {export.Symbol}({(signature.Count == 0 ? "void" : string.Join(", ", signature))}) {{ {body}}}");
         return text.ToString();
     }
 
@@ -1675,12 +1859,12 @@ public sealed class CEmitter
         // the environment's own type — and is cast to it once, here.
         if (TakesEnvironment(function))
         {
-            _fn.AppendLine($"    {Declare(function.Locals[0].Type, LocalName(function.Locals[0]))} = ({CType(function.Locals[0].Type)})lyr_env;");
+            _fn.AppendLine($"    {Declare(function.Locals[0].Type, LocalName(function, function.Locals[0]))} = ({CType(function.Locals[0].Type)})lyr_env;");
             // A closure's code that cannot throw has the slot every function value takes, unused.
             if (!function.Throws) _fn.AppendLine("    (void)lyr_err;");
         }
         foreach (var local in function.Locals.Skip(function.ParamCount))
-            _fn.AppendLine($"    {Declare(local.Type, LocalName(local))} = {Zero(local.Type)};");
+            _fn.AppendLine($"    {Declare(local.Type, LocalName(function, local))} = {Zero(local.Type)};");
         // The in-flight error: what a throw sets, what a call that failed wrote, what a
         // catch reads and clears.
         if (UsesErrors(function)) _fn.AppendLine("    LyrErr *lyr_e = NULL;");
@@ -1819,12 +2003,12 @@ public sealed class CEmitter
         Lyric.Ir.Convert v => $"{Temp(v.Dest)} = {Conversion(v)};",
         // The receiver of a struct method is already the place; every other struct local is
         // storage, and its temp aliases it.
-        LoadLocal l when IsReceiverPlace(l.Local) => $"{Temp(l.Dest)} = {LocalName(_function.Locals[l.Local.Value])};",
+        LoadLocal l when IsReceiverPlace(l.Local) => $"{Temp(l.Dest)} = {Local(l.Local)};",
         LoadLocal l => IsAggregate(l.Type)
-            ? $"{Temp(l.Dest)} = &{LocalName(_function.Locals[l.Local.Value])};"
-            : $"{Temp(l.Dest)} = {LocalName(_function.Locals[l.Local.Value])};",
-        StoreLocal s when IsReceiverPlace(s.Local) => $"*{LocalName(_function.Locals[s.Local.Value])} = {Value(s.Value)};",
-        StoreLocal s => $"{LocalName(_function.Locals[s.Local.Value])} = {Value(s.Value)};",
+            ? $"{Temp(l.Dest)} = &{Local(l.Local)};"
+            : $"{Temp(l.Dest)} = {Local(l.Local)};",
+        StoreLocal s when IsReceiverPlace(s.Local) => $"*{Local(s.Local)} = {Value(s.Value)};",
+        StoreLocal s => $"{Local(s.Local)} = {Value(s.Value)};",
         // A global is storage like a local: an aggregate is aliased in place, anything else read.
         LoadGlobal l => IsAggregate(l.Type)
             ? $"{Temp(l.Dest)} = &{GlobalName(l.Global.Value)};"
@@ -1832,8 +2016,8 @@ public sealed class CEmitter
         StoreGlobal g => $"{GlobalName(g.Global.Value)} = {Value(g.Value)};",
         // Places. The receiver of a struct method already is one.
         AddrLocal a => IsReceiverPlace(a.Local)
-            ? $"{Temp(a.Dest)} = {LocalName(_function.Locals[a.Local.Value])};"
-            : $"{Temp(a.Dest)} = &{LocalName(_function.Locals[a.Local.Value])};",
+            ? $"{Temp(a.Dest)} = {Local(a.Local)};"
+            : $"{Temp(a.Dest)} = &{Local(a.Local)};",
         AddrField a => $"{Temp(a.Dest)} = &{Temp(a.Object)}->{Field(a.Type, a.Field)};",
         AddrElem a => $"LYR_CHECK_INDEX({Temp(a.Index)}, {Length(a.Array)}); "
             + $"{Temp(a.Dest)} = &{Elements(a.Array, a.Element)}[{Temp(a.Index)}];",
@@ -1846,6 +2030,12 @@ public sealed class CEmitter
         Call call => Assign(call.Dest, $"{FunctionName(_module.Functions[call.Target.Value].Name)}({Arguments(_module.Functions[call.Target.Value], call.Args)}"
             + $"{SlotArgument(_module.Functions[call.Target.Value], call.Args.Length)})"),
         CallImport call when Intrinsics.IsForeign(_module.Imports[call.Target.Value].Name) => ForeignCall(call),
+        CCallback cb => $"{Temp(cb.Dest)} = (uint64_t)(uintptr_t)&{TrampolineName(_module.Functions[cb.Function.Value])};",
+        CallCPointer cp => CPointerCall(cp),
+        RootClosure r => $"{Temp(r.Dest)} = lyr_ffi_closure_root((void *){Temp(r.Closure)}.fn, {Temp(r.Closure)}.env);",
+        RootObject r => $"{Temp(r.Dest)} = (uint64_t)(uintptr_t)lyr_root_new({Temp(r.Value)});",
+        RootedObject r => $"{Temp(r.Dest)} = ({CType(r.Type)})lyr_ffi_rooted((uint64_t){Temp(r.Root)}, &{DescriptorName(r.Type.Type)});",
+        CClosureCallback c => $"{Temp(c.Dest)} = (uint64_t)(uintptr_t)&{ClosureTrampolineName(c)};",
         CallImport call => Assign(call.Dest, Intrinsics.Call(_module.Imports[call.Target.Value].Name, call.Args.Select(Value).ToArray())),
         NewObject { Result: IrRefType r } n => $"{Temp(n.Dest)} = ({CType(r)})lyr_alloc(&{DescriptorName(r.Type)});",
         NewObject n => $"{Storage(n.Dest)} = ({CType(n.Result)}){{0}}; {Temp(n.Dest)} = &{Storage(n.Dest)};",
@@ -2009,7 +2199,7 @@ public sealed class CEmitter
     /// <c>std.ffi</c>'s, an enum's integer, C's <c>bool</c>, the rest as Lyric holds it.</summary>
     private string CAbiType(IrType type, IrCForm? form) => form?.Kind switch
     {
-        IrCKind.Pointer or IrCKind.OptionalPointer => "void *",
+        IrCKind.Pointer or IrCKind.OptionalPointer or IrCKind.OptionalFunction => "void *",
         IrCKind.CString or IrCKind.OptionalCString => "const char *",
         IrCKind.Enum => form.Integer!,
         _ when type is IrScalarType { Kind: IrScalar.Bool } => "bool",
@@ -2037,40 +2227,138 @@ public sealed class CEmitter
     private string ForeignCall(CallImport call)
     {
         var import = _module.Imports[call.Target.Value];
-        var address = FieldName("address");
         var fixedCount = import.ParamTypes.Length;
         var arguments = call.Args.Select((arg, i) =>
         {
-            var value = Value(arg);
             // past the parameters, C's variadic arguments: in their form, then as C promotes them
             var variadic = i >= fixedCount;
             var form = variadic ? call.Variadic![i - fixedCount] : import.CParams?[i];
-            var crossing = form?.Kind switch
-            {
-                IrCKind.Pointer => $"(void *)(uintptr_t)({value}).{address}",
-                IrCKind.CString => $"(const char *)(uintptr_t)({value}).{address}",
-                IrCKind.OptionalPointer => $"(({value}).has ? (void *)(uintptr_t)({value}).value.{address} : NULL)",
-                IrCKind.OptionalCString => $"(({value}).has ? (const char *)(uintptr_t)({value}).value.{address} : NULL)",
-                IrCKind.Enum => $"({form.Integer})({value}).tag",
-                _ => value,
-            };
+            var crossing = CrossingOut(Value(arg), form);
             return variadic ? Promoted(crossing, TypeOf(arg), form!) : crossing;
         });
-        var c = $"{ForeignName(import.Name[2..])}({string.Join(", ", arguments)})";
-        if (call.Dest is not { } dest) return $"{c};";
+        return ComingBack($"{ForeignName(import.Name[2..])}({string.Join(", ", arguments)})", call.Dest, import.CReturn);
+    }
+
+    /// <summary>A Lyric value as C takes it, in its form: a pointer out of the struct that holds
+    /// its address, null for an absent optional, an enum's tag as its integer.</summary>
+    private string CrossingOut(string value, IrCForm? form)
+    {
+        var address = FieldName("address");
+        return form?.Kind switch
+        {
+            IrCKind.Pointer => $"(void *)(uintptr_t)({value}).{address}",
+            IrCKind.CString => $"(const char *)(uintptr_t)({value}).{address}",
+            IrCKind.OptionalPointer => $"(({value}).has ? (void *)(uintptr_t)({value}).value.{address} : NULL)",
+            IrCKind.OptionalCString => $"(({value}).has ? (const char *)(uintptr_t)({value}).value.{address} : NULL)",
+            IrCKind.OptionalFunction => $"(({value}).has ? (void *)(uintptr_t)({value}).value : NULL)",
+            IrCKind.Enum => $"({form.Integer})({value}).tag",
+            _ => value,
+        };
+    }
+
+    /// <summary>A C value as Lyric holds it, a C expression of <paramref name="type"/>: a pointer
+    /// into its struct, null into <c>none</c>, an integer into its variant. <paramref name="c"/> is
+    /// read twice for an optional: a name, never a call.</summary>
+    private string ComingIn(string c, IrType type, IrCForm? form)
+    {
+        var address = FieldName("address");
+        return form?.Kind switch
+        {
+            IrCKind.Pointer or IrCKind.CString => $"({CType(type)}){{ .{address} = (uint64_t)(uintptr_t){c} }}",
+            IrCKind.OptionalPointer or IrCKind.OptionalCString =>
+                $"({CType(type)}){{ .value = {{ .{address} = (uint64_t)(uintptr_t){c} }}, .has = {c} != NULL }}",
+            IrCKind.OptionalFunction => $"({CType(type)}){{ .value = (uint64_t)(uintptr_t){c}, .has = {c} != NULL }}",
+            IrCKind.Enum => $"({CType(type)}){{ .tag = lyr_ffi_enum_tag((int64_t){c}, {form.Variants}, \"{form.EnumName}\") }}",
+            _ => c,
+        };
+    }
+
+    /// <summary>The call <paramref name="c"/> of a C function, its result into
+    /// <paramref name="dest"/> as Lyric holds it.</summary>
+    private string ComingBack(string c, TempId? result, IrCForm? form)
+    {
+        var address = FieldName("address");
+        if (result is not { } dest) return $"{c};";
         var type = CType(TypeOf(dest));
-        return import.CReturn?.Kind switch
+        return form?.Kind switch
         {
             IrCKind.Pointer or IrCKind.CString =>
                 $"{Storage(dest)} = ({type}){{ .{address} = (uint64_t)(uintptr_t){c} }}; {Temp(dest)} = &{Storage(dest)};",
             IrCKind.OptionalPointer or IrCKind.OptionalCString =>
                 $"{{ const void *lyr_r = {c}; {Storage(dest)} = ({type}){{ .value = {{ .{address} = (uint64_t)(uintptr_t)lyr_r }}, "
                 + $".has = lyr_r != NULL }}; }} {Temp(dest)} = &{Storage(dest)};",
-            IrCKind.Enum =>
-                $"{Storage(dest)} = ({type}){{ .tag = lyr_ffi_enum_tag((int64_t){c}, {import.CReturn.Variants}, "
-                + $"\"{import.CReturn.EnumName}\") }}; {Temp(dest)} = &{Storage(dest)};",
+            IrCKind.Enum => $"{Storage(dest)} = {ComingIn(c, TypeOf(dest), form)}; {Temp(dest)} = &{Storage(dest)};",
+            IrCKind.OptionalFunction => $"{{ void *lyr_r = (void *){c}; {Assign(dest, ComingIn("lyr_r", TypeOf(dest), form))} }}",
             _ => Assign(dest, c),
         };
+    }
+
+    /// <summary>A call through a C function's pointer: the address cast to the function's C type,
+    /// then as a call of an <c>extern "C"</c> function.</summary>
+    private string CPointerCall(CallCPointer call)
+    {
+        var parameters = call.ParamTypes.Length == 0 ? "void"
+            : string.Join(", ", call.ParamTypes.Select((t, i) => CAbiType(t, call.Params[i])));
+        var callee = $"(({CAbiType(call.ReturnType, call.Return)} (*)({parameters}))(uintptr_t){Temp(call.Callee)})";
+        var arguments = call.Args.Select((arg, i) => CrossingOut(Value(arg), call.Params[i]));
+        return ComingBack($"{callee}({string.Join(", ", arguments)})", call.Dest, call.Return);
+    }
+
+    /// <summary>The trampoline C calls for a Lyric function: C's values into Lyric's, the call, the
+    /// result back — between the runtime's two marks that C's frames lie below.</summary>
+    private string Trampoline(CCallback callback)
+    {
+        var target = _module.Functions[callback.Function.Value];
+        var environment = TakesEnvironment(target) ? 1 : 0;
+        var parameters = target.Locals.Skip(environment).Take(target.ParamCount - environment).ToList();
+        var signature = parameters.Count == 0 ? "void"
+            : string.Join(", ", parameters.Select((p, i) => $"{CAbiType(p.Type, callback.Params[i])} lyr_a{i}"));
+        var arguments = (environment == 1 ? ["NULL"] : Array.Empty<string>())
+            .Concat(parameters.Select((p, i) => ComingIn($"lyr_a{i}", p.Type, callback.Params[i])));
+        var call = $"{FunctionName(target.Name)}({string.Join(", ", arguments)})";
+        var returned = CAbiType(target.ReturnType, callback.Return);
+        var body = IsVoid(target.ReturnType)
+            ? $"lyr_ffi_callback_enter(); {call}; lyr_ffi_callback_leave();"
+            : $"lyr_ffi_callback_enter(); {CType(target.ReturnType)} lyr_r = {call}; lyr_ffi_callback_leave(); "
+              + $"return {CrossingOut("lyr_r", callback.Return)};";
+        return $"static {returned} {TrampolineName(target)}({signature}) {{ {body} }}";
+    }
+
+    private string TrampolineName(IrFunction target) => "lyr_cb_" + FunctionName(target.Name)[4..];
+
+    /// <summary>The trampoline of a <c>Callback</c>: one per closure type and userdata place.</summary>
+    private string ClosureTrampolineName(CClosureCallback c) => $"lyr_cbc_{Mangle(c.Closure)}_{c.Userdata}";
+
+    /// <summary>The trampoline C calls for a <c>Callback</c>: the closure out of the userdata, C's
+    /// values into Lyric's, the call through the closure's code with its environment, the result back
+    /// — between the marks that count C's frames, as a function's trampoline.</summary>
+    private string ClosureTrampoline(CClosureCallback c)
+    {
+        var signature = string.Join(", ", c.ParamTypes.Select((t, i) => $"{CAbiType(t, c.Params[i])} lyr_a{i}"));
+        var arguments = c.ParamTypes.Select((t, i) => (t, i)).Where(p => p.i != c.Userdata)
+            .Select(p => ComingIn($"lyr_a{p.i}", p.t, c.Params[p.i]));
+        var closure = $"(({CType(c.Closure)}){{ ({CodePointer(c.Closure, "")})lyr_c->code, lyr_c->env }})";
+        var call = $"{closure}.fn({closure}.env{string.Concat(arguments.Select(a => ", " + a))}, NULL)";
+        var head = $"lyr_ffi_callback_enter(); LyrFfiClosure *lyr_c = lyr_ffi_closure_of((void *)lyr_a{c.Userdata});";
+        if (!IsVoid(c.ReturnType))
+            return $"static {CAbiType(c.ReturnType, c.Return)} {ClosureTrampolineName(c)}({signature}) {{ {head} "
+                   + $"{CType(c.ReturnType)} lyr_r = {call}; lyr_ffi_callback_leave(); return {CrossingOut("lyr_r", c.Return)}; }}";
+
+        // One that returns nothing may be called on a thread Lyric does not run: what C passed goes,
+        // copied, to the thread that made the Callback, which runs it in its scheduler's next turn.
+        var name = ClosureTrampolineName(c);
+        var fields = string.Concat(c.ParamTypes.Select((t, i) => $" {CAbiType(t, c.Params[i])} lyr_a{i};"));
+        var queued = c.ParamTypes.Select((t, i) => (t, i)).Where(p => p.i != c.Userdata)
+            .Select(p => ComingIn($"lyr_q->lyr_a{p.i}", p.t, c.Params[p.i]));
+        var queuedCall = $"{closure}.fn({closure}.env{string.Concat(queued.Select(a => ", " + a))}, NULL)";
+        var copies = string.Concat(c.ParamTypes.Select((_, i) => $" lyr_q->lyr_a{i} = lyr_a{i};"));
+        var holder = $"typedef struct {{{fields} }} {name}_call;";
+        var run = $"static void {name}_run(void *lyr_p) {{ {name}_call *lyr_q = lyr_p; "
+                  + $"LyrFfiClosure *lyr_c = lyr_ffi_closure_of((void *)lyr_q->lyr_a{c.Userdata}); {queuedCall}; }}";
+        var away = $"if (!lyr_thread_attached()) {{ {name}_call *lyr_q = lyr_ffi_call_alloc(sizeof *lyr_q);" + copies
+                   + $" lyr_ffi_enqueue(lyr_ffi_closure_of((void *)lyr_a{c.Userdata})->owner, {name}_run, lyr_q); return; }}";
+        return $"{holder}\n{run}\n"
+               + $"static void {name}({signature}) {{ {away} {head} {call}; lyr_ffi_callback_leave(); }}";
     }
 
     private string Arguments(IrFunction callee, TempId[] args) =>

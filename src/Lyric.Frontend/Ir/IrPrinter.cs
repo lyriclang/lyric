@@ -220,6 +220,13 @@ public static class IrPrinter
         BlackBox b => $"{b.Dest}: {TypeStr(b.Type)} = blackbox {b.Value}",
         PlaceAt p => $"{p.Dest}: {TypeStr(new IrPlaceType(p.Type))} = placeat {p.Address}",
         SizeOf s => $"{s.Dest}: u64 = sizeof {TypeStr(s.Type)}",
+        CCallback c => $"{c.Dest}: u64 = ccallback fn#{c.Function.Value}",
+        RootClosure r => $"{r.Dest}: u64 = rootclosure {r.Closure}",
+        RootObject r => $"{r.Dest}: u64 = rootobject {r.Value}",
+        RootedObject r => $"{r.Dest}: {TypeStr(r.Type)} = rootedobject {r.Root}",
+        CClosureCallback c => $"{c.Dest}: u64 = cclosurecallback {TypeStr(c.Closure)} userdata#{c.Userdata}",
+        CallCPointer c => (c.Dest is { } d ? $"{d}: {TypeStr(c.ReturnType)} = " : "")
+                          + $"callc {c.Callee}({string.Join(", ", c.Args)})",
         DataAddress d => $"{d.Dest}: u64 = dataaddress {d.Value}",
         _ => throw new InternalCompilationException($"ir-printer: unhandled op {op.GetType().Name}")
     };

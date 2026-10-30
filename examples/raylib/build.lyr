@@ -1,0 +1,34 @@
+// raylib from its source tree, as its own Makefile builds it for the desktop: GLFW for the window,
+// OpenGL 3.3. On Linux GLFW is told to use X11, as raylib's Makefile tells it; on macOS GLFW's Cocoa
+// part is Objective-C, so rglfw.c is a library of its own there, compiled as Objective-C.
+import std.build;
+
+/// A part of raylib: its headers, the desktop platform, OpenGL 3.3; raylib's own warnings are its.
+fn desktop(name: string): build.CLibrary {
+    let library = build.cLibrary(name);
+    library.include("@raylib/src", "@raylib/src/external/glfw/include");
+    library.define("PLATFORM_DESKTOP");
+    library.define("GRAPHICS_API_OPENGL_33");
+    library.flags("-O2", "-w");
+    return library;
+}
+
+fn main(): void {
+    let os = build.target().os;
+    let raylib = desktop("raylib");
+    for (m in ["rcore", "rshapes", "rtextures", "rtext", "rmodels", "raudio", "utils"]) {
+        raylib.sources(f"@raylib/src/{m}.c");
+    }
+    if (os == .MacOS) {
+        let glfw = desktop("glfw");
+        glfw.sources("@raylib/src/rglfw.c");
+        glfw.flags("-x", "objective-c");
+        glfw.compile();
+    } else {
+        raylib.sources("@raylib/src/rglfw.c");
+    }
+    if (os == .Linux) {
+        raylib.define("_GLFW_X11");
+    }
+    raylib.compile();
+}

@@ -822,6 +822,47 @@ public static class IrVerifier
                 case SizeOf s:
                     RequireDestType(s.Dest, new IrScalarType(IrScalar.U64), "sizeof", block, index);
                     break;
+                case CCallback c:
+                    if (c.Function.Value < 0 || c.Function.Value >= _module.Functions.Count)
+                        Report(block, index, $"ccallback names function {c.Function}, out of range");
+                    else if (c.Params.Length != _module.Functions[c.Function.Value].ParamCount
+                             - (_module.Functions[c.Function.Value] is { ParamCount: > 0 } f && f.Locals[0].Name == "<env>" ? 1 : 0))
+                        Report(block, index, $"ccallback gives {N(c.Params.Length)} form(s) for the parameters of fn#{c.Function.Value}");
+                    RequireDestType(c.Dest, new IrScalarType(IrScalar.U64), "ccallback", block, index);
+                    break;
+                case RootObject r:
+                    if (TypeOf(r.Value) is not IrRefType)
+                        Report(block, index, $"rootobject {r.Value} is {Show(TypeOf(r.Value))}, expected an object");
+                    RequireDestType(r.Dest, new IrScalarType(IrScalar.U64), "rootobject", block, index);
+                    break;
+                case RootedObject r:
+                    if (!IrType.Equal(TypeOf(r.Root), new IrScalarType(IrScalar.U64)))
+                        Report(block, index, $"rootedobject {r.Root} is {Show(TypeOf(r.Root))}, expected a root, u64");
+                    RequireDestType(r.Dest, r.Type, "rootedobject", block, index);
+                    break;
+                case RootClosure r:
+                    if (TypeOf(r.Closure) is not IrFunctionType)
+                        Report(block, index, $"rootclosure {r.Closure} is {Show(TypeOf(r.Closure))}, expected a function value");
+                    RequireDestType(r.Dest, new IrScalarType(IrScalar.U64), "rootclosure", block, index);
+                    break;
+                case CClosureCallback c:
+                    if (c.Userdata < 0 || c.Userdata >= c.ParamTypes.Length || c.Params.Length != c.ParamTypes.Length
+                        || c.Closure.Parameters.Length != c.ParamTypes.Length - 1)
+                        Report(block, index, $"cclosurecallback: userdata#{c.Userdata} among {N(c.ParamTypes.Length)} C parameter(s), "
+                                             + $"{N(c.Closure.Parameters.Length)} of the closure");
+                    RequireDestType(c.Dest, new IrScalarType(IrScalar.U64), "cclosurecallback", block, index);
+                    break;
+                case CallCPointer c:
+                    if (!IrType.Equal(TypeOf(c.Callee), new IrScalarType(IrScalar.U64)))
+                        Report(block, index, $"callc {c.Callee} is {Show(TypeOf(c.Callee))}, expected a C function's pointer, u64");
+                    if (c.Args.Length != c.ParamTypes.Length || c.Params.Length != c.ParamTypes.Length)
+                        Report(block, index, $"callc passes {N(c.Args.Length)} arg(s) with {N(c.Params.Length)} form(s), expected {N(c.ParamTypes.Length)}");
+                    else
+                        for (var i = 0; i < c.Args.Length; i++)
+                            if (!IrType.Equal(TypeOf(c.Args[i]), c.ParamTypes[i]))
+                                Report(block, index, $"callc: arg {N(i)} is {Show(TypeOf(c.Args[i]))}, expected {Show(c.ParamTypes[i])}");
+                    if (c.Dest is { } called) RequireDestType(called, c.ReturnType, "callc", block, index);
+                    break;
                 case DataAddress d:
                     if (TypeOf(d.Value) is not (IrArrayType or IrSliceType))
                         Report(block, index, $"dataaddress {d.Value} is {Show(TypeOf(d.Value))}, expected an array or a slice");

@@ -603,6 +603,9 @@ public sealed class TypeChecker
                 var fnAttributes = CheckAttributes(fn.Attributes, AttributeSite.Function, fn.Generics.Length > 0,
                     module.Members, "a function");
                 if (fnAttributes.Exists(IsCanonicalTest)) CheckTest(fn, module);
+                foreach (var attribute in fn.Attributes)
+                    if (_result.RefOf(attribute) is TypeSymbol named && ReferenceEquals(named, _coreMembers?.LookupLocal("Export")))
+                        CheckExport(fn, attribute, module);
                 RequireBody(fn, module);
                 if (fn.IsMacro) CheckMacroSignature(fn);
                 CheckFunction(fn, module.Members, thisType: null);
@@ -829,7 +832,7 @@ public sealed class TypeChecker
                     $"parameter '{p.Name}' of extern '{fn.Name}' takes a place ('&'), which does not cross into C — "
                     + "what C takes by address is a 'Ptr'");
             var type = ResolveType(p.Type, module.Members);
-            if (CFault(type, CSite.Parameter) is { } fault)
+            if (CFault(type, CSite.Parameter, IsStdModule(module)) is { } fault)
                 _de.Report("LYR-SEM0099", Severity.Error, p.Type.Span,
                     $"parameter '{p.Name}' of extern '{fn.Name}' has type '{TypeFacts.Display(type)}', which does not "
                     + $"cross into C — {fault}");
@@ -837,7 +840,7 @@ public sealed class TypeChecker
         if (fn.ReturnType is { } ret)
         {
             var type = ResolveType(ret, module.Members);
-            if (CFault(type, CSite.Return) is { } fault)
+            if (CFault(type, CSite.Return, IsStdModule(module)) is { } fault)
                 _de.Report("LYR-SEM0099", Severity.Error, ret.Span,
                     $"extern '{fn.Name}' returns '{TypeFacts.Display(type)}', which does not come back from C — {fault}");
         }
@@ -856,10 +859,16 @@ public sealed class TypeChecker
     /// by value; an enum with <c>@Layout</c> as its integer, beside a struct's fields; an inline
     /// array as a field. A <c>string</c> crosses where a <c>CStr</c> parameter takes it, as its
     /// bytes.
+    /// <para>One row more for the standard library's own C functions, which are the runtime's
+    /// (<paramref name="std"/>): an object of the runtime's — a <c>string</c>, an array, an object of
+    /// a class, a coroutine, or the optional of one — crosses as the runtime's pointer to it, a
+    /// parameter or a result. The runtime is the one C that knows those objects.</para>
     /// </summary>
-    private string? CFault(LyrType type, CSite site)
+    private string? CFault(LyrType type, CSite site, bool std = false)
     {
         const string table = "integers, floats, bool, char, a 'Ptr', a 'CStr' and a '@Layout(C)' struct do";
+        if (std && site != CSite.Field && IsRuntimeObject(type is Optional { Inner: var held } ? held : type))
+            return null;
         switch (type)
         {
             case { IsError: true }:
@@ -876,7 +885,7 @@ public sealed class TypeChecker
                 return null;
             case NamedRef r when IsFfiType(r.Symbol, "CStr"):
                 return null;
-            case Optional { Inner: var inner } when IsFfiPointer(inner):
+            case Optional { Inner: var inner } when IsFfiPointer(inner) || inner is FnType { IsC: true }:
                 return site == CSite.Field
                     ? "an optional pointer is wider than a pointer in a struct; a field of C's that may be null is a 'Ptr' C never leaves null, or the struct holds an integer"
                     : null;
@@ -890,10 +899,52 @@ public sealed class TypeChecker
                 return site == CSite.Field ? "an enum crosses as a parameter or a result; a C struct's enum field is its integer" : null;
             case InlineArrayOf ia when site == CSite.Field:
                 return CFault(ia.Element, CSite.Field);
+            // a C function's pointer is one word, wherever C holds it
+            case FnType { IsC: true }:
+                return null;
+            case FnType:
+                return "a Lyric function value holds its environment; C's function pointer is an 'extern \"C\" fn(…) -> T', "
+                       + "which a function or a lambda that captures nothing becomes";
             default:
                 return table;
         }
     }
+
+    /// <summary>
+    /// <c>extern "C" fn(int) -&gt; int</c>: a pointer to a C function, which C calls and which Lyric
+    /// calls as C's. Its parameters and its result cross as a C function's do; it throws nothing
+    /// and takes no place. The ABI is C's, the one boundary.
+    /// </summary>
+    private LyrType ResolveCFunctionType(FunctionType f, string abi, LyrType[] parameters, LyrType result)
+    {
+        if (abi != "C")
+        {
+            _de.Report("LYR-SEM0099", Severity.Error, f.AbiSpan, $"unknown ABI \"{abi}\" — this compiler binds \"C\"");
+            return LyrType.Error;
+        }
+        if (f.Throws is { } thrown)
+            _de.Report("LYR-SEM0099", Severity.Error, thrown.Span, "a C function throws nothing — its type has no 'throws'");
+        if (f.Places.Contains(true))
+            _de.Report("LYR-SEM0099", Severity.Error, f.Span,
+                "a place does not cross into C — what C takes by address is a 'Ptr'");
+        for (var i = 0; i < parameters.Length; i++)
+            if (CFault(parameters[i], CSite.Parameter) is { } fault)
+                _de.Report("LYR-SEM0099", Severity.Error, f.Parameters[i].Span,
+                    $"a C function's parameter of type '{TypeFacts.Display(parameters[i])}' does not cross into C — {fault}");
+        if (CFault(result, CSite.Return) is { } returned)
+            _de.Report("LYR-SEM0099", Severity.Error, f.ReturnType.Span,
+                $"a C function's result of type '{TypeFacts.Display(result)}' does not come back from C — {returned}");
+        return new FnType(parameters, result) { IsC = true };
+    }
+
+    /// <summary>A module of the standard library, whose C functions are the runtime's.</summary>
+    private static bool IsStdModule(ModuleSymbol module) => module.Path is ["std", ..];
+
+    /// <summary>An object the runtime holds and knows: a <c>string</c>, an array, an object of a
+    /// class, a coroutine — what std's C functions take and give as the runtime's pointer.</summary>
+    private static bool IsRuntimeObject(LyrType type) => type is PrimitiveType { Kind: PrimitiveKind.String }
+        or ArrayOf or CoroutineOf
+        or NamedRef { Symbol.Kind: TypeSymbolKind.Class } or GenericInstance { Definition.Kind: TypeSymbolKind.Class };
 
     /// <summary>Is this <c>std.ffi</c>'s type of this name?</summary>
     private bool IsFfiType(TypeSymbol symbol, string name) =>
@@ -990,6 +1041,181 @@ public sealed class TypeChecker
         if (declared.Variants.Length - 1 > max)
             _de.Report("LYR-SEM0099", Severity.Error, layout.Span,
                 $"'{type.Name}' has {declared.Variants.Length} variants, and '{form}' holds 0 to {max}");
+    }
+
+    /// <summary><c>@Export</c> and <c>@Export("c_name")</c>: a bare one, or the symbol as a string
+    /// written out — the header and the linker read it before anything is computed.</summary>
+    private void CheckExportForm(AttributeNode attribute)
+    {
+        if (attribute.Fields.Length == 0 && attribute.Positional is null or StringLiteralExpr) return;
+        _de.Report("LYR-SEM0099", Severity.Error, attribute.Span,
+            "'@Export' takes the C symbol as a string written out, '@Export(\"geo_area\")', or nothing for the function's own name");
+    }
+
+    /// <summary>The symbols the program exports, each with where it was claimed: two functions
+    /// cannot both be one symbol.</summary>
+    private readonly Dictionary<string, Span> _exportSymbols = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// <c>@Export("geo_area") pub fn area(…)</c>: a function C calls by a symbol. It has a body
+    /// and one signature — <c>pub</c>, no type parameters, not <c>inline</c> —, and what it takes and
+    /// gives crosses as for a C function the program calls (<see cref="CFault"/>), the other way:
+    /// a <c>string</c> is no parameter here, C's text comes in as a <c>CStr</c>. It may throw; C
+    /// then gets <c>LyrStatus</c>. Its declaration in C, and the types that declaration names, go
+    /// into the header the library carries.
+    /// </summary>
+    private void CheckExport(FunctionDecl fn, AttributeNode export, ModuleSymbol module)
+    {
+        // a function is one export, however often a declaration is checked
+        if (_result.Exports.Exists(e => ReferenceEquals(e.Function, fn))) return;
+        var symbol = (export.Positional as StringLiteralExpr)?.Value ?? fn.Name;
+        var faults = 0;
+        void Refuse(Span span, string message)
+        {
+            _de.Report("LYR-SEM0099", Severity.Error, span, message);
+            faults++;
+        }
+        if (!CIdentifier.IsMatch(symbol)) Refuse(export.Span, $"'{symbol}' is no C function's name");
+        else if (symbol.StartsWith("lyr_", StringComparison.Ordinal) || symbol.StartsWith("LYR_", StringComparison.Ordinal))
+            Refuse(export.Span, $"'{symbol}' begins as the runtime's own names do ('lyr_') — name the export otherwise");
+        else if (_exportSymbols.TryGetValue(symbol, out var first) && first != export.Span)
+            Refuse(export.Span, $"'{symbol}' is exported already by another function — one C symbol is one function");
+        else _exportSymbols[symbol] = export.Span;
+        if (fn.Body is null) Refuse(fn.NameSpan, $"'{fn.Name}' has no body to export — an export is a Lyric function C calls");
+        if (!fn.IsPublic) Refuse(fn.NameSpan, $"'{fn.Name}' is exported, and an export is 'pub': C calls it from outside every module");
+        if (fn.Generics.Length > 0) Refuse(fn.NameSpan, $"'{fn.Name}' is generic — an export is one signature, and C has no type arguments");
+        if (fn.IsInline) Refuse(fn.NameSpan, $"'{fn.Name}' is 'inline', set in place at every call — an export is a function C calls");
+        if (fn.IsMacro) Refuse(fn.NameSpan, $"'{fn.Name}' is a macro, which runs while the program compiles — C cannot call it");
+        var parameters = new List<LyrType>();
+        foreach (var p in fn.Parameters)
+        {
+            var type = ResolveType(p.Type, module.Members);
+            parameters.Add(type);
+            if (p.IsPlace)
+                Refuse(p.Span, $"parameter '{p.Name}' of export '{fn.Name}' takes a place ('&'), which C cannot hand — what C hands by address is a 'Ptr'");
+            else if (type is PrimitiveType { Kind: PrimitiveKind.String })
+                Refuse(p.Type.Span, $"parameter '{p.Name}' of export '{fn.Name}' is a 'string', and C hands its text as a 'CStr' (std.ffi) — "
+                                    + "declare it so, and 'toString()' copies it");
+            else if (CFault(type, CSite.Parameter) is { } fault)
+                Refuse(p.Type.Span, $"parameter '{p.Name}' of export '{fn.Name}' has type '{TypeFacts.Display(type)}', which C cannot hand — {fault}");
+        }
+        var result = fn.ReturnType is { } written ? ResolveType(written, module.Members) : LyrType.Void;
+        if (fn.ReturnType is { } returned && CFault(result, CSite.Return) is { } resultFault)
+            Refuse(returned.Span, $"export '{fn.Name}' returns '{TypeFacts.Display(result)}', which C cannot take — {resultFault}");
+        if (faults > 0 || parameters.Concat([result]).Any(t => t.IsError)) return;
+
+        // its declaration as C reads it: the parameters by their names, a throwing export's result
+        // through the last one
+        var names = fn.Parameters.Select(p => CHeaderName(p.Name)).ToList();
+        var declared = parameters.Select((t, i) => CDeclarator(t, names[i])).ToList();
+        string declaration;
+        if (fn.Throws is not null)
+        {
+            if (result is not PrimitiveType { Kind: PrimitiveKind.Void }) declared.Add(CDeclarator(result, "*lyr_out"));
+            declaration = $"LyrStatus {symbol}({(declared.Count == 0 ? "void" : string.Join(", ", declared))})";
+        }
+        else declaration = CDeclarator(result, $"{symbol}({(declared.Count == 0 ? "void" : string.Join(", ", declared))})");
+        _result.Exports.Add(new CExport(fn, symbol, declaration));
+    }
+
+    /// <summary>C's keywords, which a parameter's name in the header is not.</summary>
+    private static readonly HashSet<string> CKeywords =
+    [
+        "auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern",
+        "float", "for", "goto", "if", "inline", "int", "long", "register", "restrict", "return", "short", "signed",
+        "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while",
+        "bool", "true", "false",
+    ];
+
+    private static string CHeaderName(string name) => CKeywords.Contains(name) || name.StartsWith("lyr_", StringComparison.Ordinal) ? name + "_" : name;
+
+    /// <summary>
+    /// The C declaration of <paramref name="inner"/> — a name, a pointer to it, a function's head —
+    /// of a type that crosses (<see cref="CFault"/>): C's integer of each width, <c>bool</c>, a
+    /// <c>char</c> as its scalar value; a <c>Ptr&lt;T&gt;</c> as <c>T *</c> (<c>void *</c> where C
+    /// has no name for <c>T</c>), a <c>CStr</c> as <c>const char *</c>, either's optional alike; a
+    /// C function's pointer in C's form; a <c>@Layout</c> type by the name the header defines it
+    /// under, its module's path and its own (<c>geo_Point</c>).
+    /// </summary>
+    private string CDeclarator(LyrType type, string inner)
+    {
+        string Named(string c) => inner.Length == 0 ? c : $"{c} {inner}";
+        switch (type)
+        {
+            case PrimitiveType { Kind: var kind }:
+                return Named(kind switch
+                {
+                    PrimitiveKind.Int => "int64_t", PrimitiveKind.Uint => "uint64_t",
+                    PrimitiveKind.Int8 => "int8_t", PrimitiveKind.Int16 => "int16_t", PrimitiveKind.Int32 => "int32_t",
+                    PrimitiveKind.Uint8 => "uint8_t", PrimitiveKind.Uint16 => "uint16_t", PrimitiveKind.Uint32 => "uint32_t",
+                    PrimitiveKind.Float => "double", PrimitiveKind.Float32 => "float",
+                    PrimitiveKind.Bool => "bool", PrimitiveKind.Char => "uint32_t",
+                    _ => "void",
+                });
+            case Optional { Inner: var held }:
+                return CDeclarator(held, inner);
+            case GenericInstance g when IsFfiType(g.Definition, "Ptr"):
+                var pointee = g.Arguments is [var target] && CFault(target, CSite.Field) is null && target is not FnType
+                    ? target : LyrType.Void;
+                return CDeclarator(pointee, "*" + inner);
+            case NamedRef r when IsFfiType(r.Symbol, "CStr"):
+                return Named("const char *").Replace("* ", "*");
+            case FnType f:
+                var parameters = f.Parameters.Length == 0 ? "void" : string.Join(", ", f.Parameters.Select(p => CDeclarator(p, "")));
+                return CDeclarator(f.Return, $"(*{inner})({parameters})");
+            case InlineArrayOf ia:
+                return CDeclarator(ia.Element, $"{inner}[{ia.Length}]");
+            case NamedRef { Symbol: var s }:
+                return Named(CHeaderType(s));
+            default:
+                return Named("void");
+        }
+    }
+
+    /// <summary>A <c>@Layout</c> type's name in the header, its definition added to the header's
+    /// types — after every type its fields name, a type through a pointer only declared ahead.</summary>
+    private string CHeaderType(TypeSymbol type)
+    {
+        var name = $"{string.Join('_', ModuleOfType(type))}_{type.Name}".TrimStart('_');
+        // a struct whose fields are still being written — through a pointer to itself — by its tag
+        if (!_headerTypes.Add(type))
+            return type.Kind == TypeSymbolKind.Struct && !_headerTypesDone.Contains(type) ? $"struct {name}" : name;
+        if (type.Kind == TypeSymbolKind.Enum && type.Declaration is EnumDecl declared)
+        {
+            var constants = string.Join(", ", declared.Variants.Select((v, i) => $"{name}_{v.Name} = {i}"));
+            var definition = LayoutOf(type) == "C"
+                ? $"typedef enum {name} {{ {constants} }} {name};"
+                : $"typedef {CDeclarator(new PrimitiveType(LayoutKind(LayoutOf(type)!)), "")} {name};\nenum {{ {constants} }};";
+            _result.CHeaderTypes.Add(definition);
+            return name;
+        }
+        var fields = new List<string>();
+        foreach (var field in (type.Declaration as StructDecl)?.Members.OfType<FieldDecl>() ?? [])
+            if (type.Members.LookupLocal(field.Name) is FieldSymbol fs)
+                fields.Add($"    {CDeclarator(FieldType(fs), CHeaderName(field.Name))};");
+        _result.CHeaderTypes.Add($"typedef struct {name} {{\n{string.Join('\n', fields)}\n}} {name};");
+        _headerTypesDone.Add(type);
+        return name;
+    }
+
+    private readonly HashSet<TypeSymbol> _headerTypes = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<TypeSymbol> _headerTypesDone = new(ReferenceEqualityComparer.Instance);
+
+    private static PrimitiveKind LayoutKind(string form) => form switch
+    {
+        "int8" => PrimitiveKind.Int8, "int16" => PrimitiveKind.Int16, "int32" => PrimitiveKind.Int32,
+        "uint8" => PrimitiveKind.Uint8, "uint16" => PrimitiveKind.Uint16, "uint32" => PrimitiveKind.Uint32,
+        "uint" or "uint64" => PrimitiveKind.Uint,
+        _ => PrimitiveKind.Int,
+    };
+
+    /// <summary>The path of the module that declares a type, by identity; empty where none does.</summary>
+    private string[] ModuleOfType(TypeSymbol type)
+    {
+        foreach (var module in _comp.Modules)
+            if (ReferenceEquals(module.Members.LookupLocal(type.Name), type))
+                return module.Path;
+        return [];
     }
 
     private static readonly System.Text.RegularExpressions.Regex CIdentifier = new("^[A-Za-z_][A-Za-z0-9_]*$");
@@ -3172,6 +3398,58 @@ public sealed class TypeChecker
     private int _unsafeDepth;
 
     /// <summary>
+    /// <c>Callback&lt;C&gt;.new(closure)</c>: <c>C</c> is a C function's type whose first or last
+    /// parameter is the <c>Ptr&lt;void&gt;</c> C hands back; the closure is a Lyric function of the
+    /// others, which throws nothing. The type it takes, and where the userdata stands for the
+    /// lowering; <c>null</c> for any other call, and where <c>C</c> is refused.
+    /// </summary>
+    private FnType? CallbackClosureType(FnType fn, FunctionDecl? decl, CallExpr call)
+    {
+        if (decl is null || _comp.FindModule(["std", "ffi"])?.Members.LookupLocal("Callback") is not TypeSymbol callback
+            || !ReferenceEquals(callback.Members.LookupLocal("new")?.Declaration, decl)
+            || fn.Return is not GenericInstance { Arguments: [var c] } || c.IsError || MentionsTypeParam(c))
+            return null;
+        if (c is not FnType { IsC: true } cFunction)
+        {
+            _de.Report("LYR-SEM0099", Severity.Error, call.Span,
+                $"a Callback's type is the C function's, 'extern \"C\" fn(…)', not '{TypeFacts.Display(c)}'");
+            return null;
+        }
+        bool IsUserdata(LyrType t) => t is GenericInstance { Arguments: [PrimitiveType { Kind: PrimitiveKind.Void }] } p
+                                      && IsFfiType(p.Definition, "Ptr");
+        var parameters = cFunction.Parameters;
+        var first = parameters.Length > 0 && IsUserdata(parameters[0]);
+        var last = parameters.Length > 1 && IsUserdata(parameters[^1]);
+        if (first == last)
+        {
+            _de.Report("LYR-SEM0099", Severity.Error, call.Span,
+                first
+                    ? $"'{TypeFacts.Display(c)}' has a 'Ptr<void>' first and last — the userdata is one of them: "
+                      + "type the other as what it points at"
+                    : $"'{TypeFacts.Display(c)}' has no userdata — its first or last parameter is the 'Ptr<void>' C hands back");
+            return null;
+        }
+        var at = first ? 0 : parameters.Length - 1;
+        _result.SetCallbackUserdata(call, at);
+        return new FnType([.. parameters.Where((_, i) => i != at)], cFunction.Return);
+    }
+
+    /// <summary><c>lib.symbol&lt;F&gt;(name)</c> of <c>std.ffi</c>'s <c>Library</c>: <c>F</c> is a C
+    /// function's type, which the address of the symbol is a value of.</summary>
+    private void CheckLibrarySymbol(FnType fn, FunctionDecl? decl, CallExpr call)
+    {
+        if (decl is null || _comp.FindModule(["std", "ffi"])?.Members.LookupLocal("Library") is not TypeSymbol library
+            || !ReferenceEquals(library.Members.LookupLocal("symbol")?.Declaration, decl)
+            || fn.Return is not Optional { Inner: var f } || f.IsError || MentionsTypeParam(f))
+            return;
+        if (f is FnType { IsC: true })
+            _result.SetLibrarySymbol(call);
+        else
+            _de.Report("LYR-SEM0099", Severity.Error, call.Span,
+                $"a library's symbol is a C function, 'extern \"C\" fn(…)', not '{TypeFacts.Display(f)}'");
+    }
+
+    /// <summary>
     /// <c>std.ffi</c>'s memory operations — a pointer's <c>read</c>, <c>write</c>,
     /// <c>offset</c> and <c>cast</c>, <c>alloc</c> and <c>free</c> — the closed list of what holds
     /// to what the compiler cannot see: within an <c>unsafe</c> block only. What is read or
@@ -3186,6 +3464,14 @@ public sealed class TypeChecker
             if (ReferenceEquals(ptr?.Members.LookupLocal(name)?.Declaration, decl)) operation = $"Ptr.{name}";
         foreach (var name in (string[])["alloc", "free"])
             if (ReferenceEquals(ffi.LookupLocal(name)?.Declaration, decl)) operation = name;
+        var handle = ffi.LookupLocal("GcHandle") as TypeSymbol;
+        if (ReferenceEquals(handle?.Members.LookupLocal("from")?.Declaration, decl)) operation = "GcHandle.from";
+        // a handle holds an object: what the collector keeps by a root
+        if (ReferenceEquals(handle?.Members.LookupLocal("pin")?.Declaration, decl)
+            && fn.Parameters is [{ IsError: false } held] && !MentionsTypeParam(held)
+            && held is not (NamedRef { Symbol.Kind: TypeSymbolKind.Class } or GenericInstance { Definition.Kind: TypeSymbolKind.Class }))
+            _de.Report("LYR-SEM0099", Severity.Error, call.Span,
+                $"a GcHandle holds an object of a class, which the collector keeps by its handle — not a '{TypeFacts.Display(held)}'");
         if (operation is null) return;
         if (_unsafeDepth == 0)
             _de.Report(Lyric5Code("LYR-SEM0233"), Severity.Error, call.Span,
@@ -7196,7 +7482,13 @@ public sealed class TypeChecker
 
         // A type's own index: 'x[k]' reads 'x.index(k)' through Index<K>.
         if (_coreIndex is { } index && IndexesThrough(target, index))
+        {
+            // '^n' is sugar for an array's, a view's or a string's length; a type's own 'index'
+            // takes the argument as written, and '^n' has no value to pass it.
+            if (ix.Index is UnaryExpr { Operator: UnaryOp.FromEnd } fromEnd)
+                return FromEndOnOwnIndex(ix, fromEnd, target, scope);
             return DesugarIndex(ix, ix, "index", [ix.Index], scope);
+        }
 
         CheckIndexValue(ix.Index, target, scope);
         return target switch
@@ -7215,6 +7507,22 @@ public sealed class TypeChecker
                      $"'{TypeFacts.Display(target)}' is not indexable — it must implement "
                      + "'Indexable<T>' from std.collections")
         };
+    }
+
+    /// <summary><c>x[^n]</c> on a type with its own <c>index</c>: refused where it is written, with
+    /// the subtraction it stands for as the change — one to look at, since the type may have no
+    /// <c>length()</c> and <c>x</c> is written twice.</summary>
+    private LyrType FromEndOnOwnIndex(IndexExpr ix, UnaryExpr fromEnd, LyrType target, SymbolTable scope)
+    {
+        var n = CheckExpr(fromEnd.Operand, scope, LyrType.Int);
+        if (!n.IsError) CheckAssignable(fromEnd.Operand, n, LyrType.Int, fromEnd.Operand.Span);
+        _result.SetType(fromEnd, LyrType.Int);
+        var written = $"{_comp.TextOf(ix.Target.Span)}.length() - {_comp.TextOf(fromEnd.Operand.Span)}";
+        _de.Report(new Diagnostic("LYR-SEM0114", Severity.Error, fromEnd.Span,
+            $"'{TypeFacts.Display(target)}' is indexed through its own 'index', which takes the index as written — "
+            + "'^n' counts from the end of an array, a view or a string",
+            [DiagnosticNote.Suggest($"count from its length: '{written}'", new Replacement(fromEnd.Span, written, Applicability.NeedsReview))]));
+        return LyrType.Error;
     }
 
     /// <summary>Whether a value of the type is indexed through <paramref name="iface"/> of std.core:
@@ -7559,6 +7867,8 @@ public sealed class TypeChecker
         // In parameter order, a named argument where its name says; a hole is a parameter
         // the call leaves to its default.
         var args = ArrangeArguments(call, decl);
+        // std.ffi's 'Callback<C>.new(closure)': the closure takes C's parameters but its userdata
+        if (CallbackClosureType(fn, decl, call) is { } closureType) fn = fn with { Parameters = [closureType] };
         _callees.Add(call.Callee);
         if (_currentModule is { } asker && IsMetaQuery(fsym)) _result.SetMetaFrom(call, asker);
         if (IsMetaQuery(fsym) && fsym!.Name is "attribute" or "variantAttribute" or "memberAttribute" or "parameterAttribute") _metaAttributeCalls.Add(call);
@@ -7652,9 +7962,19 @@ public sealed class TypeChecker
             if (call.TypeArguments is { Length: > 0 } written && fsym is { Generics.Length: > 0 })
             {
                 if (written.Length != fsym.Generics.Length)
-                    _de.Report("LYR-SEM0026", Severity.Error, call.Span,
+                {
+                    // too few: each one left out is a '_' the inference fills — the call it meant
+                    var missing = fsym.Generics.Length - written.Length;
+                    var at = written[^1].Span;
+                    DiagnosticNote[] notes = missing > 0
+                        ? [DiagnosticNote.Suggest(
+                            $"its type parameters are {string.Join(", ", fsym.Generics.Select(g => g.Name))}; '_' leaves one to the inference",
+                            new Replacement(new Span(at.File, at.End, at.End), string.Concat(Enumerable.Repeat(", _", missing)), Applicability.Safe))]
+                        : [];
+                    _de.Report(new Diagnostic("LYR-SEM0026", Severity.Error, call.Span,
                         $"generic function '{fsym.Name}' expects {fsym.Generics.Length} type "
-                        + $"argument(s), got {written.Length}");
+                        + $"argument(s), got {written.Length}", notes));
+                }
 
                 // A placeholder ('collect<_, int>(xs)') is not bound here: it is the one
                 // position the inference below is asked to fill, the way it fills every argument
@@ -7787,6 +8107,7 @@ public sealed class TypeChecker
 
         CheckCallArgs(call, substituted, args, argTypes, decl);
         CheckUnsafeCall(call, substituted, decl);
+        CheckLibrarySymbol(substituted, decl, call);
 
         // What this call may throw, in its instance's terms: the exception analysis
         // asks whether it is marked and covered. 'task.await()' throws what the task's type says
@@ -7919,9 +8240,10 @@ public sealed class TypeChecker
             // refused where it was checked.
             if (!fn.PlaceAt(i))
             {
-                // a C function's 'CStr' takes a 'string' as its bytes, for the call
+                // a C function's 'CStr' — or '?CStr' — takes a 'string' as its bytes, for the call
                 if (decl?.Extern is { Abi: "C" } && argTypes[i] is PrimitiveType { Kind: PrimitiveKind.String }
-                    && fn.Parameters[i] is NamedRef cstr && IsFfiType(cstr.Symbol, "CStr"))
+                    && (fn.Parameters[i] is Optional { Inner: var inner } ? inner : fn.Parameters[i]) is NamedRef cstr
+                    && IsFfiType(cstr.Symbol, "CStr"))
                 {
                     _result.MarkCStrArgument(a);
                     continue;
@@ -8566,7 +8888,7 @@ public sealed class TypeChecker
             SliceOf s => new SliceOf(Fix(s.Element)),
             InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
             TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
-            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = ThrownAfter(f.Throws.Select(Fix)), Places = f.Places },
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = ThrownAfter(f.Throws.Select(Fix)), Places = f.Places, IsC = f.IsC },
             GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations, Throws = g.Throws },
             RangeOf r => new RangeOf(Fix(r.Element)),
             CoroutineOf c => c with { Yield = Fix(c.Yield), Result = Fix(c.Result) },
@@ -8639,7 +8961,7 @@ public sealed class TypeChecker
             InlineArrayOf ia => new InlineArrayOf(Substitute(ia.Element, map), ia.Length),
             TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()) { Labels = t.Labels },
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map))
-                { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map))), Places = f.Places },
+                { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map))), Places = f.Places, IsC = f.IsC },
             // A join reduces once both its parts are known.
             GenericInstance gi => ReduceJoin(new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray())
             {
@@ -8788,7 +9110,7 @@ public sealed class TypeChecker
             SliceOf s => new SliceOf(Fix(s.Element)),
             InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
             TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
-            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws, Places = f.Places },
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = f.Throws, Places = f.Places, IsC = f.IsC },
             GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations, Throws = g.Throws },
             _ => t,
         };
@@ -8818,7 +9140,7 @@ public sealed class TypeChecker
             SliceOf s => new SliceOf(Fix(s.Element)),
             InlineArrayOf ia => new InlineArrayOf(Fix(ia.Element), ia.Length),
             TupleOf tu => new TupleOf(tu.Elements.Select(Fix).ToArray()) { Labels = tu.Labels },
-            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = ThrownAfter(f.Throws.Select(Fix)), Places = f.Places },
+            FnType f => new FnType(f.Parameters.Select(Fix).ToArray(), Fix(f.Return)) { Throws = ThrownAfter(f.Throws.Select(Fix)), Places = f.Places, IsC = f.IsC },
             GenericInstance g => new GenericInstance(g.Definition, g.Arguments.Select(Fix).ToArray()) { Fixations = g.Fixations, Throws = g.Throws },
             RangeOf r => new RangeOf(Fix(r.Element)),
             CoroutineOf c => c with { Yield = Fix(c.Yield), Result = Fix(c.Result) },
@@ -10792,6 +11114,11 @@ public sealed class TypeChecker
         if (ReferenceEquals(ts, _coreMembers?.LookupLocal("Layout")))
         {
             CheckLayoutForm(attribute);
+            return ts;
+        }
+        if (ReferenceEquals(ts, _coreMembers?.LookupLocal("Export")))
+        {
+            CheckExportForm(attribute);
             return ts;
         }
 
@@ -14440,6 +14767,9 @@ public sealed class TypeChecker
                   + "generic call instantiating itself at a larger type, which cannot be "
                   + "monomorphized)"
                 : FixationMismatch(from, to) is { } differs ? $" — {differs}"
+                : to is FnType { IsC: true } && from is FnType { IsC: false }
+                    ? " — C calls a function by its address alone: a function by its name, or a lambda that captures "
+                      + "nothing and throws nothing, of the same signature"
                 : "";
             if (_expectedAt is { } at)
                 _de.Report(new Diagnostic("LYR-SEM0001", Severity.Error, span, $"cannot assign '{fromText}' to '{toText}'{hint}")
@@ -14595,6 +14925,15 @@ public sealed class TypeChecker
         // parameters and return — no variance — and its set covered by the target's. Free
         // at run time, since every function value takes the error slot; never the way back, which
         // is how the demand to mark a call would vanish.
+        // A Lyric function as a C function's pointer: of the same signature, and one C can call —
+        // named, or a lambda that captures nothing —, through a trampoline the emitter writes.
+        if (to is FnType { IsC: true } cWanted && from is FnType { IsC: false } lyricFn)
+        {
+            if (!coercionSite || !FitsFunctionType(lyricFn, cWanted with { IsC = false }) || !IsCCallbackSource(expr))
+                return false;
+            _result.MarkCCallback(expr);
+            return true;
+        }
         if (to is FnType wantedFn && from is FnType givenFn && FitsFunctionType(givenFn, wantedFn)) return true;
 
         if (coercionSite && to is SliceOf view && from is ArrayOf whole && LyrType.Equal(whole.Element, view.Element))
@@ -14635,7 +14974,21 @@ public sealed class TypeChecker
         && given.Parameters.Zip(wanted.Parameters).All(p => LyrType.Equal(p.First, p.Second))
         && LyrType.Equal(given.Return, wanted.Return)
         && FnType.SamePlaces(given, wanted)
+        && given.IsC == wanted.IsC
         && given.Throws.All(t => wanted.Throws.Any(w => ThrownCoveredBy(t, w, _currentModule)));
+
+    /// <summary>What C can call through a trampoline: a function by its name — free or static, with
+    /// a body and no type parameters — or a lambda that captures nothing. A closure's state has
+    /// nowhere to go in a C function's pointer.</summary>
+    private bool IsCCallbackSource(Expr expr) => expr switch
+    {
+        LambdaExpr lambda => !_result.IsInlineLambda(lambda) && _result.CapturesOf(lambda) is { Symbols.Count: 0, CapturesThis: false },
+        IdentifierExpr or MemberExpr => _result.RefOf(expr) is FunctionSymbol
+        {
+            Generics.Length: 0, Declaration: FunctionDecl { Body: not null, Extern: null, IsMacro: false },
+        } named && (named.IsStatic || ReferenceEquals(named.Home?.Members.LookupLocal(named.Name), named)),
+        _ => false,
+    };
 
     /// <summary>
     /// Nominal subtyping: a value may stand wherever one of its declared interfaces is expected.
@@ -15093,6 +15446,7 @@ public sealed class TypeChecker
                 var result = ResolveType(f.ReturnType, scope);
                 // 'fn() -> Task<int> throws E': the call's set, or the task's? As on a declaration.
                 if (f.Throws is { } whose && LeavesOpenWhoseThrows(result, f.ReturnGrouped, whose)) return LyrType.Error;
+                if (f.Abi is { } abi) return ResolveCFunctionType(f, abi, parameters, result);
                 return new FnType(parameters, result)
                     { Throws = f.Throws is { } thrown ? ResolveThrownSet(thrown, scope) : [], Places = f.Places };
             }
@@ -15408,7 +15762,7 @@ public sealed class TypeChecker
     /// <summary>The compiler instructions of <c>std.core</c> beside <c>@Test</c>, <c>@Bench</c> and
     /// <c>@callerExpr</c> (the closed list of T2): what changes what the compiler does.</summary>
     private static readonly string[] CompilerInstructions =
-        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "Warn", "Deny", "When", "Shared", "SeesConformer", "Layout"];
+        ["Deprecated", "AlwaysInline", "NoInline", "Cold", "MustUse", "NonExhaustive", "callerLine", "callerFile", "Allow", "Warn", "Deny", "When", "Shared", "SeesConformer", "Layout", "Export"];
 
     /// <summary>Whether this is one of <see cref="CompilerInstructions"/>, by identity.</summary>
     private bool IsCompilerInstruction(TypeSymbol ts) =>

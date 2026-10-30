@@ -90,6 +90,12 @@ public static class IrShape
         BlackBox b => new[] { b.Value },
         PlaceAt p => new[] { p.Address },
         SizeOf => Array.Empty<TempId>(),
+        CCallback => Array.Empty<TempId>(),
+        RootClosure r => new[] { r.Closure },
+        RootObject r => new[] { r.Value },
+        RootedObject r => new[] { r.Root },
+        CClosureCallback => Array.Empty<TempId>(),
+        CallCPointer c => new[] { c.Callee }.Concat(c.Args).ToArray(),
         DataAddress d => new[] { d.Value },
 
         _ => throw new InternalCompilationException($"ir: unhandled op {op.GetType().Name}")
@@ -173,6 +179,12 @@ public static class IrShape
         BlackBox b => b.Dest,
         PlaceAt p => p.Dest,
         SizeOf s => s.Dest,
+        CCallback c => c.Dest,
+        RootClosure r => r.Dest,
+        RootObject r => r.Dest,
+        RootedObject r => r.Dest,
+        CClosureCallback c => c.Dest,
+        CallCPointer c => c.Dest,
         DataAddress d => d.Dest,
         ClearError or StashError or RestoreError or SuppressError => null,
 
@@ -279,6 +291,12 @@ public static class IrShape
             BlackBox b => b with { Dest = temp(b.Dest), Value = temp(b.Value) },
             PlaceAt p => p with { Dest = temp(p.Dest), Address = temp(p.Address) },
             SizeOf s => s with { Dest = temp(s.Dest) },
+            CCallback c => c with { Dest = temp(c.Dest) },
+            RootClosure r => r with { Dest = temp(r.Dest), Closure = temp(r.Closure) },
+            RootObject r => r with { Dest = temp(r.Dest), Value = temp(r.Value) },
+            RootedObject r => r with { Dest = temp(r.Dest), Root = temp(r.Root) },
+            CClosureCallback c => c with { Dest = temp(c.Dest) },
+            CallCPointer c => c with { Dest = Opt(c.Dest), Callee = temp(c.Callee), Args = All(c.Args) },
             DataAddress d => d with { Dest = temp(d.Dest), Value = temp(d.Value) },
             ClearError or StashError or RestoreError or SuppressError => op,
 

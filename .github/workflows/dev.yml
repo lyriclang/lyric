@@ -14,8 +14,9 @@ permissions:
   contents: write
 
 # One publish at a time; a newer push supersedes an older run that has not published yet.
+# One run per ref: a dispatch that tries the packaging on a branch does not cancel main's publish.
 concurrency:
-  group: dev-channel
+  group: dev-channel-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -37,6 +38,12 @@ jobs:
       - name: Set up zig (the Lyric 5 runtime tests build C)
         uses: ./.github/actions/setup-zig
 
+      # examples/raylib builds raylib for Linux with the system's X11 and OpenGL (as in ci.yml)
+      - name: X11 and OpenGL for the raylib example
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libgl-dev
+
       - name: Restore
         run: dotnet restore
 
@@ -54,10 +61,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { rid: win-x64,     os: windows-latest }
-          - { rid: linux-x64,   os: ubuntu-latest }
-          - { rid: linux-arm64, os: ubuntu-24.04-arm }
-          - { rid: osx-arm64,   os: macos-latest }
+          - { rid: win-x64,     os: windows-latest,   triple: x86_64-windows-gnu }
+          - { rid: linux-x64,   os: ubuntu-latest,    triple: x86_64-linux-gnu }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm, triple: aarch64-linux-gnu }
+          - { rid: osx-arm64,   os: macos-latest,     triple: aarch64-macos }
+          # Built across the architecture on the ARM runner, run under Rosetta.
+          - { rid: osx-x64,     os: macos-latest,     triple: x86_64-macos }
 
     steps:
       - name: Checkout
@@ -93,6 +102,15 @@ jobs:
       - name: Publish lyric5 (NativeAOT)
         run: dotnet publish src/Lyric5/Lyric5.csproj --configuration Release -r ${{ matrix.rid }} -o out
 
+      - name: The runtime prebuilt for the target, and the manifest
+        shell: bash
+        run: dotnet run --project tools/Package --configuration Release -- out --version "$DEV_VERSION" --triple ${{ matrix.triple }}
+
+      - name: Rosetta for the x86-64 binary
+        if: matrix.rid == 'osx-x64'
+        shell: bash
+        run: arch -x86_64 /usr/bin/true 2>/dev/null || sudo softwareupdate --install-rosetta --agree-to-license
+
       - name: The self-report names the dev version
         shell: bash
         run: |
@@ -127,14 +145,22 @@ jobs:
             tar -xzf "$archive" -C "$trial/toolchain"
             lyric5="$trial/toolchain/lyric5"
           fi
+          dotnet run --project tools/Package --configuration Release --no-build -- verify "$trial/toolchain"
           test -d "$trial/toolchain/runtime/include/lyr" || { echo "the archive holds no runtime"; exit 1; }
+          test -f "$trial/toolchain/runtime/lib/${{ matrix.triple }}/debug/liblyr.a" || { echo "the archive holds no prebuilt runtime"; exit 1; }
+          test -f "$trial/toolchain/lldb/lyric.lldbinit" || { echo "the archive holds no lyric.lldbinit"; exit 1; }
+          test -f "$trial/toolchain/LICENSE" || { echo "the archive holds no LICENSE"; exit 1; }
+          test -f "$trial/toolchain/runtime/include/lyric.h" || { echo "the archive holds no lyric.h"; exit 1; }
           test -d "$trial/toolchain/stdlib5" || { echo "the archive holds no stdlib5"; exit 1; }
           if [ -e "$trial/toolchain/stdlib" ]; then echo "the archive holds the 4.x stdlib"; exit 1; fi
           printf '[package]\nname = "hello"\nversion = "0.1.0"\n' > "$trial/hello/lyric.toml"
           printf 'import std.io { println };\n\nfn main(): void {\n    println("hello from the dev archive");\n}\n' > "$trial/hello/src/main.lyr"
+          # A cold cache: the build takes the archive's runtime and compiles none of its own.
+          export LYRIC_CACHE="$trial/cache"
           out=$(cd "$trial/hello" && "$lyric5" run | tr -d '\r')
           echo "$out"
           [ "$out" = "hello from the dev archive" ]
+          if [ -d "$trial/cache/runtime" ]; then echo "the build compiled the runtime beside the prebuilt one"; exit 1; fi
 
       - name: Upload archive
         uses: actions/upload-artifact@v7
@@ -178,5 +204,5 @@ jobs:
           gh release create dev dist/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "dev ($(date -u +%Y-%m-%d), ${GITHUB_SHA::7})" \
-            --notes "Lyric 5 in development, built from main at ${GITHUB_SHA::7}. No promise of any kind. The archive holds lyric5, the Lyric 5 command line as it grows, its standard library (stdlib5/) and the runtime's C source (runtime/), which lyric5 builds on first use. Building a program needs zig on the PATH." \
+            --notes "Lyric 5 in development, built from main at ${GITHUB_SHA::7}. No promise of any kind. The archive holds lyric5, the Lyric 5 command line as it grows, its standard library (stdlib5/) and the runtime's C source (runtime/), prebuilt for the archive's target (a build with another zig, or for another target, builds it from the source on first use). Each archive lists its files in toolchain.json. Building a program needs zig on the PATH." \
             --prerelease

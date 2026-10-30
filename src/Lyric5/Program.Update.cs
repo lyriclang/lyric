@@ -48,11 +48,21 @@ public static partial class Program
                 throw;
             }
             ToolchainCheck.Check(graph, DisplayVersion());
-            var unknown = names.Where(n => graph.Locked.All(entry => entry.Name != n)).ToList();
+            // the source trees the lock held, read anew where a manifest still names them so; a tree
+            // no build has needed is not held, and stays to be read when one does
+            var trees = before.Where(l => l.IsTree && graph.Packages.TryGetValue(l.Of!, out var owner)
+                                          && owner.Vendor.Any(t => t.Name == l.Name && t.Git == l.Git)).ToList();
+            foreach (var tree in trees.Where(t => Named(t.Name)))
+            {
+                var owner = graph.Packages[tree.Of!];
+                graph.Trees!.Renew(owner, owner.Vendor.First(t => t.Name == tree.Name && t.Git == tree.Git));
+            }
+            var readable = graph.Locked.Concat(trees).Select(e => e.Name).Distinct().ToList();
+            var unknown = names.Where(n => !readable.Contains(n)).ToList();
             if (unknown.Count > 0)
-                return Unknown($"no package '{unknown[0]}' is read from git here"
-                               + (graph.Locked.Count > 0 ? $": {string.Join(", ", graph.Locked.Select(e => e.Name).Distinct())}" : ""));
-            Report(before, graph.Locked);
+                return Unknown($"no package or source tree '{unknown[0]}' is read from git here"
+                               + (readable.Count > 0 ? $": {string.Join(", ", readable)}" : ""));
+            Report(before, LockFile.Read(LockFile.For(manifest)));
             return 0;
         }
         catch (ManifestException refused)
@@ -95,20 +105,22 @@ public static partial class Program
     /// <summary>What the update changed in the lock, a line per revision of a repository.</summary>
     private static void Report(IReadOnlyList<Locked> before, IReadOnlyList<Locked> after)
     {
-        var old = before.ToDictionary(e => (e.Name, e.Git));
+        var old = before.ToDictionary(e => (e.Of, e.Name, e.Git));
         var changed = false;
+        // a package by its version, a source tree by its package
+        static string Named(Locked entry) => entry.Of is { } of ? $"{entry.Name} (tree of {of})" : $"{entry.Name} {entry.Version}";
         foreach (var entry in after)
         {
-            if (!old.Remove((entry.Name, entry.Git), out var was))
-                Console.Out.WriteLine($"  added    {entry.Name} {entry.Version} ({entry.Git}) {entry.Commit[..12]}");
+            if (!old.Remove((entry.Of, entry.Name, entry.Git), out var was))
+                Console.Out.WriteLine($"  added    {Named(entry)} ({entry.Git}) {entry.Commit[..12]}");
             else if (was.Commit != entry.Commit)
-                Console.Out.WriteLine($"  updated  {entry.Name} {entry.Version} ({entry.Git}) {was.Commit[..12]} -> {entry.Commit[..12]}");
+                Console.Out.WriteLine($"  updated  {Named(entry)} ({entry.Git}) {was.Commit[..12]} -> {entry.Commit[..12]}");
             else continue;
             changed = true;
         }
         foreach (var gone in LockFile.Sorted(old.Values))
         {
-            Console.Out.WriteLine($"  removed  {gone.Name} {gone.Version} ({gone.Git})");
+            Console.Out.WriteLine($"  removed  {Named(gone)} ({gone.Git})");
             changed = true;
         }
         if (!changed) Console.Out.WriteLine(after.Count == 0 ? "no package is read from git" : "lyric.lock is up to date");

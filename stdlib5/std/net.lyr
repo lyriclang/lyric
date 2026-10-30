@@ -21,25 +21,101 @@
 //! }
 //! ```
 import std.collections { List };
-import std.core { Parse, ParseError, StringBuilder, viewBytes };
+import std.core { Parse, ParseError, StringBuilder, viewBytes, sliceAddress };
 import std.io { IoError, Reader, Writer, failure, onPool };
 import std.task { Cancelled, Waits, awaitDescriptor, forgetDescriptor };
 
-fn netSocket(family: int, kind: int): int;
-fn netBind(fd: int, family: int, address: Slice<uint8>, port: int, reuse: int): int;
-fn netListen(fd: int, backlog: int): int;
-fn netAccept(fd: int): int;
-fn netConnect(fd: int, family: int, address: Slice<uint8>, port: int): int;
-fn netConnected(fd: int): int;
-fn netRecv(fd: int, into: Slice<uint8>): int;
-fn netSend(fd: int, from: Slice<uint8>): int;
-fn netShutdown(fd: int, how: int): int;
-fn netSetNoDelay(fd: int, on: int): int;
-fn netName(fd: int, peer: int, into: Slice<uint8>): int;
-fn netClose(fd: int): int;
-fn netSendTo(fd: int, from: Slice<uint8>, family: int, address: Slice<uint8>, port: int): int;
-fn netRecvFrom(fd: int, into: Slice<uint8>, sender: Slice<uint8>): int;
-fn netResolve(host: string, into: Slice<uint8>): int;
+extern "C" fn netSocket(family: int, kind: int): int = "lyr_net_socket";
+
+inline fn netBind(fd: int, family: int, address: Slice<uint8>, port: int, reuse: int): int {
+    return netBindRaw(fd, family, sliceAddress(address), port, reuse);
+}
+
+extern "C" fn netBindRaw(
+    fd: int,
+    family: int,
+    addressAt: uint,
+    port: int,
+    reuse: int
+): int = "lyr_net_bind";
+extern "C" fn netListen(fd: int, backlog: int): int = "lyr_net_listen";
+extern "C" fn netAccept(fd: int): int = "lyr_net_accept";
+
+inline fn netConnect(fd: int, family: int, address: Slice<uint8>, port: int): int {
+    return netConnectRaw(fd, family, sliceAddress(address), port);
+}
+
+extern "C" fn netConnectRaw(
+    fd: int,
+    family: int,
+    addressAt: uint,
+    port: int
+): int = "lyr_net_connect";
+extern "C" fn netConnected(fd: int): int = "lyr_net_connected";
+
+inline fn netRecv(fd: int, into: Slice<uint8>): int {
+    return netRecvRaw(fd, sliceAddress(into), into.length());
+}
+
+extern "C" fn netRecvRaw(fd: int, intoAt: uint, intoLength: int): int = "lyr_net_recv";
+
+inline fn netSend(fd: int, from: Slice<uint8>): int {
+    return netSendRaw(fd, sliceAddress(from), from.length());
+}
+
+extern "C" fn netSendRaw(fd: int, fromAt: uint, fromLength: int): int = "lyr_net_send";
+extern "C" fn netShutdown(fd: int, how: int): int = "lyr_net_shutdown";
+extern "C" fn netSetNoDelay(fd: int, on: int): int = "lyr_net_set_nodelay";
+
+inline fn netName(fd: int, peer: int, into: Slice<uint8>): int {
+    return netNameRaw(fd, peer, sliceAddress(into), into.length());
+}
+
+extern "C" fn netNameRaw(fd: int, peer: int, intoAt: uint, intoLength: int): int = "lyr_net_name";
+extern "C" fn netClose(fd: int): int = "lyr_net_close";
+
+inline fn netSendTo(
+    fd: int,
+    from: Slice<uint8>,
+    family: int,
+    address: Slice<uint8>,
+    port: int
+): int {
+    return netSendToRaw(fd, sliceAddress(from), from.length(), family, sliceAddress(address), port);
+}
+
+extern "C" fn netSendToRaw(
+    fd: int,
+    fromAt: uint,
+    fromLength: int,
+    family: int,
+    addressAt: uint,
+    port: int
+): int = "lyr_net_sendto";
+
+inline fn netRecvFrom(fd: int, into: Slice<uint8>, sender: Slice<uint8>): int {
+    return netRecvFromRaw(
+        fd,
+        sliceAddress(into),
+        into.length(),
+        sliceAddress(sender),
+        sender.length()
+    );
+}
+
+extern "C" fn netRecvFromRaw(
+    fd: int,
+    intoAt: uint,
+    intoLength: int,
+    senderAt: uint,
+    senderLength: int
+): int = "lyr_net_recvfrom";
+
+inline fn netResolve(host: string, into: Slice<uint8>): int {
+    return netResolveRaw(host, sliceAddress(into), into.length());
+}
+
+extern "C" fn netResolveRaw(host: string, intoAt: uint, intoLength: int): int = "lyr_net_resolve";
 
 /// The answer of a call that would block (lyr/net.h).
 let wouldBlock = -(64 << 32);

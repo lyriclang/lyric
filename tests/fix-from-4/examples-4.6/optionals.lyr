@@ -1,0 +1,51 @@
+// optionals.lyr — complexity: simple
+// Shows: ?T, null, ??, ! and flow narrowing.
+//
+// `?T` means "maybe a value", and the case cannot be forgotten: an `int` is reachable only through
+// `??`, `!` or a null check that narrows the type.
+
+import std.io.console { println };
+
+class Account {
+    owner: string,
+    balance: int,
+}
+
+// No hit is a normal outcome rather than an error, hence `?Account` and not `throws`.
+fn findAccount(accounts: Account[], owner: string): ?Account {
+    var i = 0;
+    while (i < accounts.length) {
+        if (accounts[i].owner == owner) {
+            return accounts[i];
+        }
+        i += 1;
+    }
+    return null;
+}
+
+fn balanceOf(accounts: Account[], owner: string): int {
+    let found = findAccount(accounts, owner);
+
+    // Flow narrowing: in the then branch `found` has the type `Account` rather than `?Account`, so
+    // the access to `.balance` needs no `!`.
+    if (found != null) {
+        return found.balance;
+    }
+    return 0;
+}
+
+fn main(): int {
+    let accounts = [
+        Account { owner = "Olivier", balance = 120 },
+        Account { owner = "Mara", balance = 80 },
+    ];
+
+    let mara = balanceOf(accounts, "Mara");
+    let niemand = balanceOf(accounts, "Kim");
+
+    // `??` evaluates its right-hand side only when the left holds nothing.
+    let fallback = findAccount(accounts, "Kim") ?? accounts[0];
+
+    println(f"Mara: {mara}, unbekannt: {niemand}, Ersatz: {fallback.owner}");
+    return mara + niemand + fallback.balance;
+}

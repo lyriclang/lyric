@@ -1,0 +1,51 @@
+// arith.lyr — complexity: simple
+// Deliberately WITHOUT the standard library, so it compiles to bytecode from the core alone.
+//
+// Shows what the lowering produces for scalar expressions, locals, module-internal calls and
+// control flow. Observable through `lyric lower examples/arith.lyr`.
+
+fn add(a: int, b: int): int {
+    return a + b;
+}
+
+fn abs(n: int): int {
+    if (n < 0) {
+        return -n;
+    }
+    return n;
+}
+
+// The classic shape of a lowered loop: a back edge plus an accumulator.
+fn sumTo(n: int): int {
+    var total = 0;
+    var i = 1;
+    while (i <= n) {
+        total += i;
+        i++;
+    }
+    return total;
+}
+
+fn gcd(a: int, b: int): int {
+    var x = abs(a);
+    var y = abs(b);
+    while (y != 0) {
+        let rest = x % y;
+        x = y;
+        y = rest;
+    }
+    return x;
+}
+
+// if as an EXPRESSION: the value travels through a synthetic local, because a temp may be
+// defined only once.
+fn max(a: int, b: int): int {
+    return if (a >= b) a else b;
+}
+
+fn main(): int {
+    let sum = sumTo(10);
+    let common = gcd(48, 18);
+    let biggest = max(sum, common);
+    return add(biggest, 0);
+}

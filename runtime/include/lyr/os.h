@@ -46,11 +46,4 @@ int64_t lyr_os_hostname(uint8_t *into, int64_t n);
 /* The program ended with `code`: what the console holds written first, nothing else run. */
 LYR_NORETURN void lyr_os_exit(int64_t code);
 
-/* A Slice<uint8> of emitted code is a pointer and a length (CEmitter). */
-#define LYR_OS_ARG(i, slice) lyr_os_arg((i), (slice).ptr, (slice).len)
-#define LYR_OS_ENV(name, slice) lyr_os_env((name), (slice).ptr, (slice).len)
-#define LYR_OS_ENVS(slice) lyr_os_envs((slice).ptr, (slice).len)
-#define LYR_OS_CWD(slice) lyr_os_cwd((slice).ptr, (slice).len)
-#define LYR_OS_HOSTNAME(slice) lyr_os_hostname((slice).ptr, (slice).len)
-
 #endif

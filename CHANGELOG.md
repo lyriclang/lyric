@@ -271,6 +271,30 @@ promise. This entry fills with the milestones.
   the one form, with no options to change it; comments and the parentheses a program writes stay, and
   a file that does not parse is left as it is. `--check` writes nothing and fails where a file would
   change; `--diff` shows how. The standard library is in the form.
+- **C libraries (M14b** — `design/v5/spec/11` and `07` "Review 2026-10-28"; spec chapters 13 §4, 14, 15 §5,
+  §8, 16**):** a package's `[native]` part names `archives` and `dylibs` it brings prebuilt, `defines`, `include`,
+  `libs`, macOS `frameworks` and `pkgConfig`, in tables per system and per triple; `[native.vendor]` names C source
+  trees from git or from a URL checked by its SHA-256, fetched when a target needs them and kept in the lock
+  (`lyric add --vendor`); `bindings` make a module from a C header for each target, and `lyric bindgen` prints one.
+  `std.build` is new: `target()`, `cLibrary(name)` with its own definitions and flags, `linkArchive`,
+  `linkFramework`, `pkgConfig`, `linkSearch`, `besideBinary`, `vendorDir`, `cEnv` for CMake or configure;
+  `compileC` and `cFlags` are gone. Shared libraries lie beside the binary, which finds them there. `lyric build
+  --lib` puts the packages' archives into `lib<name>.a` and says the rest of the link (`linkArgs` under `--json`). A
+  failed link is said where the fix belongs — `LYR-LNK0001` at the `extern` line, `LNK0002` at the manifest's line,
+  `LNK0003` with the packages that define a symbol twice —, and `-v` shows each command of the C compiler and the
+  linker. A finding's message keeps its lines. `examples/native-prebuilt` and `examples/raylib` show it.
+- **FFI and embedding (M14** — `design/v5/spec/11` X1–X8, H1–H7, 01 K4; spec chapter 13 §2–§6**):**
+  `extern "C"` takes C's types: `std.ffi`'s `Ptr<T>`, `?Ptr<T>` and `CStr` — a `string` passes as one without a
+  copy —, `@Layout(C)` structs by value and behind a pointer, `@Layout` enums, `char`, C function pointers
+  `extern "C" fn(…) -> …`, the block `extern "C" { … }` and C's `...`. Memory through `alloc`/`free` and
+  `Ptr.read`/`write`/`offset`/`cast` inside `unsafe { }`. A function or a lambda that captures nothing is C's
+  callback; a closure is one through `Callback<…>.new` and its userdata; an error crosses C through
+  `stash`/`takeStashed`; a callback C calls on a thread of its own runs on the thread that made it. `GcHandle` holds
+  an object for C. `@Export("sym")` makes a function C calls; `lyric build --lib` builds `lib<name>.a`, with
+  `--shared` the `.so`/`.dylib`/`.dll`, beside `<name>.h` and `lyric.h`: `lyr_init`, each export a task,
+  `lyr_step`/`lyr_run`, `LyrStatus` and `lyr_take_error`, a thread of the host attached at its first call.
+  `std.ffi.Library` loads a shared library while the program runs. `examples/ffi` and `examples/embedded-host` go
+  each way.
 - **The editor and the debugger (M13b** — `design/v5/spec/11` E1–E4, E8; spec chapter 14 §11, §12**):**
   `lyric lsp` is the language server of a package — diagnostics as you type, quick fixes from the compiler's
   suggestions and an `@Allow` for a lint, a finding's link to its page, formatting, hover with a declaration's head as
@@ -290,6 +314,11 @@ promise. This entry fills with the milestones.
   `lyric api` prints the public surface a line per element, `--json` as data, and `--diff <rev>` says what changed
   since a git revision and whether it breaks code written against it (exit 1). The standard library's reference is
   at <https://lyric.oil1i.de/dev/std/>, an example in every module.
+- **A build says what it does** (spec chapter 14 §1.1 rule 11): `build`, `run`, `check`, `test` and `bench` say
+  each step that does work on the standard error — `Fetching` a source tree, `Running` a build script, `Binding` a
+  header, `Compiling` the program, the runtime and `3 of 14 C units of app`, `Linking` —, and `Finished` with the
+  profile and the time; on a terminal the C units are counted as they finish. What is up to date says nothing;
+  `-q` says none of it, and `--json` none.
 
 ---
 

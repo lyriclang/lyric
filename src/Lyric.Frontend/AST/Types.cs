@@ -62,6 +62,13 @@ public sealed record FunctionType(TypeNode[] Parameters, TypeNode ReturnType, Sp
     /// <summary><c>fn(&amp;int) -&gt; void</c>: which parameters take a
     /// place, by position; empty when none does.</summary>
     public bool[] Places { get; init; } = [];
+
+    /// <summary><c>extern "C" fn(int) -&gt; int</c>: a pointer to a C function, its ABI; <c>null</c>
+    /// for a Lyric function type.</summary>
+    public string? Abi { get; init; }
+
+    /// <summary>Where the ABI's string literal stands, for the formatter.</summary>
+    public Span AbiSpan { get; init; }
 }
 
 // Recovery placeholder, set when ParseType cannot continue, so later stages do not meet a null.

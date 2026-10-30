@@ -251,6 +251,7 @@ public static partial class TestRun
             PackageDependencies = project.DeclaredDependencies,
             PackageTestRoots = new Dictionary<string, string> { [manifest.Name] = testRoot },
             PackageGenRoots = Pipeline.GenRoots(project),
+            PackageBindingRoots = Bindings.Roots(project, null),
             PlaceNames = Pipeline.Places(project),
             ToolchainVersion = Pipeline.ClaimedVersion,
             LintLevels = project.LintLevels, RootPackage = project.Name, WarnDeps = project.LintArgs.WarnDeps,

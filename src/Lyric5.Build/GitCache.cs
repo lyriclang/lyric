@@ -48,19 +48,22 @@ public sealed partial class GitCache(string root, bool offline, Func<string, boo
     /// does not hold the revision (<c>LYR-PKG0007</c>); the repository has no such revision, or no
     /// package at its root (<c>LYR-PKG0006</c>); the locked commit is not there, or its content is
     /// not what the lock holds (<c>LYR-PKG0008</c>).</exception>
-    public (string Directory, string Commit, string Hash) Checkout(Dependency dependency, string declaring, Locked? locked = null)
+    /// <param name="tree">A source tree of <c>[native.vendor]</c> rather than a package: every file
+    /// of the commit, kept apart from the packages' checkouts, and no manifest asked for.</param>
+    public (string Directory, string Commit, string Hash) Checkout(Dependency dependency, string declaring, Locked? locked = null,
+        bool tree = false)
     {
         var id = Id(dependency.Git!.Url);
         var db = Path.Combine(root, "db", id);
         var commit = locked is null ? Resolve(dependency, db, declaring) : Locate(dependency, db, locked.Commit, declaring);
-        var checkout = Path.Combine(root, "checkouts", id, commit);
-        if (!Directory.Exists(checkout)) Export(dependency, db, commit, checkout, declaring);
+        var checkout = Path.Combine(root, tree ? "trees" : "checkouts", id, commit);
+        if (!Directory.Exists(checkout)) Export(dependency, db, commit, checkout, declaring, tree);
         var hash = PackageContent.Hash(checkout);
         if (locked is null || hash == locked.Hash) return (checkout, commit, hash);
         // The checkout is the cache's, written from the commit: written anew, it is the commit's
         // content — if that is still not what the lock holds, the lock is wrong, or the repository.
         DeleteTree(checkout);
-        Export(dependency, db, commit, checkout, declaring);
+        Export(dependency, db, commit, checkout, declaring, tree);
         hash = PackageContent.Hash(checkout);
         if (hash == locked.Hash) return (checkout, commit, hash);
         throw new ManifestException("LYR-PKG0008", declaring, dependency.Line, 1,
@@ -143,6 +146,7 @@ public sealed partial class GitCache(string root, bool offline, Func<string, boo
         _fetched.Add(db);
         Directory.CreateDirectory(Path.GetDirectoryName(db)!);
         var partial = $"{db}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
+        BuildStatus.Say("Fetching", $"{dependency.Name} ({dependency.Git!.Url})");
         Run(dependency, declaring, ["clone", "--bare", "--quiet", "--", dependency.Git!.Url, partial], FetchTime);
         try { Directory.Move(partial, db); }
         catch (IOException) when (Directory.Exists(db)) { DeleteTree(partial); }
@@ -153,6 +157,7 @@ public sealed partial class GitCache(string root, bool offline, Func<string, boo
     private void Fetch(Dependency dependency, string db, string declaring)
     {
         if (!_fetched.Add(db)) return;
+        BuildStatus.Say("Updating", $"{dependency.Name} ({dependency.Git!.Url})");
         Run(dependency, declaring, ["--git-dir", db, "fetch", "--quiet", "--force", "--", dependency.Git!.Url,
             "+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*"], FetchTime);
     }
@@ -171,9 +176,9 @@ public sealed partial class GitCache(string root, bool offline, Func<string, boo
         return result.Exit == 0 ? result.Text : null;
     }
 
-    /// <summary>The package content of the commit into <paramref name="checkout"/>:
-    /// written beside it and moved in whole, so a checkout that exists is complete.</summary>
-    private static void Export(Dependency dependency, string db, string commit, string checkout, string declaring)
+    /// <summary>The package content of the commit into <paramref name="checkout"/> — a tree's,
+    /// every file —: written beside it and moved in whole, so a checkout that exists is complete.</summary>
+    private static void Export(Dependency dependency, string db, string commit, string checkout, string declaring, bool tree)
     {
         // core.autocrlf off: the files are the commit's bytes on every machine.
         var archive = Run(dependency, declaring,
@@ -190,25 +195,37 @@ public sealed partial class GitCache(string root, bool offline, Func<string, boo
                 files[entry.Name] = data.ToArray();
             }
         }
+        if (tree)
+        {
+            Place(checkout, files);
+            return;
+        }
         if (!files.TryGetValue("lyric.toml", out var text))
             throw new ManifestException("LYR-PKG0006", declaring, dependency.Line, 1,
                 $"there is no package at the root of {dependency.Git} — no lyric.toml there");
         // The package's own manifest says what the package is made of.
         var manifest = Manifest.Parse(Encoding.UTF8.GetString(text), Path.Combine(checkout, "lyric.toml"));
+        Place(checkout, files.Where(file => PackageContent.Holds(manifest, file.Key)));
+    }
 
-        var partial = $"{checkout}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
+    /// <summary>Files into <paramref name="directory"/>, by their paths relative to it: written
+    /// beside it and moved in whole, so a directory of the cache that exists is complete. A path
+    /// that would lie outside is left out.</summary>
+    internal static void Place(string directory, IEnumerable<KeyValuePair<string, byte[]>> files)
+    {
+        var partial = $"{directory}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
         var inside = Path.GetFullPath(partial) + Path.DirectorySeparatorChar;
         foreach (var (name, bytes) in files)
         {
-            if (!PackageContent.Holds(manifest, name)) continue;
             var target = Path.GetFullPath(Path.Combine(partial, name));
             if (!target.StartsWith(inside, StringComparison.Ordinal)) continue;
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.WriteAllBytes(target, bytes);
         }
         Directory.CreateDirectory(partial);
-        try { Directory.Move(partial, checkout); }
-        catch (IOException) when (Directory.Exists(checkout)) { DeleteTree(partial); }
+        Directory.CreateDirectory(Path.GetDirectoryName(directory)!);
+        try { Directory.Move(partial, directory); }
+        catch (IOException) when (Directory.Exists(directory)) { DeleteTree(partial); }
     }
 
     /// <summary>git that has to succeed: what it cannot reach is the environment's failure (exit 2).</summary>

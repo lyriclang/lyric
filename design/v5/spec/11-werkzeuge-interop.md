@@ -313,6 +313,93 @@ eine ältere Zeile dieses Dokuments dem widerspricht, gilt die Zeile hier.
 | C2 | **`lyric new` und `lyric init`** in Cargos Form: `new <name>` legt das Verzeichnis an, `init` nutzt das aktuelle (nicht, wo schon ein `lyric.toml` liegt); `lyric.toml`, `src/main.lyr` oder mit `--lib` `src/lib.lyr`, `.gitignore`; kein `build.lyr` (BS1). **git** über das Flag `--git`/`--no-git`; ohne Flag entscheidet die Umgebungsvariable `LYRIC_GIT_ON_NEW` (C4: Kommandozeile vor `LYRIC_*`), ohne beides kein git | C2, C4, BS1 |
 | M12 | **M12 geschnitten**: M12a die Diagnostik (W6, W7, die Verben), M12b die Sprach-Uhren der Reviews (03, 04) | 13 |
 
+## Review 2026-10-28 — C-Bibliotheken einbinden (M14b)
+
+Entscheidungen des Maintainers („alle Empfehlungen“, Schnitt wie empfohlen) aus einer Analyse am Stand nach M14
+S7 (#596). Das Ziel des Maintainers: **eine C-Bibliothek einzubinden soll für den Entwickler so angenehm wie
+möglich sein.** Gemessen am Beispiel raylib war es das nicht: `[native]` kannte `sources`, `include` und `libs`,
+und `libs` wurde nur `-l<name>` — kein Suchpfad, kein Dateipfad, also kein vorgebautes Archiv aus dem Paket,
+unter Windows praktisch keine Bibliothek außer denen, die zig mitbringt; Frameworks waren nicht ausdrückbar;
+Defines gab es nur über `build.cFlags`, und die galten nur den `compileC`-Quellen desselben Skripts; die nativen
+Quellen sahen weder `lyric.h` noch die Header einer Abhängigkeit; ein statisches `--lib` nannte dem C-Nutzer nicht,
+was er dazulinken muss; der Link-Record hielt Pfade und Zeitstempel, nicht Inhalte. Und das Teuerste —
+Bindungen — schrieb man von Hand (X9: Tür). Wo eine ältere Zeile dieses Dokuments dem widerspricht — X1 („Linken
+über `[native] libs`“), X9, BS2 —, gilt die Zeile hier.
+
+**Gemessen mit zig 0.16** (Linux-Wirt, cross): ein vorgebautes Archiv linkt auf allen fünf Tier-1-Tripeln über
+den Pfad wie über `-L`/`-l`; unter Windows findet `-lt` auch `t.lib`, und `opengl32`/`gdi32`/`winmm` linken
+cross (zig bringt die mingw-Importbibliotheken mit); `-framework Foundation` nach macOS scheitert (kein SDK),
+ebenso `-lGL` nach `aarch64-linux-gnu` (kein Sysroot). `zig cc -Xclang -ast-dump=json -fsyntax-only` schreibt
+den vollständigen clang-AST eines Headers je Ziel — und endet danach mit Exit 1 („FileNotFound“, eine Eigenheit
+des Treibers), was ein Werkzeug darüber behandeln muss.
+
+Die Form, auf die es hinausläuft — raylib aus dem Quelltext, ohne Wrapper-Repository und ohne eine
+handgeschriebene Bindung:
+
+```toml
+[native.vendor]
+raylib = { git = "https://github.com/raysan5/raylib", tag = "5.5" }
+
+[native]
+sources  = ["@raylib/src/r*.c", "@raylib/src/utils.c"]
+include  = ["@raylib/src", "@raylib/src/external/glfw/include"]
+defines  = ["PLATFORM_DESKTOP", "GRAPHICS_API_OPENGL_33"]
+bindings = [{ header = "@raylib/src/raylib.h", module = "rl" }]
+
+[native.windows] sources = ["@raylib/src/rglfw.c"]  libs = ["opengl32", "gdi32", "winmm"]
+[native.linux]   sources = ["@raylib/src/rglfw.c"]  libs = ["GL", "X11", "m", "dl", "pthread"]
+[native.macos]   frameworks = ["Cocoa", "IOKit", "CoreVideo", "OpenGL"]
+# macOS: rglfw.c ist dort Objective-C (N7) — bis dahin ein Archiv je Tripel (E1)
+```
+
+| # | Entscheidung | Vorbild / Verworfenes | Betrifft |
+|---|---|---|---|
+| E1 | **`archives = ["native/lib/libraylib.a"]`**: vorgebaute statische Archive, Dateien des Paketinhalts (P8) oder eines Quellbaums (N1), **über ihren Pfad** gelinkt — nach den Objekten des Programms, vor den Bibliotheken nach Namen | build.zig `addObjectFile`, CMake `IMPORTED_LOCATION`; verworfen: Cargos `rustc-link-search` + `link-lib` (die Suchreihenfolge entscheidet, eine `.so` schlägt die `.a`, eine Systembibliothek gleichen Namens gewinnt still), Pfade in `libs` (ein Schlüssel, zwei Bedeutungen) | P1, X1, 07 B5 |
+| E2 | **`[native.<tripel>]`** neben `[native.<os>]` (nur Tier-1- und Tier-2-Tripel, T4), dieselben Schlüssel; geschichtet `[native]` → OS → Tripel. Ein Archiv ist je Tripel ein anderes | Cargo `[target.<triple>]`; verworfen: ein Platzhalter `{target}` in Pfaden (Templating als zweiter Mechanismus), Universal-Archive | P4 |
+| E3 | ~~**Nur statisch**~~ — **ersetzt durch E3′a–f** (Nachtrag unten). Was bleibt: ein Archiv oder eine Importbibliothek mit **GNU-ABI** (mingw) ist unter Windows zugesagt, eines von MSVC nicht — die C-Laufzeiten passen nicht | — | 07 B5 |
+| E4 | **`frameworks = ["Cocoa"]`** nur unter macOS (`[native.macos]`, macOS-Tripel; anderswo abgelehnt), gelinkt als `-framework X`; dazu `build.linkFramework`. Ein Framework kommt aus dem SDK des Wirts: cross ohne SDK lehnt der Bau ab, mit dem Hinweis, auf einem macOS-Wirt zu bauen | Cargo `link-lib=framework=`, build.zig `linkFramework`; verworfen: `libs = ["framework=Cocoa"]` (Syntax im String) | X1 |
+| E5 | **Kein Sysroot/SDK-Mechanismus in 5.0**: was cross geht, sagt die Spec — Windows-Systembibliotheken ja, Linux-Systembibliotheken außer libc und macOS-Frameworks nur auf dem Wirt. Tür: `--sysroot` je Tripel; **Uhr: M15** (Distribution, `lyric toolchain`) | Zig (bringt nur libc), Go (cgo cross braucht `CC` mit Sysroot) | T3, T4 |
+| E6 | **`defines = ["RAYLIB_STATIC", "LEVEL=2"]`** für die C-Quellen des Pakets; **keine freien `cFlags` im Manifest** — `-march=native` oder ein absolutes `-I` brechen P6 und die Cross-Builds; freie Flags hat nur das Build-Skript (N4) | CMake `target_compile_definitions`; verworfen: cgo `#cgo CFLAGS` | P1, P6 |
+| E7 | **Keine freien Linker-Flags** in 5.0 (raylib braucht keine; `-mwindows` ist eine Wahl, keine Pflicht). Tür: `build.linkArg`; **Uhr: Abschluss von M14b** — *entschieden 2026-10-29 (M14b L8)*: **nicht in 5.0**, kein `build.linkArg`. Gemessen: `examples/raylib` baut für Linux, Windows und macOS mit `libs`, `frameworks` und den Flags seiner `cLibrary` allein; was pkg-config an Flags gibt, die keine Bibliothek sind, geht schon an den Link. Ein späterer Bedarf ist eine neue Idee mit eigenem Issue | Cargo `rustc-link-arg` | BS2 |
+| E8 | aufgegangen in N4: die Flags gehören einer C-Bibliothek des Skripts, nicht dem Skript | — | BS2 |
+| E9 | **Native Quellen sehen `<lyric.h>`**: das Include-Verzeichnis der Laufzeit kommt zu jeder nativen Einheit; zugesagt ist nur `lyric.h`, `lyr/…` bleibt intern | verworfen: ein Verzeichnis nur für `lyric.h` (ändert das Archivlayout T1) | H1 |
+| E10 | siehe N8 | — | — |
+| E11 | **`--lib`**: vorgebaute Archive der nativen Teile kommen **mit in `lib<name>.a`** — ein C-Programm linkt eine Datei; die übrige Zeile (Bibliotheken nach Namen, Frameworks, die der Laufzeit) nennt der Bau als Note und das Artefakt-Ereignis von `--json` als `linkArgs` — sie hängt vom Ziel ab, darum nicht `lyric metadata`. Eine geteilte Bibliothek linkt alles selbst | Cargo `staticlib` (bündelt), Rust `--print native-static-libs`; verworfen: `<name>.pc` (unter Windows fremd, Präfix-Pfade, ein drittes Artefakt) | X8 |
+| E12 | **Linkreihenfolge** nach Abhängigkeit (die Abhängigen vor ihren Abhängigkeiten); Archive und Quellbäume **nach Inhalt** im Link-Record, nicht nach Zeitstempel. P6: ein vorgebautes Archiv kommt, wie es ist — wie zigs `libunwind` | — | P6 |
+| E13 | **Keine neue Vertrauensregel**: Archive und Quellbäume führen beim Bau nichts aus, der Lock-Hash hält ihre Bytes; `[trust]` bleibt die Regel der Skripte (BS5). Ein Archiv ist undurchsichtig — die Spec sagt es | Cargo, Go | BS5 |
+| E14 | siehe N2 | — | X9 |
+| N1 | **`[native.vendor]`**: Quellbäume ohne Lyric-Paket — `name = { git = "…", tag \| branch \| rev = "…" }` oder `name = { url = "https://…", hash = "sha256:<hex>" }` (der Hash der geladenen Datei; `.tar.gz`, ~~`.tar.xz`~~ (nicht in 5.0, 13 L3-5), `.zip`; ein einzelnes oberstes Verzeichnis fällt weg); die Pfade des nativen Teils nennen sie `@name/…`. Git über den Cache und das Lock der Abhängigkeiten (07 P5, P9), mit Commit und Inhalts-Hash; `--offline`, `--locked`, `lyric update` gelten. **Lazy**: geholt wird nur, was eine Tabelle nennt, die für das Ziel gilt. Ohne `hash` lehnt der Bau ab und nennt ihn | Zig `build.zig.zon` (`.url` + `.hash`, lazy); verworfen: Git-Submodule (der Git-Bezug holt sie nicht, kein Hash), „jede C-Bibliothek braucht ein Wrapper-Repository“ als einziger Weg | 07 P5, P9 |
+| N2 | **Bindungen aus dem Header** (X9 wieder geöffnet und entschieden): `bindings = [{ header = "…", module = "rl" }]` erzeugt je Ziel das Modul `<paket>.rl` aus dem clang-AST, den zig cc schreibt — **kein libclang** (der Grund für die Tür fällt). Abgebildet nach der Typtabelle (X2): Funktionen (`extern "C"`, Variadik), Structs (`@Layout(C)`), Enums (ihre Konstanten), Typedefs, Funktionszeiger, `#define` mit einer Ganzzahl oder einem String; C-Namen bleiben, wie sie sind. Was nicht abbildbar ist (Unions, Bitfelder, Funktionsmakros, `static inline`, Variablen), fällt weg und wird im Modul aufgelistet. Dazu **`lyric bindgen <header>`**: dasselbe Modul auf die Standardausgabe, zum Einchecken | Rust `bindgen` (libclang), Zig `@cImport` (in der Sprache — verworfen, X9) | X9, BS6 |
+| N3 | **`pkgConfig = ["sdl2"]`**: `pkg-config --cflags --libs` auf dem Wirt — `-I`/`-D` an die C-Quellen des Pakets, der Rest an den Link; cross lehnt der Bau ab. P6: eine Systembibliothek gehört der Maschine | cgo `#cgo pkg-config:`, SwiftPM `pkgConfig`, Rusts `pkg-config` | P6 |
+| N4 | **`std.build` neu**: `target()` liefert einen **Typ** (`triple`, `os`, `arch`, `isHost`) statt eines Strings; `vendorDir(name)`; **`cLibrary(name)`** als Builder (`sources`, `include`, `define`, `flags`, `compile`) **ersetzt `compileC` und `cFlags`** — eine Bibliothek trägt ihre Flags, sieht die `include` des Pakets und `lyric.h`; `linkLib`, `linkArchive`, `linkFramework`, `pkgConfig` als Gegenstücke des Manifests; `cEnv()` gibt `CC`, `AR` und `CFLAGS` für zig cc mit dem Ziel, für CMake- und Autotools-Bäume über `std.process` | Rusts `cc` und `cmake`; verworfen: lose Direktiven je Skript (heute) | BS2 |
+| N5 | **`lyric add <name> --vendor --git … \| --url …`** schreibt den Eintrag in `[native.vendor]`, bei `--url` mit dem Hash der geladenen Datei | `zig fetch --save` | C2 |
+| N6 | **Linkerfehler als Diagnosen** (Bereich `LNK`, G2): ein undefiniertes Symbol zeigt auf die `extern`-Deklaration, die es nennt, mit dem Hinweis auf `libs`/`archives`/`frameworks`/`pkgConfig`; eine Bibliothek, die der Linker nicht findet, auf die Zeile, die sie nennt; ein doppeltes Symbol nennt die Pakete; ein fehlender Header bekommt eine Note mit den durchsuchten Verzeichnissen. `lyric build -v` zeigt die Befehle für zig cc | rustc (Linkerausgabe roh) verworfen | G2, G4 |
+| N7 | **Objective-C-Quellen** (`.m`, raylib übersetzt `rglfw.c` unter macOS so): ungeprüft mit zig cc; **Uhr: M15** — bis dahin baut raylib unter macOS aus einem vorgebauten Archiv (E1) | — | — |
+| N8 | **Header und Bindungen einer Abhängigkeit**: die `include` eines Pakets und seine Bindungsmodule sehen die Pakete, die es direkt nennen — transitiv nicht (07 P6) | CMake `PUBLIC`, Cargo `DEP_<links>_INCLUDE` | 07 P6 |
+
+**Verworfen für 5.0**: ein C-Paketindex (vcpkg, Conan) und ein eingebauter CMake-Lauf — beides ist mit N1 und
+`cEnv()` (N4) erreichbar, ohne dass die Toolchain ein Bausystem für C wird. Plan: 13, M14b.
+
+### Nachtrag 2026-10-28 — E3′, die dynamische Bibliothek eines Pakets
+
+E3 („nur statisch“) war ohne den häufigsten Fall entschieden. lyriclang/lyric#585 (lyrgui, SDL3 unter Windows)
+zeigte ihn: ein SDK bringt `SDL3.dll` und die Importbibliothek `libSDL3.dll.a`, viele Bibliotheken gibt es nur
+als `.so` oder `.dylib`, und ein Archiv selbst zu bauen ist das Gegenteil von angenehm. #585 fand dabei zwei
+Eigenheiten von zig, die bleiben: **zig schreibt jedes `-L`, das ihm eine geteilte Bibliothek lieferte, als
+`RUNPATH` in ein ELF- oder Mach-O-Binary** (die Verzeichnisse des Bauenden, in jedem Binary), und **zigs
+Windows-Link sucht `X.dll`, `X.lib`, `libX.a`, nicht MinGWs `libX.dll.a`**. Der Maintainer hat nach Empfehlung
+entschieden; #585 und lyric-spec#365 gehen in M14b auf (L2a), ihr Code `LYR-BLD0004` wird `LYR-BLD0006` (0004
+und 0005 hält schon L1).
+
+| # | Entscheidung | Vorbild / Verworfenes | Betrifft |
+|---|---|---|---|
+| E3′a | **`dylibs`** im nativen Teil, nur in Tabellen je OS oder Tripel (eine geteilte Bibliothek ist je Ziel eine andere): unter Linux und macOS Pfade (`"native/linux/libfoo.so"`), unter Windows `{ dll = "…/SDL3.dll", lib = "…/libSDL3.dll.a" }` — zigs lld linkt nicht gegen eine DLL, nur gegen ihre Importbibliothek (GNU-ABI, E3). Dateien des Paketinhalts oder eines Quellbaums (N1), **über ihren Pfad** gelinkt wie ein Archiv (E1), also auch cross. Eine Mach-O-Bibliothek, deren Name (`LC_ID_DYLIB`) nicht mit `@rpath/` beginnt, lehnt der Bau ab (`LYR-BLD0006`) und sagt, wie man sie umbenennt — sie würde neben dem Binary nicht gefunden; ebenso eine ELF-Bibliothek ohne `soname` (in L2b gemessen: zig trägt sie dann mit dem Pfad ein, über den sie gelinkt wurde, als `NEEDED /…/libfoo.so`) | build.zig `addObjectFile`, CMake `IMPORTED_LOCATION` + `IMPORTED_IMPLIB`; verworfen: „nur statisch“ (E3), ein String mit gesuchter Importbibliothek (Magie über Dateinamen) | 07 B5 |
+| E3′b | **Neben das Binary, automatisch**: was `dylibs` des Graphen nennen, kopiert der Bau nach jedem Link unter seinem Namen neben jedes Binary des Programms (`build`, `run`, `test`, `bench`; kein Build-Skript), nur wo die Bytes sich unterscheiden. ELF bekommt den Laufpfad `$ORIGIN`, Mach-O `@executable_path`; Windows sucht selbst zuerst dort. **Kein durchsuchtes Verzeichnis kommt ins Binary** (der zig-Befund oben) — der Bau übergibt eine gefundene Bibliothek über ihren Pfad. Zwei Dateien gleichen Namens lehnt er ab (`LYR-BLD0006`) | Cargo kann es nicht (ein Skript kopiert, `target/` je nach Profil); .NET kopiert native Assets neben die Anwendung | P6 |
+| E3′c | **SDKs außerhalb des Pakets über das Skript**: `build.linkSearch(dir)` (vor den Verzeichnissen des Linkers, unter Windows auch `libX.dll.a`/`X.dll.a`) und `build.besideBinary(paths…)` (eine DLL, aber auch Daten) — aus #585. Im Manifest gibt es keine Suchpfade: ein absoluter Pfad bricht P6 und jede andere Maschine | Cargo `rustc-link-search`, aber nur im Skript | BS2 |
+| E3′d | **`build.rerunIfEnvChanged(names…)`** — ein Skript, das den Ort eines SDK aus der Umgebung liest (`SDL3_DIR`), läuft wieder, wo der Wert sich ändert; der Zustand hält den Wert als SHA-256, kein Geheimnis landet in `out/` | Cargo `rerun-if-env-changed` | BS4 |
+| E3′e | **`--lib`**: die `dylibs` kommen neben `lib<name>.a`/`.so`/`.dll` und stehen in der Link-Zeile (E11, `linkArgs`) | — | X8 |
+| E3′f | **Reproduzierbarkeit und Vertrauen**: eine `dylib` des Pakets hält der Lock-Hash wie ein Archiv; was ein Skript über `linkSearch` findet, gehört der Maschine wie `pkgConfig` (N3). Keine neue Vertrauensregel (E13) | — | P6, BS5 |
+
 ---
 
 **Bereich 11 ist damit vollständig entschieden** (W1–W9, 2026-09-29). Es bleibt 12 (Migration).

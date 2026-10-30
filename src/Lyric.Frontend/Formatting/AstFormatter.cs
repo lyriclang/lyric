@@ -385,17 +385,17 @@ public sealed class AstFormatter
         ImportDecl d => ImportDoc(d),
         FunctionDecl d => FunctionDoc(d),
         StructDecl d => TypeBodyDoc(Attributes(d.Attributes), d.Visibility, "struct", d.Name,
-            d.Generics, d.Interfaces, d.Members, d.Span, d.Delegates),
+            d.Generics, d.Interfaces, d.Members, d.Span, d.Delegates, d.InterfacesBracketed),
         ClassDecl d => TypeBodyDoc(Attributes(d.Attributes), d.Visibility, "class", d.Name,
-            d.Generics, d.Interfaces, d.Members, d.Span, d.Delegates),
+            d.Generics, d.Interfaces, d.Members, d.Span, d.Delegates, d.InterfacesBracketed),
         EnumDecl d => EnumDoc(d),
         InterfaceDecl d => MethodBodyDoc(
             Doc.Of(Pub(d.Visibility), Doc.From($"{(d.IsSealed ? "sealed " : "")}interface {d.Name}"), GenericsDoc(d.Generics),
-                InterfaceListDoc(d.Interfaces), Doc.Space),
+                InterfaceListDoc(d.Interfaces, bracketed: d.InterfacesBracketed), Doc.Space),
             InOrder(d.Types, d.Members, d.Statics), d.Span),
         ExtendDecl d => MethodBodyDoc(
             Doc.Of(Pub(d.Visibility), Doc.From("extend"), GenericsDoc(d.Generics), Doc.Space, TypeDoc(d.Target),
-                InterfaceListDoc(d.Interfaces), Doc.Space),
+                InterfaceListDoc(d.Interfaces, bracketed: d.InterfacesBracketed), Doc.Space),
             InOrder(d.Types, d.Methods, d.Statics), d.Span),
         GlobalBindingDecl d => Doc.Of(Pub(d.Visibility), StmtDoc(d.Binding)),
         StaticBindingDecl d => Doc.Of(Pub(d.Visibility), Doc.From("static "), StmtDoc(d.Binding)),
@@ -406,6 +406,7 @@ public sealed class AstFormatter
         // [Iterator];' bounds.
         AssociatedTypeDecl d => Doc.Of(Doc.From($"type {d.Name}"),
             d.Bounds.Length == 0 ? Doc.Nil
+                : d.Bounds is [var bound1] && !d.BoundsBracketed ? Doc.Of(Doc.From(" :: "), TypeDoc(bound1))
                 : Doc.Of(Doc.From(" :: ["), Doc.Join(Doc.From(", "), d.Bounds.Select(TypeDoc).ToArray()), Doc.From("]")),
             d.Type is { } bound ? Doc.Of(Doc.From(" = "), TypeDoc(bound)) : Doc.Nil, Doc.From(";")),
         FieldDecl d => FieldDoc(d),
@@ -522,6 +523,7 @@ public sealed class AstFormatter
 
         var parts = generics.Select(g => Doc.Of(g.Constraints.Length == 0
             ? Doc.From(g.Name)
+            : g.Constraints is [var only] && !g.ConstraintsBracketed ? Doc.Of(Doc.From($"{g.Name} :: "), TypeDoc(only))
             : Doc.Of(Doc.From($"{g.Name} :: ["),
                 Doc.Join(Doc.From(", "), g.Constraints.Select(TypeDoc).ToArray()),
                 Doc.From("]")),
@@ -565,10 +567,10 @@ public sealed class AstFormatter
     }
 
     private Doc TypeBodyDoc(Doc attributes, VisibilityWord isPublic, string keyword, string name,
-        GenericParam[] generics, TypeNode[] interfaces, Decl[] members, Span whole, string?[]? delegates = null)
+        GenericParam[] generics, TypeNode[] interfaces, Decl[] members, Span whole, string?[]? delegates = null, bool bracketed = true)
     {
         var head = Doc.Of(attributes, Pub(isPublic), Doc.From($"{keyword} {name}"),
-            GenericsDoc(generics), InterfaceListDoc(interfaces, delegates), Doc.Space);
+            GenericsDoc(generics), InterfaceListDoc(interfaces, delegates, bracketed), Doc.Space);
 
         var closing = whole.End - 1;
         return BracedDoc(head, members.Length == 0 && !AnyCommentBefore(closing),
@@ -602,9 +604,13 @@ public sealed class AstFormatter
 
     /// <summary>A declaration's interfaces; too long for the line, one to a line like parameters.</summary>
     /// <param name="delegates">The field an entry delegates to (<c>Walker by legs</c>).</param>
-    private Doc InterfaceListDoc(TypeNode[] interfaces, string?[]? delegates = null) =>
+    /// <param name="bracketed">Whether the list stood in brackets: one interface written without
+    /// them is written without them again.</param>
+    private Doc InterfaceListDoc(TypeNode[] interfaces, string?[]? delegates = null, bool bracketed = true) =>
         interfaces.Length == 0
             ? Doc.Nil
+            : interfaces is [var only] && !bracketed
+                ? Doc.Of(Doc.From(" :: "), TypeDoc(only), delegates is [{ } field] ? Doc.From($" by {field}") : Doc.Nil)
             : Doc.Of(Doc.From(" :: "), Doc.GroupOf(Doc.From("["),
                 Doc.IndentOf(Doc.LineOrNothing,
                     Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace), interfaces.Select((t, i) =>
@@ -617,7 +623,7 @@ public sealed class AstFormatter
     {
         var head = Doc.Of(Attributes(decl.Attributes), Pub(decl.Visibility),
             Doc.From($"enum {decl.Name}"), GenericsDoc(decl.Generics),
-            InterfaceListDoc(decl.Interfaces), Doc.Space);
+            InterfaceListDoc(decl.Interfaces, bracketed: decl.InterfacesBracketed), Doc.Space);
 
         var members = InOrder(decl.Types, decl.Methods, decl.Statics);
         var closing = decl.Span.End - 1;
@@ -1482,7 +1488,9 @@ public sealed class AstFormatter
         TupleType t => Doc.Of(Doc.From("("),
             Doc.Join(Doc.From(", "), t.Elements.Select((e, i) => t.Labels?[i] is { } label
                 ? Doc.Of(Doc.From(label + ": "), TypeDoc(e)) : TypeDoc(e)).ToArray()), Doc.From(")")),
-        FunctionType f => Doc.Of(Doc.From("fn("),
+        FunctionType f => Doc.Of(f.Abi is { } abi
+                ? Doc.Of(Doc.From("extern "), _synthesized ? Doc.From(Quote(abi)) : Src(f.AbiSpan), Doc.Space) : Doc.Nil,
+            Doc.From("fn("),
             Doc.Join(Doc.From(", "), f.Parameters.Select((p, i) => i < f.Places.Length && f.Places[i]
                 ? Doc.Of(Doc.From("&"), TypeDoc(p)) : TypeDoc(p)).ToArray()),
             Doc.From(") -> "), ReturnDoc(f.ReturnType, f.Throws, f.ReturnGrouped), f.Throws is { } thrown ? ThrowsDoc(thrown) : Doc.Nil),

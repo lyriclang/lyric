@@ -1,0 +1,65 @@
+// Structs with value semantics.
+//
+// The point is what does NOT happen: 'b = a' copies, so 'b.x = 99' never changes 'a.x'. That is the
+// whole difference between a struct and a class.
+import std.io.console;
+
+pub struct Vector2 {
+    x: int,
+    y: int,
+
+    static fn zero(): Vector2 {
+        return Vector2 { x = 0, y = 0 };
+    }
+
+    fn plus(other: Vector2): Vector2 {
+        return Vector2 { x = this.x + other.x, y = this.y + other.y };
+    }
+
+    fn sum(): int {
+        return this.x + this.y;
+    }
+
+    // Mutates the receiver; because the receiver is a copy, the caller sees nothing of it once the
+    // value has been passed on.
+    mut fn scale(factor: int) {
+        this.x *= factor;
+        this.y *= factor;
+    }
+}
+
+// A struct as a field of another struct: the copy has to reach through to here.
+pub struct Segment {
+    from: Vector2,
+    to: Vector2,
+}
+
+// The parameter is a copy. What happens here stays here.
+fn shrink(v: Vector2): int {
+    v.scale(0);
+    return v.sum();
+}
+
+fn main(): int {
+    let a = Vector2 { x = 3, y = 4 };
+
+    // 1) assignment copies.
+    var b = a;
+    b.x = 99;
+    console.println(f"a.x={a.x} b.x={b.x}");
+
+    // 2) the parameter copies, so 'a' survives unchanged.
+    let shrunk = shrink(a);
+    console.println(f"shrunk={shrunk} a.sum={a.sum()}");
+
+    // 3) a struct inside a struct copies along.
+    let line = Segment { from = a, to = Vector2.zero() };
+    var moved = line;
+    moved.from.x = 42;
+    console.println(f"line.from.x={line.from.x} moved.from.x={moved.from.x}");
+
+    // 4) computing without a side effect.
+    let c = a.plus(Vector2 { x = 1, y = 1 });
+
+    return a.sum() + b.x + c.sum();
+}

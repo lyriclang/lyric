@@ -37,7 +37,7 @@
 //! 60
 //! ```
 
-import std.core { filled };
+import std.core { filled, sliceAddress };
 import std.time { Duration };
 
 /// The error a wait throws in a cancelled task, and a suspended `yield` when `close()` unwinds its
@@ -1328,6 +1328,9 @@ class Context {
     /// Cancelled: every wait from here on throws `Cancelled`. Atomic: a cancel may come
     /// from another thread.
     var cancelled: bool = false,
+    /// The error a function C called left for the code around the C call (std.ffi's `stash`),
+    /// until it takes it: the task's own, as the callback that left it may have parked.
+    var stashed: ?Error = null,
     /// What becomes of a panic of it: its handle's — a context without one, main's or a
     /// detached task's, ends the process with the panic.
     var onPanic: ?fn(PanicInfo) -> void = null,
@@ -1941,6 +1944,8 @@ class Scheduler {
     /// Runs one turn: the next ready context runs until it waits; with none ready, the thread waits for
     /// the earliest sleeper — without end where there is none, until another thread wakes it.
     mut fn step(): void {
+        // what C's threads handed this thread's Callbacks, before the tasks
+        lyr_ffi_drain();
         this.takeInbox();
         if (this.sleepers != null) {
             this.wakeSleepers(monotonicNanos());
@@ -2044,7 +2049,12 @@ class Scheduler {
     /// it leaves the count, so with the count at one they are all there to be seen. A task that
     /// waits on a descriptor waits on the system, which may end it: no deadlock while one does. A file's call waits on the pool, a thread that lives.
     mut fn deadlock(): bool {
-        if (this.liveFirst == null || this.ioCount > 0 || living.others(this) || this.pending()) {
+        // a Callback of this thread a thread of C's may call: a call may come and wake a task
+        if (this.liveFirst == null
+            || this.ioCount > 0
+            || living.others(this)
+            || this.pending()
+            || lyr_ffi_callbacks_alive() > 0) {
             return false;
         }
         var at = this.liveFirst;
@@ -2280,6 +2290,79 @@ fn runMain(main: Coroutine<void>): void {
     setCurrentScheduler(null);
 }
 
+// The embedding: a library's exports, which C calls, each as a task on the calling thread.
+
+/// Runs an export's context where C called the export, on the thread's scheduler — made at the
+/// thread's first call and kept from then on, so the tasks an export leaves go on with the next
+/// call and the host's pump (`stepEmbedded`, `runEmbedded`). It runs until that context is done:
+/// 1 its body returned, 2 it panicked — the panic the export's, which the runtime answers C with.
+fn runExport(body: Coroutine<void>): int {
+    let s = embeddedScheduler();
+    let c = Context { body = body, home = s };
+    c.onPanic = (_: PanicInfo) => { };
+    s.ready(c);
+    while (!body.isDone() && panicCode(body) == null) {
+        s.step();
+    }
+    return if (panicCode(body) == null) 1 else 2;
+}
+
+/// The calling thread's scheduler for the exports: the one it runs, or a new one that lives from
+/// here on — in the list of the living, which keeps it between the calls.
+fn embeddedScheduler(): Scheduler {
+    if (let s = currentScheduler()) {
+        return s;
+    }
+    let s = Scheduler { };
+    setCurrentScheduler(s);
+    s.started();
+    living.join(s);
+    return s;
+}
+
+/// `lyr_step`: one turn where a task is ready or due — without waiting — and whether tasks
+/// remain on the thread.
+fn stepEmbedded(): bool {
+    if (let s = currentScheduler()) {
+        if (s.first == null) {
+            // nothing ready: what came in, what is due, what the poller has, all without a wait
+            lyr_ffi_drain();
+            s.takeInbox();
+            if (s.sleepers != null) {
+                s.wakeSleepers(monotonicNanos());
+            }
+            if (waitOnPoller(0)) {
+                s.pollerWoke();
+            }
+            s.takeFired();
+            s.takeInbox();
+        }
+        if (s.first != null) {
+            s.step();
+        }
+        return s.first != null || s.liveFirst != null || s.pending();
+    }
+    return false;
+}
+
+/// `lyr_run`: the thread's tasks to their end, waiting as they wait.
+fn runEmbedded(): void {
+    if (let s = currentScheduler()) {
+        while (s.first != null || s.liveFirst != null || s.pending()) {
+            s.step();
+        }
+    }
+}
+
+/// `lyr_detach_thread`: the thread's scheduler stops; what remains on it never runs again.
+fn endEmbedded(): void {
+    if (let s = currentScheduler()) {
+        s.stopped();
+        living.leave(s);
+        setCurrentScheduler(null);
+    }
+}
+
 // The runtime's side, the module's own.
 
 /// Creates a task's context around `body` on a stack of its own — `stack` bytes, 0 for the
@@ -2287,29 +2370,75 @@ fn runMain(main: Coroutine<void>): void {
 fn startContext(body: fn() -> void, stack: int): Coroutine<void>;
 
 /// Parks the running chain at the scheduler.
-fn park(): void;
+extern "C" fn park(): void = "lyr_coro_park";
 
 /// Panics for a wait nothing can end: `LYR-RT0018`.
-fn deadlocked(): never;
+extern "C" fn deadlocked(): never = "lyr_panic_deadlock";
 
 /// Panics for an acquire on a poisoned lock: `LYR-RT0019`, naming the first panic.
-fn poisonedBy(code: string, message: string): never;
+extern "C" fn poisonedBy(code: string, message: string): never = "lyr_panic_poisoned";
 
 /// Resumes a task's context until it parks (0), its body returns (1) or it panics (2): a panic
 /// stays the context's, for the scheduler to settle.
-fn resumeContext(c: Coroutine<void>): int;
+extern "C" fn resumeContext(c: Coroutine<void>): int = "lyr_task_resume";
 
 /// The report a panicked context left; null where it did not panic.
-fn panicCode(c: Coroutine<void>): ?string;
-fn panicMessage(c: Coroutine<void>): ?string;
-fn panicTrace(c: Coroutine<void>): ?string;
+extern "C" fn panicCode(c: Coroutine<void>): ?string = "lyr_task_panic_code";
+extern "C" fn panicMessage(c: Coroutine<void>): ?string = "lyr_task_panic_message";
+extern "C" fn panicTrace(c: Coroutine<void>): ?string = "lyr_task_panic_trace";
 
 /// Panics again, with the report an earlier panic left: its code, its message, its frames.
-fn repanic(code: string, message: string, trace: string): never;
+extern "C" fn repanic(code: string, message: string, trace: string): never = "lyr_task_repanic";
 
 /// The running thread's scheduler, as `runMain` set it.
-fn currentScheduler(): ?Scheduler;
-fn setCurrentScheduler(s: ?Scheduler): void;
+extern "C" fn currentScheduler(): ?Scheduler = "lyr_task_scheduler";
+
+extern "C" fn lyr_ffi_drain(): void;
+extern "C" fn lyr_ffi_callbacks_alive(): int;
+
+/// What `stashForeign` keeps where no task runs — the program's, behind its lock, as threads
+/// without a scheduler share it.
+@Allow("global-var-without-sync")
+var unscheduledStash: ?Error = null;
+
+let unscheduledGuard = SpinLock { };
+
+/// std.ffi's `stash`: the error a function C called leaves for the code around the C call — the
+/// running task's, or the program's where no task runs. One waits at a time: a second, before the
+/// first is taken, is the first's consequence, and the first stays.
+internal fn stashForeign(e: Error): void {
+    if (let s = currentScheduler()) {
+        if (let me = s.running) {
+            if (me.stashed == null) {
+                me.stashed = e;
+            }
+            return;
+        }
+    }
+    unscheduledGuard.acquire();
+    if (unscheduledStash == null) {
+        unscheduledStash = e;
+    }
+    unscheduledGuard.release();
+}
+
+/// std.ffi's `takeStashed`: the error `stashForeign` kept, which it forgets; `null` where none waits.
+internal fn takeForeign(): ?Error {
+    if (let s = currentScheduler()) {
+        if (let me = s.running) {
+            let kept = me.stashed;
+            me.stashed = null;
+            return kept;
+        }
+    }
+    unscheduledGuard.acquire();
+    let kept = unscheduledStash;
+    unscheduledStash = null;
+    unscheduledGuard.release();
+    return kept;
+}
+
+extern "C" fn setCurrentScheduler(s: ?Scheduler): void = "lyr_task_set_scheduler";
 
 /// Returns whether a scheduler runs on this thread — the question the I/O pool's callers ask:
 /// where one runs, a blocking call goes to the pool and the task parks; where none runs, nothing
@@ -2320,27 +2449,32 @@ fn schedulerRuns(): bool;
 
 /// Waits on the thread's poller for `nanos` at most, a negative one without end; returns true
 /// when woken.
-fn waitOnPoller(nanos: int): bool;
+extern "C" fn waitOnPoller(nanos: int): bool = "lyr_task_wait";
 
 /// Returns the monotonic clock's reading, in nanoseconds.
-fn monotonicNanos(): int;
+extern "C" fn monotonicNanos(): int = "lyr_clock_monotonic_ns";
 
 /// Starts a thread of the program that runs `body` on its own stack.
 fn startThread(body: fn() -> void): void;
 
 /// The running thread's poller as the runtime numbers it, and the wake of a poller so numbered —
 /// from any thread, while its thread runs.
-fn currentPoller(): int;
-fn wakePoller(poller: int): void;
+extern "C" fn currentPoller(): int = "lyr_task_poller";
+extern "C" fn wakePoller(poller: int): void = "lyr_task_wake";
 
 /// A descriptor's readiness on the running thread's poller (lyr/task.h): armed with a
 /// waiter's token, out of the poller before its close, and the tokens fired since the last take.
-fn armOnPoller(fd: int, interest: int, token: int): int;
-fn forgetOnPoller(fd: int): void;
-fn takeFromPoller(into: Slice<int>): int;
+extern "C" fn armOnPoller(fd: int, interest: int, token: int): int = "lyr_task_arm";
+extern "C" fn forgetOnPoller(fd: int): void = "lyr_task_forget";
+
+inline fn takeFromPoller(into: Slice<int>): int {
+    return takeFromPollerRaw(sliceAddress(into), into.length());
+}
+
+extern "C" fn takeFromPollerRaw(intoAt: uint, intoLength: int): int = "lyr_task_take";
 
 /// A thread that spins on a lock lets another run.
-fn spin(): void;
+extern "C" fn spin(): void = "lyr_task_spin";
 
 /// The atomic operations (lyr/atomic.h), each on a PLACE: a field of the
 /// scheduler's own, or the value of std.sync's `Atomic<T>`, which is built on

@@ -270,6 +270,7 @@ void lyr_weak_free(LyrWeak *weak);         /* before death: the callback will no
  * thread; every other thread calls lyr_thread_attach first and lyr_thread_detach last. */
 int lyr_thread_attach(void);   /* 0 on success */
 void lyr_thread_detach(void);
+int lyr_thread_attached(void); /* whether the calling thread is attached: 1 or 0 */
 
 /* Collects now, then runs the callbacks of what died. For tests and hosts; programs never need it. */
 void lyr_gc_collect(void);

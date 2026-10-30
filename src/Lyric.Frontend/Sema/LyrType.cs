@@ -59,7 +59,7 @@ public abstract record LyrType
         // The thrown set counts: 'fn() -> int' and 'fn() -> int throws E' are two types —
         // a set, in any order.
         (FnType x, FnType y) => Equal(x.Return, y.Return) && SameSequence(x.Parameters, y.Parameters)
-                                && SameSet(x.Throws, y.Throws) && FnType.SamePlaces(x, y),
+                                && SameSet(x.Throws, y.Throws) && FnType.SamePlaces(x, y) && x.IsC == y.IsC,
         (RangeOf x, RangeOf y) => Equal(x.Element, y.Element),
         // Throwability counts: 'Coroutine<int>' and 'Coroutine<int> throws E' are two types, or
         // the second would pass for the first and the demand would be lost again at the binding.
@@ -151,6 +151,10 @@ public sealed record FnType(LyrType[] Parameters, LyrType Return) : LyrType
     /// none does. Part of the type's identity: <c>fn(&amp;int) -&gt; void</c> is not
     /// <c>fn(int) -&gt; void</c>.</summary>
     public bool[] Places { get; init; } = [];
+
+    /// <summary><c>extern "C" fn(int) -&gt; int</c>: a pointer to a C function, part of the type's
+    /// identity — a Lyric function value is no C function, and a C function is called as C's.</summary>
+    public bool IsC { get; init; }
 
     /// <summary>Whether parameter <paramref name="i"/> takes a place.</summary>
     public bool PlaceAt(int i) => i < Places.Length && Places[i];

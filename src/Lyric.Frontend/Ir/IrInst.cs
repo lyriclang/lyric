@@ -335,6 +335,36 @@ public sealed record PlaceAt(TempId Dest, TempId Address, IrType Type, Span Span
 /// <c>sizeof</c> says of it, and the step between two of them.</summary>
 public sealed record SizeOf(TempId Dest, IrType Type, Span Span) : IrOp(Span);
 
+/// <summary>A Lyric function as a C function's pointer, a <c>uint</c>: the address of a trampoline
+/// that takes C's values in their <paramref name="Params"/> forms, calls <paramref name="Function"/>
+/// and returns its result in the <paramref name="Return"/> form.</summary>
+public sealed record CCallback(TempId Dest, FunctionId Function, IrCForm[] Params, IrCForm Return, Span Span) : IrOp(Span);
+
+/// <summary>A call through a C function's pointer, <paramref name="Callee"/> a <c>uint</c>: each
+/// argument of <paramref name="ParamTypes"/> in its form, the result back from its own — as a call
+/// of an <c>extern "C"</c> function is.</summary>
+/// <summary><c>Callback&lt;C&gt;.new</c>'s state: the closure's code and environment in an object a
+/// root keeps alive; <paramref name="Dest"/> is the root's address, a <c>uint</c>, which is the
+/// userdata C hands back.</summary>
+/// <summary><c>GcHandle.pin</c>: <paramref name="Value"/>, an object, held by a root the collector
+/// keeps; <paramref name="Dest"/> is the root's address, a <c>uint</c>.</summary>
+public sealed record RootObject(TempId Dest, TempId Value, Span Span) : IrOp(Span);
+
+/// <summary><c>GcHandle.get</c>: the object a root holds, of <paramref name="Type"/> — a panic where
+/// the root holds another class's, as a pointer from C may say.</summary>
+public sealed record RootedObject(TempId Dest, TempId Root, IrRefType Type, Span Span) : IrOp(Span);
+
+public sealed record RootClosure(TempId Dest, TempId Closure, Span Span) : IrOp(Span);
+
+/// <summary><c>Callback&lt;C&gt;.new</c>'s function: the address of a trampoline of C's type —
+/// <paramref name="ParamTypes"/> with the userdata at <paramref name="Userdata"/> — that finds the
+/// closure through the userdata and calls it with the others.</summary>
+public sealed record CClosureCallback(TempId Dest, IrFunctionType Closure, int Userdata, IrType[] ParamTypes,
+    IrType ReturnType, IrCForm[] Params, IrCForm Return, Span Span) : IrOp(Span);
+
+public sealed record CallCPointer(TempId? Dest, TempId Callee, TempId[] Args, IrType[] ParamTypes, IrType ReturnType,
+    IrCForm[] Params, IrCForm Return, Span Span) : IrOp(Span);
+
 /// <summary><c>std.ffi</c>'s address of the first element of an array or a slice, a
 /// <c>uint</c>.</summary>
 public sealed record DataAddress(TempId Dest, TempId Value, IrType Element, Span Span) : IrOp(Span);

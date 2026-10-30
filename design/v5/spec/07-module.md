@@ -208,6 +208,31 @@ Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert 
 |---|---|---|
 | D6 | **Der pfadlose Kopf `module;` ist der Ort der Modul-Attribute** (bestätigt, M9a S7): M2 strich den Kopf mit Pfad, 09 B3/T7 wollen `@When` am Modulkopf; `@When(cond) module;` steht vor der ersten Deklaration und nennt keinen Namen, `module a.b;` bleibt `RES0008`. Spec 04 §2 Regel 2 und 01 Regel 4 | M2; 09 A6 |
 
+## Review 2026-10-28 — C-Bibliotheken einbinden (M14b)
+
+Entscheidungen des Maintainers („alle Empfehlungen“) aus der Analyse, wie ein Paket eine C-Bibliothek
+einbindet. Die volle Fassung mit Vergleich und Verworfenem steht in 11, „Review 2026-10-28“; hier nur, was
+B5 schärft.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| E1 | **Vorgebaute Archive** sind die Form, die B5 „`lib.a` je Ziel“ nennt: `[native] archives = ["native/lib/libz.a"]`, Dateien des Paketinhalts, gelinkt über ihren Pfad — nicht über eine Suche (`-L` + `-l`) | V8 B5 |
+| E2 | **„Je Ziel“ heißt je Tripel**: `[native.<tripel>]` neben `[native.<os>]`, geschichtet `[native]` → OS → Tripel | V8 B5; 11 P4 |
+| E3 | ~~**Nur statisch**~~ — **ersetzt durch E3′** (unten, am selben Tag): ein Paket bringt auch dynamische Bibliotheken mit | V8 B5 |
+| N1 | **Fremder C-Quelltext ohne Lyric-Paket**: `[native.vendor]` holt einen Quellbaum aus Git oder von einer URL mit Hash, gehalten im Lock wie eine Abhängigkeit (P5), aber **kein Paket** — er hat keine Module und kein Manifest; die Pfade des nativen Teils nennen ihn `@name/…`. Das `-sys`-Muster (ein Paket je C-Bibliothek) bleibt der Weg, sie zu teilen; P3 gilt ihm: zwei Pakete, die denselben Baum übersetzen, definieren seine Symbole zweimal | V7 P5, V8 B5 |
+| N2 | **Bindungen aus dem Header** sind ein Modulraum des Pakets wie `gen/` (11 BS6): `bindings = [{ header = "…", module = "rl" }]` ist das Modul `<paket>.rl`; ein Modul gleichen Pfads unter `src/` ist ein Fehler (K3) | V1 M1, V6 K3 |
+| N8 | **Die Header eines Pakets** (`include`) und seine Bindungsmodule sehen die Pakete, die es direkt als Abhängigkeit nennen — transitiv nicht (P6) | V7 P6 |
+
+### Nachtrag 2026-10-28 — E3′, die dynamische Bibliothek eines Pakets
+
+E3 war ohne den häufigsten Fall entschieden: ein SDK (SDL3 unter Windows) bringt eine DLL mit Importbibliothek,
+viele Bibliotheken gibt es nur als `.so`/`.dylib` (gefunden über lyriclang/lyric#585). Der Maintainer hat E3′
+nach Empfehlung entschieden; die volle Fassung steht in 11, „Nachtrag 2026-10-28 — E3′“.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| E3′ | **Ein Paket bringt dynamische Bibliotheken mit**: `[native.<os/tripel>] dylibs = […]`, Dateien des Paketinhalts oder eines Quellbaums, über ihren Pfad gelinkt und vom Bau neben jedes Binary des Programms gelegt. B5 „`lib.a` je Ziel“ bleibt die erste Wahl, ist aber nicht mehr die einzige | V8 B5 |
+
 ---
 
 **Bereich 7 ist damit vollständig entschieden** (V1–V10, 2026-09-29).

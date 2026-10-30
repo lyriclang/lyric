@@ -114,14 +114,13 @@ public class BuildScriptTests
     }
 
     [Fact]
-    public void A_scripts_C_is_compiled_with_its_flags_and_linked()
+    public void A_scripts_C_library_is_compiled_with_its_definitions_and_linked()
     {
         const string script = """
             import std.build;
 
             fn main(): void {
-                build.cFlags("-DTWICE=2");
-                build.compileC("native/twice.c");
+                build.cLibrary("twice").sources("native/*.c").define("TWICE", "2").compile();
             }
             """;
         const string twice = "#include <stdint.h>\nint64_t twice_of(int64_t n) { return n * TWICE; }\n";
@@ -239,5 +238,166 @@ public class BuildScriptTests
         var (exit, _, error) = Run("build", "-C", dir);
         Assert.Equal(0, exit);
         Assert.Contains("warning[LYR-BLD0003]: app's build.lyr: the schema is old", error);
+    }
+
+    /// <summary>A path as a Lyric string literal holds it: forward slashes, which every system
+    /// takes, and no backslash to escape.</summary>
+    private static string Slashed(string path) => path.Replace('\\', '/');
+
+    /// <summary>A shared library <c>greet</c> outside any package, built by the C compiler the
+    /// build uses — what a system library or an SDK's is to a package —, and the file a program
+    /// that links it needs beside it when it runs. A Mach-O library names itself by the run path,
+    /// as one meant to lie beside a program does.</summary>
+    private static (string Dir, string Shared) GreetLibrary()
+    {
+        var dir = TestDirectories.Fresh("lyric5-greet-");
+        File.WriteAllText(Path.Combine(dir, "greet.c"), "#include <stdint.h>\nint64_t greet_answer(void) { return 42; }\n");
+        var compiler = Lyric5.Toolchain.CCompiler.Locate() ?? throw new InvalidOperationException("no C compiler");
+        var os = Lyric5.Toolchain.Target.Host.Os;
+        var shared = Path.Combine(dir, os switch
+        {
+            Lyric5.Toolchain.TargetOs.Windows => "greet.dll",
+            Lyric5.Toolchain.TargetOs.MacOs => "libgreet.dylib",
+            _ => "libgreet.so",
+        });
+        List<string> arguments = compiler.Kind == Lyric5.Toolchain.CCompilerKind.Zig ? ["cc"] : [];
+        arguments.AddRange(["-shared", "-o", shared, Path.Combine(dir, "greet.c")]);
+        if (os == Lyric5.Toolchain.TargetOs.Linux) arguments.AddRange(["-fPIC", "-Wl,-soname,libgreet.so"]);
+        if (os == Lyric5.Toolchain.TargetOs.MacOs) arguments.Add("-Wl,-install_name,@rpath/libgreet.dylib");
+        var built = Lyric5.Toolchain.ProcessRunner.Run(compiler.Path, arguments, TimeSpan.FromMinutes(2), dir);
+        Assert.True(built.ExitCode == 0, built.Stderr + built.Stdout);
+        // the import library under the name a MinGW SDK gives it, which zig's linker does not look for
+        var import = Path.Combine(dir, "greet.lib");
+        if (File.Exists(import)) File.Move(import, Path.Combine(dir, "libgreet.dll.a"));
+        return (dir, shared);
+    }
+
+    private const string GreetMain = """
+        import std.io { println };
+
+        extern "C" fn greet_answer(): int;
+
+        fn main(): void {
+            println(f"{greet_answer()}");
+        }
+        """;
+
+    private const string GreetTest = """
+        import std.test { assertEq };
+
+        extern "C" fn greet_answer(): int;
+
+        @Test
+        fn theLibraryAnswers(): void {
+            assertEq(greet_answer(), 42);
+        }
+        """;
+
+    private static string GreetScript(string? search, string? beside) =>
+        "import std.build;\n\nfn main(): void {\n"
+        + (search is null ? "" : $"    build.linkSearch(\"{Slashed(search)}\");\n")
+        + "    build.linkLib(\"greet\");\n"
+        + (beside is null ? "" : $"    build.besideBinary(\"{Slashed(beside)}\");\n")
+        + "}\n";
+
+    /// <summary>A library outside the package: without the directory the script names the link
+    /// does not find it; with it the program links, and starts only once the library lies beside
+    /// it — the test program as well as the program.</summary>
+    [Fact]
+    public void A_library_is_linked_from_where_the_script_says_and_runs_from_beside_the_binary()
+    {
+        var (lib, shared) = GreetLibrary();
+        var dir = Package(("lyric.toml", AppManifest), ("build.lyr", GreetScript(null, null)), ("src/main.lyr", GreetMain),
+            ("tests/greet.lyr", GreetTest));
+
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.Equal(2, exit);
+        Assert.Contains("error[LYR-LNK0002]", error);
+        Assert.Contains("app's build script named it", error);
+
+        File.WriteAllText(Path.Combine(dir, "build.lyr"), GreetScript(lib, null));
+        (exit, _, error) = Run("build", "-C", dir);
+        Assert.True(exit == 0, error);
+        var host = Lyric5.Toolchain.Target.Host;
+        var exe = Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix);
+        var alone = Lyric5.Toolchain.ProcessRunner.Run(exe, [], TimeSpan.FromMinutes(1));
+        Assert.True(alone.ExitCode != 0, $"started without the library beside it: {alone.Stdout}");
+        // the directory the link searched is the build's, and no part of the binary
+        var bytes = File.ReadAllBytes(exe);
+        Assert.True(bytes.AsSpan().IndexOf(System.Text.Encoding.UTF8.GetBytes(lib)) < 0, $"the binary holds '{lib}'");
+
+        File.WriteAllText(Path.Combine(dir, "build.lyr"), GreetScript(lib, shared));
+        Assert.Equal("42\n", BuildAndRun(dir, "app", "build", "-C", dir));
+        Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(exe)!, Path.GetFileName(shared))));
+        (exit, _, error) = Run("test", "-C", dir);
+        Assert.True(exit == 0, error);
+    }
+
+    /// <summary>A script that reads the environment runs again where a variable it named has another
+    /// value, is set where it was not, or is not where it was — and only then.</summary>
+    [Fact]
+    public void A_script_runs_again_where_a_variable_it_named_changed()
+    {
+        const string script = """
+            import std.build;
+            import std.fs;
+            import std.os;
+            import std.path;
+
+            fn main(): void throws Error {
+                let word = os.env("LYRIC_TEST_BUILD_WORD") ?? "unset";
+                try fs.appendText(path.join(build.outDir(), "runs.txt"), "x");
+                try fs.writeText(path.join(build.genDir(), "word.lyr"), f"pub let word = \"{word}\";\n");
+                build.rerunIfEnvChanged("LYRIC_TEST_BUILD_WORD");
+            }
+            """;
+        const string main = """
+            import app.gen.word { word };
+            import std.io { println };
+
+            fn main(): void {
+                println(word);
+            }
+            """;
+        var dir = Package(("lyric.toml", AppManifest), ("build.lyr", script), ("src/main.lyr", main));
+        const string name = "LYRIC_TEST_BUILD_WORD";
+        try
+        {
+            Environment.SetEnvironmentVariable(name, "one");
+            Assert.Equal("one\n", BuildAndRun(dir, "app", "build", "-C", dir));
+            Assert.Equal("one\n", BuildAndRun(dir, "app", "build", "-C", dir));
+            Assert.Equal(1, Runs(dir));
+            Environment.SetEnvironmentVariable(name, "two");
+            Assert.Equal("two\n", BuildAndRun(dir, "app", "build", "-C", dir));
+            Assert.Equal(2, Runs(dir));
+            Environment.SetEnvironmentVariable(name, null);
+            Assert.Equal("unset\n", BuildAndRun(dir, "app", "build", "-C", dir));
+            Assert.Equal(3, Runs(dir));
+            Assert.Equal("unset\n", BuildAndRun(dir, "app", "build", "-C", dir));
+            Assert.Equal(3, Runs(dir));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(name, null);
+        }
+    }
+
+    /// <summary>Two files of one name would overwrite each other beside the binary: the build stops
+    /// and names both.</summary>
+    [Fact]
+    public void Two_files_of_one_name_beside_the_binary_stop_the_build()
+    {
+        const string script = """
+            import std.build;
+
+            fn main(): void {
+                build.besideBinary("a/notes.txt", "b/notes.txt");
+            }
+            """;
+        var dir = Package(("lyric.toml", AppManifest), ("build.lyr", script), ("a/notes.txt", "a"), ("b/notes.txt", "b"),
+            ("src/main.lyr", "fn main(): void {\n}\n"));
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.Equal(1, exit);
+        Assert.Contains("error[LYR-BLD0006]: two files named 'notes.txt' would lie beside the binary", error);
     }
 }

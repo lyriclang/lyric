@@ -1,0 +1,264 @@
+// std.io.file — reading and writing files.
+//
+// Capability-gated: an import requires `fileAccess`. A script embedded in a host must not reach
+// the disk, while the same language standalone may be a CLI tool.
+//
+// Failures are return values, not exceptions. A file that does not exist is an ordinary state of
+// the world, so a read answers `?T` rather than `T` with `throws`. A panic stays reserved for
+// what the programmer got wrong.
+//
+// TWO conventions since 2.14, and each one says what it is for:
+//
+//   * a READ answers `?T` — `null` is "could not", and an empty result is an empty file;
+//   * an OPERATION answers `bool` — whether it happened. It carries no value, so nothing is
+//     lost by saying only that.
+//
+// A predicate (`exists`, `isFile`, `isDirectory`) also answers `bool`, and there `false` is an
+// ANSWER rather than a failure.
+//
+// The PATH helpers (`joinPath`, `fileName`, …) moved to `std.io.path` at 4.0: a path is a
+// string and touches no disk, so it should cost no capability.
+//
+// Before 2.14 there were three, and the third one lied: `readBytes` and `readLines` answered an
+// empty array to both "the file is empty" and "there is no file". No caller could tell those
+// apart, and the documentation told them to ask `exists` first — which is a race, not an answer.
+//
+// Since 3.7 the REASON has a form too (§9.0): every silent form has an `*OrThrow` twin that
+// throws an `IoError` — kind, path, and what the platform said — where the silent one answers
+// `null` or `false`. Both come from ONE implementation: the twin calls the silent form and
+// turns its refusal into the reason the runtime recorded. Which form a caller uses states what
+// they will do with a failure: fall back, or handle the why.
+
+module std.io.file;
+
+import std.io.error { IoError, IoErrorKind };
+import std.result { Result };
+
+// For the deprecation promises on the three names this module used before 2.14.
+import std.core { Deprecated };
+
+/// The whole content as text, decoded as UTF-8 — bytes that are not valid UTF-8 become
+/// U+FFFD. For binary data use `bytes`. `null` when the file does not exist or is not readable.
+pub fn text(path: string): ?string;
+
+/// The raw bytes, undecoded — what `text` cannot give: its UTF-8 decoding turns invalid bytes
+/// into U+FFFD. `null` when the file is not readable; an EMPTY array is an empty file.
+pub fn bytes(path: string): ?uint8[];
+
+/// The lines of a file, terminators removed, so whether the file used CRLF or LF is no longer
+/// visible. `null` when the file is not readable; an EMPTY array is an empty file.
+pub fn lines(path: string): ?string[];
+
+/// Writes text (UTF-8), replacing an existing file. `true` on success.
+pub fn writeText(path: string, content: string): bool;
+
+/// Appends to an existing file or creates it. `true` on success.
+pub fn appendText(path: string, content: string): bool;
+
+/// Whether something — file or directory — exists at the path.
+pub fn exists(path: string): bool;
+
+/// `true` when the file is gone afterwards, including when it never existed.
+pub fn remove(path: string): bool;
+
+/// Writes raw bytes, replacing an existing file. `true` on success — the `writeText`
+/// convention. (v1.14: the first native whose parameter is an array.)
+pub fn writeBytes(path: string, data: uint8[]): bool;
+
+/// Appends raw bytes to an existing file or creates it. `true` on success.
+pub fn appendBytes(path: string, data: uint8[]): bool;
+
+// ------------------------------------------------------------------------ the reasons (3.7)
+//
+// The runtime classifies the last failed operation of this module; the OrThrow forms read the
+// classification immediately after a silent form refused. The VM is single-threaded, so nothing
+// runs between the failure and the read. The codes are a contract with the runtime:
+// 1 NotFound, 2 PermissionDenied, 3 InvalidPath, 0 Other.
+
+fn lastErrorKind(): int;
+fn lastErrorDetail(): string;
+
+fn lastIoError(path: string): IoError {
+    let kind = match (lastErrorKind()) {
+        1 => IoErrorKind.NotFound,
+        2 => IoErrorKind.PermissionDenied,
+        3 => IoErrorKind.InvalidPath,
+        _ => IoErrorKind.Other,
+    };
+    return IoError { kind = kind, path = path, detail = lastErrorDetail() };
+}
+
+/// `text`, with the reason when it cannot: the content, or an `IoError` saying why not.
+pub fn textOrThrow(path: string): string throws IoError {
+    let content = text(path);
+    if (content == null) {
+        throw lastIoError(path);
+    }
+    return content;
+}
+
+/// `text`, with the reason as a VALUE: the content, or the `IoError` that `textOrThrow`
+/// would throw — for a read whose failure is stored or handled later rather than caught here.
+pub fn textOrErr(path: string): Result<string, IoError> {
+    let content = text(path);
+    if (content == null) {
+        return Result<string, IoError>.Err(lastIoError(path));
+    }
+    return Result<string, IoError>.Ok(content);
+}
+
+/// `bytes`, with the reason when it cannot.
+pub fn bytesOrThrow(path: string): uint8[] throws IoError {
+    let content = bytes(path);
+    if (content == null) {
+        throw lastIoError(path);
+    }
+    return content;
+}
+
+/// `lines`, with the reason when it cannot.
+pub fn linesOrThrow(path: string): string[] throws IoError {
+    let content = lines(path);
+    if (content == null) {
+        throw lastIoError(path);
+    }
+    return content;
+}
+
+/// `size`, with the reason when it cannot.
+pub fn sizeOrThrow(path: string): int throws IoError {
+    let result = size(path);
+    if (result == null) {
+        throw lastIoError(path);
+    }
+    return result;
+}
+
+/// `entries`, with the reason when it cannot.
+pub fn entriesOrThrow(path: string): string[] throws IoError {
+    let names = entries(path);
+    if (names == null) {
+        throw lastIoError(path);
+    }
+    return names;
+}
+
+// The operations' twins: `void` where the silent form answers `bool`, and the reason where it
+// answers `false`. For the two-path operations the error's `path` carries the SOURCE; the
+// platform's detail names the half that actually failed.
+
+/// `writeText`, with the reason when it cannot.
+pub fn writeTextOrThrow(path: string, content: string): void throws IoError {
+    if (!writeText(path, content)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `appendText`, with the reason when it cannot.
+pub fn appendTextOrThrow(path: string, content: string): void throws IoError {
+    if (!appendText(path, content)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `writeBytes`, with the reason when it cannot.
+pub fn writeBytesOrThrow(path: string, data: uint8[]): void throws IoError {
+    if (!writeBytes(path, data)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `appendBytes`, with the reason when it cannot.
+pub fn appendBytesOrThrow(path: string, data: uint8[]): void throws IoError {
+    if (!appendBytes(path, data)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `remove`, with the reason when it cannot. A file that never existed is still success, as in
+/// `remove` — the twin throws exactly where the silent form answers `false`.
+pub fn removeOrThrow(path: string): void throws IoError {
+    if (!remove(path)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `copy`, with the reason when it cannot.
+pub fn copyOrThrow(from: string, to: string): void throws IoError {
+    if (!copy(from, to)) {
+        throw lastIoError(from);
+    }
+}
+
+/// `move`, with the reason when it cannot.
+pub fn moveOrThrow(from: string, to: string): void throws IoError {
+    if (!move(from, to)) {
+        throw lastIoError(from);
+    }
+}
+
+/// `createDir`, with the reason when it cannot.
+pub fn createDirOrThrow(path: string): void throws IoError {
+    if (!createDir(path)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `createDirAll`, with the reason when it cannot.
+pub fn createDirAllOrThrow(path: string): void throws IoError {
+    if (!createDirAll(path)) {
+        throw lastIoError(path);
+    }
+}
+
+/// `removeDir`, with the reason when it cannot.
+pub fn removeDirOrThrow(path: string): void throws IoError {
+    if (!removeDir(path)) {
+        throw lastIoError(path);
+    }
+}
+
+// ------------------------------------------------------------------------------------------
+//
+// The capability hangs off the module name, so no individual function has to state it.
+
+/// The size in bytes, or `null` when the file does not exist.
+pub fn size(path: string): ?int;
+
+/// When the file was last written, as milliseconds since the Unix epoch (UTC), or `null` when
+/// it does not exist — what a watcher compares between two looks without reading the content.
+/// Milliseconds rather than an `Instant`, because `std.time` costs `osAccess` and a file
+/// module must not; `Instant.ofEpochMillis` turns it into one.
+pub fn modifiedMillis(path: string): ?int;
+/// Whether the path names an existing FILE.
+pub fn isFile(path: string): bool;
+/// Whether the path names an existing DIRECTORY.
+pub fn isDirectory(path: string): bool;
+
+/// Copies. `false` when the source is missing or the target is not writable.
+pub fn copy(from: string, to: string): bool;
+
+/// Moves or renames; the same operation on every file system.
+pub fn move(from: string, to: string): bool;
+
+/// Creates one directory; the parent must exist. `createDirAll` creates the chain.
+pub fn createDir(path: string): bool;
+
+/// Creates missing parent directories too. An existing directory counts as success.
+pub fn createDirAll(path: string): bool;
+
+/// Deletes an EMPTY directory. There is no recursive delete; a caller that needs one writes
+/// the loop visibly.
+pub fn removeDir(path: string): bool;
+
+/// The entries of a directory: names rather than paths, sorted alphabetically. `null` when the
+/// directory cannot be read; an EMPTY array is an empty directory — the 2.14 convention, which
+/// `listDir` predates.
+pub fn entries(path: string): ?string[];
+
+// 'listDir' went with 4.0, as its clock promised since 3.7: it answered an empty array to both
+// "empty" and "unreadable". 'entries' says null, 'entriesOrThrow' says why; the native stays
+// registered in the runtime, because modules compiled before 4.0 still bind it by name.
+
+/// A path in the system's temporary directory. Does NOT create the file.
+pub fn tempDir(): string;

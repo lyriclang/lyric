@@ -13,6 +13,8 @@ namespace Lyric5.Tests;
 /// <c>programs/wordcount.lyr</c>, over a text in four scripts. The log
 /// filter, <c>programs/logfilter.lyr</c>, over a log; the JSON server, <c>programs/jsonserver.lyr</c>, with its
 /// client; the gzip tool, <c>programs/gzipfile.lyr</c>, against .NET's GZipStream and the platform's gzip.
+/// The C library examples: <c>examples/ffi</c>, <c>examples/native-prebuilt</c> with its archives made again,
+/// <c>examples/raylib</c> built from raylib's release.
 /// Through <c>Main</c>, so in the console collection.
 /// </summary>
 [Collection("console")]
@@ -21,7 +23,7 @@ public class ExampleTests
     private static string Examples([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "programs", "three_packages"));
 
-    private static void Copy(string from, string to)
+    internal static void Copy(string from, string to)
     {
         foreach (var file in Directory.EnumerateFiles(from, "*", SearchOption.AllDirectories))
         {
@@ -348,5 +350,125 @@ public class ExampleTests
         Assert.Contains("println(2 * x.pow(2) + 3 * x + 1);", expanded);
         Assert.Contains("if (attempts__", expanded);
         Assert.DoesNotContain("retry!", expanded);
+    }
+
+    private static string NativePrebuiltExample([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "examples", "native-prebuilt"));
+
+    /// <summary><c>examples/native-prebuilt</c>: the archive of its target linked by its path, and on
+    /// macOS a framework of the SDK, CoreFoundation, where it counts the text — a few lines of C on
+    /// the other systems.</summary>
+    [Fact]
+    public void The_native_prebuilt_example_links_its_archive_and_on_macos_a_framework()
+    {
+        var dir = Package(("x", ""));
+        Copy(NativePrebuiltExample(), dir);
+        var counter = Target.Host.Os == TargetOs.MacOs ? "CoreFoundation" : "portable C";
+        Assert.Equal($"crc32 414fa339\ngrüß dich 👋: 12 UTF-16 units, counted by {counter}\n", BuildAndRun(dir, "checksum", "build", "-C", dir));
+    }
+
+    /// <summary>The example builds for every Tier 1 target this host can link: each takes the archive
+    /// of its triple. A Mac's build needs the Mac — the framework is the SDK's.</summary>
+    [CrossTargetFact]
+    public void The_native_prebuilt_example_builds_for_every_tier_1_target()
+    {
+        var dir = Package(("x", ""));
+        Copy(NativePrebuiltExample(), dir);
+        foreach (var target in Target.Tier1)
+        {
+            var (exit, _, error) = Run("build", "-C", dir, "--target", target.Triple);
+            if (target.Os == TargetOs.MacOs && !target.IsHost)
+            {
+                Assert.Equal(2, exit);
+                Assert.Contains("error[LYR-BLD0004]", error);
+                continue;
+            }
+            Assert.True(exit == 0, $"{target}: {error}");
+        }
+    }
+
+    /// <summary>The archives the example brings are what its script makes: built again here with the
+    /// toolchain's zig, they are the same bytes — no archive in the repository that nobody can make
+    /// again. The bytes are those of the zig the toolchain pins (<c>tooling/zig-version</c>), as
+    /// ziglang.org builds it; a zig built otherwise — a distribution's, against its own LLVM — makes
+    /// other code and other bytes.</summary>
+    [CrossTargetFact]
+    public void The_native_prebuilt_archives_are_what_their_script_makes()
+    {
+        var zig = CCompiler.Locate(CCompilerKind.Zig) ?? throw new InvalidOperationException("zig is required to build the archives");
+        var dir = Package(("x", ""));
+        Copy(NativePrebuiltExample(), dir);
+        var made = ProcessRunner.Run("sh", [Path.Combine(dir, "native", "make-archives.sh")], TimeSpan.FromMinutes(10),
+            environment: new Dictionary<string, string> { ["ZIG"] = zig.Path });
+        Assert.True(made.ExitCode == 0, made.Stderr + made.Stdout);
+        foreach (var target in Target.Tier1)
+        {
+            var relative = Path.Combine("native", "lib", target.Triple, "libcrc32.a");
+            Assert.True(File.ReadAllBytes(Path.Combine(NativePrebuiltExample(), relative)).AsSpan()
+                .SequenceEqual(File.ReadAllBytes(Path.Combine(dir, relative))), $"{relative} is not what the script makes");
+        }
+    }
+
+    private static string RaylibExample([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "examples", "raylib"));
+
+    /// <summary><c>examples/raylib</c>: raylib fetched as a source tree from its release, checked
+    /// against its hash, compiled by the build script, called through the module made from
+    /// <c>raylib.h</c> — built for this machine, not run: a runner has no display.</summary>
+    [Fact]
+    public void The_raylib_example_builds_raylib_from_its_source()
+    {
+        var dir = Package(("x", ""));
+        Copy(RaylibExample(), dir);
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.True(exit == 0, error);
+        Assert.True(File.Exists(Path.Combine(dir, "out", "debug", Target.Host.Triple, "bounce" + Target.Host.ExecutableSuffix)));
+    }
+
+    /// <summary>And for Windows from another system: raylib needs nothing of the host there.</summary>
+    [CrossTargetFact]
+    public void The_raylib_example_builds_for_windows_from_elsewhere()
+    {
+        if (Target.Host.Os == TargetOs.Windows) return;
+        var dir = Package(("x", ""));
+        Copy(RaylibExample(), dir);
+        var (exit, _, error) = Run("build", "-C", dir, "--target", "x86_64-windows-gnu");
+        Assert.True(exit == 0, error);
+    }
+
+    private static string FfiExample([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "examples", "ffi"));
+
+    /// <summary>The FFI example, <c>examples/ffi</c>: the C library of its native part bound and
+    /// called — a struct by value and behind a pointer, strings, a callback with its state, a handle
+    /// C owns —, then its plugin, built here as the system's shared library, loaded while it runs
+    /// (<c>std.ffi.Library</c>): two symbols found, one not, a library that is not there refused.</summary>
+    [Fact]
+    public void The_ffi_example_binds_a_C_library_and_loads_another()
+    {
+        var dir = Package(("x", ""));
+        Copy(FfiExample(), dir);
+        var (built, _, why) = Run("build", "-C", dir);
+        Assert.True(built == 0, why);
+        var host = Target.Host;
+        var o = Path.Combine(dir, "out", "debug", host.Triple);
+        var plugin = Path.Combine(o, host.Os switch
+        {
+            TargetOs.Windows => "plugin.dll",
+            TargetOs.MacOs => "libplugin.dylib",
+            _ => "libplugin.so",
+        });
+        var zig = CCompiler.Locate(CCompilerKind.Zig) ?? throw new InvalidOperationException("zig is required to build the plugin");
+        var shared = ProcessRunner.Run(zig.Path, ["cc", "-shared", Path.Combine(dir, "plugin", "plugin.c"), "-o", plugin], TimeSpan.FromMinutes(5));
+        Assert.True(shared.ExitCode == 0, shared.Stderr + shared.Stdout);
+
+        const string bound = "length 5.0\nscaled(6.0, 8.0)\ncorners 4, coordinates summed 6.0\npath 9.0\n";
+        var exe = Path.Combine(o, "geometry" + host.ExecutableSuffix);
+        var ran = ProcessRunner.Run(exe, [plugin], TimeSpan.FromMinutes(1));
+        Assert.True(ran.ExitCode == 0, ran.Stderr);
+        Assert.Equal(bound + "plugin triple: 14 -> 42\nplugin_missing found: false\nno-such-library: not loaded\n",
+            ran.Stdout.Replace("\r\n", "\n"));
+        var alone = ProcessRunner.Run(exe, [], TimeSpan.FromMinutes(1));
+        Assert.Equal(bound + "no plugin given\n", alone.Stdout.Replace("\r\n", "\n"));
     }
 }

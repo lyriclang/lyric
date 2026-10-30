@@ -83,7 +83,8 @@ public class VerbTableTests
         var second = RunRaw("build", "-C", root, "--color", "never");
         Assert.Equal(0, second.Exit);
         Assert.Contains("warning[LYR-SEM0071]: 'unused' is never used", first.Err);
-        Assert.Equal(first.Err, second.Err);
+        // the findings again; the status lines say what each build did, and the second compiled nothing
+        Assert.Equal(WithoutStatus(first.Err), WithoutStatus(second.Err));
         var (_, json, _) = RunRaw("build", "-C", root, "--json");
         Assert.Contains("{\"type\":\"summary\",\"version\":1,\"errors\":0,\"warnings\":1}", json);
     }
@@ -105,5 +106,25 @@ public class VerbTableTests
         var (_, text, _) = RunRaw("env", "-C", root);
         Assert.Contains("profile.opt", text);
         Assert.Contains("(default)", text);
+    }
+
+    [Fact]
+    public void Env_says_each_lint_s_level_and_who_set_it_and_where_zig_comes_from()
+    {
+        var root = Package(("lyric.toml", AppManifest + "\n[lints]\nwarn = [\"unused-label\"]\ndeny = [\"deprecated\"]\n"), ("src/main.lyr", Warns));
+        var (exit, output, error) = RunRaw("env", "-C", root, "-D", "unused-import", "-A", "deprecated", "--warn-deps", "--json");
+        Assert.True(exit == 0, output + error);
+        var settings = JsonDocument.Parse(output).RootElement.GetProperty("settings").EnumerateArray()
+            .ToDictionary(s => s.GetProperty("name").GetString()!, s => (s.GetProperty("value").GetString(), s.GetProperty("origin").GetString()));
+        Assert.Equal(("deny", "command line"), settings["lint.unused-import"]);
+        Assert.Equal(("allow", "command line"), settings["lint.deprecated"]);
+        Assert.Equal(("warn", "lyric.toml"), settings["lint.unused-label"]);
+        Assert.Equal("default", settings["lint.unreachable-code"].Item2);
+        Assert.Equal(("true", "command line"), settings["lint.warnDeps"]);
+        Assert.Equal(Lyric.Core.DiagnosticCatalog.Lints.Count + 1, settings.Keys.Count(k => k.StartsWith("lint.", StringComparison.Ordinal)));
+
+        // the tests' home holds no zig: it is the PATH's, or none
+        Assert.Contains(settings["zig"].Item2, new[] { "PATH", "default" });
+        Assert.Contains(settings["cc"].Item2, new[] { "PATH", "LYRIC_CC", "default" });
     }
 }

@@ -26,6 +26,7 @@ public class RuntimeProgramTests
             data.Add("threads", profile, 0, "threads ok\n", []);
             data.Add("coro_basic", profile, 0, "coro ok\n", []);
             data.Add("coro_gc", profile, 0, "coro gc ok\n", []);
+            data.Add("coro_foreign", profile, 0, "coro foreign ok\n", []);
             data.Add("generations", profile, 0, "generations ok\n", []);
             data.Add("mark_shared", profile, 0, "shared marking ok\n", []);
             data.Add("reuse_zeroed", profile, 0, "reuse ok\n", []);
@@ -63,6 +64,7 @@ public class RuntimeProgramTests
             data.Add("weak", profile, 0, "weak ok\n", []);
             data.Add("threads", profile, 0, "threads ok\n", []);
             data.Add("coro_gc", profile, 0, "coro gc ok\n", []);
+            data.Add("coro_foreign", profile, 0, "coro foreign ok\n", []);
             data.Add("generations", profile, 0, "generations ok\n", []);
             data.Add("mark_shared", profile, 0, "shared marking ok\n", []);
             data.Add("gc_numbers", profile, 0, "numbers ok\n", []);

@@ -1,0 +1,67 @@
+// std.os — environment and process.
+//
+// Capability-gated: an import requires `osAccess`. Standalone grants it, an embedded host decides.
+// What a module requires is recorded in its bytecode and enforced at load time.
+
+module std.os;
+
+/// `"windows"`, `"linux"`, `"macos"` or `"unknown"`.
+pub fn platform(): string;
+
+/// An environment variable, or `null` when it is not set — an ordinary question about the
+/// environment, not a panic.
+pub fn env(name: string): ?string;
+
+/// The current working directory.
+pub fn currentDir(): string;
+
+/// Ends the process immediately with this code. No `defer` runs and no `catch` applies. To
+/// exit cleanly, return from `main`.
+pub fn exit(code: int): void;
+
+// ----------------------------------------------------------------------------------
+
+/// The command-line arguments, also outside `main`.
+///
+/// `main(args)` receives them, but a function deeper in the program does not; here they are
+/// available without threading them through.
+pub fn args(): string[];
+
+/// Sets an environment variable for this process. Child processes inherit it; the system does
+/// not.
+pub fn setEnv(name: string, value: string): bool;
+
+/// The machine's name, or `null` when the system does not say.
+pub fn hostName(): ?string;
+/// The current user's name, or `null` when the system does not say.
+pub fn userName(): ?string;
+/// The user's home directory, or `null` when the system does not say.
+pub fn homeDir(): ?string;
+
+/// How many cores the machine has, for programs that split their work. The VM itself is
+/// single-threaded.
+pub fn cpuCount(): int;
+
+/// Milliseconds since 1970-01-01 UTC.
+///
+/// A number rather than a date type: dates, time zones and calendars are their own module. The
+/// number is the same on every platform.
+pub fn nowMillis(): int;
+
+/// Nanoseconds from a monotonic clock. Not comparable with `nowMillis`; the origin is arbitrary.
+/// A system clock can jump during a measurement, a monotonic one cannot.
+pub fn nowNanos(): int;
+
+/// Suspends the process. The VM is single-threaded, so nothing runs alongside.
+pub fn sleep(millis: int): void;
+
+// ---------------------------------------------------------------- written in Lyric
+
+/// An environment variable with a default.
+pub fn envOr(name: string, fallback: string): string {
+    let value = env(name);
+    if (value == null) {
+        return fallback;
+    }
+    return value;
+}

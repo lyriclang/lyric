@@ -73,8 +73,13 @@ internal static class Reachability
             module.GlobalInit = new FunctionId(initNeu);
         if (module.TaskMain is { } loop)
             module.TaskMain = new FunctionId(neueId[loop.Value]);
+        if (module.Embedding is { } e)
+            module.Embedding = new IrEmbedding(new FunctionId(neueId[e.Run.Value]), new FunctionId(neueId[e.Step.Value]),
+                new FunctionId(neueId[e.Pump.Value]), new FunctionId(neueId[e.End.Value]));
         for (var i = 0; i < module.ExportRoots.Count; i++)
             module.ExportRoots[i] = new FunctionId(neueId[module.ExportRoots[i].Value]);
+        for (var i = 0; i < module.Exports.Count; i++)
+            module.Exports[i] = module.Exports[i] with { Function = new FunctionId(neueId[module.Exports[i].Function.Value]) };
 
         // The attribute rows follow the renumbering. Their function targets are roots above, so
         // the lookup cannot miss; type targets are untouched, the table keeps every entry.
@@ -108,9 +113,9 @@ internal static class Reachability
     /// a spawned task takes that branch.</remarks>
     public static bool CallsImport(IrModule module, string name, string? unless = null)
     {
-        var target = module.Imports.FindIndex(import => import.Name == name);
+        var target = module.Imports.FindIndex(import => import.Is(name));
         if (target < 0) return false;
-        var guard = unless is null ? -1 : module.Imports.FindIndex(import => import.Name == unless);
+        var guard = unless is null ? -1 : module.Imports.FindIndex(import => import.Is(unless));
         foreach (var function in Collect(module, guard))
             foreach (var block in BlocksOf(module.Functions[function], guard))
                 foreach (var op in block.Insts)
@@ -174,6 +179,13 @@ internal static class Reachability
         Wurzel(module.EntryFunction);
         Wurzel(module.GlobalInit);
         Wurzel(module.TaskMain);
+        if (module.Embedding is { } embedding)
+        {
+            Wurzel(embedding.Run);
+            Wurzel(embedding.Step);
+            Wurzel(embedding.Pump);
+            Wurzel(embedding.End);
+        }
         foreach (var export in module.ExportRoots) Wurzel(export);
 
         // An attributed function is a root: the row in section 11 is a promise to the host that
@@ -203,6 +215,9 @@ internal static class Reachability
                         // A closure becomes visible here rather than at the call: 'mkclosure' names the
                         // lifted function, and it is called indirectly later.
                         case MakeClosure closure: Wurzel(closure.Target); break;
+
+                        // A function C calls: its trampoline names it.
+                        case CCallback callback: Wurzel(callback.Function); break;
 
                         // A coroutine body the same way: 'mkcoro' names it, the chain calls it
                         // by index at the first pull.
@@ -262,6 +277,7 @@ internal static class Reachability
                     {
                         Call call => call with { Target = new FunctionId(funktionen[call.Target.Value]) },
                         MakeClosure c => c with { Target = new FunctionId(funktionen[c.Target.Value]) },
+                        CCallback cb => cb with { Function = new FunctionId(funktionen[cb.Function.Value]) },
                         MakeCoroutine co => co with { Body = new FunctionId(funktionen[co.Body.Value]) },
                         CallImport ci => ci with { Target = new ImportId(importe[ci.Target.Value]) },
                         var other => other,

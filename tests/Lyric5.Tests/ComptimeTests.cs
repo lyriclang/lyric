@@ -36,7 +36,7 @@ public class ComptimeTests
     {
         var result = RuntimeBuildTests.RunEmitted(CEmitterTests.EmitC("comptime_same"), "comptime_same", profile);
         Assert.True(result.ExitCode == 0, $"exit {result.ExitCode}\nstdout:\n{result.Stdout}\nstderr:\n{result.Stderr}");
-        Assert.Equal("14 cases, 0 differ\n", result.Stdout.Replace("\r\n", "\n"));
+        Assert.Equal("15 cases, 0 differ\n", result.Stdout.Replace("\r\n", "\n"));
     }
 
     /// <summary>The comparison above holds vacuously where a site is not computed at all — lowered

@@ -1,0 +1,36 @@
+[package]
+name = "checksum"
+version = "0.1.0"
+description = "A prebuilt C archive for each target, and a macOS framework (design/v5/spec/13 M14b L8)"
+
+# The CRC-32 library comes prebuilt: one archive per target, made by native/make-archives.sh from
+# native/src/crc32.c. Its header is the package's include.
+[native]
+include = ["native/include"]
+
+[native.x86_64-linux-gnu]
+archives = ["native/lib/x86_64-linux-gnu/libcrc32.a"]
+
+[native.aarch64-linux-gnu]
+archives = ["native/lib/aarch64-linux-gnu/libcrc32.a"]
+
+[native.x86_64-windows-gnu]
+archives = ["native/lib/x86_64-windows-gnu/libcrc32.a"]
+
+[native.aarch64-macos]
+archives = ["native/lib/aarch64-macos/libcrc32.a"]
+
+[native.x86_64-macos]
+archives = ["native/lib/x86_64-macos/libcrc32.a"]
+
+# Counting a text's UTF-16 units: CoreFoundation does it on macOS — a framework of the SDK, linked
+# in a build on the Mac —, a few lines of C everywhere else.
+[native.macos]
+sources = ["native/platform/macos.c"]
+frameworks = ["CoreFoundation"]
+
+[native.linux]
+sources = ["native/platform/portable.c"]
+
+[native.windows]
+sources = ["native/platform/portable.c"]

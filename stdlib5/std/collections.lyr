@@ -847,7 +847,7 @@ pub struct MapValuesIter<K :: [Hashable], V, H :: [Hasher]> :: [Iterator] {
 ///
 /// The panic has the code `LYR-RT0016` and a message such as "List: changed while it was walked".
 /// Implemented by the runtime.
-fn changedWhileWalked(what: string): never;
+extern "C" fn changedWhileWalked(what: string): never = "lyr_panic_walked";
 
 // --- Set: a Map's keys -------------------------------------------------------------------------
 

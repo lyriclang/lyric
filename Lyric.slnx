@@ -3,6 +3,7 @@
     <Project Path="src/Lyric.Core/Lyric.Core.csproj" />
     <Project Path="src/Lyric.Frontend/Lyric.Frontend.csproj" />
     <Project Path="src/Lyric.Lsp/Lyric.Lsp.csproj" />
+    <Project Path="src/Lyric4.Frontend/Lyric4.Frontend.csproj" />
     <Project Path="src/Lyric5/Lyric5.csproj" />
     <Project Path="src/Lyric5.Doc/Lyric5.Doc.csproj" />
     <Project Path="src/Lyric5.Compiler/Lyric5.Compiler.csproj" />
@@ -21,6 +22,7 @@
     <Project Path="tests/Lyric.Tests.Lsp/Lyric.Tests.Lsp.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/Package/Package.csproj" />
     <Project Path="tools/Site/Site.csproj" />
   </Folder>
 </Solution>

@@ -27,6 +27,8 @@
 #define LYR_RT_DEADLOCK         "LYR-RT0018"  /* every task of a thread waits, and nothing can wake one */
 #define LYR_RT_POISONED         "LYR-RT0019"  /* a lock a task panicked while holding, acquired again */
 #define LYR_RT_INVARIANT        "LYR-RT0020"  /* the runtime found its own invariant broken: a bug in the runtime or the compiler */
+#define LYR_RT_FOREIGN_HANDLE   "LYR-RT0023"  /* a GcHandle that holds another class's object, or none */
+#define LYR_RT_FOREIGN_THREAD   "LYR-RT0022"  /* C called a Lyric function on a thread Lyric does not run */
 #define LYR_RT_FOREIGN_ENUM     "LYR-RT0021"  /* C returned an integer no variant of a `@Layout` enum stands for */
 
 #if defined(__GNUC__) || defined(__clang__)

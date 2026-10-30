@@ -42,6 +42,14 @@ public sealed class TypeResult
     /// </summary>
     public SiteList ComptimeSites { get; } = new();
 
+    /// <summary>The program's exports (<c>@Export</c>) in the order the checker met them: each
+    /// function with its C symbol and its declaration as the library's header writes it.</summary>
+    public List<CExport> Exports { get; } = [];
+
+    /// <summary>The definitions of the <c>@Layout</c> types the exports' declarations name, each
+    /// after the types its own fields name.</summary>
+    public List<string> CHeaderTypes { get; } = [];
+
     /// <summary>The quotes of the program, in the order the checker met them, each
     /// with the module it stands in: the lowering numbers them for the interpreter, which builds
     /// the tree, and a free name of the content is that module's.</summary>
@@ -85,6 +93,27 @@ public sealed class TypeResult
     /// its bytes, without a copy.</summary>
     public bool IsCStrArgument(Expr argument) => _cstrArguments.Contains(argument);
     internal void MarkCStrArgument(Expr argument) => _cstrArguments.Add(argument);
+
+    private readonly HashSet<Expr> _cCallbacks = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>A function — named, or a lambda that captures nothing — where a C function's
+    /// pointer is expected: C calls it through a trampoline.</summary>
+    public bool IsCCallback(Expr source) => _cCallbacks.Contains(source);
+    internal void MarkCCallback(Expr source) => _cCallbacks.Add(source);
+
+    private readonly Dictionary<CallExpr, int> _callbackUserdata = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary><c>Callback&lt;C&gt;.new(closure)</c>: which of <c>C</c>'s parameters is the
+    /// userdata — its first or its last —, or <c>null</c> for any other call.</summary>
+    public int? CallbackUserdataOf(CallExpr call) => _callbackUserdata.TryGetValue(call, out var at) ? at : null;
+    internal void SetCallbackUserdata(CallExpr call, int at) => _callbackUserdata[call] = at;
+
+    /// <summary><c>std.ffi</c>'s <c>lib.symbol&lt;F&gt;(name)</c> with <c>F</c> a C function's type:
+    /// the lowering reads the symbol's address, which a value of <c>F</c> is.</summary>
+    private readonly HashSet<CallExpr> _librarySymbols = new(ReferenceEqualityComparer.Instance);
+
+    public bool IsLibrarySymbol(CallExpr call) => _librarySymbols.Contains(call);
+    internal void SetLibrarySymbol(CallExpr call) => _librarySymbols.Add(call);
 
     /// <summary>The parameter whose argument's text <paramref name="parameter"/> takes, or
     /// <c>null</c> where no <c>@callerExpr</c> sits on it.</summary>
@@ -802,3 +831,8 @@ public enum CallerPlace
     /// <summary><c>@callerFile</c>: the file the call stands in.</summary>
     File,
 }
+
+/// <summary>A function C calls (<c>@Export</c>): its declaration, the symbol C calls it by, and
+/// that symbol's declaration in C — <c>int64_t geo_add(int64_t a, int64_t b)</c>, or with
+/// <c>LyrStatus</c> where it throws.</summary>
+public sealed record CExport(FunctionDecl Function, string Symbol, string Declaration);

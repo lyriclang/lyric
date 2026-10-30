@@ -25,7 +25,8 @@ public static class LintFilter
 
     public static void Apply(Compilation compilation, TypeResult types, DiagnosticEngine diagnostics,
         Func<AttributeNode, IReadOnlyDictionary<string, string>?> fieldsOf,
-        IReadOnlyDictionary<string, LintSettings>? packages, string? root = null, bool warnDeps = false)
+        IReadOnlyDictionary<string, LintSettings>? packages, string? root = null, bool warnDeps = false,
+        Func<FileId, bool>? written = null)
     {
         var core = compilation.FindModule(["std", "core"])?.Members;
         var marks = new (Symbol? Symbol, LintLevel Level, string Name)[]
@@ -58,12 +59,15 @@ public static class LintFilter
 
         // std's files and the dependencies' are foreign: their warnings are theirs to read
         var foreign = new HashSet<FileId>();
+        var quiet = new HashSet<FileId>();
         foreach (var module in compilation.Modules)
         {
             if (module.Path.Length == 0) continue;
             var ast = compilation.AstOf(module);
             packageOf[ast.Span.File] = module.Path[0];
             if (compilation.IsNative(module) || (root is not null && module.Path[0] != root)) foreign.Add(ast.Span.File);
+            // a module the toolchain wrote from a C header is no one's to lint, --warn-deps or not
+            if (written?.Invoke(ast.Span.File) == true) quiet.Add(ast.Span.File);
             Collect(ast);
         }
 
@@ -93,6 +97,7 @@ public static class LintFilter
         Diagnostic? Decide(Diagnostic d, Site? about = null)
         {
             if (LintOf(d) is not { } lint || !packageOf.TryGetValue(d.Span.File, out var package)) return d;
+            if (quiet.Contains(d.Span.File)) return null;
             var isForeign = foreign.Contains(d.Span.File);
             if (isForeign && !warnDeps) return null;
             LintLevel level;

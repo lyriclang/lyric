@@ -56,9 +56,9 @@ uint8_t lyr_task_wait(int64_t timeout_ns) {
     return (uint8_t)lyr_poller_wait(lyr_poller_current(), timeout_ns);
 }
 
-uint8_t lyr_task_resume(LyrCoro *co) {
+int64_t lyr_task_resume(LyrCoro *co) {
     int status = lyr_coro_resume_quiet(co);
-    return (uint8_t)(status == LYR_CORO_PANICKED ? 2 : status == LYR_CORO_DONE ? 1 : 0);
+    return status == LYR_CORO_PANICKED ? 2 : status == LYR_CORO_DONE ? 1 : 0;
 }
 
 LyrStr *lyr_task_panic_code(LyrCoro *co) { return co->panic_code; }

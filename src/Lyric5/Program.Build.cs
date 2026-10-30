@@ -30,6 +30,7 @@ public static partial class Program
     private static int Build(string[] args, LintArgs lints, BuildVerb how)
     {
         var verb = how.ToString().ToLowerInvariant();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         bool run = how == BuildVerb.Run, expand = how == BuildVerb.Expand, check = how == BuildVerb.Check;
         if (Verbs.Read(Verbs.Find(verb)!, args, Unknown, out var refused) is not { } parsed) return refused;
         if (parsed.Rest is not null && !run) return Unknown("'--' separates the program's arguments, which only 'run' passes on");
@@ -53,6 +54,10 @@ public static partial class Program
         var offline = flags.Contains("--offline");
         // '--locked': the lock as it is — what it does not hold, or holds besides, refused.
         var locked = flags.Contains("--locked");
+
+        if (flags.Contains("--shared") && !flags.Contains("--lib"))
+            return Unknown("'--shared' says which library '--lib' builds; without '--lib' there is none");
+        if (flags.Contains("--lib")) return BuildLibrary(values, flags, baseDirectory, file, lints, offline, locked, clock);
 
         // The programs this command is about: a package's every one, or the file's.
         List<Project> programs;
@@ -156,6 +161,7 @@ public static partial class Program
             var exit = 0;
             foreach (var program in programs)
                 exit = Math.Max(exit, Pipeline.CheckProgram(program, profile, target, DisplayVersion(), Console.Error));
+            if (exit == 0) Finished(profile, clock);
             return exit;
         }
 
@@ -169,6 +175,7 @@ public static partial class Program
             executable = built;
             Lyric.Core.Rendering.RenderStyle.Current.Events?.Artifact("binary", program.BinaryName, built);
         }
+        Finished(profile, clock);
         if (!run) return 0;
         if (!target.IsHost)
         {
@@ -177,7 +184,69 @@ public static partial class Program
         }
         // the build's count before the program, whose output follows on the same stream
         Lyric.Core.Rendering.RenderStyle.Current.Events?.Summary();
+        BuildStatus.Say("Running", Pipeline.Shown(executable!));
         return ProcessRunner.RunInherited(executable!, programArgs);
+    }
+
+    /// <summary>The last status line of a build that succeeded: the profile, what it compiles with,
+    /// and how long the command took.</summary>
+    private static void Finished(BuildProfile profile, System.Diagnostics.Stopwatch clock) =>
+        BuildStatus.Say("Finished", $"{profile.Name} [opt {profile.Opt}{(profile.DebugInfo ? ", debug info" : "")}] in "
+            + clock.Elapsed.TotalSeconds.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + "s");
+
+    /// <summary>
+    /// <c>build --lib</c>: the package's <c>src/lib.lyr</c> and what it imports as a library C links
+    /// — <c>lib&lt;name&gt;.a</c>, or with <c>--shared</c> the system's shared library — and its
+    /// header <c>&lt;name&gt;.h</c>, under <c>out/&lt;profile&gt;/&lt;target&gt;/</c>.
+    /// </summary>
+    private static int BuildLibrary(Dictionary<string, string> values, HashSet<string> flags, string baseDirectory, string? file,
+        LintArgs lints, bool offline, bool locked, System.Diagnostics.Stopwatch clock)
+    {
+        if (file is not null) return Unknown("'--lib' builds the package's library, src/lib.lyr; a file is a program by itself");
+        if (values.ContainsKey("--bin")) return Unknown("'--bin' names a program of the package; '--lib' builds its library");
+        if (values.ContainsKey("--emit")) return Unknown("'--emit' prints a program's IR or C; '--lib' builds the library");
+        Project? project;
+        try { project = Project.LibraryOf(baseDirectory, flags.Contains("--shared") ? LibraryKind.Shared : LibraryKind.Static, offline, locked); }
+        catch (ManifestException manifestRefused)
+        {
+            Say.Manifest(Console.Error, manifestRefused);
+            return manifestRefused.Exit;
+        }
+        if (project is null)
+        {
+            Say.Error(Console.Error, "LYR-CLI0004", "no lyric.toml here or above", "'--lib' builds a package's src/lib.lyr");
+            return 2;
+        }
+        if (!File.Exists(project.Source))
+        {
+            Say.Error(Console.Error, "LYR-CLI0001", $"no such file '{project.Source}'", "a library C links starts from the package's src/lib.lyr");
+            return 2;
+        }
+        try { ToolchainCheck.Check(project.Graph!, DisplayVersion()); }
+        catch (ManifestException manifestRefused)
+        {
+            Say.Manifest(Console.Error, manifestRefused);
+            return manifestRefused.Exit;
+        }
+        if (ProfileOf(values, flags, project.Manifest) is not { } profile) return 2;
+        Target target;
+        try { target = values.TryGetValue("--target", out var triple) ? Target.Parse(triple) : Target.Host; }
+        catch (ArgumentException)
+        {
+            return Unknown($"unknown target '{values["--target"]}': {string.Join(", ", Target.Tier1.Select(t => t.Triple))}");
+        }
+        if (CompilerFor(profile) is not { } compiler) return 2;
+        var (exit, built, linkArgs) = Pipeline.BuildLibrary(
+            new BuildRequest(project with { LintArgs = lints }, profile, target, compiler, DisplayVersion()), Console.Error);
+        if (exit != 0 || built is null) return exit;
+        Finished(profile, clock);
+        // what a C program links beside the archive, the target's (spec 13 §4 rule 9)
+        var shared = project.Library == LibraryKind.Shared;
+        if (Lyric.Core.Rendering.RenderStyle.Current.Events is { } events)
+            events.Artifact("library", project.Name, built, shared ? null : linkArgs);
+        else if (!shared && linkArgs.Count > 0)
+            Console.Error.WriteLine($"note: link {built} with {string.Join(' ', linkArgs)}");
+        return 0;
     }
 
     /// <summary>The profile: '--profile', else LYRIC_PROFILE, else debug — built in, or
@@ -233,7 +302,7 @@ public static partial class Program
         if (compiler is null)
             Console.Error.WriteLine(profile.RequiresClang
                 ? $"error[LYR-CLI0002]: the {profile.Name} profile needs clang, and none was found"
-                : "error[LYR-CLI0002]: no C compiler found — install zig (recommended), clang or gcc, or set LYRIC_CC");
+                : "error[LYR-CLI0002]: no C compiler found — 'lyric5 toolchain install zig' installs the one this toolchain is tested with; or put zig, clang or gcc on the PATH, or set LYRIC_CC");
         return compiler;
     }
 }

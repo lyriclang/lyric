@@ -27,6 +27,34 @@ public class ReproducibilityTests
         ("deps/geo/src/shapes.lyr", "pub fn area(w: int, h: int): int {\n    return w * h;\n}\n"),
     ];
 
+    /// <summary>A prebuilt archive comes into the binary as it is (spec 15 §6 rule 3): one archive's
+    /// bytes, in two copies of a package, give one binary.</summary>
+    [Fact]
+    public void A_package_with_an_archive_built_in_two_places_is_the_same_binary()
+    {
+        var host = Target.Host;
+        var made = TestDirectories.Fresh("lyric5-archive-once-");
+        NativeLinkTests.Archive(made, "libadd.a", host, NativeLinkTests.AddC);
+        (string, string)[] files =
+        [
+            ("lyric.toml", AppManifest + "\n[native]\narchives = [\"native/libadd.a\"]\n"),
+            ("src/main.lyr", "import std.io { println };\n\nextern \"C\" fn add(a: int, b: int): int;\n\nfn main(): void {\n    println(f\"{add(2, 3)}\");\n}\n"),
+        ];
+        byte[] Built()
+        {
+            var dir = Package(files);
+            Directory.CreateDirectory(Path.Combine(dir, "native"));
+            File.Copy(Path.Combine(made, "libadd.a"), Path.Combine(dir, "native", "libadd.a"));
+            var (exit, _, error) = Run("build", "-C", dir);
+            Assert.True(exit == 0, error);
+            return File.ReadAllBytes(Path.Combine(dir, "out", "debug", host.Triple, "app" + host.ExecutableSuffix));
+        }
+        var a = Built();
+        Thread.Sleep(TimeSpan.FromSeconds(1.1));
+        var b = Built();
+        Assert.True(a.AsSpan().SequenceEqual(b), $"the binaries differ: {a.Length} and {b.Length} bytes, first at byte {First(a, b)}");
+    }
+
     [CrossTargetTheory]
     [InlineData("debug", "x86_64-linux-gnu")]
     [InlineData("debug", "x86_64-windows-gnu")]

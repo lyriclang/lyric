@@ -132,6 +132,10 @@ public static class ModuleLowerer
         var exportRoots = new List<FunctionId>();
         FunctionId? entry = null;
         var failed = false;
+        // the functions C calls (@Export): roots of every build, the program's and the library's
+        var exported = new Dictionary<FunctionDecl, CExport>(ReferenceEqualityComparer.Instance);
+        foreach (var export in types.Exports) exported[export.Function] = export;
+        var exports = new List<IrExport>();
 
         // Pass 1: the function table. The order is module order then declaration order and therefore
         // deterministic; FunctionIds land as indices in the bytecode.
@@ -190,6 +194,8 @@ public static class ModuleLowerer
                                     CParams = [.. cTypes.Select(t => CFormOf(t, typeTable, compilation))],
                                     CReturn = CFormOf(cReturn, typeTable, compilation),
                                     CVariadic = function.CVariadic is not null,
+                                    StdName = compilation.IsNative(module) ? NameMangling.ForFunction(module, function.Name) : null,
+                                    Declared = compilation.IsNative(module) ? null : function.Span,
                                 },
                                 new ImportShape([.. cTypes.Select(t => new ImportParam(t, null, []))], null));
                             continue;
@@ -244,10 +250,34 @@ public static class ModuleLowerer
                 if (libraryRoots && function.IsPublic && !compilation.IsNative(module))
                     exportRoots.Add(id);
 
+                // An export: C's values come in and go back in their forms, as a C function's go
+                // out and come back.
+                if (exported.TryGetValue(function, out var exportedAs))
+                {
+                    try
+                    {
+                        var aliases = LocalAliases(compilation, module);
+                        var parameters = function.Parameters
+                            .Select(p => typeTable.Lower(ResolveLocalAliases(p.Type, aliases, binding)!)).ToArray();
+                        var returned = function.ReturnType is { } written
+                            ? typeTable.Lower(ResolveLocalAliases(written, aliases, binding)!)
+                            : new IrScalarType(IrScalar.Void);
+                        exports.Add(new IrExport(id, exportedAs.Symbol, [.. parameters.Select(t => CFormOf(t, typeTable, compilation))],
+                            CFormOf(returned, typeTable, compilation), function.Throws is not null));
+                        exportRoots.Add(id);
+                    }
+                    catch (UnsupportedConstructException ex)
+                    {
+                        LoweringDiagnostics.ReportUnsupported(de, ex);
+                        failed = true;
+                    }
+                }
+
                 // The entry contract: exactly one 'main' per executable. The sema checked that it is
                 // unique; here it is only recorded — the entry module's, where the compilation knows
-                // one (in Lyric 5 a 'main' elsewhere is an ordinary function).
-                if (function.Name != "main") continue;
+                // one (in Lyric 5 a 'main' elsewhere is an ordinary function). A library C links
+                // starts from nothing of its own.
+                if (function.Name != "main" || compilation.Library) continue;
                 if (compilation.Entry is { } home && !ReferenceEquals(module, home)) continue;
 
                 if (function.Parameters.Length == 0) { entry = id; continue; }
@@ -636,6 +666,12 @@ public static class ModuleLowerer
             Attributes = attributes,
             ExportRoots = exportRoots,
             Quotes = typeTable.Quotes,
+            // the hoisting pass computes the sites alone, whose functions are its only roots
+            Exports = comptime is { Hoist: true } ? [] : exports,
+            Header = comptime is { Hoist: true } || exports.Count == 0
+                ? IrHeader.Empty
+                : new IrHeader([.. types.CHeaderTypes],
+                    [.. types.Exports.Where(e => exports.Exists(x => x.Symbol == e.Symbol)).Select(e => e.Declaration)]),
         };
         if (failed) return null;
 
@@ -649,6 +685,14 @@ public static class ModuleLowerer
             && ids.TryGetValue(loop, out var loopId)
             && Reachability.CallsImport(result, "std.task.currentScheduler", unless: "std.task.schedulerRuns"))
             result.TaskMain = loopId;
+
+        // A library's exports are tasks where what they reach waits, the same question: each runs
+        // under std.task's loop for the embedding, and the host pumps what one left running.
+        if (compilation.Library && exports.Count > 0
+            && compilation.FindModule(["std", "task"]) is { } task
+            && EmbeddingOf(task, ids) is { } embedding
+            && Reachability.CallsImport(result, "std.task.currentScheduler", unless: "std.task.schedulerRuns"))
+            result.Embedding = embedding;
 
         var verifies = verify ?? VerifyByDefault;
         if (timings is not null) timings.Verified = verifies;
@@ -738,7 +782,7 @@ public static class ModuleLowerer
         // reaches may call it, what the program runs never does. Asked of the pruned module — a
         // function only a site called was lowered all the same, and is gone now.
         if (comptime is not { Hoist: true } && entry is not null
-            && result.Imports.FindIndex(import => import.Name == "std.core.embed") is var embed and >= 0)
+            && result.Imports.FindIndex(import => import.Is("std.core.embed")) is var embed and >= 0)
         {
             var calls = result.Functions.SelectMany(f => f.Blocks).SelectMany(b => b.Insts)
                 .OfType<CallImport>().Where(call => call.Target.Value == embed).ToList();
@@ -772,6 +816,17 @@ public static class ModuleLowerer
     /// <summary>Runs the action and adds its duration to the tally. The verifier is 90% of the
     /// lowering time, so <c>--verbose</c> showing it as part of 'lower' would misname the bill; ONE
     /// tally for both runs, because the table reports a pipeline stage, not a number of calls.</summary>
+    /// <summary>std.task's four functions of the embedding, each lowered, or null.</summary>
+    private static IrEmbedding? EmbeddingOf(ModuleSymbol task, Dictionary<FunctionSymbol, FunctionId> ids)
+    {
+        FunctionId? Of(string name) =>
+            task.Members.LookupLocal(name) is FunctionSymbol f && ids.TryGetValue(f, out var id) ? id : null;
+        return Of("runExport") is { } run && Of("stepEmbedded") is { } step && Of("runEmbedded") is { } pump
+               && Of("endEmbedded") is { } end
+            ? new IrEmbedding(run, step, pump, end)
+            : null;
+    }
+
     private static void Timed(LoweringTimings? timings, Action action)
     {
         if (timings is null)
@@ -877,6 +932,9 @@ public static class ModuleLowerer
         {
             if (Is(inner, "Ptr")) return new IrCForm(IrCKind.OptionalPointer);
             if (Is(inner, "CStr")) return new IrCForm(IrCKind.OptionalCString);
+            // an address that may be absent: only a C function's pointer crosses so, the checker's
+            // table refusing every other optional integer
+            if (inner is IrScalarType { Kind: IrScalar.U64 }) return new IrCForm(IrCKind.OptionalFunction);
         }
         if (type is IrEnumType e && typeTable.SymbolOfId(e.Type) is { Declaration: EnumDecl declared } symbol
             && declared.Attributes.FirstOrDefault(a => a.Path is ["Layout"])?.Positional is IdentifierExpr { Name: var form })

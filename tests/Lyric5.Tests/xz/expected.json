@@ -1,0 +1,57 @@
+{
+  "empty.xz": {
+    "plain": "empty",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size": 0
+  },
+  "mixed-none.xz": {
+    "plain": "mixed",
+    "sha256": "50a25483d9b6841971531d082b6b359344c9524c0d6cc6f36b8437cf09b2e1cd",
+    "size": 194560
+  },
+  "mixed-properties.xz": {
+    "plain": "mixed",
+    "sha256": "50a25483d9b6841971531d082b6b359344c9524c0d6cc6f36b8437cf09b2e1cd",
+    "size": 194560
+  },
+  "mixed-sha256.xz": {
+    "plain": "mixed",
+    "sha256": "50a25483d9b6841971531d082b6b359344c9524c0d6cc6f36b8437cf09b2e1cd",
+    "size": 194560
+  },
+  "noise-crc32.xz": {
+    "plain": "noise",
+    "sha256": "07d16b64ca109ea1a1f96112c8a7f98f45492219d693a00b8cd58e92077c493f",
+    "size": 92160
+  },
+  "small-x86.xz": {
+    "plain": "small",
+    "sha256": "cb8dd9df64f9b30cd59095d9b8ac610d072d63771bca1bd908e4a8b679dfb36f",
+    "size": 6
+  },
+  "small.xz": {
+    "plain": "small",
+    "sha256": "cb8dd9df64f9b30cd59095d9b8ac610d072d63771bca1bd908e4a8b679dfb36f",
+    "size": 6
+  },
+  "strides-crc64.xz": {
+    "plain": "strides",
+    "sha256": "eb22d78db0c0852b781077e53b93c22f5013e291752ce3568d8cc41d8f8bd9bd",
+    "size": 65536
+  },
+  "text-blocks.xz": {
+    "plain": "text",
+    "sha256": "0ab209622dcc83a2c01c892a1106958ee6565b1ebf9b5cb5cc5355aefc626cd9",
+    "size": 409600
+  },
+  "text-crc64.xz": {
+    "plain": "text",
+    "sha256": "0ab209622dcc83a2c01c892a1106958ee6565b1ebf9b5cb5cc5355aefc626cd9",
+    "size": 409600
+  },
+  "two-streams.xz": {
+    "plain": "mixed-halves",
+    "sha256": "50a25483d9b6841971531d082b6b359344c9524c0d6cc6f36b8437cf09b2e1cd",
+    "size": 194560
+  }
+}

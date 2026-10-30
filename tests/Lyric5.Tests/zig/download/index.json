@@ -1,0 +1,64 @@
+{
+  "master": {
+    "version": "9.10.0-dev.1+0000000",
+    "date": "2026-04-15"
+  },
+  "9.9.0": {
+    "date": "2026-04-14",
+    "docs": "https://ziglang.org/documentation/9.9.0/",
+    "x86_64-linux": {
+      "tarball": "https://ziglang.org/download/9.9.0/zig-x86_64-linux-9.9.0.tar.xz",
+      "shasum": "db5e6f2506a18c119578d93a027c65c38ef27b3f72bd53b2b1a35172c9073748",
+      "size": "276"
+    },
+    "aarch64-linux": {
+      "tarball": "https://ziglang.org/download/9.9.0/zig-aarch64-linux-9.9.0.tar.xz",
+      "shasum": "3d68950602761fb64daa15892e8ce788528e02483412d5767417e0e95e1538db",
+      "size": "276"
+    },
+    "x86_64-windows": {
+      "tarball": "https://ziglang.org/download/9.9.0/zig-x86_64-windows-9.9.0.zip",
+      "shasum": "b43c617729be42e04e4314b6ce7356524b4a41ad0dd8b208c464dd37ee621c52",
+      "size": "376"
+    },
+    "aarch64-macos": {
+      "tarball": "https://ziglang.org/download/9.9.0/zig-aarch64-macos-9.9.0.tar.xz",
+      "shasum": "07410f41a5fc7956e38a52cf74edbc7694cec6d6dddcdb4c3bd07bb3f7bb55e2",
+      "size": "276"
+    },
+    "x86_64-macos": {
+      "tarball": "https://ziglang.org/download/9.9.0/zig-x86_64-macos-9.9.0.tar.xz",
+      "shasum": "6cab8832116de270decbcf9ba0569c268d0ca16026717cbd9ffabb24e8dd5974",
+      "size": "276"
+    }
+  },
+  "9.9.1": {
+    "date": "2026-04-14",
+    "docs": "https://ziglang.org/documentation/9.9.1/",
+    "x86_64-linux": {
+      "tarball": "https://ziglang.org/download/9.9.1/zig-x86_64-linux-9.9.1.tar.xz",
+      "shasum": "98a5a59a0d455cc545e5b29d220a62fe89c5cca02c460a28c16831055ef61cb0",
+      "size": "216"
+    },
+    "aarch64-linux": {
+      "tarball": "https://ziglang.org/download/9.9.1/zig-aarch64-linux-9.9.1.tar.xz",
+      "shasum": "bf5999d7d91d805a64420a2f1b8959bafee3ecdf37b06a2e37ac07153ed00891",
+      "size": "212"
+    },
+    "x86_64-windows": {
+      "tarball": "https://ziglang.org/download/9.9.1/zig-x86_64-windows-9.9.1.zip",
+      "shasum": "6eeb7a08615c991659359fbafb3bc2aed8cb2c94d3ac4c78b11ab324b881d04c",
+      "size": "183"
+    },
+    "aarch64-macos": {
+      "tarball": "https://ziglang.org/download/9.9.1/zig-aarch64-macos-9.9.1.tar.xz",
+      "shasum": "830316922a6a3b4e26f69a6564762635115b220ded0e29dc085dd0a768f5d828",
+      "size": "212"
+    },
+    "x86_64-macos": {
+      "tarball": "https://ziglang.org/download/9.9.1/zig-x86_64-macos-9.9.1.tar.xz",
+      "shasum": "d022aeed38c7ab24da8cf9efff3d98c3b3598a677213faaff75cb5ea1601fb5b",
+      "size": "212"
+    }
+  }
+}

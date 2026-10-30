@@ -300,4 +300,4 @@ fn programPool(): Pool {
 }
 
 /// Returns the number of processors the system runs the process on, one at least (lyr/os.h).
-fn processorCount(): int;
+extern "C" fn processorCount(): int = "lyr_os_cpu_count";

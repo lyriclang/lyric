@@ -271,7 +271,8 @@ internal sealed class TestRepo : IDisposable
     public void Dispose()
     {
         var id = GitCache.Id(Url);
-        foreach (var directory in new[] { Dir, Path.Combine(UserCache.Root, "git", "db", id), Path.Combine(UserCache.Root, "git", "checkouts", id) })
+        foreach (var directory in new[] { Dir, Path.Combine(UserCache.Root, "git", "db", id), Path.Combine(UserCache.Root, "git", "checkouts", id),
+                     Path.Combine(UserCache.Root, "git", "trees", id) })
         {
             try { DeleteTree(directory); }
             catch (IOException) { }
