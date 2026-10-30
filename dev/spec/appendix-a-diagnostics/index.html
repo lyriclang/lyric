@@ -2285,6 +2285,13 @@ code is no longer reported, and its number is not given again.</p>
 <td>a memory operation outside an unsafe block</td>
 <td>A pointer's <code>read</code>, <code>write</code>, <code>offset</code> or <code>cast</code>, <code>std.ffi</code>'s <code>alloc</code> or <code>free</code>, or <code>GcHandle.from</code>, is called outside an <code>unsafe { … }</code> block.</td>
 </tr>
+<tr>
+<td>LYR-SEM0234</td>
+<td>W</td>
+<td><a href="../../spec/13-abi/">13-abi</a></td>
+<td>an unsafe block that holds no memory operation</td>
+<td>An <code>unsafe { … }</code> block calls none of <code>std.ffi</code>'s memory operations, or stands within another <code>unsafe</code> block, which covers what it holds already.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a5-mac--macros">A.5 MAC — Macros</h2>
@@ -3402,6 +3409,13 @@ code is no longer reported, and its number is not given again.</p>
 <td>resources</td>
 <td>warn</td>
 <td>a task's handle dropped</td>
+</tr>
+<tr>
+<td><code>unused-unsafe</code></td>
+<td>LYR-SEM0234</td>
+<td>unused</td>
+<td>warn</td>
+<td>an unsafe block that holds no memory operation</td>
 </tr>
 <tr>
 <td><code>unused-var</code></td>

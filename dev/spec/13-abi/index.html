@@ -459,7 +459,9 @@ within which <code>std.ffi</code>'s memory operations may be called: a pointer's
 about the block differs, and calling a C function is not unsafe. As a statement it gives no
 value: <code>unsafe {</code> where an expression stands — after <code>=</code>, after <code>return</code>, as an operand — is
 refused (<code>LYR-PAR0067</code>), not read as a call of a name <code>unsafe</code> with a trailing lambda; a value
-made inside goes to a variable declared before the block.
+made inside goes to a variable declared before the block. A block that holds none of the
+memory operations, or stands within another <code>unsafe</code> block, marks nothing: the lint
+<code>unused-unsafe</code> (<code>LYR-SEM0234</code>, warn) says so — the block is kept as small as what it holds.
 <ul>
 <li><code>read()</code> is the <code>T</code> at the pointer's address, <code>write(v)</code> puts one there; <code>T</code> is what a field
 of a <code>@Layout(C)</code> struct may be (rule 4, <code>LYR-SEM0099</code>), and the memory's layout is C's.</li>

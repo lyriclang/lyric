@@ -455,6 +455,10 @@ The enum crosses as that integer both ways, and one that is no variant is <code>
 integer C keeps elsewhere: <code>Mode.from(n)</code> is the variant or <code>null</code>, <code>m.value()</code> the integer;
 <code>VariantInfo.value</code> gives it to a <code>comptime</code> walk.</p>
 </li>
+<li><p><strong>An <code>unsafe</code> block that needs no <code>unsafe</code> is said</strong> (lint <code>unused-unsafe</code>, <code>LYR-SEM0234</code>, group <code>unused</code>, spec
+chapter 13 §3 rule 8): a block that calls none of <code>std.ffi</code>'s memory operations, or one within another <code>unsafe</code>
+block, which already allows them.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
