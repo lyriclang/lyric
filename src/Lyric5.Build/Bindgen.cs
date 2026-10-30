@@ -402,8 +402,9 @@ public static partial class Bindgen
                 return;
             }
             var text = new StringBuilder($"@Layout(C)\npub struct {Name(record.Name)} {{\n");
+            // C writes every field of a struct; so can Lyric
             foreach (var (field, type, _) in record.Fields!)
-                text.Append($"    pub {Name(field)}: {Map(type, Use.Field).Lyric},\n");
+                text.Append($"    pub var {Name(field)}: {Map(type, Use.Field).Lyric},\n");
             _out.Add(text.Append('}').ToString());
         }
 
@@ -530,7 +531,9 @@ public static partial class Bindgen
 
         private Mapped MapPointer(CType to, Use use)
         {
-            var optional = use is Use.Parameter or Use.Result ? "?" : "";
+            // where C may hold null: a parameter, a result, a struct's field — a field's optional
+            // function pointer would be wider than C's, and stays the function
+            var optional = use is Use.Parameter or Use.Result || (use is Use.Field && to is not CType.Function) ? "?" : "";
             if (to is CType.Named { Name: "char", Const: true })
             {
                 _imports.Add("CStr");
@@ -585,7 +588,9 @@ public static partial class Bindgen
                 var alias = Map(underlying, Use.Alias);
                 if (alias.Lyric is null) return alias;
                 if (underlying is CType.Named { Name: var opaque } && opaque.StartsWith("struct ", StringComparison.Ordinal)) return alias;
-                return new Mapped((alias.Pointer && use is Use.Parameter or Use.Result ? "?" : "") + Name(name), null, alias.Pointer);
+                var nullable = alias.Pointer && (use is Use.Parameter or Use.Result
+                                                 || (use is Use.Field && underlying is not CType.Pointer { To: CType.Function }));
+                return new Mapped((nullable ? "?" : "") + Name(name), null, alias.Pointer);
             }
             return Map(typedef.Type, use);
         }

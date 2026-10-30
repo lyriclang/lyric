@@ -6937,11 +6937,14 @@ pub struct FieldInfo :: [Equatable, Debug] {
 
 /// Describes a variant of an enum, in declaration order, and the fields of its payload.
 ///
-/// A positional field is named by its position, `0`, `1`, ….
+/// A positional field is named by its position, `0`, `1`, …. `value` is the integer C holds for
+/// the variant of an enum with `@Layout` — written after `=`, or one more than the variant
+/// before —, and its index in any other enum.
 pub struct VariantInfo :: [Equatable, Debug] {
     pub name: string,
     pub index: int,
     pub payload: FieldInfo[],
+    pub value: int,
 }
 
 /// The kind of a member of a type's own body: a function, a constant (a `static let`), an

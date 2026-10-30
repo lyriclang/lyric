@@ -856,6 +856,7 @@ struct lyr_ty_std_core_VariantInfo {
     LyrStr *name;
     int64_t index;
     LyrArr *payload;
+    int64_t value;
 };
 struct lyr_ty_17_std_core_TypeKind_Primitive {
     uint8_t lyr_unit;
@@ -1427,7 +1428,7 @@ _Static_assert(offsetof(lyr_box_ty_std_core_Bench, value) == 8, "layout of lyr_b
 extern const LyrItable lyr_itab_ty_std_core_Bench[];
 const LyrDesc lyr_desc_box_ty_std_core_Bench = { sizeof(lyr_box_ty_std_core_Bench), 0, 0, 0, NULL, "box<std.core.Bench>", lyr_itab_ty_std_core_Bench };
 typedef struct { LyrObj header; lyr_ty_std_core_VariantInfo value; } lyr_box_ty_std_core_VariantInfo;
-_Static_assert(sizeof(lyr_box_ty_std_core_VariantInfo) == 32, "layout of lyr_box_ty_std_core_VariantInfo");
+_Static_assert(sizeof(lyr_box_ty_std_core_VariantInfo) == 40, "layout of lyr_box_ty_std_core_VariantInfo");
 _Static_assert(offsetof(lyr_box_ty_std_core_VariantInfo, value) == 8, "layout of lyr_box_ty_std_core_VariantInfo");
 extern const LyrItable lyr_itab_ty_std_core_VariantInfo[];
 static const uint64_t lyr_refmap_box96[] = { UINT64_C(0xa) };

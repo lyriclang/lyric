@@ -1943,3 +1943,28 @@ nach 5.0 gesetzt; der Maintainer öffnet sie jetzt, und entscheidet die beiden F
 
 Spec 14 §1.1 Regel 11 (die Zeilen sind Text für einen Leser, kein Format); `-q`/`--quiet` auf den Verben, die bauen.
 Tests: `BuildStatusTests`; die übrigen Tests lesen die gefaltete stderr ohne Statuszeilen (`PackageFixture.Run`).
+
+## Nachtrag 2026-10-30 — die wartenden Punkte entschieden
+
+**Anlass** (Maintainer, 2026-10-30): die offenen Punkte aus M13b, M14, M15 und M14b, die je „entscheiden oder Tür“
+warteten, einzeln geklärt; danach alles gemergt und ein Dev-Build, der M0 bis M16 S2 enthält. Die Halte von M15 (S6
+Signieren, S7 Mirror) warten weiter auf Schlüssel und DNS des Maintainers; der Dev-Build geht ohne sie.
+
+| Punkt | Entscheidung | Wo |
+|---|---|---|
+| 287 | **Vor 5.0**: eine Variante eines `@Layout`-Enums bekommt C's Ganzzahl, `Read = 1`, sonst eins mehr als die davor; `std.ffi.CEnum` gibt `from(n): ?Self` und `value()` über `VariantInfo.value` | 13 §3 R5, 11 §4 |
+| 288 | **Tür**: ein Enum-Feld in einem C-Struct bleibt seine Ganzzahl — C darf jede hineinschreiben; `CEnum.from` liest sie | — |
+| 289 | **Vor 5.0**: `?Ptr<T>`/`?CStr` als Feld, ein Wort wie C's Zeiger; `?Ptr` ist überall seine Adresse, 0 für keine | 13 §3 R1, R4 |
+| L8-a | **Vor 5.0**: `lyric bindgen` schreibt jedes Feld `var` und Zeigerfelder optional (der Funktionszeiger bleibt, was er ist: ein optionaler wäre breiter) | 15 R18 |
+| 292 | **Vor 5.0**: Lint `unused-unsafe` (`LYR-SEM0234`) — ein `unsafe`-Block ohne Speicheroperation, oder in einem anderen | 13 §3 R8 |
+| 293 | **Doku**: `asPtr` sagt, wie das Array für C gehalten wird (ein Feld eines Objekts, das ein `GcHandle` hält; der Sammler bewegt nichts) | std.ffi |
+| 306 | **Vor 5.0**: `x[^n]` auf einem Typ mit eigenem `index` über ein Interface `Length` von std.core, auch schreibend; `x` einmal ausgewertet | 03 §5 |
+| 273, 281, 297 | **Türen nach 5.0** (geprüfte std über Prozesse; Debugger-Scope „Tasks“; `Callback.new(…, thread:)`) | — |
+| 300 | Die Ratchet „kalt ≤ 400 ms“ gilt mit warmem zig-Cache; das Frontend bekommt vor 5.0 keine Uhr dafür | — |
+| L8-b, L8-c, L8-d | **Fehler**, behoben (`LYR-PAR0067`, `fmt` und Ketten, `S_OBJNAME`) | 13 §3 R8 |
+| translate-c | **Tür nach 5.0** (lyric#635): ein eigenes Verb `lyric translate-c <datei.c>`, kein `fix --from-c` — `fix` ändert Lyric im eigenen Paket, das hier liest eine andere Sprache; Grundlage clangs AST über `zig cc -ast-dump=json` wie `bindgen`, ein Header wird `import` seines Bindings; was keine Entsprechung hat, ist eine Diagnose, nie geraten | — |
+
+**Verworfen**: Enum-Felder mit `RT0021` beim Lesen (288) — ein altes Binding stürzte ab, sobald die Bibliothek eine
+Variante dazubekommt; Rusts bindgen bildet C-Enums aus demselben Grund als Ganzzahl ab. Ein optionaler
+Funktionszeiger als Feld (wie 289): im IR ist er ein `u64`, ein `?u64` hat keine Nische — dafür bräuchte es einen
+eigenen IR-Typ; offen als Tür.

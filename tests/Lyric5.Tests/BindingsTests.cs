@@ -45,6 +45,8 @@ public class BindingsTests
         extern int geo_count;
         void geo_any(union Any a);
         typedef int string;
+        int geo_box_nulls(Box b);
+        Box geo_box_make(void);
         #endif
         """;
 
@@ -64,6 +66,8 @@ public class BindingsTests
         bool geo_flag(bool on) { return !on; }
         float geo_area(Box b) { return (b.max.x - b.min.x) * (b.max.y - b.min.y) + b.m[1][1]; }
         void geo_any(union Any a) { (void)a; }
+        int geo_box_nulls(Box b) { return (b.label == NULL) + 2 * (b.next == NULL); }
+        Box geo_box_make(void) { Box b = {0}; b.label = "made"; return b; }
         """;
 
     private const string GeoMain = """
@@ -98,6 +102,36 @@ public class BindingsTests
         Assert.Equal("5 5.0 42 6 4\n2 8 10 31 geo 3 true true\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
+    /// <summary>A bound struct's fields are written in place, and a pointer field may be null —
+    /// one word, C's null: C reads what Lyric wrote, and Lyric what C made. The fields were
+    /// neither writable nor optional, so a null pointer C left in a struct had no Lyric value.</summary>
+    [Fact]
+    public void A_bound_structs_fields_are_written_and_its_pointers_may_be_null()
+    {
+        var dir = Geo("""
+            import std.io { println };
+            import app.geo { Box, Vec2, geo_area, geo_box_nulls, geo_box_make, geo_name };
+
+            fn main(): void {
+                var b = Box {
+                    min = Vec2 { x = 0.0, y = 0.0 },
+                    max = Vec2 { x = 2.0, y = 3.0 },
+                    m = [0.0, 0.0, 0.0, 0.5],
+                    label = null,
+                    next = null,
+                };
+                println(f"{geo_box_nulls(b)}");
+                b.label = geo_name();
+                b.max.x = 4.0;
+                println(f"{geo_box_nulls(b)} {geo_area(b)}");
+                let made = geo_box_make();
+                println(f"{made.label!.length()} {made.next == null}");
+            }
+
+            """);
+        Assert.Equal("3\n2 12.5\n4 true\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
     /// <summary>What the module holds, as the spec says to write it — and what it leaves out, listed.</summary>
     [Fact]
     public void The_module_writes_what_crosses_and_lists_the_rest()
@@ -109,9 +143,10 @@ public class BindingsTests
         foreach (var line in new[]
                  {
                      "import std.ffi { CStr, Ptr };",
-                     "@Layout(C)\npub struct Vec2 {\n    pub x: float32,\n    pub y: float32,\n}",
-                     // fields hold no optional; an array of arrays is one array
-                     "@Layout(C)\npub struct Box {\n    pub min: Vec2,\n    pub max: Vec2,\n    pub m: float32[4],\n    pub label: CStr,\n    pub next: Ptr<Box>,\n}",
+                     "@Layout(C)\npub struct Vec2 {\n    pub var x: float32,\n    pub var y: float32,\n}",
+                     // every field written as C writes it; a pointer field may be null, as C's;
+                     // an array of arrays is one array
+                     "@Layout(C)\npub struct Box {\n    pub var min: Vec2,\n    pub var max: Vec2,\n    pub var m: float32[4],\n    pub var label: ?CStr,\n    pub var next: ?Ptr<Box>,\n}",
                      "pub type Shape = int32;",
                      "pub let SHAPE_DOT: Shape = 1;\npub let SHAPE_LINE: Shape = 2;\npub let SHAPE_BOX: Shape = 8;",
                      "pub type Visit = extern \"C\" fn(int32, ?CStr) -> int32;",
