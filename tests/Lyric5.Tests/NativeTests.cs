@@ -103,7 +103,7 @@ public class NativeTests
     [InlineData("enum E { A, B }\nextern \"C\" fn f(): E;", "extern 'f' returns 'E', which does not come back from C — 'E' is laid out by the compiler")]
     [InlineData("@Layout(C)\nstruct P { s: string }", "field 's' of '@Layout(C)' struct 'P' has type 'string', which C does not hold")]
     [InlineData("@Layout(C)\nenum E { A }\n@Layout(C)\nstruct P { e: E }", "field 'e' of '@Layout(C)' struct 'P' has type 'E', which C does not hold — an enum crosses as a parameter or a result")]
-    [InlineData("import std.ffi { CStr };\n@Layout(C)\nstruct P { s: ?CStr }", "field 's' of '@Layout(C)' struct 'P' has type '?CStr', which C does not hold — an optional pointer is wider")]
+    [InlineData("@Layout(C)\nstruct P { f: ?extern \"C\" fn(int) -> int }", "field 'f' of '@Layout(C)' struct 'P' has type '?extern \"C\" fn(int) -> int', which C does not hold — an optional C function's pointer is wider")]
     [InlineData("@Layout(uint8)\nstruct P { x: int }", "'@Layout(uint8)' makes an enum an integer")]
     [InlineData("@Layout(C)\nenum E { A(int), B }", "variant 'A' carries a payload")]
     [InlineData("@Layout(C)\nclass K { }", "'K' is a class")]

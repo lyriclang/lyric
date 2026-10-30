@@ -34,8 +34,9 @@ fn main(): void {
     var dy: float32 = 180.0;
     while (!WindowShouldClose()) {
         let dt = GetFrameTime();
-        // a binding's struct is a value: a new one each frame
-        at = Vector2 { x = at.x + dx * dt, y = at.y + dy * dt };
+        // a binding's fields are C's, each written in place
+        at.x += dx * dt;
+        at.y += dy * dt;
         if (at.x < radius || at.x > GetScreenWidth() as float32 - radius) {
             dx = -dx;
         }

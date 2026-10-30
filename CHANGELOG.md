@@ -319,6 +319,11 @@ promise. This entry fills with the milestones.
   header, `Compiling` the program, the runtime and `3 of 14 C units of app`, `Linking` —, and `Finished` with the
   profile and the time; on a terminal the C units are counted as they finish. What is up to date says nothing;
   `-q` says none of it, and `--json` none.
+- **A C struct's pointer field may be null** (spec chapter 13 §3 rules 1 and 4): a `@Layout(C)` struct takes
+  `?Ptr<T>` and `?CStr` fields, one word as C's pointer — a `?Ptr` is now its address everywhere, 0 for none.
+  `lyric bindgen` writes a struct's pointer fields optional and every field `var`, so `pos.x += 1` writes a bound
+  struct in place (spec chapter 15 rule 18). An array's `asPtr` says how to keep the array for a C function that
+  keeps the pointer.
 
 ---
 
