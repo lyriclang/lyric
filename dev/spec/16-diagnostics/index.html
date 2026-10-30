@@ -111,9 +111,10 @@ not drawn. The exit code is what it would be without the limit.</li>
 <p><strong>Conformance.</strong> Every rejecting case names its codes; the catalogue against the compiler in the toolchain's
 own tests (<code>tests/Lyric5.Tests</code>, <code>CatalogTests</code>).</p>
 <ol>
-<li>A code is <code>LYR-</code>, an area — <code>LEX</code>, <code>PAR</code>, <code>RES</code>, <code>SEM</code>, <code>MAC</code>, <code>CT</code>, <code>CG</code>, <code>PKG</code>, <code>BLD</code>, <code>LNK</code>, <code>CLI</code>,
+<li>A code is <code>LYR-</code>, an area — <code>LEX</code>, <code>PAR</code>, <code>RES</code>, <code>SEM</code>, <code>MAC</code>, <code>MIG</code>, <code>CT</code>, <code>CG</code>, <code>PKG</code>, <code>BLD</code>, <code>LNK</code>, <code>CLI</code>,
 <code>ICE</code>, <code>RT</code>, and <code>IR</code>, retired —, and four digits. <code>LNK</code> holds the link's findings
-(<a href="../../spec/15-project/#52-linking">15 §5.2</a> rule 12). The code and its severity are contract; the message's wording is not.</li>
+(<a href="../../spec/15-project/#52-linking">15 §5.2</a> rule 12), <code>MIG</code> the migration's (§6 rule 5). The code and its severity are
+contract; the message's wording is not.</li>
 <li>Every code the toolchain reports stands in <a href="../../spec/appendix-a-diagnostics/">Appendix A</a>, generated from the
 toolchain's catalogue, with its severity, the chapter whose rule it is, and when it is reported. A code no
 longer reported is <strong>retired</strong> there: its number is not given to another finding.</li>
@@ -218,6 +219,14 @@ a call that writes fewer type arguments than the function has gets a <code>_</co
 A change that needs a reader: <code>naming</code>'s new name, written where the name is declared (its uses are an
 editor's rename); <code>self-assignment</code>'s removal of <code>x = x</code>, which may stand for an assignment meant
 otherwise; an unknown name's closest known one (<code>did you mean</code>).</li>
+<li><em>(Informative.)</em> <strong><code>lyric fix --from-4 [&lt;file.lyr&gt;]</code></strong> migrates a Lyric 4 program — the <code>lyric.json</code> of the
+directory (<code>-C</code>), or the file — to Lyric 5. It reads the program with Lyric 4.6's own front end, frozen in
+the toolchain, and a program 4.6 refuses is not changed (<code>LYR-MIG0001</code>, exit 1; a <code>lyric.json</code> 4.6 would
+not read, <code>LYR-MIG0002</code>, exit 2). The rules of the migration rewrite the program's own files in place —
+spans of the text, so comments and layout stay —, make a <code>lyric.toml</code> of the <code>lyric.json</code>, and say what
+they leave to a person as hints of the area <code>MIG</code>, on the standard error and in <code>fix-from-4.txt</code> beside
+the manifest or the file. <code>--dry-run</code> prints the changes as a unified diff and writes nothing; <code>--json</code>
+does not go with it. The migration promises no program that compiles: <code>lyric check</code> says what is left.</li>
 </ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">

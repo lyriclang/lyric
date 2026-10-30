@@ -72,6 +72,12 @@ is. <code>LYRIC_TOOLCHAIN=local</code> runs the one you started, and <code>LYRIC
 only from a mirror of your own, which <code>LYRIC_MIRROR</code> names with its key in <code>LYRIC_MIRROR_KEY</code>.</p>
 <p><code>lyric env</code> says what a build here reads and where each value comes from — the C compiler and zig
 (<code>installed</code> or <code>PATH</code>), the profile, and each lint's level with who set it (<code>-D</code>, <code>[lints]</code>).</p>
+<h2 id="coming-from-lyric-4">Coming from Lyric 4</h2>
+<p><code>lyric fix --from-4</code> migrates a Lyric 4 program: run it in the directory of its <code>lyric.json</code>, or name one
+file. It reads the program with Lyric 4.6's own checker, so the program has to check with 4.6 first, then
+rewrites the files in place — the module headers go, the imports name Lyric 5's modules, <code>lyric.json</code>
+becomes <code>lyric.toml</code> — and lists in <code>fix-from-4.txt</code> what it leaves to you. <code>--dry-run</code> shows the changes
+as a diff first. Then <code>lyric check</code> says what is left.</p>
 <h2 id="a-package">A package</h2>
 <p>A program lives in a <strong>package</strong>: a directory with a manifest, <code>lyric.toml</code>, and its source under
 <code>src/</code>. <code>lyric new</code> makes one:</p>

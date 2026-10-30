@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYR-MIG0001 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="reference">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a class="current" href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">MIG</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../diagnostics/">All codes</a></li>
+<li><a class="current" href="../../diagnostics/LYR-MIG0001/">LYR-MIG0001</a></li>
+<li><a href="../../diagnostics/LYR-MIG0002/">LYR-MIG0002</a></li>
+<li><a href="../../diagnostics/LYR-MIG0101/">LYR-MIG0101</a></li>
+<li><a href="../../diagnostics/LYR-MIG0102/">LYR-MIG0102</a></li>
+<li><a href="../../diagnostics/LYR-MIG0103/">LYR-MIG0103</a></li>
+<li><a href="../../diagnostics/LYR-MIG0104/">LYR-MIG0104</a></li>
+<li><a href="../../diagnostics/LYR-MIG0106/">LYR-MIG0106</a></li>
+<li><a href="../../diagnostics/LYR-MIG0107/">LYR-MIG0107</a></li>
+<li><a href="../../diagnostics/LYR-MIG0108/">LYR-MIG0108</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
+<h1>LYR-MIG0001</h1>
+<p class="code-title">a program Lyric 4.6 refuses is not migrated</p>
+<p class="meta">error · <a href="../../spec/14-cli/">spec 14-cli</a></p>
+<p><code>lyric fix --from-4</code> reads the program with Lyric 4.6's own front end, and 4.6 refuses it. Nothing is written; 4.6's findings are said before this error. The exit code is 1.</p>
+<h2 id="explanation">Explanation</h2>
+<p>The migration reads a Lyric 4 program with the types 4.6 gave it — which <code>abs</code> a call meant, which field is written — and so it only reads a program 4.6 accepted. A program that did not check with 4.6 has no such answers, and a rewrite of it would be a guess.</p>
+<p>Put the program right as Lyric 4.6 sees it — the findings above this error are 4.6's own —, then migrate it.</p>
+<h2 id="example">Example</h2>
+<pre><code>$ lyric5 fix --from-4 main.lyr
+  4.6: main.lyr:2:12: error[LYR-SEM0001]: cannot return 'string' from a function returning 'int'
+error[LYR-MIG0001]: Lyric 4.6 refuses the program, and it is not migrated
+  = help: make it check with Lyric 4.6 first: the migration reads what 4.6 accepted</code></pre>
+</main>
+<aside class="on-this-page" aria-label="On this page">
+<p class="aside-title">On this page</p>
+<ul>
+<li class="level-2"><a href="#explanation">Explanation</a></li>
+<li class="level-2"><a href="#example">Example</a></li>
+</ul>
+</aside>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

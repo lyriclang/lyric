@@ -2302,7 +2302,85 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a6-ct--compile-time-evaluation">A.6 CT — Compile-time evaluation</h2>
+<h2 id="a6-mig--the-migration">A.6 MIG — The migration</h2>
+<p><code>lyric fix --from-4</code>: a Lyric 4 program it does not read, and what it leaves to a person.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>S</th>
+<th>Chapter</th>
+<th>Title</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LYR-MIG0001</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a program Lyric 4.6 refuses is not migrated</td>
+<td><code>lyric fix --from-4</code> reads the program with Lyric 4.6's own front end, and 4.6 refuses it. Nothing is written; 4.6's findings are said before this error. The exit code is 1.</td>
+</tr>
+<tr>
+<td>LYR-MIG0002</td>
+<td>E</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a lyric.json the migration cannot read</td>
+<td><code>lyric fix --from-4</code> finds a <code>lyric.json</code> that Lyric 4.6 would not have read either: not JSON, a key of the wrong kind, a path that is not there. The exit code is 2.</td>
+</tr>
+<tr>
+<td>LYR-MIG0101</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a module named otherwise by its header</td>
+<td>A note of <code>lyric fix --from-4</code>: a Lyric 4 module's <code>module</code> header gave it a name other than its path does. The header goes; Lyric 5 names the module by its path, and the package's own imports of it are rewritten to that name.</td>
+</tr>
+<tr>
+<td>LYR-MIG0102</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a native root without a counterpart</td>
+<td>A note of <code>lyric fix --from-4</code>: the <code>lyric.json</code> names a native root (<code>nativeRoots</code>), whose modules Lyric 4 took from a host. Lyric 5 has no host and no native roots; a library of C is described under <code>[native]</code> and called through <code>extern &quot;C&quot;</code>.</td>
+</tr>
+<tr>
+<td>LYR-MIG0103</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a source root other than src/</td>
+<td>A note of <code>lyric fix --from-4</code>: the Lyric 4 project keeps its modules somewhere other than <code>src/</code> — its own directory, or the <code>sourceRoot</code> it names. A Lyric 5 package keeps them under <code>src/</code>; the migration does not move files.</td>
+</tr>
+<tr>
+<td>LYR-MIG0104</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a toolchain line of Lyric 4</td>
+<td>A note of <code>lyric fix --from-4</code>: the <code>lyric.json</code> names a version of Lyric 4 under <code>toolchain</code>. It goes; <code>[package] toolchain</code> in <code>lyric.toml</code> names the least Lyric 5 a package needs, where one is needed.</td>
+</tr>
+<tr>
+<td>LYR-MIG0106</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>declarations the whole package now sees</td>
+<td>A note of <code>lyric fix --from-4</code>, once a module: declarations without <code>pub</code> were private to their module in Lyric 4 and are seen by the whole package in Lyric 5. <code>main</code> is left aside.</td>
+</tr>
+<tr>
+<td>LYR-MIG0107</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a build script of Lyric 4</td>
+<td>A note of <code>lyric fix --from-4</code>: the project has a <code>build.lyr</code> written for Lyric 4, which defined the build. In Lyric 5 <code>lyric.toml</code> does — <code>[[bin]]</code>, <code>[profile.*]</code> —, and a build script only prepares sources.</td>
+</tr>
+<tr>
+<td>LYR-MIG0108</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>tests compiled apart</td>
+<td>A note of <code>lyric fix --from-4</code>: the <code>lyric.json</code> names a <code>testRoot</code>, whose files Lyric 4 compiled apart from the program. Lyric 5 runs a package's <code>tests/</code> with <code>lyric test</code>; each test is an <code>@Test</code> function.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a7-ct--compile-time-evaluation">A.7 CT — Compile-time evaluation</h2>
 <p>The evaluation of <code>comptime</code>, a macro or a synthesis at build time.</p>
 <table>
 <thead>
@@ -2366,7 +2444,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a7-cg--code-generation">A.7 CG — Code generation</h2>
+<h2 id="a8-cg--code-generation">A.8 CG — Code generation</h2>
 <p>What the C backend does not take.</p>
 <table>
 <thead>
@@ -2395,7 +2473,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a8-pkg--packages-and-manifests">A.8 PKG — Packages and manifests</h2>
+<h2 id="a9-pkg--packages-and-manifests">A.9 PKG — Packages and manifests</h2>
 <p><code>lyric.toml</code>, the lock file, dependencies.</p>
 <table>
 <thead>
@@ -2494,7 +2572,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a9-bld--the-build">A.9 BLD — The build</h2>
+<h2 id="a10-bld--the-build">A.10 BLD — The build</h2>
 <p>The C toolchain, the runtime, the build script.</p>
 <table>
 <thead>
@@ -2551,7 +2629,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a10-lnk--the-link">A.10 LNK — The link</h2>
+<h2 id="a11-lnk--the-link">A.11 LNK — The link</h2>
 <p>What the linker says, read: a symbol nothing defines, a library it does not find, a symbol defined twice (15 §5.2 rule 12).</p>
 <table>
 <thead>
@@ -2587,7 +2665,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a11-cli--the-command-line">A.11 CLI — The command line</h2>
+<h2 id="a12-cli--the-command-line">A.12 CLI — The command line</h2>
 <p>The driver's options and verbs.</p>
 <table>
 <thead>
@@ -2777,7 +2855,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a12-ir--the-lowering">A.12 IR — The lowering</h2>
+<h2 id="a13-ir--the-lowering">A.13 IR — The lowering</h2>
 <p>Retired: each refusal of the lowering has a code of its own.</p>
 <table>
 <thead>
@@ -2799,7 +2877,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a13-ice--internal-compiler-errors">A.13 ICE — Internal compiler errors</h2>
+<h2 id="a14-ice--internal-compiler-errors">A.14 ICE — Internal compiler errors</h2>
 <p>The toolchain's own failure: a bug to report, never the program's fault.</p>
 <table>
 <thead>
@@ -2828,7 +2906,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a14-rt--runtime-panics">A.14 RT — Runtime panics</h2>
+<h2 id="a15-rt--runtime-panics">A.15 RT — Runtime panics</h2>
 <p>A panic ends the program with exit code 101 and a backtrace; the compile-time evaluation reports the same codes inside <code>LYR-CT0001</code>.</p>
 <table>
 <thead>
@@ -3004,7 +3082,7 @@ code is no longer reported, and its number is not given again.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="a15-lints">A.15 Lints</h2>
+<h2 id="a16-lints">A.16 Lints</h2>
 <p>Every warning is a lint (16 §5): its name, its code, its group and its level unless said. <code>warnings</code> names them all.</p>
 <table>
 <thead>
@@ -3371,16 +3449,17 @@ code is no longer reported, and its number is not given again.</p>
 <li class="level-2"><a href="#a3-res--names-and-modules">A.3 RES — Names and modules</a></li>
 <li class="level-2"><a href="#a4-sem--semantic-errors-and-warnings">A.4 SEM — Semantic errors and warnings</a></li>
 <li class="level-2"><a href="#a5-mac--macros">A.5 MAC — Macros</a></li>
-<li class="level-2"><a href="#a6-ct--compile-time-evaluation">A.6 CT — Compile-time evaluation</a></li>
-<li class="level-2"><a href="#a7-cg--code-generation">A.7 CG — Code generation</a></li>
-<li class="level-2"><a href="#a8-pkg--packages-and-manifests">A.8 PKG — Packages and manifests</a></li>
-<li class="level-2"><a href="#a9-bld--the-build">A.9 BLD — The build</a></li>
-<li class="level-2"><a href="#a10-lnk--the-link">A.10 LNK — The link</a></li>
-<li class="level-2"><a href="#a11-cli--the-command-line">A.11 CLI — The command line</a></li>
-<li class="level-2"><a href="#a12-ir--the-lowering">A.12 IR — The lowering</a></li>
-<li class="level-2"><a href="#a13-ice--internal-compiler-errors">A.13 ICE — Internal compiler errors</a></li>
-<li class="level-2"><a href="#a14-rt--runtime-panics">A.14 RT — Runtime panics</a></li>
-<li class="level-2"><a href="#a15-lints">A.15 Lints</a></li>
+<li class="level-2"><a href="#a6-mig--the-migration">A.6 MIG — The migration</a></li>
+<li class="level-2"><a href="#a7-ct--compile-time-evaluation">A.7 CT — Compile-time evaluation</a></li>
+<li class="level-2"><a href="#a8-cg--code-generation">A.8 CG — Code generation</a></li>
+<li class="level-2"><a href="#a9-pkg--packages-and-manifests">A.9 PKG — Packages and manifests</a></li>
+<li class="level-2"><a href="#a10-bld--the-build">A.10 BLD — The build</a></li>
+<li class="level-2"><a href="#a11-lnk--the-link">A.11 LNK — The link</a></li>
+<li class="level-2"><a href="#a12-cli--the-command-line">A.12 CLI — The command line</a></li>
+<li class="level-2"><a href="#a13-ir--the-lowering">A.13 IR — The lowering</a></li>
+<li class="level-2"><a href="#a14-ice--internal-compiler-errors">A.14 ICE — Internal compiler errors</a></li>
+<li class="level-2"><a href="#a15-rt--runtime-panics">A.15 RT — Runtime panics</a></li>
+<li class="level-2"><a href="#a16-lints">A.16 Lints</a></li>
 </ul>
 </aside>
 </div>
