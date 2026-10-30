@@ -164,8 +164,31 @@ public static class Pipeline
         return denied;
     }
 
+    /// <summary>A program as its status line names it: <c>app v0.1.0 (src/main.lyr)</c>.</summary>
+    public static string Described(Project project) =>
+        $"{project.BinaryName}{(project.Manifest is { } manifest ? " v" + manifest.Version : "")} ({Shown(project.Source)})";
+
+    /// <summary>A path as the status lines and the diagnostics say it.</summary>
+    public static string Shown(string path) => Lyric.Core.Rendering.RenderStyle.Current.Display(path);
+
     /// <summary>The binary's path, or the exit code of the failure.</summary>
-    public static (int Exit, string? Executable) Build(BuildRequest request, TextWriter error)
+    public static (int Exit, string? Executable) Build(BuildRequest request, TextWriter error) => Build(request, error, null);
+
+    /// <summary>
+    /// <c>build --lib</c>: the library's path, or the exit code of the failure, and what a C program
+    /// links beside a static library, after it, as a C compiler's arguments (spec 13 §4 rule 9) — the
+    /// shared libraries of the packages where they lie beside it, the libraries by name and their
+    /// directories, the flags and frameworks, the runtime's. Empty for a shared library, which is
+    /// linked against them itself.
+    /// </summary>
+    public static (int Exit, string? Library, IReadOnlyList<string> LinkArgs) BuildLibrary(BuildRequest request, TextWriter error)
+    {
+        var linkArgs = new List<string>();
+        var (exit, built) = Build(request, error, linkArgs);
+        return (exit, built, linkArgs);
+    }
+
+    private static (int Exit, string? Executable) Build(BuildRequest request, TextWriter error, List<string>? linkArgs)
     {
         var project = request.Project;
         // One build at a time writes into out/; a second one waits here.
@@ -208,6 +231,8 @@ public static class Pipeline
         // A library's header: the runtime's API, the types its exports name, its exports.
         var header = manifest + ".h";
         List<string> sources;
+        // the front end's answer where it ran: a failed link points at the declarations it read
+        CompileResult? compiled = null;
         if (File.Exists(manifest))
         {
             DiagnosticStore.Replay(said, error);
@@ -215,8 +240,10 @@ public static class Pipeline
         }
         else
         {
+            BuildStatus.Say("Compiling", Described(project));
             var result = Compile(project, error, request.Profile, request.Target);
             if (result is null) return (1, null);
+            compiled = result;
             var read = result.Embedded.Select(file => $"{FileKey(file)} {file}").ToList();
             var unitKey = read.Count == 0 ? key : Key(key, string.Join("\n", read));
             var paths = new List<string>();
@@ -241,6 +268,7 @@ public static class Pipeline
             sources = paths;
         }
 
+        LinkSite? site = null;
         try
         {
             // a library's code, the runtime's too, as a library's must be (LinkageOf)
@@ -254,7 +282,12 @@ public static class Pipeline
             // every unit names its paths by the packages' names, not by where they lie.
             var paths = PathMaps(project, runtimeRoot);
             var units = sources.Select(path => new CUnit(path, [], [RuntimeLayout.IncludeDir(runtimeRoot)],
-                ExtraFlags: [.. request.Profile.ProgramFlags, .. paths])).ToList();
+                ExtraFlags: [.. request.Profile.ProgramFlags, .. paths])
+            {
+                // the cache names a unit by its key; the count by the program, a generic instance as one
+                Shown = Path.GetFileName(path).StartsWith("inst-", StringComparison.Ordinal)
+                    ? $"{project.BinaryName} (a generic instance)" : project.BinaryName,
+            }).ToList();
             NativeLink? read;
             try { read = Native(project, request.Target, paths, RuntimeLayout.IncludeDir(runtimeRoot), directives, error); }
             catch (ManifestException refused)
@@ -271,7 +304,11 @@ public static class Pipeline
             }
             if (read is not { } native) return (1, null);
             var libraries = native.Libraries;
-            var objects = build.Compile([.. units, .. native.Units]);
+            var objects = build.Compile([.. units, .. native.Units], project.BinaryName);
+            // whose each input of the link is, for a link that fails (spec 15 §5.2 rule 12)
+            var owners = new Dictionary<string, string>(native.FileOwners) { [archive] = "the runtime" };
+            for (var i = 0; i < objects.Count; i++) owners[objects[i]] = i < units.Count ? "the program" : native.UnitOwners[i - units.Count];
+            site = new LinkSite(owners, native.LibraryOrigins, native.FrameworkOrigins);
             var linkPaths = new LinkPaths([.. directives.SearchDirs, .. native.SearchDirs], OwnDirFirst: native.Beside.Count > 0,
                 Args: native.Args, Frameworks: native.Frameworks);
             // The packages' archives and shared libraries after the objects that call them, by their
@@ -279,19 +316,35 @@ public static class Pipeline
             string[] prebuilt = [.. native.Archives, .. native.Dylibs.Select(d => d.Linked)];
             if (project.Library is { } libraryKind)
             {
-                // The archive holds the runtime too: a C program links one file and the libraries the
-                // packages' native parts ask for. A shared library is linked against them itself.
+                // The archive holds the runtime and the packages' archives too: a C program links one
+                // file and what the build says beside it (spec 13 §4 rule 9). A shared library is
+                // linked against all of it itself.
                 var file = project.LibraryFile(request.Profile, request.Target);
                 Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                BuildStatus.Say(libraryKind == LibraryKind.Static ? "Archiving" : "Linking", Shown(file));
                 if (libraryKind == LibraryKind.Static)
                 {
                     var runtime = RuntimeArchive.Objects(request.Compiler, request.Target, profile, request.ToolchainVersion);
-                    File.Copy(build.Archive([.. objects, .. runtime], Path.Combine(project.CacheDir, "lib", $"lib{project.Name}.a")), file, overwrite: true);
+                    File.Copy(build.Archive([.. objects, .. runtime], Path.Combine(project.CacheDir, "lib", $"lib{project.Name}.a"), native.Archives),
+                        file, overwrite: true);
                 }
                 else build.LinkShared([.. objects, .. prebuilt, archive], file, libraries, linkPaths);
                 File.Copy(header, project.HeaderFile(request.Profile, request.Target), overwrite: true);
-                // what the library needs when it runs lies beside it, as beside a program
+                // what the library needs when it runs lies beside it, as beside a program; beside an
+                // archive also what a C program links a shared library by, its import library on Windows
                 PutBeside(native.Beside, file);
+                if (libraryKind == LibraryKind.Static)
+                {
+                    PutBeside([.. native.Dylibs.Select(d => d.ImportLibrary).OfType<string>()], file);
+                    var dir = Path.GetDirectoryName(Path.GetFullPath(file))!;
+                    linkArgs?.AddRange([
+                        .. native.Dylibs.Select(d => Path.Combine(dir, Path.GetFileName(d.Linked))),
+                        .. linkPaths.SearchDirs.Select(d => "-L" + d),
+                        .. libraries.Select(l => "-l" + l),
+                        .. native.Args,
+                        .. native.Frameworks.SelectMany(f => new[] { "-framework", f }),
+                        .. build.RuntimeLinkArgs]);
+                }
                 return (0, file);
             }
             var executable = project.Executable(request.Profile, request.Target);
@@ -302,6 +355,7 @@ public static class Pipeline
             var lines = LinkLines(inputs, libraries, linkPaths, prebuiltFiles);
             if (!UpToDate(executable, record, inputs, lines))
             {
+                BuildStatus.Say("Linking", $"{project.BinaryName} ({Shown(executable)})");
                 build.LinkExecutable(inputs, executable, libraries, linkPaths);
                 File.WriteAllText(record, lines);
             }
@@ -311,7 +365,11 @@ public static class Pipeline
         }
         catch (CBuildException failure)
         {
-            Say.Error(error, "LYR-BLD0001", failure.Message);
+            // a link whose failure the build can read is said as its findings; the rest as it is
+            if (failure.LinkerOutput is { } linker && site is not null)
+                LinkReport.Say(linker, failure.Message, request.Target, site,
+                    () => compiled ?? Compile(project, TextWriter.Null, request.Profile, request.Target), error);
+            else Say.Error(error, "LYR-BLD0001", failure.Message);
             return (2, null);
         }
     }
@@ -338,6 +396,15 @@ public static class Pipeline
         public List<string> SearchDirs { get; } = [];
         public List<string> Args { get; } = [];
         public List<string> Frameworks { get; } = [];
+
+        /// <summary>The package each of <see cref="Units"/> is, in their order; the package each
+        /// archive and shared library is, by its path.</summary>
+        public List<string> UnitOwners { get; } = [];
+        public Dictionary<string, string> FileOwners { get; } = [];
+
+        /// <summary>Where each library by name and each framework was first named.</summary>
+        public Dictionary<string, LinkOrigin> LibraryOrigins { get; } = [];
+        public Dictionary<string, LinkOrigin> FrameworkOrigins { get; } = [];
     }
 
     /// <summary>A native part the build cannot link for its target — a framework or a library of
@@ -383,6 +450,7 @@ public static class Pipeline
                 List<string> defines = [.. part.Defines, .. system.Defines];
                 link.Units.AddRange(part.SourceFiles(manifest.Root, name => Tree(manifest, name))
                     .Select(file => new CUnit(file, defines, include, ExtraFlags: paths)));
+                var written = manifest.NativeFor(target);
                 // a script's C library: its own include first, its own definitions and flags alone
                 foreach (var library in directives.LibrariesOf(manifest.Name))
                 {
@@ -391,6 +459,12 @@ public static class Pipeline
                     link.Units.AddRange(sources.Select(file => new CUnit(file, [.. defines, .. library.Defines], own,
                         ExtraFlags: [.. paths, .. library.Flags])));
                 }
+                while (link.UnitOwners.Count < link.Units.Count) link.UnitOwners.Add(manifest.Name);
+                LinkOrigin From(IReadOnlyList<string> manifestKey, string key, string name) =>
+                    new(manifest, manifestKey.Contains(name) ? key : system.Libraries.Contains(name) || system.Frameworks.Contains(name) ? "pkgConfig" : "script");
+                foreach (var library in part.Libs.Concat(system.Libraries)) link.LibraryOrigins.TryAdd(library, From(written.Libs, "libs", library));
+                foreach (var framework in part.Frameworks.Concat(system.Frameworks))
+                    link.FrameworkOrigins.TryAdd(framework, From(written.Frameworks, "frameworks", framework));
                 foreach (var dir in system.SearchDirs)
                     if (!link.SearchDirs.Contains(dir)) link.SearchDirs.Add(dir);
                 foreach (var arg in system.Args)
@@ -401,6 +475,7 @@ public static class Pipeline
                 {
                     if (Prebuilt(manifest, archive, Full(manifest, archive), "archives", error) is not { } full) return null;
                     if (!link.Archives.Contains(full)) link.Archives.Add(full);
+                    link.FileOwners.TryAdd(full, manifest.Name);
                 }
                 foreach (var dylib in part.Dylibs)
                 {
@@ -423,6 +498,7 @@ public static class Pipeline
                     }
                     var full = new Dylib(file, import);
                     if (!link.Dylibs.Contains(full)) link.Dylibs.Add(full);
+                    link.FileOwners.TryAdd(full.Linked, manifest.Name);
                 }
                 foreach (var library in part.Libs.Concat(system.Libraries))
                     if (!link.Libraries.Contains(library)) link.Libraries.Add(library);
@@ -668,6 +744,7 @@ public static class Pipeline
             var (ran, directives) = BuildScripts.Run(project, target, profile, compiler, version, error);
             if (directives is null) return ran;
         }
+        BuildStatus.Say("Checking", Described(project));
         return Compile(project, error, profile, target) is null ? 1 : 0;
     }
 

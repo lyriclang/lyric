@@ -210,6 +210,16 @@ public sealed class DefinitionTests
     }
 
     [Fact]
+    public void A_name_in_an_import_clause_jumps_to_what_it_imports()
+    {
+        // The name in the clause is no node; it jumps where a use of it jumps.
+        var target = TargetAt("import std.io { pri$ntln };\n\nfn main(): int {\n    println(\"hi\");\n    return 0;\n}\n", out var result);
+        Assert.NotNull(target);
+        Assert.EndsWith("std/io.lyr", result.Sources.GetPath(target.File).Replace('\\', '/'));
+        Assert.Equal("println", result.Sources.GetText(target.File).Substring(target.NameSpan.Start, target.NameSpan.Length));
+    }
+
+    [Fact]
     public void The_target_carries_the_declaration_AND_the_name()
     {
         // Two spans rather than one, because a jump reveals the declaration and selects the name.

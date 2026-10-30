@@ -41,6 +41,7 @@ public static class RuntimeArchive
         var key = $"{toolchainVersion}|{compiler.Identity}|{target.Triple}|{profile.Name}|{string.Join(' ', profile.Codegen)}|{SourceStamp(root)}";
         string Build()
         {
+            BuildStatus.Say("Compiling", $"the runtime ({target.Triple}, {profile.Name})");
             var built = RuntimeLayout.BuildArchive(new CBuild(compiler, target, profile, cache), root, Path.Combine(cache, "lib"));
             // A new archive is rare — a new version, target or profile —: then the versions nobody
             // used for a while go (a development build's version carries its commit,

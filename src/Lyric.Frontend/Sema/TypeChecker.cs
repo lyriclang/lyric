@@ -7482,7 +7482,13 @@ public sealed class TypeChecker
 
         // A type's own index: 'x[k]' reads 'x.index(k)' through Index<K>.
         if (_coreIndex is { } index && IndexesThrough(target, index))
+        {
+            // '^n' is sugar for an array's, a view's or a string's length; a type's own 'index'
+            // takes the argument as written, and '^n' has no value to pass it.
+            if (ix.Index is UnaryExpr { Operator: UnaryOp.FromEnd } fromEnd)
+                return FromEndOnOwnIndex(ix, fromEnd, target, scope);
             return DesugarIndex(ix, ix, "index", [ix.Index], scope);
+        }
 
         CheckIndexValue(ix.Index, target, scope);
         return target switch
@@ -7501,6 +7507,22 @@ public sealed class TypeChecker
                      $"'{TypeFacts.Display(target)}' is not indexable — it must implement "
                      + "'Indexable<T>' from std.collections")
         };
+    }
+
+    /// <summary><c>x[^n]</c> on a type with its own <c>index</c>: refused where it is written, with
+    /// the subtraction it stands for as the change — one to look at, since the type may have no
+    /// <c>length()</c> and <c>x</c> is written twice.</summary>
+    private LyrType FromEndOnOwnIndex(IndexExpr ix, UnaryExpr fromEnd, LyrType target, SymbolTable scope)
+    {
+        var n = CheckExpr(fromEnd.Operand, scope, LyrType.Int);
+        if (!n.IsError) CheckAssignable(fromEnd.Operand, n, LyrType.Int, fromEnd.Operand.Span);
+        _result.SetType(fromEnd, LyrType.Int);
+        var written = $"{_comp.TextOf(ix.Target.Span)}.length() - {_comp.TextOf(fromEnd.Operand.Span)}";
+        _de.Report(new Diagnostic("LYR-SEM0114", Severity.Error, fromEnd.Span,
+            $"'{TypeFacts.Display(target)}' is indexed through its own 'index', which takes the index as written — "
+            + "'^n' counts from the end of an array, a view or a string",
+            [DiagnosticNote.Suggest($"count from its length: '{written}'", new Replacement(fromEnd.Span, written, Applicability.NeedsReview))]));
+        return LyrType.Error;
     }
 
     /// <summary>Whether a value of the type is indexed through <paramref name="iface"/> of std.core:
@@ -7940,9 +7962,19 @@ public sealed class TypeChecker
             if (call.TypeArguments is { Length: > 0 } written && fsym is { Generics.Length: > 0 })
             {
                 if (written.Length != fsym.Generics.Length)
-                    _de.Report("LYR-SEM0026", Severity.Error, call.Span,
+                {
+                    // too few: each one left out is a '_' the inference fills — the call it meant
+                    var missing = fsym.Generics.Length - written.Length;
+                    var at = written[^1].Span;
+                    DiagnosticNote[] notes = missing > 0
+                        ? [DiagnosticNote.Suggest(
+                            $"its type parameters are {string.Join(", ", fsym.Generics.Select(g => g.Name))}; '_' leaves one to the inference",
+                            new Replacement(new Span(at.File, at.End, at.End), string.Concat(Enumerable.Repeat(", _", missing)), Applicability.Safe))]
+                        : [];
+                    _de.Report(new Diagnostic("LYR-SEM0026", Severity.Error, call.Span,
                         $"generic function '{fsym.Name}' expects {fsym.Generics.Length} type "
-                        + $"argument(s), got {written.Length}");
+                        + $"argument(s), got {written.Length}", notes));
+                }
 
                 // A placeholder ('collect<_, int>(xs)') is not bound here: it is the one
                 // position the inference below is asked to fill, the way it fills every argument

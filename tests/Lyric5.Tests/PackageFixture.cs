@@ -62,7 +62,7 @@ internal static class TestDirectories
 /// A package on disk for a test, and the driver run over it through <c>Main</c> — with the console
 /// redirected, so a class that uses it belongs to the console collection.
 /// </summary>
-internal static class PackageFixture
+internal static partial class PackageFixture
 {
     /// <summary>The manifest of the package <c>app</c>.</summary>
     public const string AppManifest = "[package]\nname = \"app\"\nversion = \"0.1.0\"\n";
@@ -81,12 +81,21 @@ internal static class PackageFixture
     }
 
     /// <summary>The driver with <paramref name="args"/>: its exit code and what it wrote, the
-    /// diagnostics folded to one line per finding (<see cref="DiagnosticHeads"/>).</summary>
+    /// diagnostics folded to one line per finding (<see cref="DiagnosticHeads"/>) and the build's
+    /// status lines left out — <see cref="BuildStatusTests"/> reads those through
+    /// <see cref="RunRaw"/>.</summary>
     public static (int Exit, string Out, string Err) Run(params string[] args)
     {
         var (exit, output, error) = RunRaw(args);
-        return (exit, output, DiagnosticHeads.Fold(error));
+        return (exit, output, DiagnosticHeads.Fold(WithoutStatus(error)));
     }
+
+    /// <summary>The standard error without the build's status lines (spec 14 §1.1).</summary>
+    public static string WithoutStatus(string error) =>
+        string.Join('\n', error.Split('\n').Where(line => !StatusLine().IsMatch(line)));
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^ *(Compiling|Checking|Linking|Archiving|Running|Binding|Fetching|Updating|Finished) ")]
+    private static partial System.Text.RegularExpressions.Regex StatusLine();
 
     /// <summary>The driver with <paramref name="args"/>, its standard error as it was written.</summary>
     public static (int Exit, string Out, string Err) RunRaw(params string[] args)

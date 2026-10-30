@@ -182,4 +182,31 @@ public class FixTests
         var (built, _, said) = RunRaw("check", "-C", root, "--color", "never");
         Assert.True(built == 0, said);
     }
+
+    /// <summary>A call that writes fewer type arguments than the function has: each one left out
+    /// becomes a '_', the call the inference would have made — 'arrayOf' has 'T' and 'E', what its
+    /// function throws.</summary>
+    [Fact]
+    public void A_call_with_too_few_type_arguments_gets_a_placeholder_for_each()
+    {
+        var root = Package(("lyric.toml", AppManifest), ("src/main.lyr", """
+            import std.core { arrayOf };
+
+            fn main(): int {
+                let rows = arrayOf<string[]>(2, (_) => arrayOf<string>(3, (_) => "x"));
+                return rows.length() + rows[0].length();
+            }
+
+            """));
+        var (before, _, said) = RunRaw("check", "-C", root, "--color", "never");
+        Assert.Equal(1, before);
+        Assert.Contains("generic function 'arrayOf' expects 2 type argument(s), got 1", said);
+        Assert.Contains("its type parameters are T, E; '_' leaves one to the inference", said);
+
+        var (exit, _, error) = RunRaw("fix", "-C", root, "--color", "never");
+        Assert.True(exit == 0, error);
+        Assert.Contains("let rows = arrayOf<string[], _>(2, (_) => arrayOf<string, _>(3, (_) => \"x\"));",
+            File.ReadAllText(Path.Combine(root, "src", "main.lyr")));
+        Assert.Equal(0, RunRaw("check", "-C", root).Exit);
+    }
 }

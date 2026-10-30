@@ -117,7 +117,7 @@ public class ExportTests
         Assert.Contains("LYRIC_API geo_Point geo_mid(geo_Point a, geo_Point b);", header);
         Assert.Contains("LYRIC_API LyrStatus geo_length(const char *text, int64_t *lyr_out);", header);
         Assert.Contains("LYRIC_API void geo_hello(void);", header);
-        Assert.Equal(Expected, RunHost(dir, [Path.Combine(o, "libgeo.a"), .. SystemLibraries()]));
+        Assert.Equal(Expected, RunHost(dir, [Path.Combine(o, "libgeo.a"), .. LinkArgs(dir)]));
     }
 
     [Fact]
@@ -144,7 +144,7 @@ public class ExportTests
         var dir = Geo("#include <stdio.h>\n#include \"geo.h\"\n\nint main(void) {\n    printf(\"%lld\\n\", (long long)geo_add(1, 2));\n    return 0;\n}\n");
         var (exit, _, error) = Run("build", "-C", dir, "--lib");
         Assert.True(exit == 0, error);
-        var ran = BuildHost(dir, [Path.Combine(OutOf(dir), "libgeo.a"), .. SystemLibraries()]);
+        var ran = BuildHost(dir, [Path.Combine(OutOf(dir), "libgeo.a"), .. LinkArgs(dir)]);
         Assert.Equal(101, ran.ExitCode);
         Assert.Contains("panic [LYR-RT0022]: C called an export before lyr_init started the runtime", ran.Stderr);
     }
@@ -217,14 +217,16 @@ public class ExportTests
         Assert.Contains("lib.lyr", error);
     }
 
-    /// <summary>What a C program links beside the archive: the system's libraries the runtime calls
-    /// — and on Linux the unwinder its backtraces need, which zig cc does not link by itself.</summary>
-    internal static string[] SystemLibraries() => Target.Host.Os switch
+    /// <summary>What a C program links beside the archive, as the build says it (spec 13 §4 rule 9):
+    /// the line of the artifact <c>build --lib --json</c> writes — the library is up to date by now.</summary>
+    internal static string[] LinkArgs(string dir)
     {
-        TargetOs.Windows => ["-lshell32", "-lws2_32"],
-        TargetOs.MacOs => [],
-        _ => ["-lpthread", "-lm", "-lunwind"],
-    };
+        var (exit, output, error) = RunRaw("build", "-C", dir, "--lib", "--json");
+        Assert.True(exit == 0, output + error);
+        return LibraryLinkTests.LinkArgsOf(output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => System.Text.Json.JsonDocument.Parse(line).RootElement)
+            .Single(e => e.GetProperty("type").GetString() == "artifact"));
+    }
 
     private static string RunHost(string dir, string[] link)
     {

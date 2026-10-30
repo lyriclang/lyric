@@ -6,11 +6,11 @@
 title = "the C compiler or the linker failed"
 severity = "error"
 area = "14-cli"
-summary = "Reported by `build`, `run`, `test` and `bench` when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails, or does not finish within five minutes and is stopped. The message carries the command and what the C compiler wrote, or the limit; the exit code is 2."
+summary = "Reported by `build`, `run`, `test` and `bench` when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails, or does not finish within five minutes and is stopped. The message carries the command and what the C compiler wrote, or the limit; the exit code is 2. A link whose failure the build can read is said as its findings instead (`LYR-LNK0001`–`LYR-LNK0003`); this error stands for what is left. A header no directory holds adds the directories that were searched."
 explanation = '''
 `lyric5` translates the program to C and hands it to a C compiler (`zig cc`, clang or gcc) together with the runtime and the C sources the packages name in `[native]` or through their build scripts. When that step fails, the build stops with this error and the compiler's own output.
 
-The Lyric program itself was accepted; what failed is C. Look at the quoted output: most often a package's own C source does not compile, a library named with `link-lib` or in `[native]` is missing, or the profile needs clang (`asan`, `tsan`) and another compiler was found. A failure in C the toolchain generated is a defect of the toolchain and worth a report.
+The Lyric program itself was accepted; what failed is C. Look at the quoted output: most often a package's own C source does not compile, a header it includes lies in no directory the package names in `include`, or the profile needs clang (`asan`, `tsan`) and another compiler was found. A failure in C the toolchain generated is a defect of the toolchain and worth a report.
 
 A step that does not finish within five minutes is stopped and said with the limit: a machine under heavy load, or a unit too large for the C compiler. Building again on a quieter machine, or splitting a very large native source, gets past it.
 '''
@@ -1263,6 +1263,79 @@ fn main(): void {
 }
 '''
 
+[LYR-LNK0001]
+title = "a C symbol nothing the link takes defines"
+severity = "error"
+area = "15-project"
+summary = "Reported by `build`, `run`, `test` and `bench` when the linker finds no definition of a symbol the program or a package's C calls. The finding stands at the `extern` declaration that names the symbol, where the program declares it; else it says what references it. Nothing is linked; the exit code is 2."
+explanation = '''
+An `extern "C" fn` declaration promises that some C defines the function. The compiler takes the promise; the linker checks it, against everything the link takes: the program, the packages' C sources and archives, the libraries their `[native]` parts and build scripts name, the runtime. When none of them defines the symbol, the link fails, and this finding points at the declaration.
+
+Most often the library that defines it is not named. Name it where the package says what it links: `libs` for a library of the system by name, `archives` for one the package brings prebuilt, `frameworks` on macOS, `pkgConfig` for one pkg-config knows — or let the build script link it. A symbol spelled otherwise than the C header spells it, or a function the header declares only as a macro, is the other common cause: compare the declaration with the header, or have `lyric bindgen` write it.
+'''
+example = '''
+$ cat src/main.lyr
+extern "C" fn sqlite3_libversion(): CStr;
+
+fn main(): void {
+    let _ = sqlite3_libversion();
+}
+$ lyric5 build
+error[LYR-LNK0001]: nothing the link takes defines 'sqlite3_libversion'
+ --> src/main.lyr:1:1
+  |
+1 | extern "C" fn sqlite3_libversion(): CStr;
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ declared here, and defined nowhere the link looks
+  |
+  = help: name the library that defines it in the package's [native] — 'libs', 'archives', 'frameworks' or 'pkgConfig' — or link it from the build script
+'''
+
+[LYR-LNK0002]
+title = "a library the linker does not find"
+severity = "error"
+area = "15-project"
+summary = "Reported by `build`, `run`, `test` and `bench` when the linker finds no library by a name a package's `[native]` part, its build script or pkg-config gave it, or no macOS framework by its name. The finding stands at the line of the manifest that names it, or says who named it. Nothing is linked; the exit code is 2."
+explanation = '''
+A library named in `libs` — or by a build script's `linkLib`, or in what pkg-config answered — is looked for by the linker in the system's directories and those the build was told of. When it is not there, the link fails at once.
+
+On Linux and macOS the library is often installed without what a link needs: install its development package (`libsqlite3-dev`, `sqlite-devel`), or let `pkgConfig` find it, which also says the directory. A library in a directory of its own is named by a build script with `linkSearch`. A misspelt name — `sqlite` for `sqlite3` — fails the same way. A framework is the macOS SDK's; its name is the SDK's, with its capital letters.
+'''
+example = '''
+$ cat lyric.toml
+[package]
+name = "app"
+version = "0.1.0"
+
+[native]
+libs = ["sqlite"]
+$ lyric5 build
+error[LYR-LNK0002]: the linker finds no library 'sqlite'
+ --> lyric.toml:6:9
+  |
+6 | libs = ["sqlite"]
+  |         ^^^^^^^^ app names it here
+  |
+  = help: install its development package, or name the directory that holds it — pkg-config says both ('pkgConfig'), a build script 'linkSearch'
+'''
+
+[LYR-LNK0003]
+title = "a C symbol two inputs of the link define"
+severity = "error"
+area = "15-project"
+summary = "Reported by `build`, `run`, `test` and `bench` when the linker finds a symbol defined twice — by two packages' C, a package and the program, or one package twice. The finding names who defines it and where. Nothing is linked; the exit code is 2."
+explanation = '''
+C has one namespace for the functions and variables a program links: two definitions of one name are one too many, wherever they come from. Two packages that each carry a copy of the same small C library, or of a helper named the same, meet here.
+
+Rename one of them, make one `static` where only its own file calls it, or leave one package's copy out — a package that depends on another can use that one's C instead of its own.
+'''
+example = '''
+$ lyric5 build
+error[LYR-LNK0003]: 'twice_c' is defined by app and by geo
+  = note: defined at a.c:1 (app/native/a.c:1)
+  = note: defined at b.c:1 (geo/native/b.c:1)
+  = help: a C symbol is defined once in a program: rename one of them, make one 'static', or leave one of the packages out
+'''
+
 [LYR-MAC0001]
 title = "an error a macro reports"
 severity = "error"
@@ -1937,37 +2010,8 @@ fn main(): void {
 title = "a list after '::' without its '['"
 severity = "error"
 area = "05-interfaces"
-summary = "The interfaces after `::` — of a struct, class, enum, interface or extend block, of a type parameter's constraints, of an associated type's bound — do not open with `[`."
-explanation = '''
-What follows `::` is a list, and a list stands in brackets even when it holds one entry: `struct User :: [Named]`, `T :: [Show, Eq]`. Without the `[` the closing `]` is usually missing too, and is refused as well (LYR-PAR0004).
-
-Put the interfaces in brackets.
-'''
-wrong = '''
-interface Named {
-    fn name(): string;
-}
-
-struct User :: Named] {
-    fn name(): string { return "u"; }
-}
-
-fn main(): void {
-}
-'''
-right = '''
-interface Named {
-    fn name(): string;
-}
-
-struct User :: [Named] {
-    fn name(): string { return "u"; }
-}
-
-fn main(): void {
-    let _ = User { }.name();
-}
-'''
+summary = "The interfaces after `::` did not open with `[`."
+retired = "the list rule: one interface after '::' stands without brackets, 'struct S :: I'; several without them are LYR-PAR0066"
 
 [LYR-PAR0031]
 title = "a parameter or field without ':' before its type"
@@ -2905,6 +2949,53 @@ fn main(): void {
         };
         let _ = n;
     }
+}
+'''
+
+[LYR-PAR0066]
+title = "several interfaces after '::' without brackets"
+severity = "error"
+area = "05-interfaces"
+summary = "Several interfaces follow `::` — of a struct, class, enum, interface or extend block, or of an associated type's bound — without brackets around them. One interface stands without them, several in them."
+explanation = '''
+After `::` one interface may stand alone, `struct User :: Named`, and several stand in brackets, `struct User :: [Named, Shown]` — the list rule, the same as for `throws` and `catch`. Without the brackets the `,` after the first would leave it open what the list holds.
+
+Put the interfaces in brackets. In a type parameter's constraint a `,` after one interface begins the next parameter: `<T :: Named, U>` has the parameters `T` and `U`; `<T :: [Named, Shown]>` constrains `T` twice.
+'''
+wrong = '''
+interface Named {
+    fn name(): string;
+}
+
+interface Shown {
+    fn show(): string;
+}
+
+struct User :: Named, Shown {
+    fn name(): string { return "u"; }
+    fn show(): string { return "U"; }
+}
+
+fn main(): void {
+}
+'''
+right = '''
+interface Named {
+    fn name(): string;
+}
+
+interface Shown {
+    fn show(): string;
+}
+
+struct User :: [Named, Shown] {
+    fn name(): string { return "u"; }
+    fn show(): string { return "U"; }
+}
+
+fn main(): void {
+    let u = User { };
+    let _ = u.name() + u.show();
 }
 '''
 
@@ -4938,7 +5029,7 @@ summary = "A generic type, alias or function is given more or fewer type argumen
 explanation = '''
 `Cell<T>` takes one type argument and `Pair<A, B>` two; a type parameter with a default may be left out. A function that is not generic takes none.
 
-Write as many type arguments as the declaration has parameters, or leave them out where the context or the arguments determine them.
+Write as many type arguments as the declaration has parameters, or leave them out where the context or the arguments determine them. A call writes them all or none: `_` stands for one the inference is to fill — `arrayOf<string, _>(3, f)` writes `T` and leaves `E`, what `f` throws, to the call. Where a call writes too few, `lyric fix` adds a `_` for each one left out.
 '''
 wrong = '''
 struct Cell<T> { v: T }
@@ -7242,7 +7333,7 @@ severity = "error"
 area = "03-types"
 summary = "'^n' stands outside '[…]' as a value of its own, indexes a string directly, or indexes a value that has no length."
 explanation = '''
-`^n` counts from the end of what is being indexed, so it is sugar inside the brackets only: `xs[^1]`, `xs[1..^1]`. On its own (`let i = ^1;`) it has no length to count from. A string's index is a byte offset where a character begins, which from the end is rarely the case, so on a string `^n` bounds a range only (`s[^3..]`). And a value without a length has no end to count from.
+`^n` counts from the end of what is being indexed, so it is sugar inside the brackets only: `xs[^1]`, `xs[1..^1]`. On its own (`let i = ^1;`) it has no length to count from. A string's index is a byte offset where a character begins, which from the end is rarely the case, so on a string `^n` bounds a range only (`s[^3..]`). And a value without a length has no end to count from. A type with its own `index`, such as `List<T>`, takes the index as written, so `list[^1]` is refused too; a range on it, `list[^2..]`, goes through its view and counts from the end.
 
 Write `^n` inside the index, compute the position as `xs.length() - n`, or slice a string with a range.
 '''

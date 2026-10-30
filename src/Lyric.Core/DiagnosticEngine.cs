@@ -270,6 +270,15 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
         static bool IsControl(char c) => c != '\t' && (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F));
     }
 
+    /// <summary>
+    /// <see cref="Printable"/>, line by line: a message's line breaks stay breaks — what a C
+    /// compiler or a linker wrote is quoted in <c>LYR-BLD0001</c> as the lines it wrote, not as one
+    /// line of <c>␊</c> — and <c>\r\n</c> is one. A message has no caret to keep in step; every other
+    /// control character is replaced as <see cref="Printable"/> replaces it.
+    /// </summary>
+    public static string PrintableLines(string text) =>
+        text.Contains('\n') ? string.Join('\n', text.Replace("\r\n", "\n").Split('\n').Select(Printable)) : Printable(text);
+
     private readonly HashSet<Diagnostic> _rendered = [];
     private int _shownErrors;
 

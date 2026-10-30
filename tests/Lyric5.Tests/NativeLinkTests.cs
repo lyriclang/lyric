@@ -40,7 +40,7 @@ public class NativeLinkTests
     /// <summary>A shared library <c>greet</c> for the host, built by the C compiler the build uses into
     /// the package, and the manifest table that names it — named as a library meant to lie beside a
     /// program names itself, unless <paramref name="named"/> is false.</summary>
-    private static string SharedLibrary(string dir, bool named = true)
+    internal static string SharedLibrary(string dir, bool named = true)
     {
         var compiler = CCompiler.Locate() ?? throw new InvalidOperationException("no C compiler");
         var os = Target.Host.Os;

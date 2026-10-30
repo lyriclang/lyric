@@ -58,7 +58,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M13a | fmt, doc, api | M | **done** 2026-10-25 |
 | M13b | LSP, DAP, clients | XL | **done** 2026-10-26 |
 | M14 | FFI and embedding | L | **done** 2026-10-28 |
-| M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | — (planned 2026-10-28) |
+| M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | **done** 2026-10-29 |
 | M15 | Distribution | M | — |
 | M16 | Migration (`lyric fix --from-4`) | L | — (planned 2026-10-29) |
 | M17 | Spec 5.0, suite, guide | L | — |
@@ -1379,6 +1379,41 @@ released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "
   conformance defaults (188, a compiler bug for the sweep; S11 worked around it); main's macOS
   job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
   step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
+
+### M14b — done (2026-10-29)
+
+The plan is design 13's addendum "der Plan für M14b" (P1–P7, L1–L8), #597, after 11 and 07 "Review 2026-10-28";
+the maintainer's word: C libraries as pleasant to bring in as can be, and every change in the explanations and the
+Book. Each slice went spec-first; `docs/book/c-libraries.md` grew with each.
+
+- **L1** the design and the rules as text (#597 + spec#372).
+- **L2a** an SDK through the build script (#602 + spec#375): `linkSearch`, `besideBinary`, `rerunIfEnvChanged`, the
+  binary looks beside itself first; the Book chapter "C libraries" begins.
+- **L2b** the native part (#604 + spec#376): `archives`, `dylibs` (a Mach-O library named by `@rpath`, an ELF one by
+  its soname, `LYR-BLD0006` otherwise), `defines`, tables per triple, a dependency's headers, the link held by the
+  archives' bytes.
+- **L3** source trees (#608 + spec#378): `[native.vendor]` from git or from a URL with its SHA-256, lazy per target,
+  in the lock; `lyric add --vendor`, `lyric update` renews them.
+- **L4** bindings (#611 + spec#381): a module per header and target from clang's syntax tree, `lyric bindgen`;
+  `LYR-BLD0005`, `LYR-RES0016`; a `string` passes as a `?CStr`.
+- **L5** `std.build` anew, frameworks, `pkgConfig` (#614 + spec#385): `target()`, `cLibrary`, `linkArchive`,
+  `linkFramework`, `pkgConfig`, `vendorDir`, `cEnv`; `compileC`/`cFlags` gone; what only the host has, asked for
+  another target, is `LYR-BLD0004`. Measured on the macOS runner: zig finds the SDK's frameworks only in a build for
+  the Mac it runs on.
+- **L6** `--lib` (#622 + spec#387): the packages' archives inside `lib<name>.a`, their shared libraries beside it,
+  the rest of the link said as a note and as `linkArgs`.
+- **L7** the link's findings (#623 + spec#390): `LYR-LNK0001` at the `extern` line, `LNK0002` at the manifest's
+  line, `LNK0003` with who defines the symbol; a missing header names the directories searched; `-v`.
+- **L8** the examples and the close: `examples/native-prebuilt` (an archive per Tier 1 triple, rebuilt and compared
+  byte for byte by `ExampleTests`; CoreFoundation on macOS) and `examples/raylib` (raylib 5.5 from its release,
+  compiled by the build script, called through bindings from `raylib.h`; built, not run). A message's lines stay
+  lines: `BLD0001` had shown a C compiler's output as one line of `␊` since M12a. E7 decided: no free linker flags
+  in 5.0.
+- The exit criterion — `examples/native-prebuilt` links its prebuilt archive and on macOS a framework;
+  `examples/raylib` builds raylib from its repository and calls it through generated bindings — holds, in the
+  platform run. Open for the maintainer, each "decide or door": L8-a (no `var` fields in a bound struct), L8-b
+  (`unsafe` as an expression is a poor error), L8-c (`fmt` and builder chains), L8-d (Windows objects carry a random
+  object name), beside 287, 288, 289, 292, 293 and 297 from M14. **Next: M15's halts (S6, S7), then M16.**
 
 ### M14 — done (2026-10-28)
 

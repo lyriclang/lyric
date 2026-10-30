@@ -38,6 +38,10 @@ public static class DefinitionProvider
         // '_' names nothing; the pattern around it is not what the cursor is on.
         if (path is [.., WildcardPattern]) return null;
 
+        // A name of an import clause is no node; it jumps where its uses jump, to what it imports.
+        if (NodeFinder.ImportedAt(model, path, file, offset, out _) is { } imported)
+            return Declaration(imported) is { } declared && !model.Compilation.IsSynthesized(declared.File) ? declared : null;
+
         // From the inside out, like hover: the innermost node is the most specific, and the nodes
         // above it are the fallback when it binds to nothing.
         for (var i = path.Count - 1; i >= 0; i--)

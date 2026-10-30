@@ -52,7 +52,7 @@ public sealed class TextRenderer(SourceManager sources, RenderStyle style)
             _ => ("hint", Cyan),
         };
         output.Write(Paint($"{level.Item1}[{diagnostic.Code}]", level.Item2));
-        output.Write(Paint(": " + DiagnosticEngine.Printable(diagnostic.Message), Bold));
+        output.Write(Paint(": " + DiagnosticEngine.PrintableLines(diagnostic.Message), Bold));
         output.Write('\n');
 
         var notes = diagnostic.Notes ?? [];

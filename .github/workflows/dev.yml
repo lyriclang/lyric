@@ -38,6 +38,12 @@ jobs:
       - name: Set up zig (the Lyric 5 runtime tests build C)
         uses: ./.github/actions/setup-zig
 
+      # examples/raylib builds raylib for Linux with the system's X11 and OpenGL (as in ci.yml)
+      - name: X11 and OpenGL for the raylib example
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libgl-dev
+
       - name: Restore
         run: dotnet restore
 

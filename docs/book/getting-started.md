@@ -110,8 +110,18 @@ In the package's directory, `lyric run` builds the program and runs it:
 ```text
 $ cd hello
 $ lyric run
+   Compiling hello v0.1.0 (src/main.lyr)
+   Compiling 3 of 3 C units of hello
+     Linking hello (out/debug/x86_64-linux-gnu/hello)
+    Finished debug [opt 0, debug info] in 1.12s
+     Running out/debug/x86_64-linux-gnu/hello
 Hello, world!
 ```
+
+The lines before the greeting are the build's, on the standard error: each step that does work
+says what it works on, and the last how long it all took. Run it again and nothing has changed —
+only `Finished` and `Running` are said. The first build of a profile also compiles the runtime,
+once for every program on the machine; `-q` says none of these lines, only the findings.
 
 `lyric build` builds without running; the binary lands under `out/`, by profile and target —
 `out/debug/x86_64-linux-gnu/hello` on Linux. The default profile is `debug`: quick to build, with
