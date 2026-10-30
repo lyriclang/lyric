@@ -16,6 +16,11 @@ public static partial class Program
         var file = parsed.Words.Count == 1 ? parsed.Words[0] : null;
         var from = parsed.Values.GetValueOrDefault("-C");
         var dryRun = parsed.Flags.Contains("--dry-run");
+        if (parsed.Flags.Contains("--from-4"))
+        {
+            if (Lyric.Core.Rendering.RenderStyle.Current.Events is not null) return Unknown("'--json' does not go with '--from-4'");
+            return FixFrom4(file, Path.GetFullPath(from ?? Directory.GetCurrentDirectory()), dryRun);
+        }
         var offline = parsed.Flags.Contains("--offline");
         var baseDirectory = Path.GetFullPath(from ?? Directory.GetCurrentDirectory());
         if (!Directory.Exists(baseDirectory))

@@ -1,0 +1,7 @@
+pub fn shout(s: string): string {
+    return bang(s);
+}
+
+fn bang(s: string): string {
+    return s + "!";
+}

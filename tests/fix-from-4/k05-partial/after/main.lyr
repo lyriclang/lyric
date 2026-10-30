@@ -1,0 +1,6 @@
+import std.core { combineHash };
+
+fn main(): int {
+    assert(true, "holds");
+    return combineHash(1, 2) - combineHash(1, 2);
+}

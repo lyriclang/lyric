@@ -1,0 +1,7 @@
+import std.io { println };
+import std.path { fileName, extension };
+
+fn main(): int {
+    println(fileName("a/b.txt") + extension("a/b.txt"));
+    return 0;
+}
