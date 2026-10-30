@@ -1613,6 +1613,17 @@ ihren bekannten Texten.
 - **L8-d** Die eigenen C-Einheiten für Windows tragen denselben zufälligen `S_OBJNAME` wie oben; ein `--lib`-Archiv
   für Windows ist darum nicht bytegleich (der gelinkte PE wird normalisiert, das Archiv nicht).
 
+**Entschieden 2026-10-30 (Maintainer):** L8-b, L8-c und L8-d sind Fehler und werden behoben (ein PR); L8-a kommt mit
+289 (nullbare Zeigerfelder) vor 5.0.
+- **L8-b**: `unsafe { … }` in Wert-Position ist eine Meldung, `LYR-PAR0067` am Wort, statt dreier ohne Ursache; der
+  Block wird gelesen und verworfen, der Wert ist ein Fehlerwert ohne Folgemeldung.
+- **L8-c**: eine Kette mit zwei Aufrufen nach dem Empfänger bricht, wo sie nicht passt, vor jedem Punkt — ein Aufruf je
+  Zeile, eine Ebene tiefer (wie Prettier und rustfmt); der Empfänger mit seinen Feldern, nach einem bloßen Namen auch
+  sein erster Aufruf, bleibt auf der ersten Zeile. Mit einem Aufruf bleibt es beim Umbruch der Argumente. Zwei
+  std-Tests kamen dadurch in eine neue Form; `examples/raylib` schreibt `desktop` als Kette.
+- **L8-d**: eine Einheit für Windows bekommt `-Xclang -object-file-name=<Objekt im Cache>` — der Name ist der
+  Inhaltsschlüssel, also derselbe bei jedem Bau.
+
 **Der Abschluss von M14b.** Die Zeile hält: `examples/native-prebuilt` linkt sein Archiv je Tripel und auf macOS
 CoreFoundation, `examples/raylib` baut raylib aus seinem Release und ruft es über erzeugte Bindungen — beide in
 `ExampleTests`, im vollen Plattformlauf. Gebaut in L1–L8 (#597, #602, #604, #608, #611, #614, #622, #623 und dieser

@@ -172,6 +172,9 @@ public sealed partial class CBuild
         var partial = $"{target}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
         var arguments = Driver();
         arguments.AddRange(FlagsFor(unit));
+        // a COFF object names the file it was written to in its CodeView record; written to a
+        // temporary name, the bytes would differ on every build
+        if (Target.Os == TargetOs.Windows) arguments.AddRange(["-Xclang", "-object-file-name=" + Path.GetFileName(target)]);
         arguments.AddRange(["-c", unit.Source, "-o", partial]);
         var result = Run(Compiler.Path, arguments, $"compiling {unit.Source} for {Target} ({Profile.Name})", partial);
         if (result.ExitCode != 0)

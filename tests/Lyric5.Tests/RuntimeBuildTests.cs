@@ -114,6 +114,24 @@ public class RuntimeBuildTests
         Assert.Equal("gc ok\n", result.Stdout.Replace("\r\n", "\n"));
     }
 
+    /// <summary>A Windows object names the file it was written to in its CodeView record
+    /// (<c>S_OBJNAME</c>). Written to a temporary name, every compilation gave other bytes: the
+    /// runtime's prebuilt archive and a <c>--lib</c> archive were never the same twice. The object
+    /// names its own cached file instead.</summary>
+    [CrossTargetFact]
+    public void A_windows_object_names_its_cached_file()
+    {
+        var dir = TestDirectories.Fresh("lyric5-objname-");
+        var source = Path.Combine(dir, "objname.c");
+        File.WriteAllText(source, "int lyr_objname_probe(int x) { return x + 1; }\n");
+        var build = new CBuild(Zig(), Target.Parse("x86_64-windows-gnu"), BuildProfile.Of(Profile.Debug), Path.Combine(dir, "cache"));
+        var objectFile = build.Compile([new CUnit(source, [], [])])[0];
+        var bytes = File.ReadAllBytes(objectFile);
+        Assert.True(bytes.AsSpan().IndexOf(System.Text.Encoding.ASCII.GetBytes(Path.GetFileName(objectFile))) >= 0,
+            $"{objectFile} does not name itself");
+        Assert.True(bytes.AsSpan().IndexOf(".tmp"u8) < 0, $"{objectFile} names a temporary file");
+    }
+
     /// <summary>On Windows <c>main</c> on the thread's stack has what it has as a task. The
     /// link asks for the main task's 8 MiB (<c>LYR_MAIN_TASK_STACK</c>); zig's default for a
     /// Windows image is 16 MiB (MSVC's 1 MiB), so a recursion went twice as deep on the thread as

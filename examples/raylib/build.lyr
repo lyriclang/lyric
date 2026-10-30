@@ -5,12 +5,11 @@ import std.build;
 
 /// A part of raylib: its headers, the desktop platform, OpenGL 3.3; raylib's own warnings are its.
 fn desktop(name: string): build.CLibrary {
-    let library = build.cLibrary(name);
-    library.include("@raylib/src", "@raylib/src/external/glfw/include");
-    library.define("PLATFORM_DESKTOP");
-    library.define("GRAPHICS_API_OPENGL_33");
-    library.flags("-O2", "-w");
-    return library;
+    return build.cLibrary(name)
+        .include("@raylib/src", "@raylib/src/external/glfw/include")
+        .define("PLATFORM_DESKTOP")
+        .define("GRAPHICS_API_OPENGL_33")
+        .flags("-O2", "-w");
 }
 
 fn main(): void {
