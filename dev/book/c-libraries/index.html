@@ -314,7 +314,10 @@ or let <code>pkgConfig</code> say where it lies.</li>
 <p>Anything else the linker says comes as it is (<code>LYR-BLD0001</code>). A C source whose <code>#include</code> finds
 nothing also says which directories were searched — the package's <code>include</code>, then its
 dependencies'.</p>
-<p>To see the commands themselves, build with <strong><code>-v</code></strong>: each run of the C compiler, the archiver and
+<p>A build says its steps as it goes: <code>Fetching raylib</code> the first time a source tree is read from git,
+<code>Binding</code> a module made from a header, <code>Compiling 7 of 9 C units of app</code> — those whose object is
+not cached yet; on a terminal a counter under it names each unit as it finishes — and <code>Linking</code>.
+To see the commands themselves, build with <strong><code>-v</code></strong>: each run of the C compiler, the archiver and
 the linker is said as it starts, <code>running: zig cc …</code>. What is up to date runs nothing, and says
 nothing.</p>
 <h2 id="loading-a-library-while-the-program-runs">Loading a library while the program runs</h2>

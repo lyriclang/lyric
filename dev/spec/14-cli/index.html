@@ -53,7 +53,8 @@ conformance case before or with its implementation. Source of the decisions:
 <p>What the command line does for a single file (M2) and for a package (M7). The precedence ladder,
 the NDJSON stream and the other verbs follow with their milestones; the rules below stay.</p>
 <p><strong>Conformance.</strong> Until the suite can drive the command line (M13), the toolchain's own tests
-are the conformance of this section (<code>tests/Lyric5.Tests</code>, <code>BuildTests</code> and <code>DriverTests</code>).</p>
+are the conformance of this section (<code>tests/Lyric5.Tests</code>, <code>BuildTests</code>, <code>DriverTests</code> and
+<code>BuildStatusTests</code>).</p>
 <h3 id="11-verbs-and-options">1.1 Verbs and options</h3>
 <ol>
 <li><code>lyric build &lt;file.lyr&gt;</code> compiles the program that starts at the file to a binary: a single
@@ -113,6 +114,22 @@ without <code>--lib</code>, and <code>--lib</code> with a file, <code>--bin</cod
 of the C compiler, the archiver and the linker on the standard error as it starts —
 <code>running: </code> and the command —, the build scripts' and the bindings' among them; what is up to
 date runs nothing and says nothing. It writes text: with <code>--json</code> it is refused (exit 2).</li>
+<li><strong>Status lines.</strong> <code>build</code>, <code>run</code>, <code>check</code>, <code>expand</code>, <code>test</code> and <code>bench</code> say each step that does
+work on the standard error as it starts, one line each — a word right-aligned in twelve
+columns, then what it works on —, whether or not the standard error is a terminal:
+<code>Fetching</code> and <code>Updating</code> a package or a source tree read from git, <code>Running</code> a build script,
+<code>Binding</code> a module made from a header, <code>Compiling</code> a program's front end (<code>app v0.1.0 (src/main.lyr)</code>), the runtime, and the C units — <code>3 of 14 C units of app</code>, the ones whose
+object is not cached —, <code>Checking</code> a program (<code>check</code>), <code>Linking</code> a binary or a shared library,
+<code>Archiving</code> a static one. What is up to date says nothing. A <code>build</code>, <code>run</code> or <code>check</code> that
+succeeds ends with <strong><code>Finished</code></strong>, the profile, its level and debug information, and the time the command took
+(<code>Finished debug [opt 0, debug info] in 0.42s</code>); one that fails ends with its findings. <code>run</code>
+then says the binary it runs (<code>Running out/debug/&lt;target&gt;/app</code>). Where the standard error is
+a terminal, the C units compiled so far are counted on a line drawn over itself and erased
+when they are done (<code>Building [3/14] app</code>), unless <code>-v</code> says commands. The word is coloured
+as the diagnostics are (<a href="../../spec/16-diagnostics/">16 §1</a>). <strong><code>-q</code></strong> (<code>--quiet</code>) says no status line,
+and <code>--json</code> none (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C6</a>):
+the findings stay. The lines are text for a reader, not a format: their words and their
+order may change.</li>
 </ol>
 <h3 id="12-where-the-files-go">1.2 Where the files go</h3>
 <ol>
@@ -324,42 +341,42 @@ verb, <code>--json</code> (<a href="../../spec/16-diagnostics/">16 §4</a>) and 
 <tr>
 <td><code>build</code></td>
 <td><code>[&lt;file.lyr&gt;]</code></td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code>, <code>--emit &lt;ir|c&gt;</code>, <code>--lib</code>, <code>--shared</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code>, <code>--quiet, -q</code>, <code>--emit &lt;ir|c&gt;</code>, <code>--lib</code>, <code>--shared</code></td>
 <td>yes</td>
 <td>yes</td>
 </tr>
 <tr>
 <td><code>run</code></td>
 <td><code>[&lt;file.lyr&gt;] [-- &lt;args&gt;…]</code></td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code>, <code>--quiet, -q</code></td>
 <td>yes</td>
 <td>yes</td>
 </tr>
 <tr>
 <td><code>check</code></td>
 <td><code>[&lt;file.lyr&gt;]</code></td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code>, <code>--quiet, -q</code></td>
 <td>yes</td>
 <td>yes</td>
 </tr>
 <tr>
 <td><code>expand</code></td>
 <td><code>[&lt;file.lyr&gt;]</code></td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--bin &lt;name&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code>, <code>--quiet, -q</code></td>
 <td>yes</td>
 <td>—</td>
 </tr>
 <tr>
 <td><code>test</code></td>
 <td>—</td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code>, <code>--filter, -f &lt;text&gt;</code>, <code>--no-run</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code>, <code>--quiet, -q</code>, <code>--filter, -f &lt;text&gt;</code>, <code>--no-run</code></td>
 <td>yes</td>
 <td>yes</td>
 </tr>
 <tr>
 <td><code>bench</code></td>
 <td>—</td>
-<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code>, <code>--filter, -f &lt;text&gt;</code>, <code>--save &lt;file&gt;</code>, <code>--compare &lt;file&gt;</code></td>
+<td><code>--profile &lt;name&gt;</code>, <code>--opt &lt;0-3&gt;</code>, <code>--gc &lt;immix|boehm&gt;</code>, <code>--[no-]lto</code>, <code>--[no-]debug-info</code>, <code>--[no-]deny-warnings</code>, <code>--[no-]overflow-checks</code>, <code>--[no-]fast-math</code>, <code>--target &lt;triple&gt;</code>, <code>-C &lt;dir&gt;</code>, <code>--offline</code>, <code>--locked</code>, <code>--verbose, -v</code>, <code>--quiet, -q</code>, <code>--filter, -f &lt;text&gt;</code>, <code>--save &lt;file&gt;</code>, <code>--compare &lt;file&gt;</code></td>
 <td>yes</td>
 <td>—</td>
 </tr>

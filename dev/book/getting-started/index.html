@@ -94,7 +94,16 @@ version = "0.1.0"</code></pre>
 <p>In the package's directory, <code>lyric run</code> builds the program and runs it:</p>
 <pre><code class="language-text">$ cd hello
 $ lyric run
+   Compiling hello v0.1.0 (src/main.lyr)
+   Compiling 3 of 3 C units of hello
+     Linking hello (out/debug/x86_64-linux-gnu/hello)
+    Finished debug [opt 0, debug info] in 1.12s
+     Running out/debug/x86_64-linux-gnu/hello
 Hello, world!</code></pre>
+<p>The lines before the greeting are the build's, on the standard error: each step that does work
+says what it works on, and the last how long it all took. Run it again and nothing has changed —
+only <code>Finished</code> and <code>Running</code> are said. The first build of a profile also compiles the runtime,
+once for every program on the machine; <code>-q</code> says none of these lines, only the findings.</p>
 <p><code>lyric build</code> builds without running; the binary lands under <code>out/</code>, by profile and target —
 <code>out/debug/x86_64-linux-gnu/hello</code> on Linux. The default profile is <code>debug</code>: quick to build, with
 checks and debug information. <code>--profile release</code> builds the optimized program:</p>

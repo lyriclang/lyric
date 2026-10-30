@@ -426,6 +426,12 @@ lint resolves them. A <code>```lyric</code> block in a doc comment is a test of 
 since a git revision and whether it breaks code written against it (exit 1). The standard library's reference is
 at <a href="https://lyric.oil1i.de/dev/std/">https://lyric.oil1i.de/dev/std/</a>, an example in every module.</p>
 </li>
+<li><p><strong>A build says what it does</strong> (spec chapter 14 §1.1 rule 11): <code>build</code>, <code>run</code>, <code>check</code>, <code>test</code> and <code>bench</code> say
+each step that does work on the standard error — <code>Fetching</code> a source tree, <code>Running</code> a build script, <code>Binding</code> a
+header, <code>Compiling</code> the program, the runtime and <code>3 of 14 C units of app</code>, <code>Linking</code> —, and <code>Finished</code> with the
+profile and the time; on a terminal the C units are counted as they finish. What is up to date says nothing;
+<code>-q</code> says none of it, and <code>--json</code> none.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
