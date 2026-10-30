@@ -1,3 +1,4 @@
+using System.Numerics;
 using Lyric.AST;
 using Lyric.Core;
 using Lyric.Lexing;
@@ -1002,6 +1003,12 @@ public sealed class TypeChecker
             _ => [],
         };
         var layout = attribute.FirstOrDefault(a => a.Path is ["Layout"]);
+        // a variant's integer is C's: only an enum C holds as one has it
+        if ((layout is null || LayoutOf(type) is null) && type.Declaration is EnumDecl plain)
+            foreach (var variant in plain.Variants)
+                if (variant.Value is { } written)
+                    _de.Report("LYR-SEM0099", Severity.Error, written.Span,
+                        $"variant '{variant.Name}' is given an integer, which C holds for it — only an enum with '@Layout' is C's integer");
         if (layout is null || LayoutOf(type) is not { } form) return;
         if (type.Kind == TypeSymbolKind.Class)
         {
@@ -1036,15 +1043,65 @@ public sealed class TypeChecker
             if (variant.TupleFields is { Length: > 0 } || variant.StructFields is { Length: > 0 })
                 _de.Report("LYR-SEM0099", Severity.Error, variant.Span,
                     $"variant '{variant.Name}' carries a payload — an enum with '@Layout' is C's integer, one per variant");
-        var max = form switch
+        var (min, max) = IntegerRange(form);
+        var values = LayoutValues(declared);
+        var seen = new Dictionary<BigInteger, string>();
+        for (var i = 0; i < values.Length; i++)
         {
-            "int8" => sbyte.MaxValue, "uint8" => byte.MaxValue, "int16" => short.MaxValue, "uint16" => ushort.MaxValue,
-            _ => (long)int.MaxValue,
-        };
-        if (declared.Variants.Length - 1 > max)
-            _de.Report("LYR-SEM0099", Severity.Error, layout.Span,
-                $"'{type.Name}' has {declared.Variants.Length} variants, and '{form}' holds 0 to {max}");
+            var variant = declared.Variants[i];
+            var at = variant.Value?.Span ?? variant.NameSpan;
+            if (values[i] is not { } value)
+            {
+                // where the value is not written, it follows one that could not be read: said there
+                if (variant.Value is { } written)
+                    _de.Report("LYR-SEM0099", Severity.Error, written.Span,
+                        $"variant '{variant.Name}' is given no integer literal — C's integer for it is written as one: '4', '-1', '0x10'");
+                continue;
+            }
+            if (value < min || value > max)
+                _de.Report("LYR-SEM0099", Severity.Error, at,
+                    variant.Value is null
+                        ? $"variant '{variant.Name}' is {value}, one more than the variant before, and '{form}' holds {min} to {max}"
+                        : $"variant '{variant.Name}' is {value}, and '{form}' holds {min} to {max}");
+            else if (!seen.TryAdd(value, variant.Name))
+                _de.Report("LYR-SEM0099", Severity.Error, at,
+                    $"variant '{variant.Name}' is {value}, as '{seen[value]}' is — each variant is its own integer, so C's integer names one");
+        }
     }
+
+    /// <summary>The integers <c>@Layout(form)</c> holds: C's <c>int</c> for <c>C</c>.</summary>
+    private static (BigInteger Min, BigInteger Max) IntegerRange(string form) => form switch
+    {
+        "int8" => (sbyte.MinValue, sbyte.MaxValue), "uint8" => (0, byte.MaxValue),
+        "int16" => (short.MinValue, short.MaxValue), "uint16" => (0, ushort.MaxValue),
+        "uint32" => (0, uint.MaxValue), "int" or "int64" => (long.MinValue, long.MaxValue),
+        "uint" or "uint64" => (0, ulong.MaxValue),
+        _ => (int.MinValue, int.MaxValue),
+    };
+
+    /// <summary>
+    /// The integer C holds for each variant of an enum with <c>@Layout</c>, numbered as C numbers an
+    /// enum's constants: the integer written after <c>=</c>, else one more than the variant before,
+    /// the first 0. <c>null</c> where it is written as no integer literal, or follows one that is.
+    /// </summary>
+    internal static BigInteger?[] LayoutValues(EnumDecl declared)
+    {
+        var values = new BigInteger?[declared.Variants.Length];
+        BigInteger? next = 0;
+        for (var i = 0; i < values.Length; i++)
+        {
+            values[i] = declared.Variants[i].Value is { } written ? IntegerOf(written) : next;
+            next = values[i] + 1;
+        }
+        return values;
+    }
+
+    private static BigInteger? IntegerOf(Expr written) => written switch
+    {
+        IntLiteralExpr { Suffix: null } literal => literal.Value,
+        UnaryExpr { Operator: UnaryOp.Neg, Operand: IntLiteralExpr { Suffix: null } literal } => -(BigInteger)literal.Value,
+        _ => null,
+    };
 
     /// <summary><c>@Export</c> and <c>@Export("c_name")</c>: a bare one, or the symbol as a string
     /// written out — the header and the linker read it before anything is computed.</summary>
@@ -1185,7 +1242,8 @@ public sealed class TypeChecker
             return type.Kind == TypeSymbolKind.Struct && !_headerTypesDone.Contains(type) ? $"struct {name}" : name;
         if (type.Kind == TypeSymbolKind.Enum && type.Declaration is EnumDecl declared)
         {
-            var constants = string.Join(", ", declared.Variants.Select((v, i) => $"{name}_{v.Name} = {i}"));
+            var values = LayoutValues(declared);
+            var constants = string.Join(", ", declared.Variants.Select((v, i) => $"{name}_{v.Name} = {values[i] ?? i}"));
             var definition = LayoutOf(type) == "C"
                 ? $"typedef enum {name} {{ {constants} }} {name};"
                 : $"typedef {CDeclarator(new PrimitiveType(LayoutKind(LayoutOf(type)!)), "")} {name};\nenum {{ {constants} }};";
@@ -13876,7 +13934,7 @@ public sealed class TypeChecker
                 if (_result.KnownFieldOf(rv) is { } f)
                     return m.Member switch { "isVar" => f.IsVar, "index" => (long)f.Index, "name" => f.Name, "hasDefault" => f.HasDefault, _ => null };
                 if (_result.KnownVariantOf(rv) is { } v)
-                    return m.Member switch { "index" => (long)v.Index, "name" => v.Name, _ => null };
+                    return m.Member switch { "index" => (long)v.Index, "name" => v.Name, "value" => v.Value, _ => null };
                 if (_result.KnownMemberOf(rv) is { } km)
                     return m.Member switch { "name" => km.Name, "isStatic" => km.IsStatic, "isMut" => km.IsMut, "kind" => new KindMark(km.Kind), _ => null };
                 if (_result.KnownParamOf(rv) is { } kp)
@@ -14353,11 +14411,21 @@ public sealed class TypeChecker
         var subst = type is GenericInstance gi ? SubstMap(gi) : EmptySubst;
         LyrType Of(TypeNode written) =>
             type is GenericInstance ? Substitute(ResolveType(written, ts.Members), subst) : ResolveType(written, ts.Members);
+        // C's integer for a variant of an enum with '@Layout', its index for any other
+        var values = LayoutOf(ts) is not null ? LayoutValues(e) : null;
         return [.. e.Variants.Select((v, i) => new TypeResult.MetaVariant(v.Name, i, v.StructFields is { } named
             ? [.. named.Select((f, j) => new TypeResult.MetaField(f.Name, Of(f.Type), j, Visibility.Public, false, null) { Declaration = f })]
             : [.. (v.TupleFields ?? []).Select((t, j) => new TypeResult.MetaField(
-                j.ToString(System.Globalization.CultureInfo.InvariantCulture), Of(t), j, Visibility.Public, false, null))]) { Attributes = v.Attributes })];
+                j.ToString(System.Globalization.CultureInfo.InvariantCulture), Of(t), j, Visibility.Public, false, null))])
+        {
+            Attributes = v.Attributes,
+            Value = values?[i] is { } value ? AsInt64(value) : i,
+        })];
     }
+
+    /// <summary>A variant's integer as Lyric's <c>int</c> holds it: one past <c>int</c>'s range, a
+    /// <c>uint</c> enum's, by its bits.</summary>
+    internal static long AsInt64(BigInteger value) => value > long.MaxValue ? unchecked((long)(ulong)value) : (long)value;
 
     /// <summary>The interfaces a type conforms to — its list's, its blocks', their parents —, in
     /// the order the modules declare them.</summary>

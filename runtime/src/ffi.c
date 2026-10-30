@@ -357,3 +357,10 @@ int64_t lyr_ffi_enum_tag(int64_t value, int64_t variants, const char *enum_name)
                   (long long)value, enum_name, (long long)variants);
     return value;
 }
+
+int64_t lyr_ffi_enum_index(int64_t value, const int64_t *values, int64_t variants, const char *enum_name) {
+    for (int64_t i = 0; i < variants; i++)
+        if (values[i] == value) return i;
+    lyr_panic(LYR_RT_FOREIGN_ENUM, "C returned %lld, which is no variant of %s (it has %lld)",
+              (long long)value, enum_name, (long long)variants);
+}

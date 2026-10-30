@@ -2263,10 +2263,16 @@ public sealed partial class CEmitter
             IrCKind.Pointer or IrCKind.OptionalPointer => $"(void *)(uintptr_t)({value}).{address}",
             IrCKind.CString or IrCKind.OptionalCString => $"(const char *)(uintptr_t)({value}).{address}",
             IrCKind.OptionalFunction => $"(({value}).has ? (void *)(uintptr_t)({value}).value : NULL)",
+            // a variant given C's integer: its integer by its tag
+            IrCKind.Enum when form.Values is { } values => $"({form.Integer}){EnumValues(values)}[({value}).tag]",
             IrCKind.Enum => $"({form.Integer})({value}).tag",
             _ => value,
         };
     }
+
+    /// <summary>The integers of an enum's variants, by their tags, as a C array.</summary>
+    private static string EnumValues(long[] values) =>
+        $"((const int64_t[]){{ {string.Join(", ", values.Select(v => v == long.MinValue ? "INT64_MIN" : $"INT64_C({v})"))} }})";
 
     /// <summary>A C value as Lyric holds it, a C expression of <paramref name="type"/>: a pointer
     /// into its struct, null into <c>none</c>, an integer into its variant. <paramref name="c"/> is
@@ -2279,6 +2285,8 @@ public sealed partial class CEmitter
             IrCKind.Pointer or IrCKind.CString or IrCKind.OptionalPointer or IrCKind.OptionalCString =>
                 $"({CType(type)}){{ .{address} = (uint64_t)(uintptr_t){c} }}",
             IrCKind.OptionalFunction => $"({CType(type)}){{ .value = (uint64_t)(uintptr_t){c}, .has = {c} != NULL }}",
+            IrCKind.Enum when form.Values is { } values =>
+                $"({CType(type)}){{ .tag = lyr_ffi_enum_index((int64_t){c}, {EnumValues(values)}, {form.Variants}, \"{form.EnumName}\") }}",
             IrCKind.Enum => $"({CType(type)}){{ .tag = lyr_ffi_enum_tag((int64_t){c}, {form.Variants}, \"{form.EnumName}\") }}",
             _ => c,
         };

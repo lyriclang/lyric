@@ -41,6 +41,10 @@ LyrStr *lyr_ffi_cstr_string(uint64_t address);
  * of its variants. */
 int64_t lyr_ffi_enum_tag(int64_t value, int64_t variants, const char *enum_name);
 
+/* The same for an enum whose variants are given C's integers: the index of `value` among
+ * `values`, one per variant, or the panic where none is it. */
+int64_t lyr_ffi_enum_index(int64_t value, const int64_t *values, int64_t variants, const char *enum_name);
+
 /* std.ffi.alloc: count values of size bytes each, set to zero, from C's heap — never null: a
  * negative count panics (LYR-RT0007), no memory left panics (LYR-RT0005). */
 uint64_t lyr_ffi_alloc(int64_t count, uint64_t size);

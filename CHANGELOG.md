@@ -332,6 +332,11 @@ promise. This entry fills with the milestones.
   `lyric bindgen` writes a struct's pointer fields optional and every field `var`, so `pos.x += 1` writes a bound
   struct in place (spec chapter 15 rule 18). An array's `asPtr` says how to keep the array for a C function that
   keeps the pointer.
+- **A C enum's variants take C's integers** (spec chapter 13 §3 rule 5, chapter 11 §4): a `@Layout(C)` enum's
+  variant may be given its integer, `Read = 1`; one without is one more than the variant before it, the first 0.
+  The enum crosses as that integer both ways, and one that is no variant is `LYR-RT0021`. `std.ffi.CEnum` reads an
+  integer C keeps elsewhere: `Mode.from(n)` is the variant or `null`, `m.value()` the integer;
+  `VariantInfo.value` gives it to a `comptime` walk.
 
 ---
 

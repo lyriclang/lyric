@@ -1962,6 +1962,7 @@ Signieren, S7 Mirror) warten weiter auf Schlüssel und DNS des Maintainers; der 
 | 273, 281, 297 | **Türen nach 5.0** (geprüfte std über Prozesse; Debugger-Scope „Tasks“; `Callback.new(…, thread:)`) | — |
 | 300 | Die Ratchet „kalt ≤ 400 ms“ gilt mit warmem zig-Cache; das Frontend bekommt vor 5.0 keine Uhr dafür | — |
 | L8-b, L8-c, L8-d | **Fehler**, behoben (`LYR-PAR0067`, `fmt` und Ketten, `S_OBJNAME`) | 13 §3 R8 |
+| translate-c | **Tür nach 5.0** (lyric#635): ein eigenes Verb `lyric translate-c <datei.c>`, kein `fix --from-c` — `fix` ändert Lyric im eigenen Paket, das hier liest eine andere Sprache; Grundlage clangs AST über `zig cc -ast-dump=json` wie `bindgen`, ein Header wird `import` seines Bindings; was keine Entsprechung hat, ist eine Diagnose, nie geraten | — |
 
 **Verworfen**: Enum-Felder mit `RT0021` beim Lesen (288) — ein altes Binding stürzte ab, sobald die Bibliothek eine
 Variante dazubekommt; Rusts bindgen bildet C-Enums aus demselben Grund als Ganzzahl ab. Ein optionaler
