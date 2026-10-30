@@ -36,6 +36,28 @@ public class BraceAfterNameTests
         Assert.Contains("run { total = …; }", Assert.Single(error.Notes!).Message);
     }
 
+    /// <summary>A name from a module that is not there was said once, at its import: the
+    /// initializer that names it — alone or through the module — says nothing more, while its
+    /// field values are still checked.</summary>
+    [Theory]
+    [InlineData("import missing { Rect };\n", "Rect { x = 1, y = 2 }")]
+    [InlineData("import missing { Rect };\n", "Rect { x, y }")]
+    [InlineData("import missing;\n", "missing.Rect { x = 1, y = 2 }")]
+    public void An_initializer_of_a_name_whose_import_failed_says_nothing_more(string import, string init)
+    {
+        var de = Check(import + "fn f(): void {\n    let x = 1;\n    let y = 2;\n    let r = " + init + ";\n}\n");
+        var error = Assert.Single(de.Diagnostics, d => d.Severity == Severity.Error);
+        Assert.Equal("LYR-RES0003", error.Code);
+    }
+
+    [Fact]
+    public void The_fields_of_such_an_initializer_are_still_checked()
+    {
+        var de = Check("import missing { Rect };\nfn f(): void {\n    let r = Rect { x = nowhere };\n}\n");
+        Assert.Equal(["LYR-RES0003", "LYR-SEM0002"],
+            de.Diagnostics.Where(d => d.Severity == Severity.Error).Select(d => d.Code).Order());
+    }
+
     [Fact]
     public void With_its_semicolon_the_block_assigns()
     {
