@@ -274,6 +274,29 @@ public class NativeTests
         Assert.Contains($"error[{code}]: {why}", error);
     }
 
+    /// <summary>An <c>unsafe</c> block that holds no memory operation, or stands within another,
+    /// marks nothing: the lint <c>unused-unsafe</c>. One whose inner block holds the operation
+    /// counts it for itself too.</summary>
+    [Theory]
+    [InlineData("unsafe {\n        let _ = 1;\n    }", "this 'unsafe' block calls none of std.ffi's memory operations")]
+    [InlineData("unsafe {\n        let p = alloc<int>(1);\n        unsafe {\n            free(p);\n        }\n    }",
+        "this block stands within an 'unsafe' block already")]
+    [InlineData("unsafe {\n        let p = alloc<int>(1);\n        free(p);\n    }", null)]
+    [InlineData("unsafe {\n        if (true) {\n            free(alloc<int>(1));\n        }\n    }", null)]
+    public void An_unsafe_block_without_a_memory_operation_is_warned_about(string body, string? why)
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr",
+            "import std.ffi { Ptr, alloc, free };\n\nfn main(): void {\n    " + body + "\n}\n"));
+        var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
+        Assert.True(exit == 0, error);
+        if (why is null) Assert.DoesNotContain("LYR-SEM0234", error);
+        else
+        {
+            Assert.Contains($"warning[LYR-SEM0234]: {why}", error);
+            Assert.Equal(1, error.Split("warning[LYR-SEM0234]").Length - 1);
+        }
+    }
+
     /// <summary>C's variadic arguments: any number after the parameters, each as it crosses — a
     /// string as its bytes — and as C promotes it: a <c>float32</c> a <c>double</c>, an <c>int8</c>
     /// and a <c>bool</c> an <c>int</c>. A Lyric variadic function beside it is what it was.</summary>

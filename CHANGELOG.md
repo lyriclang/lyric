@@ -337,6 +337,9 @@ promise. This entry fills with the milestones.
   The enum crosses as that integer both ways, and one that is no variant is `LYR-RT0021`. `std.ffi.CEnum` reads an
   integer C keeps elsewhere: `Mode.from(n)` is the variant or `null`, `m.value()` the integer;
   `VariantInfo.value` gives it to a `comptime` walk.
+- **An `unsafe` block that needs no `unsafe` is said** (lint `unused-unsafe`, `LYR-SEM0234`, group `unused`, spec
+  chapter 13 §3 rule 8): a block that calls none of `std.ffi`'s memory operations, or one within another `unsafe`
+  block, which already allows them.
 
 ---
 
