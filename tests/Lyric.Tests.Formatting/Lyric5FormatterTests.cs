@@ -244,4 +244,50 @@ public class Lyric5FormatterTests
 
             """);
     }
+
+    /// <summary>A chain of calls too long for its line breaks before each dot, one call to a line;
+    /// it broke inside each call's parentheses instead, every argument on a line of its own.</summary>
+    [Fact]
+    public void A_long_chain_of_calls_puts_one_call_to_a_line()
+    {
+        Assert.Equal("""
+            fn main(): void {
+                let lib = build.cLibrary("raylib")
+                    .sources(["rcore.c", "rshapes.c", "rtextures.c", "rtext.c"])
+                    .define("PLATFORM_DESKTOP", "1")
+                    .include("src/external/glfw/include");
+                let ys = this.items
+                    .values()
+                    .map { it * 2 }
+                    .filter { it > 2 }
+                    .map { it + 1000000000 }
+                    .filter { it > 300000 }
+                    .toList().length;
+            }
+
+            """, Format("""
+            fn main(): void {
+                let lib = build.cLibrary("raylib").sources(["rcore.c", "rshapes.c", "rtextures.c", "rtext.c"]).define("PLATFORM_DESKTOP", "1").include("src/external/glfw/include");
+                let ys = this.items.values().map { it * 2 }.filter { it > 2 }.map { it + 1000000000 }.filter { it > 300000 }.toList().length;
+            }
+
+            """));
+    }
+
+    /// <summary>What fits stays on its line, and so does a long call with one call before it: its
+    /// arguments break, as any call's.</summary>
+    [Fact]
+    public void A_chain_that_fits_or_has_one_call_after_its_receiver_keeps_its_line()
+    {
+        Keeps("""
+            fn main(): void {
+                let short = [1, 2].iter().map((x) => x).toList();
+                let one = names.iter().sortedBy(
+                    (a: (int, string), b: (int, string)) => a.0.totalCompare(b.0) + a.0.totalCompare(b.0)
+                );
+                let kept = (xs.iter().map((x) => x)).toList();
+            }
+
+            """);
+    }
 }

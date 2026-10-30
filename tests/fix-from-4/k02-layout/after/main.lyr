@@ -1,0 +1,6 @@
+import std.io { println };
+
+fn main(): int {
+    println("flat");
+    return 0;
+}

@@ -113,9 +113,9 @@ fn chunksAndWindows(): void {
 fn sortedSortedByPartitionGroupBy(): void {
     assertEq([3, 1, 2].iter().sorted().toArray(), [1, 2, 3]);
     let pairs = [(2, "x"), (1, "y"), (2, "z"), (1, "w")];
-    let byFirst = pairs.iter().sortedBy(
-        (a: (int, string), b: (int, string)) => a.0.totalCompare(b.0)
-    ).toArray();
+    let byFirst = pairs.iter()
+        .sortedBy((a: (int, string), b: (int, string)) => a.0.totalCompare(b.0))
+        .toArray();
     assertEq(byFirst, [(1, "y"), (1, "w"), (2, "x"), (2, "z")]);
     let (small, large) = [1, 5, 2, 6].iter().partition((x: int) => x < 4);
     assertEq(small.toArray(), [1, 2]);

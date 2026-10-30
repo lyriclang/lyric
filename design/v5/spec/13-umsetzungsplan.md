@@ -1613,6 +1613,17 @@ ihren bekannten Texten.
 - **L8-d** Die eigenen C-Einheiten für Windows tragen denselben zufälligen `S_OBJNAME` wie oben; ein `--lib`-Archiv
   für Windows ist darum nicht bytegleich (der gelinkte PE wird normalisiert, das Archiv nicht).
 
+**Entschieden 2026-10-30 (Maintainer):** L8-b, L8-c und L8-d sind Fehler und werden behoben (ein PR); L8-a kommt mit
+289 (nullbare Zeigerfelder) vor 5.0.
+- **L8-b**: `unsafe { … }` in Wert-Position ist eine Meldung, `LYR-PAR0067` am Wort, statt dreier ohne Ursache; der
+  Block wird gelesen und verworfen, der Wert ist ein Fehlerwert ohne Folgemeldung.
+- **L8-c**: eine Kette mit zwei Aufrufen nach dem Empfänger bricht, wo sie nicht passt, vor jedem Punkt — ein Aufruf je
+  Zeile, eine Ebene tiefer (wie Prettier und rustfmt); der Empfänger mit seinen Feldern, nach einem bloßen Namen auch
+  sein erster Aufruf, bleibt auf der ersten Zeile. Mit einem Aufruf bleibt es beim Umbruch der Argumente. Zwei
+  std-Tests kamen dadurch in eine neue Form; `examples/raylib` schreibt `desktop` als Kette.
+- **L8-d**: eine Einheit für Windows bekommt `-Xclang -object-file-name=<Objekt im Cache>` — der Name ist der
+  Inhaltsschlüssel, also derselbe bei jedem Bau.
+
 **Der Abschluss von M14b.** Die Zeile hält: `examples/native-prebuilt` linkt sein Archiv je Tripel und auf macOS
 CoreFoundation, `examples/raylib` baut raylib aus seinem Release und ruft es über erzeugte Bindungen — beide in
 `ExampleTests`, im vollen Plattformlauf. Gebaut in L1–L8 (#597, #602, #604, #608, #611, #614, #622, #623 und dieser
@@ -1893,6 +1904,27 @@ sein eigenes Repo; ein Migrator für Erato (Lyricpp, Z-Reihe); `--edition` (mit 
 - **`From4/` ist eigener Code** neben der Kopie: `CheckFile`, `CheckProject` (über `lyric.json`) mit 4.6s Lader, die
   Bibliothek aus den Ressourcen über das Overlay des alten `StdlibLoader` — kein Byte der Kopie geändert.
 - `CatalogTests` lässt die eingefrorenen Verzeichnisse aus: ihre Codes sind 4.6s, nicht die dieses Katalogs.
+
+**S2, beim Bauen entschieden** (2026-10-29):
+
+- **Eine Regel fehlte in 12 R2 — K09**: ein Modul des eigenen Pakets heißt in Lyric 5 `<paket>.<pfad>`
+  (`app.util`); der Fall k06 baute ohne sie nicht (`LYR-RES0003`). Die Regel schreibt die Imports der eigenen
+  Module um — auch die, deren Modul ein Kopf anders nannte (K01 sagt dazu nur noch, dass ein *fremdes* Paket es neu
+  nennen muss). Eine zweite fehlt und kommt mit S6: **`assert(c, m)` → `assert(c, () => m)`** — Lyric 5 nimmt die
+  Meldung als Funktion (k05 zeigte `LYR-SEM0001`).
+- **Was eine Regel sagt, ist ein Hinweis (`hint`) des Bereichs `MIG`**, nicht eine Warnung: die Warnungen des
+  Katalogs sind Lints. Die Zeile im Bericht heißt `proposal[…]` (Art R) oder `by hand[…]` (Art H) — „review“ liest
+  der Wächter gegen Design-Zitate als Verweis auf eine Runde. Codes: `MIG0001`/`0002` für den Treiber (4.6 lehnt
+  ab, `lyric.json` unlesbar), `MIG01nn` für die K-Regeln; je Art der Regel ein Bereich von hundert.
+- **Ein Durchlauf, keine Schleife**: die Regeln lesen den Baum von 4.6, nie ihr eigenes Ergebnis; zwei Regeln an
+  derselben Stelle sind ein Fehler des Katalogs (`InvalidOperationException` mit beiden Regeln) — K01 und K03
+  trafen sich so beim ersten Lauf, der Fehler lag in K01.
+- **`--json` mit `--from-4` wird abgelehnt** (`LYR-CLI0003`): die Hinweise haben keine Form im Ereignisstrom von 16 §4;
+  eine Tür, bis ein Werkzeug sie braucht. Eine einzelne Datei ist ein Paket für sich: K06 (Sichtbarkeit) und K09
+  gelten nur für ein Projekt mit `lyric.json`.
+- **Die Fälle beweisen beide Seiten**: `before/` prüft mit 4.6, `after/` mit Lyric 5 — sauber, oder `check.txt`
+  nennt Exit und Codes (k05-partial: `combineHash` mit T05 in S4, die `assert`-Meldung in S6; k07: ein `build.lyr`
+  von 4.x baut in Lyric 5 nicht, das sagt der Hinweis).
 
 ## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
 

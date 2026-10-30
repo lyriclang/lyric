@@ -1,0 +1,8 @@
+module app.greeting;
+
+import std.io.console { println };
+
+fn main(): int {
+    println("hello");
+    return 0;
+}

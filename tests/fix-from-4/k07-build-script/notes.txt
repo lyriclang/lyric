@@ -1,0 +1,1 @@
+proposal[LYR-MIG0107] build.lyr:1:1: a Lyric 4 build.lyr defines the build; in Lyric 5 lyric.toml does ([[bin]], [profile.*]), and build.lyr only prepares sources — move executable(…) and the profiles into lyric.toml; packed goes

@@ -331,6 +331,24 @@ public class NativeTests
         Assert.Contains($"error[{code}]: {why}", error);
     }
 
+    /// <summary>An <c>unsafe</c> block where a value stands is said once, at its word: read as a
+    /// name it was an unknown identifier, a trailing lambda without a type and, inside, a memory
+    /// operation outside an <c>unsafe</c> block — four findings, none of them the cause.</summary>
+    [Theory]
+    [InlineData("let p: Ptr<int> = unsafe { alloc<int>(1) };\n    unsafe { free(p); }", 4, 23)]
+    [InlineData("let p = unsafe { alloc<int>(1) };\n    unsafe { free(p); }", 4, 13)]
+    [InlineData("let n = 1 + unsafe { 2 };", 4, 17)]
+    public void An_unsafe_block_where_a_value_stands_is_said_once(string body, int line, int column)
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr",
+            "import std.ffi { Ptr, alloc, free };\n\nfn main(): void {\n    " + body + "\n}\n"));
+        var (exit, _, error) = Run("build", "-C", dir, "--emit", "ir");
+        Assert.Equal(1, exit);
+        Assert.Equal(1, error.Split("error[").Length - 1);
+        Assert.Contains("error[LYR-PAR0067]: 'unsafe { … }' is a statement and gives no value", error);
+        Assert.Contains($"main.lyr:{line}:{column}", error);
+    }
+
     private const string CallbackC = """
         #include <stdint.h>
         #include <stdlib.h>

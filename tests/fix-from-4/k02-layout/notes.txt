@@ -1,0 +1,1 @@
+proposal[LYR-MIG0103] lyric.json:1:1: the modules lie under 'the package's directory'; a Lyric 5 package keeps them under src/ — move the .lyr files into src/
