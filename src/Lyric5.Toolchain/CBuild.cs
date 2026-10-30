@@ -12,7 +12,12 @@ public sealed record CUnit(
     IReadOnlyList<string> Defines,
     IReadOnlyList<string> IncludeDirs,
     bool Instrument = true,
-    IReadOnlyList<string>? ExtraFlags = null);
+    IReadOnlyList<string>? ExtraFlags = null)
+{
+    /// <summary>What the count of the units compiled calls it: the file's name, unless the build
+    /// names it — a program's unit lies in the cache under its key. No part of the key.</summary>
+    public string? Shown { get; init; }
+}
 
 public sealed class CBuildException(string message) : Exception(message)
 {
@@ -129,24 +134,36 @@ public sealed partial class CBuild
         return Convert.ToHexStringLower(sha.GetHashAndReset())[..32];
     }
 
-    /// <summary>Compiles every unit (in parallel), reusing cached objects; returns their paths in order.</summary>
-    public IReadOnlyList<string> Compile(IReadOnlyList<CUnit> units)
+    /// <summary>Compiles every unit (in parallel), reusing cached objects; returns their paths in
+    /// order. With <paramref name="of"/>, the units it compiles are a status line — "3 of 14 C units
+    /// of app" — and none where every object is cached; the count is drawn as they finish.</summary>
+    public IReadOnlyList<string> Compile(IReadOnlyList<CUnit> units, string? of = null)
     {
-        var objects = new string[units.Count];
+        var objects = units.Select(ObjectOf).ToArray();
+        var stale = Enumerable.Range(0, units.Count).Where(i => !File.Exists(objects[i])).ToList();
+        if (of is not null && stale.Count > 0)
+            BuildStatus.Say("Compiling", $"{stale.Count} of {units.Count} C unit{(units.Count == 1 ? "" : "s")} of {of}");
         var errors = new System.Collections.Concurrent.ConcurrentBag<string>();
-        Parallel.For(0, units.Count, i =>
+        var done = 0;
+        Parallel.ForEach(stale, i =>
         {
-            try { objects[i] = CompileOne(units[i]); }
+            try { CompileTo(units[i], objects[i]); }
             catch (CBuildException exception) { errors.Add(exception.Message); }
+            BuildStatus.Count(Interlocked.Increment(ref done), stale.Count, units[i].Shown ?? Path.GetFileName(units[i].Source));
         });
+        BuildStatus.Done();
         if (!errors.IsEmpty) throw new CBuildException(string.Join("\n\n", errors));
         return objects;
     }
 
-    public string CompileOne(CUnit unit)
+    public string CompileOne(CUnit unit) => CompileTo(unit, ObjectOf(unit));
+
+    /// <summary>Where a unit's object lies in the cache: named by the unit and its key.</summary>
+    private string ObjectOf(CUnit unit) =>
+        Path.Combine(_cacheDir, "obj", $"{Path.GetFileNameWithoutExtension(unit.Source)}-{CacheKey(unit)}.o");
+
+    private string CompileTo(CUnit unit, string target)
     {
-        var name = Path.GetFileNameWithoutExtension(unit.Source);
-        var target = Path.Combine(_cacheDir, "obj", $"{name}-{CacheKey(unit)}.o");
         if (File.Exists(target)) return target;
 
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);

@@ -36,6 +36,7 @@ internal static class Verbs
     private static readonly Opt Target = new("--target", "<triple>", "a Tier 1 target (default: this machine)");
     private static readonly Opt Bin = new("--bin", "<name>", "the package's program");
     private static readonly Opt Verbose = new("-v", null, "say each command of the C compiler, the archiver and the linker as it starts", Alias: "--verbose");
+    private static readonly Opt Quiet = new("-q", null, "say no status lines: what is compiled, linked and run", Alias: "--quiet");
 
     /// <summary>The profile's fields, for one build (spec 15 §4).</summary>
     public static readonly Opt[] Fields =
@@ -49,7 +50,7 @@ internal static class Verbs
         new("--fast-math", null, "floating point without strict IEEE order", Negatable: true),
     ];
 
-    private static readonly Opt[] Building = [Profile, .. Fields, Target, Dir, Bin, Offline, Locked, Verbose];
+    private static readonly Opt[] Building = [Profile, .. Fields, Target, Dir, Bin, Offline, Locked, Verbose, Quiet];
 
     public static readonly VerbSpec[] All =
     [
@@ -62,10 +63,10 @@ internal static class Verbs
         new("check", "[<file.lyr>]", "what build says of the package or the file, without making C or a binary", Building, Lints: true, Json: true),
         new("expand", "[<file.lyr>]", "print the program's entry module with its macros expanded", Building, Lints: true),
         new("test", "", "build the package's tests and run them, each in a task of its own",
-            [Profile, .. Fields, Target, Dir, Offline, Locked, Verbose, new("-f", "<text>", "only the tests whose name holds <text>", Alias: "--filter"),
+            [Profile, .. Fields, Target, Dir, Offline, Locked, Verbose, Quiet, new("-f", "<text>", "only the tests whose name holds <text>", Alias: "--filter"),
              new("--no-run", null, "build the tests and run none: the binary's path is printed")], Lints: true, Json: true),
         new("bench", "", "build the package's benchmarks in the release profile and run them",
-            [Profile, .. Fields, Target, Dir, Offline, Locked, Verbose, new("-f", "<text>", "only the benchmarks whose name holds <text>", Alias: "--filter"),
+            [Profile, .. Fields, Target, Dir, Offline, Locked, Verbose, Quiet, new("-f", "<text>", "only the benchmarks whose name holds <text>", Alias: "--filter"),
              new("--save", "<file>", "write the times to <file>"), new("--compare", "<file>", "read the times of <file> and say how they changed")], Lints: true),
         new("fix", "[<file.lyr>]", "make the safe changes the findings suggest in the package's own files, then say what is left",
             [Dir, Offline, new("--dry-run", null, "print the changes as a diff and write nothing")], Lints: true, Json: true),

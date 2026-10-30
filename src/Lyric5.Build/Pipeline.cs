@@ -164,6 +164,13 @@ public static class Pipeline
         return denied;
     }
 
+    /// <summary>A program as its status line names it: <c>app v0.1.0 (src/main.lyr)</c>.</summary>
+    public static string Described(Project project) =>
+        $"{project.BinaryName}{(project.Manifest is { } manifest ? " v" + manifest.Version : "")} ({Shown(project.Source)})";
+
+    /// <summary>A path as the status lines and the diagnostics say it.</summary>
+    public static string Shown(string path) => Lyric.Core.Rendering.RenderStyle.Current.Display(path);
+
     /// <summary>The binary's path, or the exit code of the failure.</summary>
     public static (int Exit, string? Executable) Build(BuildRequest request, TextWriter error) => Build(request, error, null);
 
@@ -233,6 +240,7 @@ public static class Pipeline
         }
         else
         {
+            BuildStatus.Say("Compiling", Described(project));
             var result = Compile(project, error, request.Profile, request.Target);
             if (result is null) return (1, null);
             compiled = result;
@@ -274,7 +282,12 @@ public static class Pipeline
             // every unit names its paths by the packages' names, not by where they lie.
             var paths = PathMaps(project, runtimeRoot);
             var units = sources.Select(path => new CUnit(path, [], [RuntimeLayout.IncludeDir(runtimeRoot)],
-                ExtraFlags: [.. request.Profile.ProgramFlags, .. paths])).ToList();
+                ExtraFlags: [.. request.Profile.ProgramFlags, .. paths])
+            {
+                // the cache names a unit by its key; the count by the program, a generic instance as one
+                Shown = Path.GetFileName(path).StartsWith("inst-", StringComparison.Ordinal)
+                    ? $"{project.BinaryName} (a generic instance)" : project.BinaryName,
+            }).ToList();
             NativeLink? read;
             try { read = Native(project, request.Target, paths, RuntimeLayout.IncludeDir(runtimeRoot), directives, error); }
             catch (ManifestException refused)
@@ -291,7 +304,7 @@ public static class Pipeline
             }
             if (read is not { } native) return (1, null);
             var libraries = native.Libraries;
-            var objects = build.Compile([.. units, .. native.Units]);
+            var objects = build.Compile([.. units, .. native.Units], project.BinaryName);
             // whose each input of the link is, for a link that fails (spec 15 §5.2 rule 12)
             var owners = new Dictionary<string, string>(native.FileOwners) { [archive] = "the runtime" };
             for (var i = 0; i < objects.Count; i++) owners[objects[i]] = i < units.Count ? "the program" : native.UnitOwners[i - units.Count];
@@ -308,6 +321,7 @@ public static class Pipeline
                 // linked against all of it itself.
                 var file = project.LibraryFile(request.Profile, request.Target);
                 Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                BuildStatus.Say(libraryKind == LibraryKind.Static ? "Archiving" : "Linking", Shown(file));
                 if (libraryKind == LibraryKind.Static)
                 {
                     var runtime = RuntimeArchive.Objects(request.Compiler, request.Target, profile, request.ToolchainVersion);
@@ -341,6 +355,7 @@ public static class Pipeline
             var lines = LinkLines(inputs, libraries, linkPaths, prebuiltFiles);
             if (!UpToDate(executable, record, inputs, lines))
             {
+                BuildStatus.Say("Linking", $"{project.BinaryName} ({Shown(executable)})");
                 build.LinkExecutable(inputs, executable, libraries, linkPaths);
                 File.WriteAllText(record, lines);
             }
@@ -729,6 +744,7 @@ public static class Pipeline
             var (ran, directives) = BuildScripts.Run(project, target, profile, compiler, version, error);
             if (directives is null) return ran;
         }
+        BuildStatus.Say("Checking", Described(project));
         return Compile(project, error, profile, target) is null ? 1 : 0;
     }
 

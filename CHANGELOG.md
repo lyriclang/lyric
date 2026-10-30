@@ -314,6 +314,11 @@ promise. This entry fills with the milestones.
   `lyric api` prints the public surface a line per element, `--json` as data, and `--diff <rev>` says what changed
   since a git revision and whether it breaks code written against it (exit 1). The standard library's reference is
   at <https://lyric.oil1i.de/dev/std/>, an example in every module.
+- **A build says what it does** (spec chapter 14 §1.1 rule 11): `build`, `run`, `check`, `test` and `bench` say
+  each step that does work on the standard error — `Fetching` a source tree, `Running` a build script, `Binding` a
+  header, `Compiling` the program, the runtime and `3 of 14 C units of app`, `Linking` —, and `Finished` with the
+  profile and the time; on a terminal the C units are counted as they finish. What is up to date says nothing;
+  `-q` says none of it, and `--json` none.
 
 ---
 

@@ -136,8 +136,9 @@ public class LibraryLinkTests
     public void The_text_form_says_the_line_as_a_note()
     {
         var dir = Calc();
-        var (exit, _, error) = RunRaw("build", "-C", dir, "--lib");
-        Assert.True(exit == 0, error);
+        var (exit, _, said) = RunRaw("build", "-C", dir, "--lib");
+        Assert.True(exit == 0, said);
+        var error = WithoutStatus(said);
         var o = ExportTests.OutOf(dir);
         Assert.StartsWith($"note: link {Path.Combine(o, "libcalc.a")} with ", error);
         if (Target.Host.Os == TargetOs.Linux) Assert.EndsWith(" -lrt -lpthread -lm -ldl -lunwind\n", error);
@@ -153,7 +154,7 @@ public class LibraryLinkTests
         Assert.False(artifact.TryGetProperty("linkArgs", out _), artifact.ToString());
         var (exit, _, error) = RunRaw("build", "-C", dir, "--lib", "--shared");
         Assert.True(exit == 0, error);
-        Assert.Equal("", error);
+        Assert.Equal("", WithoutStatus(error));
     }
 
     /// <summary>The package's archive changed under the same name and size makes a new library.</summary>

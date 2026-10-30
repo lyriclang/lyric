@@ -30,6 +30,7 @@ public static partial class Program
     private static int Build(string[] args, LintArgs lints, BuildVerb how)
     {
         var verb = how.ToString().ToLowerInvariant();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         bool run = how == BuildVerb.Run, expand = how == BuildVerb.Expand, check = how == BuildVerb.Check;
         if (Verbs.Read(Verbs.Find(verb)!, args, Unknown, out var refused) is not { } parsed) return refused;
         if (parsed.Rest is not null && !run) return Unknown("'--' separates the program's arguments, which only 'run' passes on");
@@ -56,7 +57,7 @@ public static partial class Program
 
         if (flags.Contains("--shared") && !flags.Contains("--lib"))
             return Unknown("'--shared' says which library '--lib' builds; without '--lib' there is none");
-        if (flags.Contains("--lib")) return BuildLibrary(values, flags, baseDirectory, file, lints, offline, locked);
+        if (flags.Contains("--lib")) return BuildLibrary(values, flags, baseDirectory, file, lints, offline, locked, clock);
 
         // The programs this command is about: a package's every one, or the file's.
         List<Project> programs;
@@ -160,6 +161,7 @@ public static partial class Program
             var exit = 0;
             foreach (var program in programs)
                 exit = Math.Max(exit, Pipeline.CheckProgram(program, profile, target, DisplayVersion(), Console.Error));
+            if (exit == 0) Finished(profile, clock);
             return exit;
         }
 
@@ -173,6 +175,7 @@ public static partial class Program
             executable = built;
             Lyric.Core.Rendering.RenderStyle.Current.Events?.Artifact("binary", program.BinaryName, built);
         }
+        Finished(profile, clock);
         if (!run) return 0;
         if (!target.IsHost)
         {
@@ -181,8 +184,15 @@ public static partial class Program
         }
         // the build's count before the program, whose output follows on the same stream
         Lyric.Core.Rendering.RenderStyle.Current.Events?.Summary();
+        BuildStatus.Say("Running", Pipeline.Shown(executable!));
         return ProcessRunner.RunInherited(executable!, programArgs);
     }
+
+    /// <summary>The last status line of a build that succeeded: the profile, what it compiles with,
+    /// and how long the command took.</summary>
+    private static void Finished(BuildProfile profile, System.Diagnostics.Stopwatch clock) =>
+        BuildStatus.Say("Finished", $"{profile.Name} [opt {profile.Opt}{(profile.DebugInfo ? ", debug info" : "")}] in "
+            + clock.Elapsed.TotalSeconds.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + "s");
 
     /// <summary>
     /// <c>build --lib</c>: the package's <c>src/lib.lyr</c> and what it imports as a library C links
@@ -190,7 +200,7 @@ public static partial class Program
     /// header <c>&lt;name&gt;.h</c>, under <c>out/&lt;profile&gt;/&lt;target&gt;/</c>.
     /// </summary>
     private static int BuildLibrary(Dictionary<string, string> values, HashSet<string> flags, string baseDirectory, string? file,
-        LintArgs lints, bool offline, bool locked)
+        LintArgs lints, bool offline, bool locked, System.Diagnostics.Stopwatch clock)
     {
         if (file is not null) return Unknown("'--lib' builds the package's library, src/lib.lyr; a file is a program by itself");
         if (values.ContainsKey("--bin")) return Unknown("'--bin' names a program of the package; '--lib' builds its library");
@@ -229,6 +239,7 @@ public static partial class Program
         var (exit, built, linkArgs) = Pipeline.BuildLibrary(
             new BuildRequest(project with { LintArgs = lints }, profile, target, compiler, DisplayVersion()), Console.Error);
         if (exit != 0 || built is null) return exit;
+        Finished(profile, clock);
         // what a C program links beside the archive, the target's (spec 13 §4 rule 9)
         var shared = project.Library == LibraryKind.Shared;
         if (Lyric.Core.Rendering.RenderStyle.Current.Events is { } events)

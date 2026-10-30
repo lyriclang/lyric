@@ -402,6 +402,9 @@ Anything else the linker says comes as it is (`LYR-BLD0001`). A C source whose `
 nothing also says which directories were searched — the package's `include`, then its
 dependencies'.
 
+A build says its steps as it goes: `Fetching raylib` the first time a source tree is read from git,
+`Binding` a module made from a header, `Compiling 7 of 9 C units of app` — those whose object is
+not cached yet; on a terminal a counter under it names each unit as it finishes — and `Linking`.
 To see the commands themselves, build with **`-v`**: each run of the C compiler, the archiver and
 the linker is said as it starts, `running: zig cc …`. What is up to date runs nothing, and says
 nothing.
