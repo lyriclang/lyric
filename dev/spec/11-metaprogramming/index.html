@@ -229,8 +229,9 @@ module per target is a file per target, chosen between with <code>comptime if</c
 class, in declaration order, <code>index</code> its place in the answer, <code>hasDefault</code> whether the
 declaration writes an initializer — the type's own default counts for nothing; a payload's
 field as a struct's (the sweep after M10, W9, X2); <code>variants&lt;E&gt;()</code>, a
-<code>VariantInfo { name, index, payload }</code> per variant, the payload's fields named by their position
-where they have no names; <code>members&lt;T&gt;()</code>, a
+<code>VariantInfo { name, index, payload, value }</code> per variant, the payload's fields named by their position
+where they have no names, <code>value</code> the integer C holds for the variant of an enum with <code>@Layout</code>
+(<a href="../../spec/13-abi/">13 §3</a> rule 5) and its index in any other; <code>members&lt;T&gt;()</code>, a
 <code>MemberInfo { name, visibility, isStatic, isMut, kind, parameters }</code> per function, constant
 and associated type of the type's own body, in declaration order — <code>kind</code> a <code>MemberKind</code>
 (<code>Function</code>, <code>Constant</code>, <code>AssociatedType</code>), <code>parameters</code> a function's

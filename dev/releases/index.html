@@ -449,6 +449,12 @@ same twice.</p>
 struct in place (spec chapter 15 rule 18). An array's <code>asPtr</code> says how to keep the array for a C function that
 keeps the pointer.</p>
 </li>
+<li><p><strong>A C enum's variants take C's integers</strong> (spec chapter 13 §3 rule 5, chapter 11 §4): a <code>@Layout(C)</code> enum's
+variant may be given its integer, <code>Read = 1</code>; one without is one more than the variant before it, the first 0.
+The enum crosses as that integer both ways, and one that is no variant is <code>LYR-RT0021</code>. <code>std.ffi.CEnum</code> reads an
+integer C keeps elsewhere: <code>Mode.from(n)</code> is the variant or <code>null</code>, <code>m.value()</code> the integer;
+<code>VariantInfo.value</code> gives it to a <code>comptime</code> walk.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>

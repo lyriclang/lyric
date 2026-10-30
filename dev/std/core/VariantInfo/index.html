@@ -192,7 +192,9 @@
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">VariantInfo</span> :: [<span class="ty">Equatable</span>, <span class="ty">Debug</span>]</code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>, <code>Debug</code>.</p>
 <p>Describes a variant of an enum, in declaration order, and the fields of its payload.</p>
-<p>A positional field is named by its position, <code>0</code>, <code>1</code>, ….</p>
+<p>A positional field is named by its position, <code>0</code>, <code>1</code>, …. <code>value</code> is the integer C holds for
+the variant of an enum with <code>@Layout</code> — written after <code>=</code>, or one more than the variant
+before —, and its index in any other enum.</p>
 <h2 id="fields">Fields</h2>
 <section class="member" id="field.name">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> name: <span class="ty">string</span></code></pre>
@@ -203,6 +205,9 @@
 <section class="member" id="field.payload">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> payload: <span class="ty">FieldInfo</span>[]</code></pre>
 </section>
+<section class="member" id="field.value">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> value: <span class="ty">int</span></code></pre>
+</section>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -211,6 +216,7 @@
 <li class="level-3"><a href="#field.name">name</a></li>
 <li class="level-3"><a href="#field.index">index</a></li>
 <li class="level-3"><a href="#field.payload">payload</a></li>
+<li class="level-3"><a href="#field.value">value</a></li>
 </ul>
 </aside>
 </div>

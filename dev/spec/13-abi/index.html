@@ -422,11 +422,22 @@ another optional, a C function's pointer that may be null among them (wider than
 string — is refused (<code>LYR-SEM0099</code>). A field may be <code>var</code>, written in place as any struct's. A struct without <code>@Layout(C)</code> is the compiler's to lay out and does
 not cross (<code>LYR-SEM0099</code>).</li>
 <li>An enum with <strong><code>@Layout(C)</code></strong> is C's <code>enum</code>, an <code>int</code>; with <strong><code>@Layout(uint8)</code></strong> — or any other
-integer type of §2 — it is that integer. Its variants carry no payload (<code>LYR-SEM0099</code>). The
-first variant written is 0, the next 1, in the order they are written, and the count must fit
-the integer (<code>LYR-SEM0099</code>). It crosses as a parameter and as a result; an integer C returns that
-no variant stands for is a panic (<code>LYR-RT0021</code>), before any <code>match</code> meets it. An enum without
-<code>@Layout</code> does not cross (<code>LYR-SEM0099</code>).</li>
+integer type of §2 — it is that integer. Its variants carry no payload (<code>LYR-SEM0099</code>). Each
+variant is an integer as C numbers an enum's constants: the one written after <code>=</code> —
+<code>Read = 1</code>, an integer literal, <code>-</code> before it where it is negative —, else one more than the
+variant before, the first 0. Each must fit the integer, and no two variants are the same
+(<code>LYR-SEM0099</code>): C's integer names one variant. Only an enum with <code>@Layout</code> gives its variants
+integers (<code>LYR-SEM0099</code>). It crosses as a parameter and as a result, each variant as its
+integer; an integer C returns that no variant stands for is a panic (<code>LYR-RT0021</code>), before any
+<code>match</code> meets it. An enum without <code>@Layout</code> does not cross (<code>LYR-SEM0099</code>).
+<ul>
+<li><code>std.ffi</code>'s <strong><code>CEnum</code></strong>, taken on request (<code>enum Mode :: [CEnum] { … }</code>), gives such an enum
+<code>from(n: int): ?Self</code>, the variant C's integer <code>n</code> stands for or <code>null</code>, and <code>value(): int</code>,
+the variant's integer — for an integer C leaves in a struct's field or hands over as a plain
+integer (a field's enum is its integer, rule 4). It asks <code>Variants</code> (11 §4 rule 11), and reads
+each variant's integer from <code>VariantInfo.value</code> (11 §4).</li>
+</ul>
+</li>
 <li><code>@Layout</code> takes <code>C</code> or an integer type, written as a name: <code>@Layout(C)</code>, <code>@Layout(uint8)</code>. It
 sits on a struct or an enum that is not generic; on a class, on a generic type, on a struct
 with an integer type, or in another form it is refused (<code>LYR-SEM0099</code>).</li>

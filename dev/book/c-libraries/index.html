@@ -49,6 +49,15 @@ there, so a program can call <code>abs</code> right away:</p>
 Lyric's 64-bit <code>int</code>. The compiler checks that every type of an <code>extern &quot;C&quot;</code> function can cross into
 C — integers by their width, <code>float</code>, <code>bool</code>, <code>Ptr&lt;T&gt;</code>, <code>CStr</code>, structs marked <code>@Layout(C)</code> — and
 refuses the others. <code>std.ffi</code> has the types for pointers, C strings and callbacks.</p>
+<p>An enum C knows is marked <code>@Layout(C)</code> — C's <code>int</code> — or with its integer type, <code>@Layout(uint8)</code>.
+Its variants are the integers C gives its constants: written after <code>=</code>, else one more than the
+variant before, the first 0, as C counts them:</p>
+<pre><code class="language-text">@Layout(C)
+enum Mode :: [CEnum] { Read = 1, Write = 2, Exec = 4, After }</code></pre>
+<p>Such an enum crosses as its integer, both ways; an integer C hands back that no variant is gives a
+panic, <code>LYR-RT0021</code>, before any <code>match</code> could miss it. Where C keeps the integer as a plain <code>int</code> —
+a struct's field, a constant of a binding —, <code>std.ffi</code>'s <code>CEnum</code> reads it: <code>Mode.from(n)</code> is the
+variant or <code>null</code>, and <code>m.value()</code> gives the integer back.</p>
 <h2 id="c-in-the-package">C in the package</h2>
 <p>C sources of your own go into the package and are named in the manifest's <code>[native]</code> section:</p>
 <pre><code class="language-toml">[native]
