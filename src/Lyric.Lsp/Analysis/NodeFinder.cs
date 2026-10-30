@@ -74,6 +74,37 @@ public static class NodeFinder
     }
 
     /// <summary>
+    /// The binding a name of an import clause introduces, where the offset stands on one — <c>x</c>
+    /// in <c>import a.b { x }</c> —, and the span of that name.
+    ///
+    /// <para>The clause's names are strings beside their spans, no nodes, and the binding they
+    /// declare is in no forward table: nothing points at an import. The importing module's own
+    /// scope holds it, where the rename and the semantic tokens find it too.</para>
+    /// </summary>
+    /// <param name="path">What <see cref="PathAt"/> found, the module first.</param>
+    public static ImportBindingSymbol? ImportedAt(
+        SemanticModel model, IReadOnlyList<Node> path, FileId file, int offset, out Span name)
+    {
+        name = default;
+        if (path is not [var root, .., ImportDecl import, ImportSelective selective]) return null;
+
+        for (var i = 0; i < selective.Names.Length && i < selective.NameSpans.Length; i++)
+        {
+            var span = selective.NameSpans[i];
+            if (span.File != file || offset < span.Start || offset > span.End) continue;
+
+            var module = model.Compilation.Modules.FirstOrDefault(m => ReferenceEquals(model.Compilation.AstOf(m), root));
+            if (module?.Members.LookupLocal(selective.BoundName(i)) is not ImportBindingSymbol binding
+                || !ReferenceEquals(binding.Declaration, import)) return null;
+
+            name = span;
+            return binding;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// The chain from the module down to the innermost node covering <paramref name="offset"/>,
     /// outermost first. Empty when the offset lies outside the module.
     /// </summary>

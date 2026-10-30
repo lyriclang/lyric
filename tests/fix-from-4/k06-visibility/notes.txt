@@ -1,0 +1,1 @@
+proposal[LYR-MIG0106] src/util.lyr:5:1: 1 declaration without 'pub' were private to the module in Lyric 4; in Lyric 5 the whole package sees them — write 'private' where only the module may see one

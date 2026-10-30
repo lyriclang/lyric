@@ -1,0 +1,7 @@
+import std.io { println };
+import app.util { greeting };
+
+fn main(): int {
+    println(greeting());
+    return 0;
+}

@@ -28,6 +28,8 @@
     <ProjectReference Include="..\Lyric5.Build\Lyric5.Build.csproj" />
     <!-- The language server: the front end answering an editor over JSON-RPC. -->
     <ProjectReference Include="..\Lyric.Lsp\Lyric.Lsp.csproj" />
+    <!-- Lyric 4.6's front end, frozen, for the migration from Lyric 4 (design 12 R1). -->
+    <ProjectReference Include="..\Lyric4.Frontend\Lyric4.Frontend.csproj" />
   </ItemGroup>
 
   <ItemGroup>
