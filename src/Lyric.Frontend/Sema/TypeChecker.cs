@@ -854,8 +854,8 @@ public sealed class TypeChecker
     /// What may cross into C, and where — the one table the checker, the lowering and the
     /// specification read: <c>null</c> where the type crosses, else why not. The integers and the
     /// floats, <c>bool</c> and <c>char</c> as they are; <c>void</c> as a result; <c>std.ffi</c>'s
-    /// <c>Ptr&lt;T&gt;</c> and <c>CStr</c> as C's pointers, and their optionals as the null one
-    /// — not in a struct, where an optional is wider than a pointer; a <c>@Layout(C)</c> struct
+    /// <c>Ptr&lt;T&gt;</c> and <c>CStr</c> as C's pointers, and their optionals as the null one,
+    /// a field's too; a C function's pointer, its optional not in a struct; a <c>@Layout(C)</c> struct
     /// by value; an enum with <c>@Layout</c> as its integer, beside a struct's fields; an inline
     /// array as a field. A <c>string</c> crosses where a <c>CStr</c> parameter takes it, as its
     /// bytes.
@@ -885,9 +885,12 @@ public sealed class TypeChecker
                 return null;
             case NamedRef r when IsFfiType(r.Symbol, "CStr"):
                 return null;
-            case Optional { Inner: var inner } when IsFfiPointer(inner) || inner is FnType { IsC: true }:
+            // an optional pointer is its address, 0 for none: one word, a field's as well
+            case Optional { Inner: var inner } when IsFfiPointer(inner):
+                return null;
+            case Optional { Inner: FnType { IsC: true } }:
                 return site == CSite.Field
-                    ? "an optional pointer is wider than a pointer in a struct; a field of C's that may be null is a 'Ptr' C never leaves null, or the struct holds an integer"
+                    ? "an optional C function's pointer is wider than a pointer in a struct; a field C never leaves null is an 'extern \"C\" fn(…)'"
                     : null;
             case NamedRef { Symbol: { Kind: TypeSymbolKind.Struct } s }:
                 return LayoutOf(s) == "C" ? null

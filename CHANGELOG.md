@@ -327,6 +327,11 @@ promise. This entry fills with the milestones.
 - **A Windows object names its own file**: the toolchain's C units for Windows were each a different file every
   build (CodeView named a temporary file), so a `--lib` archive and the prebuilt runtime for Windows were never the
   same twice.
+- **A C struct's pointer field may be null** (spec chapter 13 §3 rules 1 and 4): a `@Layout(C)` struct takes
+  `?Ptr<T>` and `?CStr` fields, one word as C's pointer — a `?Ptr` is now its address everywhere, 0 for none.
+  `lyric bindgen` writes a struct's pointer fields optional and every field `var`, so `pos.x += 1` writes a bound
+  struct in place (spec chapter 15 rule 18). An array's `asPtr` says how to keep the array for a C function that
+  keeps the pointer.
 
 ---
 

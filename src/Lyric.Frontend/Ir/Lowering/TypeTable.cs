@@ -718,6 +718,7 @@ internal sealed class TypeTable
             {
                 IsStruct = symbol.Kind == TypeSymbolKind.Struct,
                 IsClass = symbol.Kind == TypeSymbolKind.Class,
+                IsAddress = IsAddressType(symbol),
                 Module = ModuleNameOf(symbol),
                 // Empty unless something is actually opaque: a list of empty strings per type would
                 // be a section that says nothing in most modules.
@@ -734,6 +735,11 @@ internal sealed class TypeTable
             throw;
         }
     }
+
+    /// <summary>Whether <paramref name="symbol"/> is std.ffi's <c>Ptr</c> or <c>CStr</c>.</summary>
+    private bool IsAddressType(TypeSymbol symbol) =>
+        Compilation?.FindModule(["std", "ffi"])?.Members is { } ffi
+        && (ReferenceEquals(ffi.LookupLocal("Ptr"), symbol) || ReferenceEquals(ffi.LookupLocal("CStr"), symbol));
 
     /// <summary>
     /// An enum becomes ONE enum entry plus ONE LAYOUT ENTRY PER VARIANT. Slot 0 of every variant is its

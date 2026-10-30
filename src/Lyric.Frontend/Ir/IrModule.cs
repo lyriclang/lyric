@@ -214,6 +214,10 @@ public record struct IrTypeDef(string Name, IrType[] FieldTypes, string[] FieldN
     /// <c>extend int :: [Display]</c>.</summary>
     public bool IsBuiltinBox { get; init; }
 
+    /// <summary>std.ffi's <c>Ptr&lt;T&gt;</c> or <c>CStr</c>: one address, which is never 0 — so
+    /// its optional is the address alone, 0 for none, as C's pointer is.</summary>
+    public bool IsAddress { get; init; }
+
     /// <summary>Declared with <c>class</c>: a heap object with a header, reached by reference.
     /// A positive flag, because the entries that are neither a struct, an enum nor an interface
     /// are not all classes — a variant, a tuple, a closure cell and an environment are entries

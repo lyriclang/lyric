@@ -190,10 +190,18 @@ type, its typedefs as aliases, its pointers to functions as `extern "C" fn` type
 
 The types are what each C type is **on your target**: a `long` is `int` on Linux and macOS and
 `int32` on Windows, a `char` is `uint8` on Linux for Arm, so the module is made for every target
-you build for. A pointer you hand to C may be null, so a parameter `const char *` is `?CStr` — a
-string goes in as it is — and `T *` is `?Ptr<T>`; in a struct's field, where Lyric takes no
-optional, they are `CStr` and `Ptr<T>`, and a null there is yours to look for. A struct the header
-names without its fields is a `Ptr<void>` behind its pointer.
+you build for. A pointer may be null, so `const char *` is `?CStr` — a string goes in as it is —
+and `T *` is `?Ptr<T>`, as a parameter, as a result and as a struct's field: a `?Ptr` is one word,
+C's pointer, and a null C left in a struct reads as `null`. A pointer to a function is its type in a
+field, never optional, and a null there is yours to look for. A struct the header names without its
+fields is a `Ptr<void>` behind its pointer.
+
+A struct's fields are `var`, as C's are: write them in place.
+
+```text
+var at = Vector2 { x = 400.0, y = 225.0 };
+at.x += 240.0 * GetFrameTime();
+```
 
 What the module cannot hold is left out and listed at its end, with the place in the header and why:
 
