@@ -59,8 +59,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M13b | LSP, DAP, clients | XL | **done** 2026-10-26 |
 | M14 | FFI and embedding | L | **done** 2026-10-28 |
 | M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | **done** 2026-10-29 |
-| M15 | Distribution | M | — |
-| M16 | Migration (`lyric fix --from-4`) | L | — (planned 2026-10-29) |
+| M15 | Distribution | M | **done** 2026-10-29 but its halts (S6 signing, S7 mirror) |
+| M16 | Migration (`lyric fix --from-4`) | L | open: S1–S2 done 2026-10-30, S3–S8 to come |
 | M17 | Spec 5.0, suite, guide | L | — |
 | M18 | Release 5.0.0 | M | — |
 
@@ -1379,6 +1379,40 @@ released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "
   conformance defaults (188, a compiler bug for the sweep; S11 worked around it); main's macOS
   job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
   step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
+
+### M16 — open (S1–S2 done 2026-10-30)
+
+The plan is design 13's addendum "der Plan für M16" (#618; S1–S8).
+
+- **S1** (#619): Lyric 4.6's front end frozen into `src/Lyric4.Frontend` (`tooling/from4/freeze.py`, `frozen.sha256`),
+  4.6's examples frozen as the acceptance run's input.
+- **S2** (#631 + spec#395): `lyric fix --from-4` — the driver, the rule interface, `--dry-run`, the report
+  `fix-from-4.txt`; K01–K05 and K09 rewrite, K06–K08 are hints (`LYR-MIG`). A case per rule under
+  `tests/fix-from-4`.
+- **Next: S3** (syntax rules), then S4–S7, S8 closes.
+
+### The open points, decided (2026-10-30)
+
+Design 13's addendum "Nachtrag 2026-10-30" holds the table; built and merged the same day:
+- **289 + L8-a** (#633 + spec#397): `?Ptr<T>`/`?CStr` fields, one word, `?Ptr` its address everywhere; bindgen writes
+  fields `var` and pointer fields optional. **293**: `asPtr`'s documentation.
+- **287** (#637 + spec#400): a `@Layout` enum's variants take C's integers; `std.ffi.CEnum`, `VariantInfo.value`.
+- **292** (#636 + spec#399): the lint `unused-unsafe` (`LYR-SEM0234`).
+- **306** (#634 + spec#398): `x[^n]` over `Length`.
+- **L8-b, L8-c, L8-d** (#632 + spec#396): `LYR-PAR0067`, `fmt` breaks chains, `S_OBJNAME` on Windows.
+- **Doors after 5.0**: 288 (an enum field stays its integer), 273, 281, 297, an optional function pointer as a field,
+  `translate-c` (lyric#635). **300**: the cold ratchet counts with a warm zig cache.
+- Fixed on the way: a held LSP hover overtook its diagnostics (#638; main red once after #633).
+- The `dev` prerelease of 2026-10-31 (3bf00f3) holds M0–M14, M14b, M15 without its halts, M16 S1–S2 and all of the
+  above.
+
+### M15 — done but its halts (2026-10-29)
+
+The plan is design 13's addendum "der Plan für M15" (#601). S1–S5 and S8a–c merged (#603–#617): the toolchain
+archive with its runtime prebuilt, minisign signatures and the channel index checked, `lyric toolchain`
+(install, list, switch, remove, `install zig`, `env`), a package's pin hands the command to its toolchain, the ICE
+report, Lyric names in the C, the measured `lyric dap` on Windows. **S6** (signing the releases) and **S7** (the
+mirror) wait for the maintainer's key and DNS; S9 closes after them.
 
 ### M14b — done (2026-10-29)
 
