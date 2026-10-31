@@ -1290,7 +1290,8 @@ full. <code>new()</code>, <code>of(xs)</code> (a copy of the array), <code>from(
 <code>withCapacity(n)</code> — room for <code>n</code> elements before
 it grows, taken at the first push, since a list holds no value it was not given (10 N3; M8a S14);
 every container's <code>withCapacity(n)</code> panics on a negative <code>n</code>. <code>xs[i]</code> and <code>xs[i] = v</code> through <code>IndexSet&lt;int&gt;</code>
-(<a href="../../spec/05-interfaces/">05 §12</a> rule 9), outside <code>0 ≤ i &lt; length()</code> a panic (<code>LYR-RT0003</code>); <code>get(i)</code>,
+(<a href="../../spec/05-interfaces/">05 §12</a> rule 9), outside <code>0 ≤ i &lt; length()</code> a panic (<code>LYR-RT0003</code>), and from
+the end, <code>xs[^1]</code>, through <code>Length</code>; <code>get(i)</code>,
 <code>null</code> there. <code>push(v)</code>, <code>pushAll(xs)</code>, <code>pop()</code> (<code>null</code> for none), <code>insert(i, v)</code>, <code>removeAt(i)</code>,
 <code>removeWhere(p)</code> (how many went; a <code>p</code> that throws ends it there — what it decided is done,
 the rest kept), <code>clear()</code> (the room stays), <code>truncate(n)</code>, <code>swap(i, j)</code>,
@@ -1329,7 +1330,8 @@ order of its own. Its operations are methods, no operators: <code>union(o)</code
 <li>Every iterator's <strong><code>toList()</code></strong> collects what it gives into a <code>List</code> (I4).</li>
 <li><strong><code>Deque&lt;T&gt;</code></strong> (C6), a class over a ring buffer: <code>new()</code>, <code>withCapacity(n)</code>, <code>pushFront(v)</code>, <code>pushBack(v)</code>,
 <code>popFront()</code> and <code>popBack()</code> (the value or <code>null</code>), <code>peekFront()</code>, <code>peekBack()</code>, <code>length()</code>,
-<code>isEmpty()</code>; <code>[i]</code> from the front, panicking outside <code>0 ≤ i &lt; length()</code> (<code>LYR-RT0003</code>);
+<code>isEmpty()</code>; <code>[i]</code> from the front, panicking outside <code>0 ≤ i &lt; length()</code> (<code>LYR-RT0003</code>), <code>[^n]</code> from
+the back through <code>Length</code>;
 <code>Iterable</code> front to back, a change while it is walked panicking at the next pull (I9).</li>
 <li><strong><code>Heap&lt;T :: [TotalOrder]&gt;</code></strong> (C1), a binary heap over a list, <strong>the least value first</strong> (the
 review's A1; the greatest first is a heap of a type whose order is reversed):

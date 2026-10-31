@@ -423,7 +423,11 @@ and <code>x[k]--</code> on an integer element, evaluate <code>x</code> and <code
 review's M8a-1); <code>&amp;&amp;=</code>, <code>||=</code> and <code>??=</code> read once and write only when they assign. The order
 and the value of an assignment are <a href="../../spec/08-expressions/">08 §3</a>'s. An element so read is a
 value, no place: <code>x[k].f = v</code> is refused (03 §2.2). The index of an array, a view and an
-inline array is built in (<a href="../../spec/03-types/">03 §5</a>).</li>
+inline array is built in (<a href="../../spec/03-types/">03 §5</a>). <strong>From the end</strong>: on a type with its own
+<code>Index&lt;int&gt;</code> that conforms to <code>Length { fn length(): int; }</code> of <code>std.core</code>, <code>x[^n]</code> is
+<code>x.index(x.length() - n)</code> and its writes go through <code>setIndex</code> the same way, <code>x</code> evaluated
+<strong>once</strong> for both calls; without <code>Length</code> the type takes the index as written, and <code>^n</code> there
+is refused (<code>LYR-SEM0114</code>). <code>List&lt;T&gt;</code> and <code>Deque&lt;T&gt;</code> conform (<a href="../../spec/12-stdlib/">12</a>).</li>
 <li><strong>Membership.</strong> <code>x in xs</code> is <code>xs.contains(x)</code> through <code>Contains&lt;T&gt; { fn contains(x: T): bool; }</code>
 (04 D6, design 10 C12) — a range, an array, a view, a list, a set and a map's keys conform
 (<a href="../../spec/12-stdlib/">12</a>) — and <code>x !in xs</code> its negation. The conformance is the <strong>right operand's</strong>,

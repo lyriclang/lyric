@@ -91,7 +91,7 @@ come with <code>comptime</code>.)</em></li>
 (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V1</a>). A package gathers modules under one name
 (<a href="../../spec/15-project/">15 §1</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/04-modules/</code> — a rule about a package as a package case, a
-directory (<a href="https://github.com/lyriclang/lyric-spec/blob/65c9613e7dda4ca564f684efb150ef4d3a36480d/conformance/README.md">the format</a>); what only the command line shows, in the
+directory (<a href="https://github.com/lyriclang/lyric-spec/blob/7a5a6b8f873a1d3825c3bb42b64f5c1ba2d97984/conformance/README.md">the format</a>); what only the command line shows, in the
 toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>PackageTests</code>).</p>
 <ol>
 <li>A <strong>package</strong> is a directory with a manifest, <code>lyric.toml</code>; its modules are the <code>.lyr</code> files
@@ -221,7 +221,7 @@ import is used when its module is named, or one of its extension methods called.
 <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 B2</a>): <code>panic</code>, <code>assert</code>, <code>unreachable</code>, <code>todo</code>, <code>same</code>, <code>sequence</code>; <code>Error</code>, <code>Exception</code>, <code>Result</code>, <code>Box</code>,
 <code>Ordering</code>, <code>Range</code>, <code>RangeInclusive</code>, <code>RangeFrom</code>, <code>RangeTo</code>, <code>RangeFull</code>; <code>Equatable</code>,
 <code>Hashable</code>, <code>Ordered</code>, <code>TotalOrder</code>, <code>Display</code>, <code>Debug</code>, <code>Default</code>, <code>Clone</code>, <code>VariantName</code>, <code>Variants</code>, <code>Closeable</code>,
-<code>Num</code>, <code>Integer</code>, <code>Float</code>, <code>Iterator</code>, <code>Iterable</code>, <code>FromIterator</code>, <code>Into</code>, <code>From</code>, <code>Index</code>, <code>IndexSet</code>; <code>List</code>, <code>Map</code>, <code>Set</code>,
+<code>Num</code>, <code>Integer</code>, <code>Float</code>, <code>Iterator</code>, <code>Iterable</code>, <code>FromIterator</code>, <code>Into</code>, <code>From</code>, <code>Index</code>, <code>IndexSet</code>, <code>Length</code>; <code>List</code>, <code>Map</code>, <code>Set</code>,
 the collections' vocabulary — what signatures and the language need, not effects: <code>println</code>
 is <code>std.io</code>'s. The rest of the
 standard library is imported, <code>std.core</code>'s operator interfaces (<code>Add</code> …) and <code>Any</code>

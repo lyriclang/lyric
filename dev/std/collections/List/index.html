@@ -36,8 +36,8 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>class List</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">List</span>&lt;<span class="ty">T</span>&gt; :: [<span class="ty">IndexSet</span>&lt;<span class="ty">int</span>&gt;, <span class="ty">Iterable</span>, <span class="ty">AsSlice</span>&lt;<span class="ty">T</span>&gt;]</code></pre>
-<p class="conforms">Conforms to <code>IndexSet&lt;int&gt;</code>, <code>Iterable</code>, <code>AsSlice&lt;T&gt;</code>, <code>FromArrayLiteral&lt;T&gt;</code>, <code>Equatable</code>, <code>Debug</code>, <code>Display</code>, <code>FromIterator&lt;T&gt;</code>, <code>Contains&lt;T&gt;</code>, <code>Clone</code>.</p>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">List</span>&lt;<span class="ty">T</span>&gt; :: [<span class="ty">IndexSet</span>&lt;<span class="ty">int</span>&gt;, <span class="ty">Length</span>, <span class="ty">Iterable</span>, <span class="ty">AsSlice</span>&lt;<span class="ty">T</span>&gt;]</code></pre>
+<p class="conforms">Conforms to <code>IndexSet&lt;int&gt;</code>, <code>Length</code>, <code>Iterable</code>, <code>AsSlice&lt;T&gt;</code>, <code>FromArrayLiteral&lt;T&gt;</code>, <code>Equatable</code>, <code>Debug</code>, <code>Display</code>, <code>FromIterator&lt;T&gt;</code>, <code>Contains&lt;T&gt;</code>, <code>Clone</code>.</p>
 <p>A growing array: its elements in order, indexed from 0.</p>
 <p><code>list[i]</code> and <code>list[i] = v</code> work as on an array; <code>list[a..b]</code> is a view of the elements, as
 <code>asSlice()[a..b]</code>. When full, the buffer doubles, so <code>push</code> is amortized constant time. Not safe
