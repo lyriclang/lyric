@@ -340,6 +340,17 @@ promise. This entry fills with the milestones.
 - **An `unsafe` block that needs no `unsafe` is said** (lint `unused-unsafe`, `LYR-SEM0234`, group `unused`, spec
   chapter 13 §3 rule 8): a block that calls none of `std.ffi`'s memory operations, or one within another `unsafe`
   block, which already allows them.
+- **`x[^n]` on a type with its own `index`** (spec chapter 3 §5): `std.core` gains `Length { fn length(): int }`,
+  in the prelude, and `List` and `Deque` conform; on a type with its own `Index<int>` and `Length`, `x[^n]` is
+  `x.index(x.length() - n)`, written too (`x[^1] = v`, `+=`, `++`), with `x` evaluated once. Without `Length` the
+  refusal (`LYR-SEM0114`) names it.
+- **`lyric fix --from-4` (M16, in progress)**: migrates a Lyric 4 package (its `lyric.json`) or a file. The program
+  is read with Lyric 4.6's frozen front end — one 4.6 refuses is not changed (`LYR-MIG0001`) —, the rules rewrite
+  spans so comments and layout stay, and what a person decides is said as a hint (`LYR-MIG`) and written to
+  `fix-from-4.txt`; `--dry-run` shows the diff. The first rules: the module header, `lyric.json` → `lyric.toml`, the
+  modules' new names, what the prelude holds, the package's own imports. The rules for syntax, interfaces, errors
+  and the library follow.
+- **The language server answers a held hover after the diagnostics** it waited for, not before them.
 
 ---
 
