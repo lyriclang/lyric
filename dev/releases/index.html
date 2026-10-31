@@ -459,6 +459,20 @@ integer C keeps elsewhere: <code>Mode.from(n)</code> is the variant or <code>nul
 chapter 13 §3 rule 8): a block that calls none of <code>std.ffi</code>'s memory operations, or one within another <code>unsafe</code>
 block, which already allows them.</p>
 </li>
+<li><p><strong><code>x[^n]</code> on a type with its own <code>index</code></strong> (spec chapter 3 §5): <code>std.core</code> gains <code>Length { fn length(): int }</code>,
+in the prelude, and <code>List</code> and <code>Deque</code> conform; on a type with its own <code>Index&lt;int&gt;</code> and <code>Length</code>, <code>x[^n]</code> is
+<code>x.index(x.length() - n)</code>, written too (<code>x[^1] = v</code>, <code>+=</code>, <code>++</code>), with <code>x</code> evaluated once. Without <code>Length</code> the
+refusal (<code>LYR-SEM0114</code>) names it.</p>
+</li>
+<li><p><strong><code>lyric fix --from-4</code> (M16, in progress)</strong>: migrates a Lyric 4 package (its <code>lyric.json</code>) or a file. The program
+is read with Lyric 4.6's frozen front end — one 4.6 refuses is not changed (<code>LYR-MIG0001</code>) —, the rules rewrite
+spans so comments and layout stay, and what a person decides is said as a hint (<code>LYR-MIG</code>) and written to
+<code>fix-from-4.txt</code>; <code>--dry-run</code> shows the diff. The first rules: the module header, <code>lyric.json</code> → <code>lyric.toml</code>, the
+modules' new names, what the prelude holds, the package's own imports. The rules for syntax, interfaces, errors
+and the library follow.</p>
+</li>
+<li><p><strong>The language server answers a held hover after the diagnostics</strong> it waited for, not before them.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
