@@ -61,7 +61,7 @@ import std.hash { DefaultHasher };
 /// # Panics
 ///
 /// `list[i]` and `list[i] = v` panic outside `0 ≤ i < length()`.
-pub class List<T> :: [IndexSet<int>, Iterable, AsSlice<T>] {
+pub class List<T> :: [IndexSet<int>, Length, Iterable, AsSlice<T>] {
     type Output = T;
     type Iter = ListIter<T>;
     var buffer: T[],
@@ -1326,7 +1326,7 @@ extend<K :: [Hashable], V> Map<K, V, DefaultHasher> {
 /// # Panics
 ///
 /// `deque[i]` panics outside `0 ≤ i < length()`.
-pub class Deque<T> :: [Index<int>, Iterable] {
+pub class Deque<T> :: [Index<int>, Length, Iterable] {
     type Output = T;
     type Iter = DequeIter<T>;
     var slots: (?T)[],

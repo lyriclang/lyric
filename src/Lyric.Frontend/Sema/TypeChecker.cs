@@ -114,6 +114,7 @@ public sealed class TypeChecker
     private readonly TypeSymbol? _indexable;
     private readonly TypeSymbol? _coreIndex;     // std.core's Index<K>: 'x[k]'
     private readonly TypeSymbol? _coreIndexSet;
+    private readonly TypeSymbol? _coreLength;    // std.core's Length: 'x[^n]' through a type's own index
     private readonly TypeSymbol? _coreAsSlice;   // std.core's AsSlice<T>: 'x[a..b]' through the view
     // 'Format': std.core declaring it is Lyric 5's format language — a spec checked here,
     // the hole a call of std.core's (12 §2); the 4.x tools keep their std.fmt converters.
@@ -209,6 +210,8 @@ public sealed class TypeChecker
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIndex ? coreIndex : null;
         _coreIndexSet = comp.FindModule(["std", "core"])?.Members.LookupLocal("IndexSet")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIndexSet ? coreIndexSet : null;
+        _coreLength = comp.FindModule(["std", "core"])?.Members.LookupLocal("Length")
+            is TypeSymbol { Kind: TypeSymbolKind.Interface } coreLength ? coreLength : null;
         _coreAsSlice = comp.FindModule(["std", "core"])?.Members.LookupLocal("AsSlice")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreAsSlice ? coreAsSlice : null;
         _coreFormat = comp.FindModule(["std", "core"])?.Members.LookupLocal("Format")
@@ -6906,7 +6909,7 @@ public sealed class TypeChecker
                 }
 
                 _typedTarget = operation;
-                try { DesugarIndex(written, a, "setIndex", [written.Index, operation], scope); }
+                try { DesugarIndex(written, a, "setIndex", [KeyOf(written), operation], scope); }
                 finally { _typedTarget = outer; }
                 return element;
             }
@@ -6916,7 +6919,7 @@ public sealed class TypeChecker
                 return Report(a.Span, "LYR-SEM0005",
                     $"'??=' on '{TypeFacts.Display(element)}' — a value of this type is never null, so the "
                     + "assignment can never happen");
-            DesugarIndex(written, a, "setIndex", [written.Index, a.Value], scope);
+            DesugarIndex(written, a, "setIndex", [KeyOf(written), a.Value], scope);
             return element;
         }
         var targetSym = a.Target is IdentifierExpr ? _result.RefOf(a.Target) : null;
@@ -7591,18 +7594,26 @@ public sealed class TypeChecker
         };
     }
 
-    /// <summary><c>x[^n]</c> on a type with its own <c>index</c>: refused where it is written, with
-    /// the subtraction it stands for as the change — one to look at, since the type may have no
-    /// <c>length()</c> and <c>x</c> is written twice.</summary>
+    /// <summary><c>x[^n]</c> on a type with its own <c>index</c>: where it conforms to std.core's
+    /// <c>Length</c>, <c>x.index(x.length() - n)</c> — the one <c>x</c> node in both calls, which
+    /// the lowering evaluates once. Elsewhere refused where it is written, with the subtraction it
+    /// stands for as the change — one to look at, since <c>x</c> is written twice there.</summary>
     private LyrType FromEndOnOwnIndex(IndexExpr ix, UnaryExpr fromEnd, LyrType target, SymbolTable scope)
     {
+        if (_coreLength is { } length && IndexesThrough(target, length))
+        {
+            var count = new CallExpr(new MemberExpr(ix.Target, "length", IsOptional: false, fromEnd.Span) { MemberSpan = default },
+                [], fromEnd.Span);
+            var key = new BinaryExpr(count, BinaryOp.Sub, fromEnd.Operand, fromEnd.Span);
+            return DesugarIndex(ix, ix, "index", [key], scope);
+        }
         var n = CheckExpr(fromEnd.Operand, scope, LyrType.Int);
         if (!n.IsError) CheckAssignable(fromEnd.Operand, n, LyrType.Int, fromEnd.Operand.Span);
         _result.SetType(fromEnd, LyrType.Int);
         var written = $"{_comp.TextOf(ix.Target.Span)}.length() - {_comp.TextOf(fromEnd.Operand.Span)}";
         _de.Report(new Diagnostic("LYR-SEM0114", Severity.Error, fromEnd.Span,
             $"'{TypeFacts.Display(target)}' is indexed through its own 'index', which takes the index as written — "
-            + "'^n' counts from the end of an array, a view or a string",
+            + "'^n' counts from the end of an array, a view, a string or a type that conforms to 'Length'",
             [DiagnosticNote.Suggest($"count from its length: '{written}'", new Replacement(fromEnd.Span, written, Applicability.NeedsReview))]));
         return LyrType.Error;
     }
@@ -7656,9 +7667,14 @@ public sealed class TypeChecker
 
         var outer = _typedTarget;
         _typedTarget = ix;
-        try { return !DesugarIndex(ix, at, "setIndex", [ix.Index, ix], scope).IsError; }
+        try { return !DesugarIndex(ix, at, "setIndex", [KeyOf(ix), ix], scope).IsError; }
         finally { _typedTarget = outer; }
     }
+
+    /// <summary>The key a type's own index was read under: the index as written, or for
+    /// <c>x[^n]</c> the <c>x.length() - n</c> it stands for — the write takes the same node.</summary>
+    private Expr KeyOf(IndexExpr ix) =>
+        _result.OperatorCallOf(ix) is CallExpr { Arguments: [var key, ..] } ? key : ix.Index;
 
     /// <summary>
     /// The index is an <c>int</c>: a narrower integer widens to it as at any

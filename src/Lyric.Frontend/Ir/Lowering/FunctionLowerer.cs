@@ -3695,13 +3695,22 @@ internal sealed class FunctionLowerer
         var type = TypeOfExpr(indexed);
         var stands = write.Arguments[^1];
         var receiver = LowerExpr(indexed.Target);
+        // The key as the two calls take it: the index as written, or for 'x[^n]' the
+        // 'x.length() - n' it stands for, whose 'x' is the receiver already in hand.
+        var keyNode = read.Arguments[0];
         // A 'null' key has no type to be lowered bare with, and no effect to be held for.
-        TempId? key = indexed.Index is NullLiteralExpr ? null : LowerExpr(indexed.Index);
+        TempId? key = null;
+        if (keyNode is not NullLiteralExpr)
+        {
+            _chainReceivers[indexed.Target] = receiver;
+            try { key = LowerExpr(keyNode); }
+            finally { _chainReceivers.Remove(indexed.Target); }
+        }
 
         TempId? Held(CallExpr call, TempId? value)
         {
             _chainReceivers[indexed.Target] = receiver;
-            if (key is { } held) _chainReceivers[indexed.Index] = held;
+            if (key is { } held) _chainReceivers[keyNode] = held;
             if (value is { } stored)
             {
                 _chainReceivers[stands] = stored;
@@ -3711,7 +3720,7 @@ internal sealed class FunctionLowerer
             finally
             {
                 _chainReceivers.Remove(indexed.Target);
-                _chainReceivers.Remove(indexed.Index);
+                _chainReceivers.Remove(keyNode);
                 if (value is not null)
                 {
                     _chainReceivers.Remove(stands);
@@ -5187,9 +5196,16 @@ internal sealed class FunctionLowerer
 
     private TempId LowerIndexRead(IndexExpr expr)
     {
-        // A type's own index: the call the sema desugared, 'x.index(k)'.
+        // A type's own index: the call the sema desugared, 'x.index(k)'. For 'x[^n]' the key is
+        // 'x.length() - n', the same 'x' in both calls: evaluated here, once, and held for them.
         if (_types.OperatorCallOf(expr) is { } indexCall)
-            return LowerCall(indexCall) ?? throw Bug("'index' returned no value");
+        {
+            if (expr.Index is not UnaryExpr { Operator: UnaryOp.FromEnd })
+                return LowerCall(indexCall) ?? throw Bug("'index' returned no value");
+            _chainReceivers[expr.Target] = LowerExpr(expr.Target);
+            try { return LowerCall(indexCall) ?? throw Bug("'index' returned no value"); }
+            finally { _chainReceivers.Remove(expr.Target); }
+        }
         // A range on a type that gives a view: the range of 'x.asSlice()', as checked.
         if (_types.RangeThroughViewOf(expr) is { Index: SliceRangeExpr viewRange } throughView)
             return LowerSlice(throughView, viewRange);
