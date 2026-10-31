@@ -624,6 +624,9 @@ public sealed class TypeResult
     {
         /// <summary>The attributes the variant carries: what <c>variantAttribute&lt;A&gt;(v)</c> reads.</summary>
         public AttributeNode[] Attributes { get; init; } = [];
+
+        /// <summary>The integer C holds for it in an enum with <c>@Layout</c>; its index in any other.</summary>
+        public long Value { get; init; }
     }
 
     /// <summary>One round of a <c>comptime for</c> over the fields of a known type: its own body,

@@ -57,6 +57,21 @@ public class Lyric5FormatterTests
     }
 
     [Fact]
+    public void A_variant_keeps_the_integer_it_is_given()
+    {
+        Keeps("""
+            @Layout(C)
+            enum Mode {
+                Read = 1,
+                Write = 0x2,
+                Back = -1,
+                After,
+            }
+
+            """);
+    }
+
+    [Fact]
     public void A_broken_if_expression_puts_its_else_one_level_in()
     {
         Assert.Equal("""

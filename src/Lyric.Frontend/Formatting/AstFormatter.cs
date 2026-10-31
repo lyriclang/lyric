@@ -688,6 +688,9 @@ public sealed class AstFormatter
                     Doc.WhenBroken(Doc.From(","))),
                 Doc.LineOrSpace, Doc.From("}"));
 
+        if (variant.Value is { } value)
+            return Doc.Of(Doc.From(variant.Name + " = "), ExprDoc(value, Assign));
+
         return Doc.From(variant.Name);
     }
 

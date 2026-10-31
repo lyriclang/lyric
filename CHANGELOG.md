@@ -327,6 +327,19 @@ promise. This entry fills with the milestones.
 - **A Windows object names its own file**: the toolchain's C units for Windows were each a different file every
   build (CodeView named a temporary file), so a `--lib` archive and the prebuilt runtime for Windows were never the
   same twice.
+- **A C struct's pointer field may be null** (spec chapter 13 §3 rules 1 and 4): a `@Layout(C)` struct takes
+  `?Ptr<T>` and `?CStr` fields, one word as C's pointer — a `?Ptr` is now its address everywhere, 0 for none.
+  `lyric bindgen` writes a struct's pointer fields optional and every field `var`, so `pos.x += 1` writes a bound
+  struct in place (spec chapter 15 rule 18). An array's `asPtr` says how to keep the array for a C function that
+  keeps the pointer.
+- **A C enum's variants take C's integers** (spec chapter 13 §3 rule 5, chapter 11 §4): a `@Layout(C)` enum's
+  variant may be given its integer, `Read = 1`; one without is one more than the variant before it, the first 0.
+  The enum crosses as that integer both ways, and one that is no variant is `LYR-RT0021`. `std.ffi.CEnum` reads an
+  integer C keeps elsewhere: `Mode.from(n)` is the variant or `null`, `m.value()` the integer;
+  `VariantInfo.value` gives it to a `comptime` walk.
+- **An `unsafe` block that needs no `unsafe` is said** (lint `unused-unsafe`, `LYR-SEM0234`, group `unused`, spec
+  chapter 13 §3 rule 8): a block that calls none of `std.ffi`'s memory operations, or one within another `unsafe`
+  block, which already allows them.
 
 ---
 

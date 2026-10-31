@@ -116,6 +116,7 @@ public static class AstChildren
             case EnumVariant v:
                 foreach (var t in v.TupleFields ?? []) yield return t;
                 foreach (var f in v.StructFields ?? []) yield return f;
+                if (v.Value is { } value) yield return value;
                 break;
 
             case InterfaceDecl i:

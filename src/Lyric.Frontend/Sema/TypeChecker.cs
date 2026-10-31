@@ -1,3 +1,4 @@
+using System.Numerics;
 using Lyric.AST;
 using Lyric.Core;
 using Lyric.Lexing;
@@ -857,8 +858,8 @@ public sealed class TypeChecker
     /// What may cross into C, and where — the one table the checker, the lowering and the
     /// specification read: <c>null</c> where the type crosses, else why not. The integers and the
     /// floats, <c>bool</c> and <c>char</c> as they are; <c>void</c> as a result; <c>std.ffi</c>'s
-    /// <c>Ptr&lt;T&gt;</c> and <c>CStr</c> as C's pointers, and their optionals as the null one
-    /// — not in a struct, where an optional is wider than a pointer; a <c>@Layout(C)</c> struct
+    /// <c>Ptr&lt;T&gt;</c> and <c>CStr</c> as C's pointers, and their optionals as the null one,
+    /// a field's too; a C function's pointer, its optional not in a struct; a <c>@Layout(C)</c> struct
     /// by value; an enum with <c>@Layout</c> as its integer, beside a struct's fields; an inline
     /// array as a field. A <c>string</c> crosses where a <c>CStr</c> parameter takes it, as its
     /// bytes.
@@ -888,9 +889,12 @@ public sealed class TypeChecker
                 return null;
             case NamedRef r when IsFfiType(r.Symbol, "CStr"):
                 return null;
-            case Optional { Inner: var inner } when IsFfiPointer(inner) || inner is FnType { IsC: true }:
+            // an optional pointer is its address, 0 for none: one word, a field's as well
+            case Optional { Inner: var inner } when IsFfiPointer(inner):
+                return null;
+            case Optional { Inner: FnType { IsC: true } }:
                 return site == CSite.Field
-                    ? "an optional pointer is wider than a pointer in a struct; a field of C's that may be null is a 'Ptr' C never leaves null, or the struct holds an integer"
+                    ? "an optional C function's pointer is wider than a pointer in a struct; a field C never leaves null is an 'extern \"C\" fn(…)'"
                     : null;
             case NamedRef { Symbol: { Kind: TypeSymbolKind.Struct } s }:
                 return LayoutOf(s) == "C" ? null
@@ -1002,6 +1006,12 @@ public sealed class TypeChecker
             _ => [],
         };
         var layout = attribute.FirstOrDefault(a => a.Path is ["Layout"]);
+        // a variant's integer is C's: only an enum C holds as one has it
+        if ((layout is null || LayoutOf(type) is null) && type.Declaration is EnumDecl plain)
+            foreach (var variant in plain.Variants)
+                if (variant.Value is { } written)
+                    _de.Report("LYR-SEM0099", Severity.Error, written.Span,
+                        $"variant '{variant.Name}' is given an integer, which C holds for it — only an enum with '@Layout' is C's integer");
         if (layout is null || LayoutOf(type) is not { } form) return;
         if (type.Kind == TypeSymbolKind.Class)
         {
@@ -1036,15 +1046,65 @@ public sealed class TypeChecker
             if (variant.TupleFields is { Length: > 0 } || variant.StructFields is { Length: > 0 })
                 _de.Report("LYR-SEM0099", Severity.Error, variant.Span,
                     $"variant '{variant.Name}' carries a payload — an enum with '@Layout' is C's integer, one per variant");
-        var max = form switch
+        var (min, max) = IntegerRange(form);
+        var values = LayoutValues(declared);
+        var seen = new Dictionary<BigInteger, string>();
+        for (var i = 0; i < values.Length; i++)
         {
-            "int8" => sbyte.MaxValue, "uint8" => byte.MaxValue, "int16" => short.MaxValue, "uint16" => ushort.MaxValue,
-            _ => (long)int.MaxValue,
-        };
-        if (declared.Variants.Length - 1 > max)
-            _de.Report("LYR-SEM0099", Severity.Error, layout.Span,
-                $"'{type.Name}' has {declared.Variants.Length} variants, and '{form}' holds 0 to {max}");
+            var variant = declared.Variants[i];
+            var at = variant.Value?.Span ?? variant.NameSpan;
+            if (values[i] is not { } value)
+            {
+                // where the value is not written, it follows one that could not be read: said there
+                if (variant.Value is { } written)
+                    _de.Report("LYR-SEM0099", Severity.Error, written.Span,
+                        $"variant '{variant.Name}' is given no integer literal — C's integer for it is written as one: '4', '-1', '0x10'");
+                continue;
+            }
+            if (value < min || value > max)
+                _de.Report("LYR-SEM0099", Severity.Error, at,
+                    variant.Value is null
+                        ? $"variant '{variant.Name}' is {value}, one more than the variant before, and '{form}' holds {min} to {max}"
+                        : $"variant '{variant.Name}' is {value}, and '{form}' holds {min} to {max}");
+            else if (!seen.TryAdd(value, variant.Name))
+                _de.Report("LYR-SEM0099", Severity.Error, at,
+                    $"variant '{variant.Name}' is {value}, as '{seen[value]}' is — each variant is its own integer, so C's integer names one");
+        }
     }
+
+    /// <summary>The integers <c>@Layout(form)</c> holds: C's <c>int</c> for <c>C</c>.</summary>
+    private static (BigInteger Min, BigInteger Max) IntegerRange(string form) => form switch
+    {
+        "int8" => (sbyte.MinValue, sbyte.MaxValue), "uint8" => (0, byte.MaxValue),
+        "int16" => (short.MinValue, short.MaxValue), "uint16" => (0, ushort.MaxValue),
+        "uint32" => (0, uint.MaxValue), "int" or "int64" => (long.MinValue, long.MaxValue),
+        "uint" or "uint64" => (0, ulong.MaxValue),
+        _ => (int.MinValue, int.MaxValue),
+    };
+
+    /// <summary>
+    /// The integer C holds for each variant of an enum with <c>@Layout</c>, numbered as C numbers an
+    /// enum's constants: the integer written after <c>=</c>, else one more than the variant before,
+    /// the first 0. <c>null</c> where it is written as no integer literal, or follows one that is.
+    /// </summary>
+    internal static BigInteger?[] LayoutValues(EnumDecl declared)
+    {
+        var values = new BigInteger?[declared.Variants.Length];
+        BigInteger? next = 0;
+        for (var i = 0; i < values.Length; i++)
+        {
+            values[i] = declared.Variants[i].Value is { } written ? IntegerOf(written) : next;
+            next = values[i] + 1;
+        }
+        return values;
+    }
+
+    private static BigInteger? IntegerOf(Expr written) => written switch
+    {
+        IntLiteralExpr { Suffix: null } literal => literal.Value,
+        UnaryExpr { Operator: UnaryOp.Neg, Operand: IntLiteralExpr { Suffix: null } literal } => -(BigInteger)literal.Value,
+        _ => null,
+    };
 
     /// <summary><c>@Export</c> and <c>@Export("c_name")</c>: a bare one, or the symbol as a string
     /// written out — the header and the linker read it before anything is computed.</summary>
@@ -1185,7 +1245,8 @@ public sealed class TypeChecker
             return type.Kind == TypeSymbolKind.Struct && !_headerTypesDone.Contains(type) ? $"struct {name}" : name;
         if (type.Kind == TypeSymbolKind.Enum && type.Declaration is EnumDecl declared)
         {
-            var constants = string.Join(", ", declared.Variants.Select((v, i) => $"{name}_{v.Name} = {i}"));
+            var values = LayoutValues(declared);
+            var constants = string.Join(", ", declared.Variants.Select((v, i) => $"{name}_{v.Name} = {values[i] ?? i}"));
             var definition = LayoutOf(type) == "C"
                 ? $"typedef enum {name} {{ {constants} }} {name};"
                 : $"typedef {CDeclarator(new PrimitiveType(LayoutKind(LayoutOf(type)!)), "")} {name};\nenum {{ {constants} }};";
@@ -3383,14 +3444,30 @@ public sealed class TypeChecker
         var scope = new SymbolTable(parent);
         var savedNarrowed = new Dictionary<Symbol, LyrType>(_narrowed, ReferenceEqualityComparer.Instance);
         _walked.Add(new Dictionary<Symbol, Span>(ReferenceEqualityComparer.Instance));
-        if (block.Unsafe is not null) _unsafeDepth++;
+        if (block.Unsafe is { } word)
+        {
+            // within another, the word says nothing the outer one does not
+            if (_unsafeDepth > 0)
+                _de.Report("LYR-SEM0234", Severity.Warning, word,
+                    "this block stands within an 'unsafe' block already, which covers what it holds; drop the word");
+            _unsafeDepth++;
+            _unsafeOperations.Add(0);
+        }
         try
         {
             foreach (var stmt in block.Statements) CheckStmt(stmt, scope);
         }
         finally
         {
-            if (block.Unsafe is not null) _unsafeDepth--;
+            if (block.Unsafe is { } closing)
+            {
+                _unsafeDepth--;
+                var operations = _unsafeOperations[^1];
+                _unsafeOperations.RemoveAt(_unsafeOperations.Count - 1);
+                if (operations == 0 && _unsafeDepth == 0)
+                    _de.Report("LYR-SEM0234", Severity.Warning, closing,
+                        "this 'unsafe' block calls none of std.ffi's memory operations, so the word says nothing; drop it");
+            }
         }
         _walked.RemoveAt(_walked.Count - 1); // a loop inside ran or did not: it speaks for no statement after the block
         EndScope(savedNarrowed); // narrowings established inside the block by an early exit end here
@@ -3399,6 +3476,10 @@ public sealed class TypeChecker
     /// <summary>How many <c>unsafe { … }</c> blocks enclose what is checked: within one,
     /// <c>std.ffi</c>'s memory operations may be called.</summary>
     private int _unsafeDepth;
+
+    /// <summary>Per enclosing <c>unsafe</c> block, innermost last, how many memory operations it
+    /// holds so far — one in an inner block counts for every block around it.</summary>
+    private readonly List<int> _unsafeOperations = [];
 
     /// <summary>
     /// <c>Callback&lt;C&gt;.new(closure)</c>: <c>C</c> is a C function's type whose first or last
@@ -3476,6 +3557,7 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0099", Severity.Error, call.Span,
                 $"a GcHandle holds an object of a class, which the collector keeps by its handle — not a '{TypeFacts.Display(held)}'");
         if (operation is null) return;
+        for (var i = 0; i < _unsafeOperations.Count; i++) _unsafeOperations[i]++;
         if (_unsafeDepth == 0)
             _de.Report(Lyric5Code("LYR-SEM0233"), Severity.Error, call.Span,
                 $"'{operation}' holds to what the compiler cannot see — that the memory is there and of its type: "
@@ -13889,7 +13971,7 @@ public sealed class TypeChecker
                 if (_result.KnownFieldOf(rv) is { } f)
                     return m.Member switch { "isVar" => f.IsVar, "index" => (long)f.Index, "name" => f.Name, "hasDefault" => f.HasDefault, _ => null };
                 if (_result.KnownVariantOf(rv) is { } v)
-                    return m.Member switch { "index" => (long)v.Index, "name" => v.Name, _ => null };
+                    return m.Member switch { "index" => (long)v.Index, "name" => v.Name, "value" => v.Value, _ => null };
                 if (_result.KnownMemberOf(rv) is { } km)
                     return m.Member switch { "name" => km.Name, "isStatic" => km.IsStatic, "isMut" => km.IsMut, "kind" => new KindMark(km.Kind), _ => null };
                 if (_result.KnownParamOf(rv) is { } kp)
@@ -14366,11 +14448,21 @@ public sealed class TypeChecker
         var subst = type is GenericInstance gi ? SubstMap(gi) : EmptySubst;
         LyrType Of(TypeNode written) =>
             type is GenericInstance ? Substitute(ResolveType(written, ts.Members), subst) : ResolveType(written, ts.Members);
+        // C's integer for a variant of an enum with '@Layout', its index for any other
+        var values = LayoutOf(ts) is not null ? LayoutValues(e) : null;
         return [.. e.Variants.Select((v, i) => new TypeResult.MetaVariant(v.Name, i, v.StructFields is { } named
             ? [.. named.Select((f, j) => new TypeResult.MetaField(f.Name, Of(f.Type), j, Visibility.Public, false, null) { Declaration = f })]
             : [.. (v.TupleFields ?? []).Select((t, j) => new TypeResult.MetaField(
-                j.ToString(System.Globalization.CultureInfo.InvariantCulture), Of(t), j, Visibility.Public, false, null))]) { Attributes = v.Attributes })];
+                j.ToString(System.Globalization.CultureInfo.InvariantCulture), Of(t), j, Visibility.Public, false, null))])
+        {
+            Attributes = v.Attributes,
+            Value = values?[i] is { } value ? AsInt64(value) : i,
+        })];
     }
+
+    /// <summary>A variant's integer as Lyric's <c>int</c> holds it: one past <c>int</c>'s range, a
+    /// <c>uint</c> enum's, by its bits.</summary>
+    internal static long AsInt64(BigInteger value) => value > long.MaxValue ? unchecked((long)(ulong)value) : (long)value;
 
     /// <summary>The interfaces a type conforms to — its list's, its blocks', their parents —, in
     /// the order the modules declare them.</summary>

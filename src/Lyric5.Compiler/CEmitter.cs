@@ -391,7 +391,7 @@ public sealed partial class CEmitter
         IrFunctionType f => FnName(f),
         IrCoroutineType => "LyrCoro *",
         IrInterfaceType => "LyrIface",
-        IrOptionalType o when IsNiche(o) || IsTagNiche(o) => CType(o.Inner),
+        IrOptionalType o when IsNiche(o) || IsTagNiche(o) || IsAddressNiche(o) => CType(o.Inner),
         IrOptionalType o => OptionalName(o),
         IrScalarType { Kind: IrScalar.I8 } => "int8_t",
         IrScalarType { Kind: IrScalar.I16 } => "int16_t",
@@ -470,6 +470,14 @@ public sealed partial class CEmitter
     /// niche left, as for a reference.
     /// </summary>
     private static bool IsTagNiche(IrType type) => type is IrOptionalType { Inner: IrEnumType };
+
+    /// <summary>
+    /// An optional of std.ffi's pointer or C string: the struct of the address itself, 0 for "no
+    /// value" — C's null, which a <c>Ptr</c> never holds. No flag: a <c>?Ptr</c> is one word, as a
+    /// field of a <c>@Layout(C)</c> struct and as C's argument.
+    /// </summary>
+    private bool IsAddressNiche(IrType type) =>
+        type is IrOptionalType { Inner: IrStructType s } && _module.Types[s.Type.Value].IsAddress;
 
     /// <summary><c>lyr_opt_&lt;inner&gt;</c>: one C struct per optional type outside the niche,
     /// named after what it holds.</summary>
@@ -594,7 +602,7 @@ public sealed partial class CEmitter
         IrSliceType or IrFunctionType or IrInterfaceType => (16, 8),
         IrInlineArrayType ia => (LayoutOf(ia.Element).Size * ia.Length, LayoutOf(ia.Element).Align),
         IrOptionalType o when IsNiche(o) => (8, 8),
-        IrOptionalType o when IsTagNiche(o) => LayoutOf(o.Inner),
+        IrOptionalType o when IsTagNiche(o) || IsAddressNiche(o) => LayoutOf(o.Inner),
         IrOptionalType o => OptionalLayout(o),
         IrStructType s => Fields(_module.Types[s.Type.Value], 0).Total,
         IrEnumType e => EnumLayout(_module.Types[e.Type.Value]).Total,
@@ -1018,7 +1026,7 @@ public sealed partial class CEmitter
             else if (type is IrStructType held) Define(held.Type.Value);
             else if (type is IrInterfaceType dyn) Define(dyn.Type.Value);
             else if (type is IrEnumType chosen) Define(chosen.Type.Value);
-            else if (IsTagNiche(type)) Require(((IrOptionalType)type).Inner);
+            else if (IsTagNiche(type) || IsAddressNiche(type)) Require(((IrOptionalType)type).Inner);
             else if (type is IrOptionalType optional && !IsNiche(optional) && !optionals.Contains(OptionalName(optional)))
             {
                 Require(optional.Inner);
@@ -1407,8 +1415,8 @@ public sealed partial class CEmitter
                + $"else {{ {Some(r.Dest, $"*({CType(r.YieldType)} *)lyr_coro_transfer({co})")} }}";
     }
 
-    /// <summary>An optional temp made absent: the niche's null, the tag no variant has, or the
-    /// flag clear.</summary>
+    /// <summary>An optional temp made absent: the niche's null, the tag no variant has, the
+    /// address 0, or the flag clear.</summary>
     private string None(TempId dest) =>
         IsTagNiche(TypeOf(dest)) ? $"{Storage(dest)} = ({CType(TypeOf(dest))}){{ .tag = LYR_ENUM_NONE }}; {Temp(dest)} = &{Storage(dest)};"
         : IsNiche(TypeOf(dest)) ? $"{Temp(dest)} = NULL;"
@@ -1417,7 +1425,7 @@ public sealed partial class CEmitter
     /// <summary>An optional temp made present with <paramref name="value"/>, a C expression of
     /// the inner type.</summary>
     private string Some(TempId dest, string value) =>
-        IsTagNiche(TypeOf(dest)) ? $"{Storage(dest)} = {value}; {Temp(dest)} = &{Storage(dest)};"
+        IsTagNiche(TypeOf(dest)) || IsAddressNiche(TypeOf(dest)) ? $"{Storage(dest)} = {value}; {Temp(dest)} = &{Storage(dest)};"
         : IsNiche(TypeOf(dest)) ? $"{Temp(dest)} = {value};"
         : $"{Storage(dest)} = ({CType(TypeOf(dest))}){{ .value = {value}, .has = 1 }}; {Temp(dest)} = &{Storage(dest)};";
 
@@ -2101,6 +2109,8 @@ public sealed partial class CEmitter
         OptSome s => Some(s.Dest, Value(s.Value)),
         OptIsSome i when IsTagNiche(TypeOf(i.Option)) =>
             $"{Temp(i.Dest)} = (uint8_t)({Temp(i.Option)}->tag != LYR_ENUM_NONE);",
+        OptIsSome i when IsAddressNiche(TypeOf(i.Option)) =>
+            $"{Temp(i.Dest)} = (uint8_t)({Temp(i.Option)}->{FieldName("address")} != 0);",
         OptIsSome i => IsNiche(TypeOf(i.Option))
             ? $"{Temp(i.Dest)} = (uint8_t)({Temp(i.Option)} != NULL);"
             : $"{Temp(i.Dest)} = {Temp(i.Option)}->has;",
@@ -2163,6 +2173,9 @@ public sealed partial class CEmitter
             return g.Checked ? $"{Temp(g.Dest)} = LYR_UNWRAP({option});" : $"{Temp(g.Dest)} = {option};";
         if (IsTagNiche(TypeOf(g.Option)))
             return (g.Checked ? $"if (LYR_UNLIKELY({option}->tag == LYR_ENUM_NONE)) lyr_panic_null(); " : "")
+                   + $"{Temp(g.Dest)} = {option};";
+        if (IsAddressNiche(TypeOf(g.Option)))
+            return (g.Checked ? $"if (LYR_UNLIKELY({option}->{FieldName("address")} == 0)) lyr_panic_null(); " : "")
                    + $"{Temp(g.Dest)} = {option};";
 
         var check = g.Checked ? $"if (LYR_UNLIKELY(!{option}->has)) lyr_panic_null(); " : "";
@@ -2246,15 +2259,20 @@ public sealed partial class CEmitter
         var address = FieldName("address");
         return form?.Kind switch
         {
-            IrCKind.Pointer => $"(void *)(uintptr_t)({value}).{address}",
-            IrCKind.CString => $"(const char *)(uintptr_t)({value}).{address}",
-            IrCKind.OptionalPointer => $"(({value}).has ? (void *)(uintptr_t)({value}).value.{address} : NULL)",
-            IrCKind.OptionalCString => $"(({value}).has ? (const char *)(uintptr_t)({value}).value.{address} : NULL)",
+            // an optional pointer is its address, 0 for none: C's null as it is
+            IrCKind.Pointer or IrCKind.OptionalPointer => $"(void *)(uintptr_t)({value}).{address}",
+            IrCKind.CString or IrCKind.OptionalCString => $"(const char *)(uintptr_t)({value}).{address}",
             IrCKind.OptionalFunction => $"(({value}).has ? (void *)(uintptr_t)({value}).value : NULL)",
+            // a variant given C's integer: its integer by its tag
+            IrCKind.Enum when form.Values is { } values => $"({form.Integer}){EnumValues(values)}[({value}).tag]",
             IrCKind.Enum => $"({form.Integer})({value}).tag",
             _ => value,
         };
     }
+
+    /// <summary>The integers of an enum's variants, by their tags, as a C array.</summary>
+    private static string EnumValues(long[] values) =>
+        $"((const int64_t[]){{ {string.Join(", ", values.Select(v => v == long.MinValue ? "INT64_MIN" : $"INT64_C({v})"))} }})";
 
     /// <summary>A C value as Lyric holds it, a C expression of <paramref name="type"/>: a pointer
     /// into its struct, null into <c>none</c>, an integer into its variant. <paramref name="c"/> is
@@ -2264,10 +2282,11 @@ public sealed partial class CEmitter
         var address = FieldName("address");
         return form?.Kind switch
         {
-            IrCKind.Pointer or IrCKind.CString => $"({CType(type)}){{ .{address} = (uint64_t)(uintptr_t){c} }}",
-            IrCKind.OptionalPointer or IrCKind.OptionalCString =>
-                $"({CType(type)}){{ .value = {{ .{address} = (uint64_t)(uintptr_t){c} }}, .has = {c} != NULL }}",
+            IrCKind.Pointer or IrCKind.CString or IrCKind.OptionalPointer or IrCKind.OptionalCString =>
+                $"({CType(type)}){{ .{address} = (uint64_t)(uintptr_t){c} }}",
             IrCKind.OptionalFunction => $"({CType(type)}){{ .value = (uint64_t)(uintptr_t){c}, .has = {c} != NULL }}",
+            IrCKind.Enum when form.Values is { } values =>
+                $"({CType(type)}){{ .tag = lyr_ffi_enum_index((int64_t){c}, {EnumValues(values)}, {form.Variants}, \"{form.EnumName}\") }}",
             IrCKind.Enum => $"({CType(type)}){{ .tag = lyr_ffi_enum_tag((int64_t){c}, {form.Variants}, \"{form.EnumName}\") }}",
             _ => c,
         };
@@ -2282,11 +2301,8 @@ public sealed partial class CEmitter
         var type = CType(TypeOf(dest));
         return form?.Kind switch
         {
-            IrCKind.Pointer or IrCKind.CString =>
+            IrCKind.Pointer or IrCKind.CString or IrCKind.OptionalPointer or IrCKind.OptionalCString =>
                 $"{Storage(dest)} = ({type}){{ .{address} = (uint64_t)(uintptr_t){c} }}; {Temp(dest)} = &{Storage(dest)};",
-            IrCKind.OptionalPointer or IrCKind.OptionalCString =>
-                $"{{ const void *lyr_r = {c}; {Storage(dest)} = ({type}){{ .value = {{ .{address} = (uint64_t)(uintptr_t)lyr_r }}, "
-                + $".has = lyr_r != NULL }}; }} {Temp(dest)} = &{Storage(dest)};",
             IrCKind.Enum => $"{Storage(dest)} = {ComingIn(c, TypeOf(dest), form)}; {Temp(dest)} = &{Storage(dest)};",
             IrCKind.OptionalFunction => $"{{ void *lyr_r = (void *){c}; {Assign(dest, ComingIn("lyr_r", TypeOf(dest), form))} }}",
             _ => Assign(dest, c),

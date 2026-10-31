@@ -575,18 +575,24 @@ public sealed class AnalysisService : IDisposable
                 _lastGood[path] = new AnalysisSnapshot(model, result.Sources, file, moduleAst,
                     result.Sources.GetText(file), open?.Version ?? 0, ProjectWide: true);
             }
-            Settle(path);
 
             published.Add(uri);
             if (file.IsValid) _findings[path] = (result.Sources, diagnostics.Where(d => d.Span.File == file).ToList());
-            await _publish(new PublishDiagnosticsParams
+
+            // A held hover is answered after the diagnostics, not before: settled first, its answer
+            // could overtake them on the wire.
+            try
             {
-                Uri = uri,
-                Version = open?.Version,
-                Diagnostics = file.IsValid
-                    ? DiagnosticMapper.ForFile(result.Sources, diagnostics, file, _toolVersion)
-                    : [],
-            }, token).ConfigureAwait(false);
+                await _publish(new PublishDiagnosticsParams
+                {
+                    Uri = uri,
+                    Version = open?.Version,
+                    Diagnostics = file.IsValid
+                        ? DiagnosticMapper.ForFile(result.Sources, diagnostics, file, _toolVersion)
+                        : [],
+                }, token).ConfigureAwait(false);
+            }
+            finally { Settle(path); }
         }
 
         // Withdraw what the last round said about files that are no longer in the project: a
@@ -641,7 +647,6 @@ public sealed class AnalysisService : IDisposable
                 new AnalysisSnapshot(model, result.Sources, file, model.Entry, document.Text,
                     document.Version, ProjectWide: false);
         }
-        Settle(document.Path);
 
         // The entry file is missing from the source manager only when the run never opened it. The
         // diagnostic explaining why is in the result and is addressed to no file, so it would be
@@ -654,12 +659,17 @@ public sealed class AnalysisService : IDisposable
 
         _published[document.Path] = [document.Uri];
 
-        await _publish(new PublishDiagnosticsParams
+        // Settled after the diagnostics are out, as in the project analysis.
+        try
         {
-            Uri = document.Uri,
-            Version = document.Version,
-            Diagnostics = diagnostics,
-        }, cancellationToken).ConfigureAwait(false);
+            await _publish(new PublishDiagnosticsParams
+            {
+                Uri = document.Uri,
+                Version = document.Version,
+                Diagnostics = diagnostics,
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        finally { Settle(document.Path); }
     }
 
     /// <summary>

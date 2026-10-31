@@ -150,7 +150,9 @@ public enum IrCKind
 /// <param name="Integer">For <see cref="IrCKind.Enum"/>: the C integer type, <c>int</c> for C's own.</param>
 /// <param name="Variants">For <see cref="IrCKind.Enum"/>: how many variants the enum has.</param>
 /// <param name="EnumName">For <see cref="IrCKind.Enum"/>: the enum as a panic names it.</param>
-public sealed record IrCForm(IrCKind Kind, string? Integer = null, int Variants = 0, string? EnumName = null)
+/// <param name="Values">For <see cref="IrCKind.Enum"/>: C's integer for each variant, by its index;
+/// <c>null</c> where it is the index, the first 0 and each next one more.</param>
+public sealed record IrCForm(IrCKind Kind, string? Integer = null, int Variants = 0, string? EnumName = null, long[]? Values = null)
 {
     public static readonly IrCForm Value = new(IrCKind.Value);
 }
@@ -213,6 +215,10 @@ public record struct IrTypeDef(string Name, IrType[] FieldTypes, string[] FieldN
     /// <c>string</c>, a view —, not a struct of it. Its table rows come from the built-in's blocks,
     /// <c>extend int :: [Display]</c>.</summary>
     public bool IsBuiltinBox { get; init; }
+
+    /// <summary>std.ffi's <c>Ptr&lt;T&gt;</c> or <c>CStr</c>: one address, which is never 0 — so
+    /// its optional is the address alone, 0 for none, as C's pointer is.</summary>
+    public bool IsAddress { get; init; }
 
     /// <summary>Declared with <c>class</c>: a heap object with a header, reached by reference.
     /// A positive flag, because the entries that are neither a struct, an enum nor an interface

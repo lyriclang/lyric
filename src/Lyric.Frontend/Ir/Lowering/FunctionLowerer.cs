@@ -5731,7 +5731,7 @@ internal sealed class FunctionLowerer
     private static readonly Dictionary<string, string[]> InfoMembers = new(StringComparer.Ordinal)
     {
         ["FieldInfo"] = ["name", "type", "index", "visibility", "isVar", "hasDefault"],
-        ["VariantInfo"] = ["name", "index", "payload"],
+        ["VariantInfo"] = ["name", "index", "payload", "value"],
         ["MemberInfo"] = ["name", "visibility", "isStatic", "isMut", "kind", "parameters"],
         ["ParameterInfo"] = ["name", "type", "index", "hasDefault"],
         ["Type"] = ["name", "kind"],
@@ -7159,9 +7159,10 @@ internal sealed class FunctionLowerer
         new BoolConst(field.HasDefault),
     ]);
 
-    /// <summary>std.meta's <c>VariantInfo</c> — name, index, payload — of a variant.</summary>
+    /// <summary>std.meta's <c>VariantInfo</c> — name, index, payload, value — of a variant.</summary>
     private static IrConstValue VariantInfoConst(TypeResult.MetaVariant variant) => new StructConst(
-        [new StringConst(variant.Name), new IntConst((ulong)variant.Index), new ArrayConst([.. variant.Payload.Select(FieldInfoConst)])]);
+        [new StringConst(variant.Name), new IntConst((ulong)variant.Index), new ArrayConst([.. variant.Payload.Select(FieldInfoConst)]),
+         new IntConst(unchecked((ulong)variant.Value))]);
 
     /// <summary>std.meta's <c>MemberInfo</c> — name, visibility, isStatic, isMut, kind, parameters — of a member.</summary>
     private static IrConstValue MemberInfoConst(TypeResult.MetaMember member) => new StructConst(
