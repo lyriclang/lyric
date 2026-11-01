@@ -4862,11 +4862,8 @@ internal sealed class FunctionLowerer
         _b.SwitchTo(whenNone);
         // 'x ?? throw e': the absent path throws and never reaches the merge.
         if (Diverges(expr.Right)) LowerDiverging(expr.Right);
-        else if (ComesOut(() =>
-                 {
-                     var fallback = LowerExpr(expr.Right);
-                     _b.Emit(new StoreLocal(slot, Coerce(fallback, TypeOfExpr(expr.Right), type, expr.Span), expr.Span));
-                 }))
+        // Lowered towards the result's type: a 'null' on the right ('?T ?? null') has no type of its own.
+        else if (ComesOut(() => _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Right, type), expr.Span))))
             _b.Seal(new Branch(merge, expr.Span));
 
         _b.SwitchTo(merge);

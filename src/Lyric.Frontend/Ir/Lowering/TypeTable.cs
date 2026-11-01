@@ -1267,19 +1267,7 @@ internal sealed class TypeTable
             // instance ('Box<T>' in 'Pair<T>').
             if (named.TypeArguments.Length > 0 && bound is TypeSymbol generic)
             {
-                var arguments = named.TypeArguments.Select(a => Resolve(a, span)).ToList();
-                // A default the use leaves out (03 §9.1 rule 5): 'Set<T>' is 'Set<T, DefaultHasher>',
-                // the default read under the parameters before it, as the sema fills it.
-                for (var i = arguments.Count; i < generic.Generics.Length; i++)
-                {
-                    if (generic.Generics[i].Declaration is not GenericParam { Default: { } fallback }) break;
-                    var earlier = new Dictionary<string, LyrType>(StringComparer.Ordinal);
-                    for (var j = 0; j < i; j++) earlier[generic.Generics[j].Name] = arguments[j];
-                    _substitutions.Push(earlier);
-                    try { arguments.Add(Resolve(fallback, span)); }
-                    finally { _substitutions.Pop(); }
-                }
-                var id = Intern(generic, arguments);
+                var id = Intern(generic, WithDefaults(generic, named.TypeArguments.Select(a => Resolve(a, span)).ToList(), span));
                 return generic.Kind switch
                 {
                     TypeSymbolKind.Struct => new IrStructType(id),
@@ -1476,6 +1464,25 @@ internal sealed class TypeTable
     private static AssociatedTypeSymbol? Declaring(IEnumerable<TypeSymbol> interfaces, string name) =>
         interfaces.Select(i => i.Members.LookupLocal(name)).OfType<AssociatedTypeSymbol>().FirstOrDefault();
 
+    /// <summary>
+    /// The written arguments of a generic type and, behind them, the defaults the use leaves out:
+    /// <c>Set&lt;T&gt;</c> is <c>Set&lt;T, DefaultHasher&gt;</c>, each default read under the parameters
+    /// before it, as the sema fills it. A list the defaults cannot complete is returned as it is.
+    /// </summary>
+    private List<LyrType> WithDefaults(TypeSymbol generic, List<LyrType> arguments, Core.Span span)
+    {
+        for (var i = arguments.Count; i < generic.Generics.Length; i++)
+        {
+            if (generic.Generics[i].Declaration is not GenericParam { Default: { } fallback }) break;
+            var earlier = new Dictionary<string, LyrType>(StringComparer.Ordinal);
+            for (var j = 0; j < i; j++) earlier[generic.Generics[j].Name] = arguments[j];
+            _substitutions.Push(earlier);
+            try { arguments.Add(Resolve(fallback, span)); }
+            finally { _substitutions.Pop(); }
+        }
+        return arguments;
+    }
+
     private LyrType Resolve(TypeNode node, Core.Span span)
     {
         // A generic alias, as in Lower.
@@ -1542,12 +1549,15 @@ internal sealed class TypeTable
                         fixations.Add((fixedMember, resolved));
                     else positional.Add(resolved);
                 }
-                return new GenericInstance(fixedInterface, positional.ToArray()) { Fixations = fixations.ToArray() };
+                return new GenericInstance(fixedInterface, WithDefaults(fixedInterface, positional, span).ToArray())
+                    { Fixations = fixations.ToArray() };
             }
 
+            // Its defaults filled here too: 'Map<string, int>' as the argument of 'List<…>' is the
+            // same instance as the 'Map<string, int, DefaultHasher>' a field of its own type keys.
             if (definition is TypeSymbol generictype)
                 return new GenericInstance(generictype,
-                    generic.TypeArguments.Select(argument => Resolve(argument, span)).ToArray());
+                    WithDefaults(generictype, generic.TypeArguments.Select(argument => Resolve(argument, span)).ToList(), span).ToArray());
         }
 
         if (node is ArrayType { Length: { } n } inline) return new InlineArrayOf(Resolve(inline.Element, span), n);
