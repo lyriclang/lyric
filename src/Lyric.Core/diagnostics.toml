@@ -1512,6 +1512,52 @@ example = '''
 by hand[LYR-MIG0108] lyric.json:1:1: the tests under 'tests' are compiled apart in Lyric 4; Lyric 5 runs a package's tests/ with lyric test — move them to tests/ and make each test an @Test function
 '''
 
+[LYR-MIG0205]
+title = "an opaque type became a struct"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: an `opaque type H = T;` of Lyric 4 is written as `struct H :: [Equatable] { v: T }`, `x as H` as `H { v = x }` and `h as T` as `h.v`."
+explanation = '''
+Lyric 5 has no opaque alias. A struct with one field keeps what the alias was for: a value of its own identity that converts to nothing implicitly, compared with `==` within its type. The two `as` crossings are written as the construction and the field access.
+
+What changes: a native signature of Lyric 4 took the underlying value, and the struct crosses into C as a struct. Where the value goes to C or to the host, pass its `v`.
+'''
+example = '''
+proposal[LYR-MIG0205] main.lyr:3:1: 'UserId' was an opaque type over 'int'; it is a struct with one field 'v', its 'as' crossings field accesses and constructions — where the value crosses into C or the host, pass its 'v'
+'''
+
+[LYR-MIG0208]
+title = "a format spec without its old output"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a format spec of Lyric 4 (.NET's) that Lyric 5's format language writes otherwise for some values (`D`, `X` on a signed integer), or not at all (`E`, `P`, `C`, `G`, `R`, a custom format)."
+explanation = '''
+Lyric 4 passed a format spec to .NET; Lyric 5 has one format language of its own (`[[fill]align][sign][#][0][width][grouping][.precision][type]`). The migration writes what keeps the output: a width is an alignment (`{name:10}` is `{name:<10}`, `{n:-8}` is `{n:>8}`), `N2` is `,.2f`, `F3` is `.3f`, and on an integer the decimals stand after the hole (`{n:N2}` is `{n:,}.00`).
+
+Written and said as a proposal: `D6` is written `06`, which counts a negative value's sign in the width; `X` is written `X`, which writes a negative value's sign and magnitude where Lyric 4 wrote its two's complement.
+
+Said by hand, left as written: scientific (`E`), percent (`P`), currency (`C`), general (`G`), round-trip (`R`) and custom formats such as `0.00` — Lyric 5 refuses them. The note proposes the nearest spec where there is one.
+'''
+example = '''
+by hand[LYR-MIG0208] main.lyr:5:15: the format 'P1' (percent) has no counterpart in Lyric 5's format language — ':.1%' writes the percent without the space
+'''
+
+[LYR-MIG0211]
+title = "a generic interface named by an associated type"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: `Indexable<T>` is `IndexSet<int>` with `type Output = T`, and `Iterable<T>` or `Indexable<T>` as the type of a value has no counterpart in Lyric 5."
+explanation = '''
+Lyric 5's `Iterator`, `Iterable`, `Index` and `IndexSet` name their element by an associated type. The migration writes `Iterator<T>` as `Iterator<Item = T>`, a conformance to `Iterator<T>` as `Iterator` with `type Item = T;`, and one to `Iterable<T>` as `Iterable` with `type Iter = Iterator<Item = T>;`.
+
+A conformance to `Indexable<T>` becomes `IndexSet<int>` with `type Output = T;`, and the migration adds `index` and `setIndex`, which `x[i]` and `x[i] = v` call, forwarding to the `get` and `set` the type had. Fold them together where nothing else calls `get` and `set`.
+
+`Iterable<T>` or `Indexable<T>` as the type of a parameter or a field is left as written: take an `Iterator<Item = T>`, the concrete type, or a type parameter with the interface as its bound.
+'''
+example = '''
+proposal[LYR-MIG0211] main.lyr:16:13: 'Indexable<int>' as a type has no counterpart: Lyric 5's 'Indexable' names its element by an associated type — take the concrete type, or a type parameter with '[IndexSet<int>]'
+'''
+
 [LYR-PAR0001]
 title = "a token after one whole expression, pattern or statement"
 severity = "error"

@@ -102,6 +102,10 @@ public static class From4
         return string.Join('.', stem.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
     }
 
+    /// <summary>Whether a source path is a file of 4.6's standard library, served from the resources.</summary>
+    internal static bool IsStdlib(string path) =>
+        Path.GetFullPath(path).StartsWith(StdlibRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+
     /// <summary>4.6's standard library from the resources, by the path the loader asks under
     /// <see cref="StdlibRoot"/>.</summary>
     private static IReadOnlyDictionary<string, string> ReadStdlib()

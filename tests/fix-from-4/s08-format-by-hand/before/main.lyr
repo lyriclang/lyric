@@ -1,0 +1,7 @@
+import std.io.console { println };
+
+fn main(): int {
+    let share = 0.125;
+    println(f"{share:P1}");
+    return 0;
+}

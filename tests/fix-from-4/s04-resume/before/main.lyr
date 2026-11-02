@@ -1,0 +1,22 @@
+import std.io.console { println };
+
+fn three(): Coroutine<int> {
+    yield 10;
+    yield 20;
+    yield 30;
+}
+
+fn steps(): Coroutine<void> {
+    yield;
+    yield;
+}
+
+fn main(): int {
+    let t = three();
+    let a = resume t;
+    let b = 2 * resume t;
+    let s = steps();
+    resume s;
+    println(f"{a} {b}");
+    return 0;
+}

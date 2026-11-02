@@ -1,0 +1,1 @@
+proposal[LYR-MIG0205] main.lyr:3:1: 'UserId' was an opaque type over 'int'; it is a struct with one field 'v', its 'as' crossings field accesses and constructions — where the value crosses into C or the host, pass its 'v'

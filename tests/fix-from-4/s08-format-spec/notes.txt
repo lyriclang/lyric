@@ -1,0 +1,2 @@
+proposal[LYR-MIG0208] main.lyr:7:63: 'D6' padded the digits to 6, after the sign; ':06' counts the sign in the width — for a negative value write ':07'
+proposal[LYR-MIG0208] main.lyr:7:72: 'X' wrote a negative value's bits (two's complement); ':X' writes its sign and magnitude — where the bits are meant, convert to 'uint64' first
