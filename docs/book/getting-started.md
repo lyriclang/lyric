@@ -73,7 +73,8 @@ only from a mirror of your own, which `LYRIC_MIRROR` names with its key in `LYRI
 `lyric fix --from-4` migrates a Lyric 4 program: run it in the directory of its `lyric.json`, or name one
 file. It reads the program with Lyric 4.6's own checker, so the program has to check with 4.6 first, then
 rewrites the files in place — the module headers go, the imports name Lyric 5's modules, `lyric.json`
-becomes `lyric.toml` — and lists in `fix-from-4.txt` what it leaves to you. `--dry-run` shows the changes
+becomes `lyric.toml`, `resume c` becomes `c.next()!`, `{avg:N2}` becomes `{avg:,.2f}` — and lists in
+`fix-from-4.txt` what it leaves to you. `--dry-run` shows the changes
 as a diff first. Then `lyric check` says what is left.
 
 ## A package

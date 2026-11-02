@@ -1,0 +1,17 @@
+import std.io { println };
+
+struct UserId :: [Equatable] { v: int }
+
+fn lookup(id: UserId): string {
+    if (id == (UserId { v = 7 })) {
+        return "ada";
+    }
+    return "?";
+}
+
+fn main(): int {
+    let id = UserId { v = 7 };
+    let raw = id.v;
+    println(f"{lookup(id)} {raw + 1}");
+    return 0;
+}

@@ -1,0 +1,20 @@
+import std.io { println };
+
+fn total(values: int...): int {
+    var sum = 0;
+    for (v in values) {
+        sum = sum + v;
+    }
+    return sum;
+}
+
+fn logged(label: string, values: int...): int {
+    println(label);
+    return total(values...);
+}
+
+fn main(): int {
+    let xs = [4, 5];
+    println(f"{total(1, 2, 3)} {total(xs...)} {logged("both", 6, 7)}");
+    return 0;
+}

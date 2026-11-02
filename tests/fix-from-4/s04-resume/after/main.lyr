@@ -1,0 +1,22 @@
+import std.io { println };
+
+fn three(): Coroutine<int> {
+    yield 10;
+    yield 20;
+    yield 30;
+}
+
+fn steps(): Coroutine<void> {
+    yield;
+    yield;
+}
+
+fn main(): int {
+    let t = three();
+    let a = t.next()!;
+    let b = 2 * t.next()!;
+    let s = steps();
+    assert(s.next());
+    println(f"{a} {b}");
+    return 0;
+}

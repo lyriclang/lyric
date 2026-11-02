@@ -1926,6 +1926,32 @@ sein eigenes Repo; ein Migrator für Erato (Lyricpp, Z-Reihe); `--edition` (mit 
   nennt Exit und Codes (k05-partial: `combineHash` mit T05 in S4, die `assert`-Meldung in S6; k07: ein `build.lyr`
   von 4.x baut in Lyric 5 nicht, das sagt der Hinweis).
 
+**S3, beim Bauen entschieden** (2026-11-01):
+
+- **S08 schreibt, was 4.6 ausgab, nicht was die Zeile in 12 R2 als Kürzel nennt**: 4.6 reichte den Spec an .NET
+  (`InvariantCulture`), und eine bloße Zahl war eine Breite (`{name:10}` rechts aufgefüllt, `{n:-8}` links) — das
+  steht so nur im 4.6-Laufzeitcode, nicht im Guide. Also `{x:10}` → `{x:<10}`, `{x:-8}` → `{x:>8}`, `N2` →
+  `,.2f` (mit Gruppierung, wie .NETs `N`; die Zeile sagt `.2f`), `F3` → `.3f`. Auf einer Ganzzahl lehnt Lyric 5 eine
+  Präzision ab (`LYR-SEM0164`), 4.6 schrieb `1,234.00`: die Dezimalen stehen hinter dem Loch (`{n:,}.00`). `D6`
+  → `06` und `X` → `X` schreiben, sagen aber zur Prüfung (`LYR-MIG0208`), dass ein negativer Wert anders herauskommt
+  (`-0042` statt `-00042`; Vorzeichen statt Zweierkomplement); auf vorzeichenlosen Typen schweigen sie. `E`, `P`,
+  `C`, `G`, `R` und eigene Formate bleiben stehen, von Hand, mit dem nächsten Spec als Vorschlag.
+- **S04 für `Coroutine<void>`**: `resume s` panikte am Ende, `s.next()` antwortet `false` — geschrieben wird
+  `assert(s.next())`, das am Ende panikt wie `resume`. Auf `Coroutine<?T>` (4.6 verbot dort `next()`) gibt
+  `c.next()!` in Lyric 5 das `?T`.
+- **S05 schreibt `struct H :: [Equatable] { v: T }`**: `==` innerhalb des Typs war das Einzige, was ein opaker
+  Wert konnte; die beiden `as` werden `H { v = x }` und `h.v`. Zur Prüfung (`LYR-MIG0205`): an einer nativen
+  Grenze nahm 4.6 den Wert darunter.
+- **S11 hat eine Lücke in 12 R2**: `Iterable<Item = T>` gibt es nicht — Lyric 5s `Iterable` nennt `type Iter`. Eine
+  Konformanz `Iterable<T>` wird `Iterable` mit `type Iter = Iterator<Item = T>;` (gemessen: baut und läuft);
+  `Iterable<T>` oder `Indexable<T>` als Typ eines Werts hat kein Gegenstück und wird zur Prüfung gesagt
+  (`LYR-MIG0211`). `Indexable<T>` wird `IndexSet<int>` mit `type Output = T;` und `index`/`setIndex`, die an
+  `get`/`set` weiterreichen — die Aufrufer von `get`/`set` bleiben, wie sie sind.
+- **K05 wuchs mit**: `import std.iter { Iterator, Iterable }` und `std.collections { Indexable }` entfallen — die
+  drei stehen in Lyric 5 im Prelude (`Indexable` als `IndexSet`); ohne das baute kein Fall von S11.
+- **Codes**: je Regel der Art R/H der Bereich `MIG02nn` mit der Nummer der Regel (`MIG0205`, `MIG0208`,
+  `MIG0211`); S01, S04, S06, S07 und S10 schreiben und sagen nichts.
+
 ## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
 
 **Anlass** (Maintainer, 2026-10-29): ein Bau mit einer eingebundenen C-Bibliothek (raylib, sieben Quellen) sagte

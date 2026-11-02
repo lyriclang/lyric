@@ -348,8 +348,12 @@ promise. This entry fills with the milestones.
   is read with Lyric 4.6's frozen front end — one 4.6 refuses is not changed (`LYR-MIG0001`) —, the rules rewrite
   spans so comments and layout stay, and what a person decides is said as a hint (`LYR-MIG`) and written to
   `fix-from-4.txt`; `--dry-run` shows the diff. The first rules: the module header, `lyric.json` → `lyric.toml`, the
-  modules' new names, what the prelude holds, the package's own imports. The rules for syntax, interfaces, errors
-  and the library follow.
+  modules' new names, what the prelude holds, the package's own imports; the syntax — `params xs: int[]` →
+  `xs: int...` (an array passed whole is spread, `f(xs...)`), `resume c` → `c.next()!`, an opaque type → a struct
+  with one field, a bare variant in a pattern → `.Red`, `\xNN` → `\u{NN}`, .NET format specs → the format language
+  (`{x:N2}` → `{x:,.2f}`, a width → an alignment), an array's `.length` → `.length()`, `Iterator<T>` →
+  `Iterator<Item = T>` and the conformances to `Iterator`, `Iterable` and `Indexable` with their associated types.
+  The rules for interfaces, errors and the library follow.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
 
 ---

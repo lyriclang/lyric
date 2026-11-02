@@ -149,7 +149,9 @@ internal sealed partial class Imports : IRule
             "Allow", "Warn", "Deny", "When", "Shared",
         ],
         ["std.test"] = ["Test"],
-        ["std.collections"] = ["List", "Map", "Set"],
+        // 'Indexable' is 'IndexSet' in Lyric 5 (S11), which the prelude holds
+        ["std.collections"] = ["List", "Map", "Set", "Indexable"],
+        ["std.iter"] = ["Iterator", "Iterable"],
     };
 
     [GeneratedRegex(@"\Gimport\s+([A-Za-z_][A-Za-z0-9_]*(?:\s*\.\s*[A-Za-z_][A-Za-z0-9_]*)*)")]

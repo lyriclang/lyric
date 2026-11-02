@@ -1,0 +1,9 @@
+import std.io { println };
+
+fn main(): int {
+    let s = "A\u{42}C";
+    let c = '\u{41}';
+    let kept = "\\x41";
+    println(f"{s} {c} {kept}\u{21}");
+    return 0;
+}

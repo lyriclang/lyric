@@ -1,0 +1,9 @@
+import std.io.console { println };
+
+fn main(): int {
+    let pi = 3.14159;
+    let n = 1234;
+    let name = "ab";
+    println(f"[{pi:N2}] [{pi:F3}] [{n:N0}] [{n:N2}] [{n:F1}] [{n:D6}] [{n:X}] [{name:6}] [{n:-8}]");
+    return 0;
+}

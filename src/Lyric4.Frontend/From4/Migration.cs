@@ -135,6 +135,14 @@ public static class Migrator
         new Rules.Imports(),
         new Rules.Visibility(),
         new Rules.BuildScript(),
+        new Rules.Variadic(),
+        new Rules.Resume(),
+        new Rules.Opaque(),
+        new Rules.VariantPatterns(),
+        new Rules.HexEscapes(),
+        new Rules.FormatSpecs(),
+        new Rules.Length(),
+        new Rules.GenericInterfaces(),
     ];
 
     /// <exception cref="InvalidOperationException">The program does not check with 4.6.</exception>

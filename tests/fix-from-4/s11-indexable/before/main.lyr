@@ -1,0 +1,25 @@
+import std.io.console { println };
+import std.collections { Indexable };
+
+class Cells :: [Indexable<int>] {
+    items: int[],
+
+    fn get(index: int): int {
+        return this.items[index];
+    }
+
+    mut fn set(index: int, value: int): void {
+        this.items[index] = value;
+    }
+}
+
+fn first(c: Indexable<int>): int {
+    return c.get(0);
+}
+
+fn main(): int {
+    let c = Cells { items = [1, 2] };
+    c.set(1, 5);
+    println(f"{c.get(1)} {first(c)}");
+    return 0;
+}

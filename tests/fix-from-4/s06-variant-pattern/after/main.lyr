@@ -1,0 +1,20 @@
+import std.io { println };
+
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+fn name(c: Color): string {
+    return match (c) {
+        .Red => "red",
+        .Green => "green",
+        other => "another",
+    };
+}
+
+fn main(): int {
+    println(f"{name(Color.Red)} {name(Color.Blue)}");
+    return 0;
+}

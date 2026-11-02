@@ -1,0 +1,1 @@
+by hand[LYR-MIG0208] main.lyr:5:15: the format 'P1' (percent) has no counterpart in Lyric 5's format language — ':.1%' writes the percent without the space

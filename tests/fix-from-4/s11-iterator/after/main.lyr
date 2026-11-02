@@ -1,0 +1,28 @@
+import std.io { println };
+
+struct Nothing :: [Iterator] {
+    type Item = int;
+    mut fn next(): ?int {
+        return null;
+    }
+}
+
+struct Bag :: [Iterable] {
+    type Iter = Iterator<Item = int>;
+    fn iter(): Iterator<Item = int> {
+        return Nothing { };
+    }
+}
+
+fn count(it: Iterator<Item = int>): int {
+    var n = 0;
+    for (x in it) {
+        n = n + 1;
+    }
+    return n;
+}
+
+fn main(): int {
+    println(f"{count(Nothing { })} {count(Bag { }.iter())}");
+    return 0;
+}
