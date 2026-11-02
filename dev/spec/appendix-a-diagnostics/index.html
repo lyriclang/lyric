@@ -2392,6 +2392,27 @@ code is no longer reported, and its number is not given again.</p>
 <td>tests compiled apart</td>
 <td>A note of <code>lyric fix --from-4</code>: the <code>lyric.json</code> names a <code>testRoot</code>, whose files Lyric 4 compiled apart from the program. Lyric 5 runs a package's <code>tests/</code> with <code>lyric test</code>; each test is an <code>@Test</code> function.</td>
 </tr>
+<tr>
+<td>LYR-MIG0205</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>an opaque type became a struct</td>
+<td>A note of <code>lyric fix --from-4</code>: an <code>opaque type H = T;</code> of Lyric 4 is written as <code>struct H :: [Equatable] { v: T }</code>, <code>x as H</code> as <code>H { v = x }</code> and <code>h as T</code> as <code>h.v</code>.</td>
+</tr>
+<tr>
+<td>LYR-MIG0208</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a format spec without its old output</td>
+<td>A note of <code>lyric fix --from-4</code>: a format spec of Lyric 4 (.NET's) that Lyric 5's format language writes otherwise for some values (<code>D</code>, <code>X</code> on a signed integer), or not at all (<code>E</code>, <code>P</code>, <code>C</code>, <code>G</code>, <code>R</code>, a custom format).</td>
+</tr>
+<tr>
+<td>LYR-MIG0211</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a generic interface named by an associated type</td>
+<td>A note of <code>lyric fix --from-4</code>: <code>Indexable&lt;T&gt;</code> is <code>IndexSet&lt;int&gt;</code> with <code>type Output = T</code>, and <code>Iterable&lt;T&gt;</code> or <code>Indexable&lt;T&gt;</code> as the type of a value has no counterpart in Lyric 5.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a7-ct--compile-time-evaluation">A.7 CT — Compile-time evaluation</h2>

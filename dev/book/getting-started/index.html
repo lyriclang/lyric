@@ -76,7 +76,8 @@ only from a mirror of your own, which <code>LYRIC_MIRROR</code> names with its k
 <p><code>lyric fix --from-4</code> migrates a Lyric 4 program: run it in the directory of its <code>lyric.json</code>, or name one
 file. It reads the program with Lyric 4.6's own checker, so the program has to check with 4.6 first, then
 rewrites the files in place — the module headers go, the imports name Lyric 5's modules, <code>lyric.json</code>
-becomes <code>lyric.toml</code> — and lists in <code>fix-from-4.txt</code> what it leaves to you. <code>--dry-run</code> shows the changes
+becomes <code>lyric.toml</code>, <code>resume c</code> becomes <code>c.next()!</code>, <code>{avg:N2}</code> becomes <code>{avg:,.2f}</code> — and lists in
+<code>fix-from-4.txt</code> what it leaves to you. <code>--dry-run</code> shows the changes
 as a diff first. Then <code>lyric check</code> says what is left.</p>
 <h2 id="a-package">A package</h2>
 <p>A program lives in a <strong>package</strong>: a directory with a manifest, <code>lyric.toml</code>, and its source under

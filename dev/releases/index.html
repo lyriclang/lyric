@@ -468,8 +468,12 @@ refusal (<code>LYR-SEM0114</code>) names it.</p>
 is read with Lyric 4.6's frozen front end — one 4.6 refuses is not changed (<code>LYR-MIG0001</code>) —, the rules rewrite
 spans so comments and layout stay, and what a person decides is said as a hint (<code>LYR-MIG</code>) and written to
 <code>fix-from-4.txt</code>; <code>--dry-run</code> shows the diff. The first rules: the module header, <code>lyric.json</code> → <code>lyric.toml</code>, the
-modules' new names, what the prelude holds, the package's own imports. The rules for syntax, interfaces, errors
-and the library follow.</p>
+modules' new names, what the prelude holds, the package's own imports; the syntax — <code>params xs: int[]</code> →
+<code>xs: int...</code> (an array passed whole is spread, <code>f(xs...)</code>), <code>resume c</code> → <code>c.next()!</code>, an opaque type → a struct
+with one field, a bare variant in a pattern → <code>.Red</code>, <code>\xNN</code> → <code>\u{NN}</code>, .NET format specs → the format language
+(<code>{x:N2}</code> → <code>{x:,.2f}</code>, a width → an alignment), an array's <code>.length</code> → <code>.length()</code>, <code>Iterator&lt;T&gt;</code> →
+<code>Iterator&lt;Item = T&gt;</code> and the conformances to <code>Iterator</code>, <code>Iterable</code> and <code>Indexable</code> with their associated types.
+The rules for interfaces, errors and the library follow.</p>
 </li>
 <li><p><strong>The language server answers a held hover after the diagnostics</strong> it waited for, not before them.</p>
 </li>
