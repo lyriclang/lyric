@@ -1994,3 +1994,38 @@ Signieren, S7 Mirror) warten weiter auf Schlüssel und DNS des Maintainers; der 
 Variante dazubekommt; Rusts bindgen bildet C-Enums aus demselben Grund als Ganzzahl ab. Ein optionaler
 Funktionszeiger als Feld (wie 289): im IR ist er ein `u64`, ein `?u64` hat keine Nische — dafür bräuchte es einen
 eigenen IR-Typ; offen als Tür.
+
+## Nachtrag 2026-11-03 — Block P: die std nach Fachmodulen
+
+**Anlass**: 10 „Nachtrag 2026-11-03“ (P1–P12) — was rechnet, sucht oder umformt, steht im Fachmodul, als
+Empfänger-Funktion (`extend` im Fachmodul) oder frei; dazu 07 S5′ (Erweiterungen reisen mit `pub import`). Block P
+kommt **vor den Bibliotheksregeln von M16** (S4: T11–T16; S6): die Migration zielt auf die std, wie sie nach P steht.
+Die Regeln von S4, die nicht daran hängen (T01–T05, T08–T10, T18), laufen weiter.
+
+**Gemessen vor dem Plan** (main 7aac7bf3): eine inhärente Erweiterung aus einem fremden Modul ist ohne Import
+unsichtbar (`LYR-SEM0012`, die Notiz nennt das Modul) — die Mechanik von P2 steht; ein `pub import` reicht sie
+**nicht** weiter. `std.core` deklariert heute `string`, `StringView`, `Slice` und die Zahltypen samt ihrer
+Operationen; `std.string` hält nur sieben Umwandlungen. Die Aufrufform ändert sich für Text nicht
+(`s.split(",")`), für die Mathematik von P8 schon (`x.clamp(lo, hi)` → `clamp(x, lo, hi)`,
+`a.checkedAdd(b)` → `checkedAdd(a, b)`).
+
+| Slice | Inhalt | Artefakt |
+|---|---|---|
+| **P-S1** Mechanik | 07 S5′: `pub import` reicht die Erweiterungen eines Moduls weiter; zwei gleichnamige sichtbare Erweiterungen sind ein Fehler mit beiden Modulen; das Prelude reicht `std.string` weiter. 10 P10: die Interna von `std.core` werden `internal` (der Compiler erreicht sie weiter). Spec 07 die Regel, Konformanzfälle | eine Erweiterung, zwei Module weit gereicht, ruft sich; der Konflikt nennt beide; `lyric doc std.core` ohne `fstring…` |
+| **P-S2** Text umziehen | 10 P5/P6: die Operationen von `StringView`/`string` und `char.toUpper/toLower/toDigit` ziehen als Erweiterungen nach `std/string.lyr`; `toBytes` → `bytes`, `matches` → `findAll`, `Slice.join` → `std.string`; was `std.core` selbst davon braucht, ruft private Hilfen. Aufrufer ändern sich nicht (außer den Umbenennungen) | `lyric doc` zeigt sie unter `std.string`; die Typseite von `string` hält nur P5s „am Typ“ |
+| **P-S3** Text ergänzen | 10 P7 (`substring`, `charAt` in Zeichen, `findFrom`, `firstOf`, `splitWhitespace`, `rsplitOnce`, `repeat`, `isAscii`, `equalsIgnoreCase`, `compareIgnoreCase`, `charIndex`, `isCharBoundary`) und P11 (Two-Way-Suche, gemessen gegen die heutige auf einem pathologischen und einem gewöhnlichen Text) | je Funktion Tests in `tests/std` und ein Doc-Beispiel; die Suche hält O(n+m) |
+| **P-S4** Mathematik | 10 P8: `clamp`, ein `pow` über `Num`, `checked…`/`saturating…`/`wrapping…`, die Bit-Funktionen frei in `std.math`; die Aufrufer in std, Tests, Konformanz, Beispielen, Book umgeschrieben | `Integer`/`Float` halten nur noch P8s „am Typ“ |
+| **P-S5** Sammlungen | 10 P6/P9: `find` = Index (`slice.indexOf` → `find`, `iter.position` → `find`), `iter.find` → `firstWhere`, `binarySearch`/`partitionPoint`/`reversed` nach `std.collections`, `chunks`/`windows` nach `std.iter` | — |
+| **P-S6** Namen und Abschluss | 10 P12 einzeln (je Befund entscheiden und bauen oder als Tür notieren), Book und Guide, STATUS, CHANGELOG, der Bericht | die Inventur noch einmal: jede Funktion am Ort von P1 |
+
+Nach Aufwand: groß P-S2 (der Umzug quer durch `std.core`, ~40 Funktionen) und P-S4 (die Aufrufer der
+Mathematik); mittel P-S3, P-S5; klein P-S1, P-S6 — **L**. **Spec**: 07 bekommt S5′; die std-Kapitel der Spec nennen
+ihre Funktionen am neuen Ort, je Slice zuerst (spec-first). **Plattformen**: P-S3 (Suche, `memchr`-Ersatz) und
+P-S4 fahren den vollen Plattformlauf.
+
+**Reflexion**: Z2 hatte die Elementarfunktionen schon einmal vom Typ in `std.math` geholt und dabei
+`clamp`, `pow`, `wrapping…` am Typ gelassen — eine halbe Regel erzeugt genau die Uneinheitlichkeit, die M16 S4
+sichtbar machte. Die ganze Regel kostet bei Text fast nichts, weil Lyric die Empfänger-Funktion im Fachmodul
+schon kann (C#/Kotlin statt Gos freier Funktionen); bei der Mathematik ändert sie Aufrufe, und das ist gewollt:
+`clamp(x, lo, hi)` steht neben `min(a, b)`. Die Gefahr ist ein Umzug, der Namen bricht, ohne dass ein Test es merkt —
+darum zählt P-S6 die Inventur ein zweites Mal.

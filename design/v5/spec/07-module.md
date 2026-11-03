@@ -233,6 +233,15 @@ nach Empfehlung entschieden; die volle Fassung steht in 11, „Nachtrag 2026-10-
 |---|---|---|
 | E3′ | **Ein Paket bringt dynamische Bibliotheken mit**: `[native.<os/tripel>] dylibs = […]`, Dateien des Paketinhalts oder eines Quellbaums, über ihren Pfad gelinkt und vom Bau neben jedes Binary des Programms gelegt. B5 „`lib.a` je Ziel“ bleibt die erste Wahl, ist aber nicht mehr die einzige | V8 B5 |
 
+## Nachtrag 2026-11-03 — Erweiterungen reisen mit `pub import`
+
+Aus 10 P2/P3 (die Operationen eines Werts stehen als Erweiterungen im Fachmodul, das Prelude reicht `std.string`
+weiter):
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| S5′ | Eine **inhärente** Erweiterung aus einem anderen Modul als dem ihres Typs ist sichtbar, wo **ihr Modul importiert** ist (so schon gebaut) **oder wo ein `pub import` es weiterreicht** — wie ein Name: wer `pub import a.b { x }` schreibt, reicht auch `a.b`s Erweiterungen weiter. Das Prelude reicht so `std.string` weiter. Zwei gleichnamige Erweiterungen aus verschiedenen sichtbaren Modulen an einer Stelle sind ein Fehler, der beide nennt. Konformanzen bleiben global (S5) | S5, I1 |
+
 ---
 
 **Bereich 7 ist damit vollständig entschieden** (V1–V10, 2026-09-29).

@@ -60,7 +60,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M14 | FFI and embedding | L | **done** 2026-10-28 |
 | M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | **done** 2026-10-29 |
 | M15 | Distribution | M | **done** 2026-10-29 but its halts (S6 signing, S7 mirror) |
-| M16 | Migration (`lyric fix --from-4`) | L | open: S1–S2 done 2026-10-30, S3–S8 to come |
+| M16 | Migration (`lyric fix --from-4`) | L | open: S1–S3 done (S3 2026-11-02); Block P before S4's library rules |
+| P | std by subject module (design 10 P1–P12, plan in 13) | L | planned 2026-11-03 |
 | M17 | Spec 5.0, suite, guide | L | — |
 | M18 | Release 5.0.0 | M | — |
 
@@ -1380,7 +1381,7 @@ released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "
   job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
   step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
 
-### M16 — open (S1–S2 done 2026-10-30)
+### M16 — open (S1–S3 done)
 
 The plan is design 13's addendum "der Plan für M16" (#618; S1–S8).
 
@@ -1389,7 +1390,11 @@ The plan is design 13's addendum "der Plan für M16" (#618; S1–S8).
 - **S2** (#631 + spec#395): `lyric fix --from-4` — the driver, the rule interface, `--dry-run`, the report
   `fix-from-4.txt`; K01–K05 and K09 rewrite, K06–K08 are hints (`LYR-MIG`). A case per rule under
   `tests/fix-from-4`.
-- **Next: S3** (syntax rules), then S4–S7, S8 closes.
+- **S3** (#641 + spec#401): the syntax rules S01, S04–S08, S10, S11 — `params` → `T...`, `resume` → `next()!`, an
+  opaque type → a struct, `.Red`, `\u{NN}`, .NET format specs → the format language (4.6's output kept), `.length()`,
+  the generic interfaces with their associated types; `LYR-MIG0205/0208/0211`.
+- **Next**: Block P (the std by subject module, design 10 "Nachtrag 2026-11-03", plan in 13), then S4's library rules
+  (T11–T16) on the new std; S4's other rules go on meanwhile. Then S5–S7, S8 closes.
 
 ### The open points, decided (2026-10-30)
 
