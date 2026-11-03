@@ -218,7 +218,7 @@ fn fnv1a64(): void {
 // is the same — over every length around a word's, at run time and at compile time, a view's too.
 fn bytewise(s: string): uint64 {
     var h = FixedHasher.new();
-    for (b in s.toBytes()) {
+    for (b in s.bytes()) {
         h.writeByte(b);
     }
     h.writeByte(255);

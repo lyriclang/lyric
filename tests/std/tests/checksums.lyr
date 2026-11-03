@@ -21,10 +21,10 @@ fn repeated(n: int, b: uint8): uint8[] {
 
 @Test
 fn theCheckValues(): void {
-    let check = "123456789".toBytes();
+    let check = "123456789".bytes();
     assertEq(crc32(check), 0xCBF43926);
     assertEq(crc32c(check), 0xE3069283);
-    assertEq(adler32("Wikipedia".toBytes()), 0x11E60398);
+    assertEq(adler32("Wikipedia".bytes()), 0x11E60398);
 }
 
 @Test
@@ -58,9 +58,9 @@ fn largeInputsAgreeWithZlib(): void {
 
 @Test
 fn aChecksumContinuesFromItsRunningValue(): void {
-    assertEq(crc32("456789".toBytes(), crc32("123".toBytes())), 0xCBF43926);
-    assertEq(crc32c("456789".toBytes(), crc32c("123".toBytes())), 0xE3069283);
-    assertEq(adler32("pedia".toBytes(), adler32("Wiki".toBytes())), 0x11E60398);
+    assertEq(crc32("456789".bytes(), crc32("123".bytes())), 0xCBF43926);
+    assertEq(crc32c("456789".bytes(), crc32c("123".bytes())), 0xE3069283);
+    assertEq(adler32("pedia".bytes(), adler32("Wiki".bytes())), 0x11E60398);
     let mixed = pattern(70000);
     assertEq(adler32(mixed[30000..], adler32(mixed[..30000])), 0x8E7B36C1);
 }

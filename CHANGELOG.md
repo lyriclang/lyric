@@ -344,6 +344,11 @@ promise. This entry fills with the milestones.
   in the prelude, and `List` and `Deque` conform; on a type with its own `Index<int>` and `Length`, `x[^n]` is
   `x.index(x.length() - n)`, written too (`x[^1] = v`, `+=`, `++`), with `x` evaluated once. Without `Length` the
   refusal (`LYR-SEM0114`) names it.
+- **Text operations are `std.string`'s**: what searches in a text, takes it apart or makes a new one of it —
+  `find`, `split`, `trim`, `replace`, `startsWith`, `toUpper`, `parse` … — moved from `std.core` to `std.string`, an
+  extension the prelude passes on, so `s.split(",")` reads as before; so did `char.toUpper/toLower/toDigit` and
+  a slice's `join`. On the type stays what describes it: `length`, `isEmpty`, `chars`, `charIndices`, `charCount`
+  and **`bytes()`** (was `toBytes()`). `matches(p)` is **`findAll(p)`**.
 - **An extension travels with `pub import`**: a block of methods reaches where its module is imported or passed
   on by a `pub import` — a chain of them; `pub import lib.error { Thing }` now brings `lib.error`'s methods on
   `Thing` with it. Two such modules seen at one call that both add the name are refused (`LYR-SEM0235`);

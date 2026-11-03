@@ -17,7 +17,7 @@
 //! import std.encoding { Base64, Hex, EncodingError };
 //!
 //! fn main(): void throws EncodingError {
-//!     let bytes = "Lyric".toBytes();
+//!     let bytes = "Lyric".bytes();
 //!     println(Base64.encode(bytes));
 //!     println(Hex.encode(bytes));
 //!     let back = try Base64.decode("THlyaWM=");

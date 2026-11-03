@@ -49,9 +49,9 @@ fn aViewAsThePattern(): void {
 
 @Test
 fn theMatches(): void {
-    assertEq(joined("banana".matches("an")), "an|an");
-    assertEq(joined("banana".matches('a')), "a|a|a");
-    assertEq(joined("banana".matches("x")), "");
+    assertEq(joined("banana".findAll("an")), "an|an");
+    assertEq(joined("banana".findAll('a')), "a|a|a");
+    assertEq(joined("banana".findAll("x")), "");
     assertNull("banana".stripPrefix('x'));
 }
 

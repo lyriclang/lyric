@@ -1324,7 +1324,7 @@ class Parser {
     }
 
     fn word(w: string): bool {
-        let bs = w.toBytes();
+        let bs = w.bytes();
         var i = 0;
         while (i < bs.length()) {
             if (this.peekAt(i) != (bs[i] as int)) {
@@ -1866,7 +1866,7 @@ fn joined(path: string[]): string {
 /// Throws `TomlError` with the line and column where the text is not valid TOML, is not UTF-8,
 /// defines a key or table twice, or nests deeper than 128 levels.
 pub fn parse(text: StringView): TomlValue throws TomlError {
-    var p = Parser { bytes = text.toBytes() };
+    var p = Parser { bytes = text.bytes() };
     try p.document();
     return TomlValue.Table(p.root);
 }

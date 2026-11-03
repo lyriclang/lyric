@@ -174,7 +174,7 @@ fn serve(listener: TcpListener): void throws Error {
                     } else {
                         out = f"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nX-Conn: {id}\r\n\r\n";
                     }
-                    try conn.writeAll(out.toBytes()[..]);
+                    try conn.writeAll(out.bytes()[..]);
                     if (path == "/close"
                         || path == "/old"
                         || path == "/garbage"
@@ -281,13 +281,13 @@ fn aClientPostsAndFollowsRedirects(): void throws Error {
     var client = Client.new();
     // a body with its length
     let posted = try client.send(
-        Request.post(uri(base, "/post"), "payload".toBytes()[..], "text/plain")
+        Request.post(uri(base, "/post"), "payload".bytes()[..], "text/plain")
     );
     assertEq(try posted.text(), "POST got 7 bytes: payload");
     // a body without: chunked
     var streamed = Request { method = Method.Put, uri = uri(base, "/echo") };
     let src = ByteBuffer.new();
-    try src.write("streamed body".toBytes()[..]);
+    try src.write("streamed body".bytes()[..]);
     streamed.body = src;
     assertEq(try (client.send(streamed)).text(), "PUT got 13 bytes: streamed body");
     // text as the body
@@ -305,7 +305,7 @@ fn aClientPostsAndFollowsRedirects(): void throws Error {
     assertEq(f.status.code, 200);
     assertEq(try f.text(), "hello, world");
     // 303 after a POST becomes a GET without the body
-    let seen = try following.send(Request.post(uri(base, "/see-other"), "x".toBytes()[..]));
+    let seen = try following.send(Request.post(uri(base, "/see-other"), "x".bytes()[..]));
     assertEq(try seen.text(), "GET got 0 bytes: ");
     // too many
     var few = Client.new(ClientOptions { followRedirects = true, maxRedirects = 3 });
