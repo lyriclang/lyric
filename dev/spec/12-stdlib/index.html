@@ -1153,7 +1153,25 @@ the iterator throws; <code>parse&lt;T :: [Parse]&gt;()</code>, <code>T.parse(s)<
 <li><code>replace(p, with)</code>, a new string with every <code>p</code> replaced, none overlapping — a <code>p</code> that matches
 the empty text panics; <code>replaceN(p, with, n)</code>, the first <code>n</code> replaced, all of them where <code>n</code> is
 negative; <code>padStart(width, fill = ' ')</code> and <code>padEnd(width, fill = ' ')</code>, a new string, the width
-in characters.</li>
+in characters; <code>repeat(n)</code>, the text <code>n</code> times over — a negative <code>n</code> panics.</li>
+<li><strong>Counted in characters</strong> (design 10 P7), each walking the bytes, <code>O(n)</code> where indexing is
+<code>O(1)</code>: <code>substring(start, end)</code>, the view of the characters from <code>start</code> up to but not including
+<code>end</code> — outside <code>0 ≤ start ≤ end ≤ charCount()</code> a panic; <code>charAt(i)</code>, character <code>i</code> — outside
+<code>0 ≤ i &lt; charCount()</code> a panic; <code>charIndex(byte)</code>, the characters before byte <code>byte</code>, which a
+character begins at or which is the length — else a panic; <code>isCharBoundary(byte)</code>, whether it is
+such a byte, <code>false</code> outside <code>0…length()</code>.</li>
+<li><code>findFrom(p, from)</code>, the byte index of the first <code>p</code> at or after byte <code>from</code> or <code>null</code> — a
+<code>from</code> that is no such byte panics; <code>firstOf(chars)</code>, the byte index of the first character that
+is one of <code>chars</code>' or <code>null</code>; <code>splitWhitespace()</code>, the runs of characters between white space
+(§Characters rule 2), views, no empty one; <code>rsplitOnce(sep)</code>, the views before and after the
+last <code>sep</code>, or <code>null</code>.</li>
+<li><code>isAscii()</code>, whether every character is below U+0080, the empty text too;
+<code>equalsIgnoreCase(o)</code> and <code>compareIgnoreCase(o)</code>, the two compared character by character,
+each by its simple lowercase mapping (§Characters rule 3) — <code>&quot;Straße&quot;</code> and <code>&quot;STRASSE&quot;</code> differ —,
+a text that ends first ordered first.</li>
+<li>A forward search for a text pattern — <code>find</code>, <code>findFrom</code>, <code>contains</code>, <code>count</code>, <code>split</code>,
+<code>splitN</code>, <code>splitOnce</code>, <code>findAll</code>, <code>replace</code>, <code>replaceN</code> — takes time linear in the text and the
+pattern together, whatever they hold (design 10 P11).</li>
 <li><strong>Bytes to text</strong> (design 10 S3): <code>string.fromUtf8(bytes)</code>, the text the bytes of a
 <code>Slice&lt;uint8&gt;</code> are, copied — bytes that are no well-formed UTF-8 (an overlong form, a surrogate,
 beyond U+10FFFF, a byte that begins nothing, a sequence cut short) throw a <strong><code>Utf8Error</code></strong>

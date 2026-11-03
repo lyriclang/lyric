@@ -20,6 +20,7 @@
 <div class="sidebar-bar"><span class="where">std.string</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
 <ul class="sidebar-box" id="sidebar-box">
 <li><a class="current" href="../../std/string/">std.string</a></li>
+<li><a href="../../std/string/SplitWhitespaceIter/">SplitWhitespaceIter</a></li>
 <li><a href="../../std/string/#fn.concat">concat()</a></li>
 <li><a href="../../std/string/#fn.fromInt">fromInt()</a></li>
 <li><a href="../../std/string/#fn.fromUint">fromUint()</a></li>
@@ -45,6 +46,8 @@ behind <code>char</code> in <a href="../../std/string/#const.unicodeVersion">uni
 }
 println(sb.toString());</code></pre>
 <pre class="output"><code>1,2,3,</code></pre>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/string/SplitWhitespaceIter/">SplitWhitespaceIter</a> <span class="kind">struct</span> <span class="summary">— Iterates over the runs of characters between white space, as views of the text.</span></div>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.concat">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extern</span> <span class="str">"C"</span> <span class="kw">fn</span> concat(a: <span class="ty">string</span>, b: <span class="ty">string</span>): <span class="ty">string</span> = <span class="str">"lyr_str_concat"</span></code></pre>
@@ -247,10 +250,80 @@ of the base.</p>
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> join(sep: <span class="ty">string</span>): <span class="ty">string</span></code></pre>
 <p>Joins the elements' texts, <code>sep</code> between each two.</p>
 </section>
+<section class="member" id="ext.StringView-2">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extend</span> <span class="ty">StringView</span></code></pre>
+</section>
+<section class="member" id="ext.StringView-2.method.substring">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> substring(start: <span class="ty">int</span>, end: <span class="ty">int</span>): <span class="ty">StringView</span></code></pre>
+<p>Returns the view of the characters from <code>start</code> up to but not including <code>end</code>, counted in
+characters: <code>&quot;héllo&quot;.substring(1, 3)</code> is <code>&quot;él&quot;</code>.</p>
+<p>It walks the bytes up to <code>end</code>, <code>O(end)</code>; <code>s[a..b]</code> cuts by bytes in <code>O(1)</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>0 ≤ start ≤ end ≤ charCount()</code> does not hold.</p>
+</section>
+<section class="member" id="ext.StringView-2.method.charAt">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> charAt(i: <span class="ty">int</span>): <span class="ty">char</span></code></pre>
+<p>Returns character <code>i</code>, counted in characters: <code>&quot;héllo&quot;.charAt(1)</code> is <code>'é'</code>.</p>
+<p>It walks the bytes up to <code>i</code>, <code>O(i)</code>; <code>s[i]</code> takes the character at byte <code>i</code> in <code>O(1)</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>0 ≤ i &lt; charCount()</code> does not hold.</p>
+</section>
+<section class="member" id="ext.StringView-2.method.charIndex">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> charIndex(byte: <span class="ty">int</span>): <span class="ty">int</span></code></pre>
+<p>Returns the number of characters before byte <code>byte</code>: <code>&quot;héllo&quot;.charIndex(3)</code> is <code>2</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>byte</code> is no character's first byte and not the length.</p>
+</section>
+<section class="member" id="ext.StringView-2.method.isCharBoundary">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isCharBoundary(byte: <span class="ty">int</span>): <span class="ty">bool</span></code></pre>
+<p>Returns whether a character begins at byte <code>byte</code>, or <code>byte</code> is the length — where a text
+can be cut. Outside <code>0…length()</code> it is <code>false</code>.</p>
+</section>
+<section class="member" id="ext.StringView-2.method.findFrom">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> findFrom&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>, from: <span class="ty">int</span>): ?<span class="ty">int</span></code></pre>
+<p>Returns the byte index of the first <code>p</code> at or after byte <code>from</code>, or <code>null</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>from</code> is no character's first byte and not the length.</p>
+</section>
+<section class="member" id="ext.StringView-2.method.firstOf">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> firstOf(chars: <span class="ty">StringView</span>): ?<span class="ty">int</span></code></pre>
+<p>Returns the byte index of the first character that is one of <code>chars</code>, or <code>null</code>.</p>
+</section>
+<section class="member" id="ext.StringView-2.method.splitWhitespace">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> splitWhitespace(): <span class="ty">SplitWhitespaceIter</span></code></pre>
+<p>Returns an iterator over the runs of characters between white space, as views; no empty
+one — leading, trailing and repeated white space separates nothing.</p>
+</section>
+<section class="member" id="ext.StringView-2.method.rsplitOnce">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> rsplitOnce&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(sep: <span class="ty">P</span>): ?(<span class="ty">StringView</span>, <span class="ty">StringView</span>)</code></pre>
+<p>Returns the part before the last <code>sep</code> and the part after it, or <code>null</code> where there is
+none.</p>
+</section>
+<section class="member" id="ext.StringView-2.method.repeat">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> repeat(n: <span class="ty">int</span>): <span class="ty">string</span></code></pre>
+<p>Returns the text <code>n</code> times over; <code>&quot;ab&quot;.repeat(3)</code> is <code>&quot;ababab&quot;</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>n</code> is negative.</p>
+</section>
+<section class="member" id="ext.StringView-2.method.isAscii">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isAscii(): <span class="ty">bool</span></code></pre>
+<p>Returns whether every character is ASCII, below U+0080; the empty text is.</p>
+</section>
+<section class="member" id="ext.StringView-2.method.equalsIgnoreCase">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> equalsIgnoreCase(o: <span class="ty">StringView</span>): <span class="ty">bool</span></code></pre>
+<p>Returns whether the two texts are equal when each character is taken by its simple
+lowercase mapping: <code>&quot;Straße&quot;.equalsIgnoreCase(&quot;STRASSE&quot;)</code> is <code>false</code>, as <code>ß</code> maps to itself.</p>
+</section>
+<section class="member" id="ext.StringView-2.method.compareIgnoreCase">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> compareIgnoreCase(o: <span class="ty">StringView</span>): <span class="ty">Ordering</span></code></pre>
+<p>Compares the two texts character by character, each taken by its simple lowercase mapping;
+a text that ends first comes first.</p>
+</section>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
 <ul>
+<li class="level-2"><a href="#types">Types</a></li>
 <li class="level-2"><a href="#functions">Functions</a></li>
 <li class="level-3"><a href="#fn.concat">concat</a></li>
 <li class="level-3"><a href="#fn.fromInt">fromInt</a></li>
@@ -265,6 +338,7 @@ of the base.</p>
 <li class="level-3"><a href="#ext.StringView">StringView</a></li>
 <li class="level-3"><a href="#ext.char">char</a></li>
 <li class="level-3"><a href="#ext.SliceT">Slice&lt;T&gt;</a></li>
+<li class="level-3"><a href="#ext.StringView-2">StringView</a></li>
 </ul>
 </aside>
 </div>

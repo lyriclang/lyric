@@ -464,6 +464,11 @@ in the prelude, and <code>List</code> and <code>Deque</code> conform; on a type 
 <code>x.index(x.length() - n)</code>, written too (<code>x[^1] = v</code>, <code>+=</code>, <code>++</code>), with <code>x</code> evaluated once. Without <code>Length</code> the
 refusal (<code>LYR-SEM0114</code>) names it.</p>
 </li>
+<li><p><strong>Text counted in characters, and more of it</strong>: <code>substring(start, end)</code> and <code>charAt(i)</code> count characters (a
+slice <code>s[a..b]</code> and <code>s[i]</code> count bytes), <code>charIndex(byte)</code> and <code>isCharBoundary(byte)</code> convert; <code>findFrom(p, from)</code>, <code>firstOf(chars)</code>, <code>splitWhitespace()</code>, <code>rsplitOnce(sep)</code>, <code>repeat(n)</code>, <code>isAscii()</code>,
+<code>equalsIgnoreCase</code>/<code>compareIgnoreCase</code>. A forward search is linear in the text and the pattern together:
+<code>&quot;a&quot;×100 000 + &quot;b&quot;</code> in a million <code>a</code> took 4.6 s for three searches, now 1 ms (Two-Way past a budget).</p>
+</li>
 <li><p><strong>Text operations are <code>std.string</code>'s</strong>: what searches in a text, takes it apart or makes a new one of it —
 <code>find</code>, <code>split</code>, <code>trim</code>, <code>replace</code>, <code>startsWith</code>, <code>toUpper</code>, <code>parse</code> … — moved from <code>std.core</code> to <code>std.string</code>, an
 extension the prelude passes on, so <code>s.split(&quot;,&quot;)</code> reads as before; so did <code>char.toUpper/toLower/toDigit</code> and
