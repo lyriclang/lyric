@@ -265,7 +265,20 @@ public sealed class Compilation
         // std.core is, so a block on a collection the prelude names reaches whoever names it.
         if (PreludeSources().Contains(to)) return true;
         foreach (var decl in AstOf(from).Declarations)
-            if (decl is ImportDecl imp && FindModule(imp.Path) is { } t && ReferenceEquals(t, to))
+            if (decl is ImportDecl imp && FindModule(imp.Path) is { } t && PassesOn(t, to, new HashSet<ModuleSymbol>(ReferenceEqualityComparer.Instance)))
+                return true;
+        return false;
+    }
+
+    /// <summary>Whether importing <paramref name="imported"/> brings <paramref name="to"/>'s extensions
+    /// along: it is the module, or it passes it on with a <c>pub import</c> — a chain of them, as a
+    /// name travels. <paramref name="walked"/> ends a cycle of re-exports.</summary>
+    private bool PassesOn(ModuleSymbol imported, ModuleSymbol to, HashSet<ModuleSymbol> walked)
+    {
+        if (ReferenceEquals(imported, to)) return true;
+        if (!walked.Add(imported)) return false;
+        foreach (var decl in AstOf(imported).Declarations)
+            if (decl is ImportDecl { IsPublic: true } passed && FindModule(passed.Path) is { } next && PassesOn(next, to, walked))
                 return true;
         return false;
     }

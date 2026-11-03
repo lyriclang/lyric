@@ -192,7 +192,7 @@ internal fn sliceAddress<T>(xs: Slice<T>): uint {
 ///
 /// # Panics
 /// When `n` is negative.
-pub fn repeatArray<T :: [Clone]>(xs: T[], n: int): T[] {
+fn repeatArray<T :: [Clone]>(xs: T[], n: int): T[] {
     if (n < 0) {
         panic("negative repeat count");
     }
@@ -4238,7 +4238,7 @@ extern "C" fn panicRange(low: int, high: int, length: int): never = "lyr_panic_r
 /// Returns whether a string and a view, or two views, hold the same bytes.
 ///
 /// The operator `==` between them calls it; a program writes `==`.
-pub fn equalViews(a: StringView, b: StringView): bool {
+fn equalViews(a: StringView, b: StringView): bool {
     return viewsHoldTheSameBytes(a, b);
 }
 
@@ -4246,7 +4246,7 @@ pub fn equalViews(a: StringView, b: StringView): bool {
 /// points.
 ///
 /// The operators `<`, `<=`, `>` and `>=` between them call it.
-pub fn compareViews(a: StringView, b: StringView): ?Ordering {
+fn compareViews(a: StringView, b: StringView): ?Ordering {
     return a.totalCompare(b);
 }
 
@@ -4254,7 +4254,7 @@ pub fn compareViews(a: StringView, b: StringView): ?Ordering {
 ///
 /// # Panics
 /// When `i` is outside the bytes, or at a byte that continues a character (`LYR-RT0003`).
-pub fn charAtByte(v: StringView, i: int): char {
+fn charAtByte(v: StringView, i: int): char {
     return charOfView(v, i);
 }
 
@@ -4429,49 +4429,49 @@ extern "C" fn stringOfUtf8LossyRaw(
 // What an f-string compiles to: a builder sized for its text, each piece appended in
 // order, the text taken — one buffer, no string per piece. The checker writes these calls.
 
-pub fn fstringStart(room: int): StringBuilder {
+fn fstringStart(room: int): StringBuilder {
     return StringBuilder.sized(room);
 }
 
-pub fn fstringEnd(out: StringBuilder): string {
+fn fstringEnd(out: StringBuilder): string {
     return out.toString();
 }
 
-pub fn fstringText(out: StringBuilder, text: StringView): void {
+fn fstringText(out: StringBuilder, text: StringView): void {
     out.appendStr(text);
 }
 
-pub fn fstringInt(out: StringBuilder, value: int): void {
+fn fstringInt(out: StringBuilder, value: int): void {
     out.putInt(value);
 }
 
-pub fn fstringUint(out: StringBuilder, value: uint): void {
+fn fstringUint(out: StringBuilder, value: uint): void {
     out.putUint(value);
 }
 
-pub fn fstringFloat(out: StringBuilder, value: float): void {
+fn fstringFloat(out: StringBuilder, value: float): void {
     out.appendStr(textOfFloat(value));
 }
 
-pub fn fstringFloat32(out: StringBuilder, value: float32): void {
+fn fstringFloat32(out: StringBuilder, value: float32): void {
     out.appendStr(textOfFloat32(value));
 }
 
-pub fn fstringBool(out: StringBuilder, value: bool): void {
+fn fstringBool(out: StringBuilder, value: bool): void {
     out.appendStr(if (value) "true" else "false");
 }
 
-pub fn fstringChar(out: StringBuilder, value: char): void {
+fn fstringChar(out: StringBuilder, value: char): void {
     out.appendChar(value);
 }
 
 /// Writes an f-string hole of a [Display] type into `out`, through `showTo`.
-pub fn fstringShown<T :: [Display]>(out: StringBuilder, value: T): void {
+fn fstringShown<T :: [Display]>(out: StringBuilder, value: T): void {
     value.showTo(out);
 }
 
 /// Writes an f-string hole of a [Format] type with a spec into `out`; the type reads the spec.
-pub fn fstringFormatted<T :: [Format]>(out: StringBuilder, value: T, spec: StringView): void {
+fn fstringFormatted<T :: [Format]>(out: StringBuilder, value: T, spec: StringView): void {
     value.format(spec, out);
 }
 
@@ -4482,7 +4482,7 @@ pub fn fstringFormatted<T :: [Format]>(out: StringBuilder, value: T, spec: Strin
 ///
 /// # Panics
 /// When the spec says more than fill, alignment and width.
-pub fn fstringPadded<T :: [Display]>(out: StringBuilder, value: T, spec: StringView): void {
+fn fstringPadded<T :: [Display]>(out: StringBuilder, value: T, spec: StringView): void {
     let s = paddingOnly(spec, "a Display type's text");
     if (s.width == 0) {
         value.showTo(out);
@@ -4495,7 +4495,7 @@ pub fn fstringPadded<T :: [Display]>(out: StringBuilder, value: T, spec: StringV
 
 /// Writes an f-string hole under `?` into `out`: what `debugTo` writes, in the spec's width,
 /// alignment and fill.
-pub fn fstringDebugged<T :: [Debug]>(out: StringBuilder, value: T, spec: StringView): void {
+fn fstringDebugged<T :: [Debug]>(out: StringBuilder, value: T, spec: StringView): void {
     let s = readSpec(spec);
     if (!padsOnly(s, '?')) {
         refuseSpec(spec, "a Debug text");
@@ -5439,7 +5439,7 @@ extend<T :: [Ordered]> RangeInclusive<T> :: [Contains<T>] {
 ///
 /// # Panics
 /// When `n` is negative (`LYR-RT0007`), as an array's repetition does.
-pub fn repeatText(s: string, n: int): string {
+fn repeatText(s: string, n: int): string {
     if (n < 0) {
         let _ = [s] * n;
     }
@@ -6051,17 +6051,17 @@ fn charBefore(c: char): char {
 }
 
 /// Returns the debug text of an array; a synthesized `debug()` calls it for an array field.
-pub fn debugArray<T :: [Debug]>(xs: T[]): string {
+fn debugArray<T :: [Debug]>(xs: T[]): string {
     return debugText(xs);
 }
 
 /// Returns the debug text of a view, as [debugArray] does for an array.
-pub fn debugSlice<T :: [Debug]>(xs: Slice<T>): string {
+fn debugSlice<T :: [Debug]>(xs: Slice<T>): string {
     return debugText(xs);
 }
 
 /// Returns the debug text of an optional: `null`, or the value's.
-pub fn debugOptional<T :: [Debug]>(o: ?T): string {
+fn debugOptional<T :: [Debug]>(o: ?T): string {
     if (o == null) {
         return "null";
     }
@@ -6070,17 +6070,17 @@ pub fn debugOptional<T :: [Debug]>(o: ?T): string {
 
 /// Returns whether two arrays are equal, element by element; a synthesized `equals` calls it
 /// for an array field.
-pub fn equalArrays<T :: [Equatable]>(a: T[], b: T[]): bool {
+fn equalArrays<T :: [Equatable]>(a: T[], b: T[]): bool {
     return sameElements(a, b);
 }
 
 /// Returns whether two views are equal, element by element.
-pub fn equalSlices<T :: [Equatable]>(a: Slice<T>, b: Slice<T>): bool {
+fn equalSlices<T :: [Equatable]>(a: Slice<T>, b: Slice<T>): bool {
     return sameElements(a, b);
 }
 
 /// Returns whether two optionals are equal: both absent, or both present and equal.
-pub fn equalOptionals<T :: [Equatable]>(a: ?T, b: ?T): bool {
+fn equalOptionals<T :: [Equatable]>(a: ?T, b: ?T): bool {
     if (a == null) {
         return b == null;
     }
@@ -6094,7 +6094,7 @@ pub fn equalOptionals<T :: [Equatable]>(a: ?T, b: ?T): bool {
 ///
 /// A synthesized `hash` calls it. Arrays and views are not [Hashable], since their slots can
 /// be written.
-pub fn hashOptionalInto<T :: [Hashable], H :: [Hasher]>(o: ?T, &h: H): void {
+fn hashOptionalInto<T :: [Hashable], H :: [Hasher]>(o: ?T, &h: H): void {
     if (o == null) {
         h.writeByte(0);
         return;
@@ -6104,7 +6104,7 @@ pub fn hashOptionalInto<T :: [Hashable], H :: [Hasher]>(o: ?T, &h: H): void {
 }
 
 /// Writes an object's identity into a hasher: its address, as the `hash` of an [Identity] does.
-pub fn hashIdentityInto<T :: [Identity], H :: [Hasher]>(o: T, &h: H): void {
+fn hashIdentityInto<T :: [Identity], H :: [Hasher]>(o: T, &h: H): void {
     h.writeInt(identityOf(o));
 }
 
@@ -6113,12 +6113,12 @@ fn identityOf<T>(o: T): int;
 
 /// Returns a copy of an array with every element cloned; a synthesized `clone` calls it for an
 /// array field.
-pub fn cloneArray<T :: [Clone]>(xs: T[]): T[] {
+fn cloneArray<T :: [Clone]>(xs: T[]): T[] {
     return arrayOf(xs.length(), (i: int) => xs[i].clone());
 }
 
 /// Returns a clone of an optional's value, or `null`.
-pub fn cloneOptional<T :: [Clone]>(o: ?T): ?T {
+fn cloneOptional<T :: [Clone]>(o: ?T): ?T {
     if (o == null) {
         return null;
     }

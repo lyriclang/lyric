@@ -344,6 +344,11 @@ promise. This entry fills with the milestones.
   in the prelude, and `List` and `Deque` conform; on a type with its own `Index<int>` and `Length`, `x[^n]` is
   `x.index(x.length() - n)`, written too (`x[^1] = v`, `+=`, `++`), with `x` evaluated once. Without `Length` the
   refusal (`LYR-SEM0114`) names it.
+- **An extension travels with `pub import`**: a block of methods reaches where its module is imported or passed
+  on by a `pub import` — a chain of them; `pub import lib.error { Thing }` now brings `lib.error`'s methods on
+  `Thing` with it. Two such modules seen at one call that both add the name are refused (`LYR-SEM0235`);
+  before, the first import won and the second was called unused. The compiler's own helpers in `std.core`
+  (`fstring…`, `equalArrays`, `cloneArray` …) are no longer public API.
 - **`lyric fix --from-4` (M16, in progress)**: migrates a Lyric 4 package (its `lyric.json`) or a file. The program
   is read with Lyric 4.6's frozen front end — one 4.6 refuses is not changed (`LYR-MIG0001`) —, the rules rewrite
   spans so comments and layout stay, and what a person decides is said as a hint (`LYR-MIG`) and written to

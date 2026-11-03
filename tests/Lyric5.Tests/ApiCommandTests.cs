@@ -114,6 +114,19 @@ public class ApiCommandTests
         MatchesGolden("std-collections.txt", collections);
     }
 
+    /// <summary>What only the compiler calls — the f-string pieces, the helpers of the synthesized
+    /// members — is std.core's own, not its surface: it stood in the docs and the completion as
+    /// API.</summary>
+    [Fact]
+    public void The_standard_librarys_surface_holds_no_helper_of_the_compiler()
+    {
+        var (exit, surface, error) = RunRaw("api", "--std");
+        Assert.True(exit == 0, error);
+        foreach (var helper in new[] { "fstringStart", "fstringInt", "equalArrays", "cloneArray", "hashOptionalInto", "repeatText", "charAtByte" })
+            Assert.DoesNotContain($"std.core.{helper}", surface);
+        Assert.Contains("pub fn std.core.arrayOf<", surface);
+    }
+
     /// <summary>The fixture as a git repository: the first version committed, the second written
     /// over it in the working tree.</summary>
     private static string Repository(string first, string second)

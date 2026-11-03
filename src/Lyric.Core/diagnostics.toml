@@ -11577,3 +11577,55 @@ fn main(): void {
     let _ = abs(-3);
 }
 '''
+
+[LYR-SEM0235]
+title = "a member two seen modules add"
+severity = "error"
+area = "04-modules"
+summary = "A call names a member that two modules this one sees add to the type, each in an `extend` block, at a count both take."
+explanation = '''
+An `extend` block in a module other than its type's adds members where that module is imported — directly, or through a `pub import` that passes it on. Where two such modules are seen and both add the name, a call cannot tell which is meant, and taking one would depend on the order of the imports.
+
+Import only the module whose member is meant, or rename one of the two.
+'''
+wrong = '''
+//- src/loud.lyr
+pub extend string {
+    pub fn shout(): string {
+        return this + "!";
+    }
+}
+//- src/soft.lyr
+pub extend string {
+    pub fn shout(): string {
+        return this + "?";
+    }
+}
+//- src/main.lyr
+import app.loud;
+import app.soft;
+
+fn main(): void {
+    let _ = "hey".shout();
+}
+'''
+right = '''
+//- src/loud.lyr
+pub extend string {
+    pub fn shout(): string {
+        return this + "!";
+    }
+}
+//- src/soft.lyr
+pub extend string {
+    pub fn shout(): string {
+        return this + "?";
+    }
+}
+//- src/main.lyr
+import app.loud;
+
+fn main(): void {
+    let _ = "hey".shout();
+}
+'''

@@ -5397,7 +5397,7 @@ public sealed class TypeChecker
             case IdentifierExpr id:
             {
                 // A desugared operator calls std.core's helper whatever the scope holds.
-                var set = _compilerWritten.Contains(id) && CoreOverloads(id.Name) is { Count: > 0 } helpers
+                var set = _compilerWritten.Contains(id) && CoreOverloads(id.Name, internals: true) is { Count: > 0 } helpers
                     ? helpers : scope.Overloads(id.Name);
                 if (set.Count == 0) set = ImplicitOverloads(id, id.Name);
                 return set.Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
@@ -10586,6 +10586,20 @@ public sealed class TypeChecker
                     ? $"separately — reach it through a type parameter one of them bounds: 'fn f<T :: [{interfaces[0]}]>(…)' and 'T.{member}(…)'"
                     : $"separately — qualify the call: '{interfaces[0]}.{member}(…)'"));
             return visible[0].Symbol;
+        }
+
+        // Two modules this one sees each add the name at a count both take: the call cannot tell
+        // which is meant, and taking the first found would follow the order of the imports.
+        var added = visible.Where(v => !v.InConformanceBlock).ToList();
+        if (added.FirstOrDefault(a => added.Any(b => !ReferenceEquals(a.Module, b.Module) && CountsOverlap(a.Symbol, b.Symbol))) is { Symbol: not null } first
+            && added.First(b => !ReferenceEquals(first.Module, b.Module) && CountsOverlap(first.Symbol, b.Symbol)) is var second)
+        {
+            _de.Report("LYR-SEM0235", Severity.Error, span,
+                $"'{member}' is added to '{ts.Name}' by '{first.Module.FullName}' and by '{second.Module.FullName}', both seen here — "
+                + "import only the one meant",
+                new DiagnosticNote(first.Symbol.Declaration?.Span ?? default, $"'{first.Module.FullName}' adds it here"),
+                new DiagnosticNote(second.Symbol.Declaration?.Span ?? default, $"'{second.Module.FullName}' adds it here"));
+            return first.Symbol;
         }
 
         return visible.Count > 0 ? visible[0].Symbol : null;
@@ -15778,7 +15792,7 @@ public sealed class TypeChecker
     /// else the scope, then what is named without an import.</summary>
     private Symbol? NameOf(IdentifierExpr id, SymbolTable scope) =>
         _compilerWritten.Contains(id)
-            ? CoreMember(id.Name) ?? scope.Lookup(id.Name)
+            ? CoreMember(id.Name, internals: true) ?? scope.Lookup(id.Name)
             : scope.Lookup(id.Name) ?? ImplicitMember(id, id.Name);
 
     /// <summary>A name not in scope: the prelude's in a program's own
@@ -15787,10 +15801,10 @@ public sealed class TypeChecker
     private Symbol? ImplicitMember(Node at, string name) =>
         _comp.Lyric5Modules && !WrittenByCompiler(at)
             ? _comp.PreludeMember(name) is (TypeSymbol or FunctionSymbol or GlobalSymbol) and var passed ? passed : null
-            : CoreMember(name);
+            : CoreMember(name, internals: WrittenByCompiler(at));
 
     private IReadOnlyList<FunctionSymbol> ImplicitOverloads(Node at, string name) =>
-        _comp.Lyric5Modules && !WrittenByCompiler(at) ? _comp.PreludeOverloads(name) : CoreOverloads(name);
+        _comp.Lyric5Modules && !WrittenByCompiler(at) ? _comp.PreludeOverloads(name) : CoreOverloads(name, internals: WrittenByCompiler(at));
 
     private TypeSymbol? ImplicitType(FileId file, string name) =>
         _comp.Lyric5Modules && !_comp.IsSynthesized(file) ? _comp.PreludeMember(name) as TypeSymbol : CoreType(name);
@@ -15800,18 +15814,20 @@ public sealed class TypeChecker
         _comp.FindModule(["std", "core"])?.Members.LookupLocal(name) is TypeSymbol { Visibility: Visibility.Public } core ? core : null;
 
     /// <summary>A public type or function of <c>std.core</c>, visible without an import (the
-    /// prelude carries what the language itself reaches for — the synthesized conformances do).</summary>
-    private Symbol? CoreMember(string name) =>
+    /// prelude carries what the language itself reaches for — the synthesized conformances do).
+    /// <paramref name="internals"/>: for code the compiler wrote, std.core's own helpers too — the
+    /// f-string pieces, the synthesized members' array and optional helpers, which no program names.</summary>
+    private Symbol? CoreMember(string name, bool internals = false) =>
         _comp.FindModule(["std", "core"])?.Members.LookupLocal(name) switch
         {
             TypeSymbol { Visibility: Visibility.Public } type => type,
-            FunctionSymbol { Visibility: Visibility.Public } fn => fn,
+            FunctionSymbol fn when fn.Visibility == Visibility.Public || internals => fn,
             _ => null,
         };
 
     /// <summary>The overloads of a name in <c>std.core</c>, where the scope has none.</summary>
-    private IReadOnlyList<FunctionSymbol> CoreOverloads(string name) =>
-        _comp.FindModule(["std", "core"])?.Members.OverloadsLocal(name).Where(f => f.Visibility == Visibility.Public).ToList() ?? [];
+    private IReadOnlyList<FunctionSymbol> CoreOverloads(string name, bool internals = false) =>
+        _comp.FindModule(["std", "core"])?.Members.OverloadsLocal(name).Where(f => f.Visibility == Visibility.Public || internals).ToList() ?? [];
 
     /// <summary>THE <c>Any</c> of <c>std.core</c>, by identity.</summary>
     private bool IsAny(LyrType type) =>
