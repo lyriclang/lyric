@@ -91,7 +91,7 @@ come with <code>comptime</code>.)</em></li>
 (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V1</a>). A package gathers modules under one name
 (<a href="../../spec/15-project/">15 §1</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/04-modules/</code> — a rule about a package as a package case, a
-directory (<a href="https://github.com/lyriclang/lyric-spec/blob/e533519e681c0e8a8422cc5b880b8efb4be11513/conformance/README.md">the format</a>); what only the command line shows, in the
+directory (<a href="https://github.com/lyriclang/lyric-spec/blob/6c2c2fa69cac2cb3374d966ad25426f2d3803c5f/conformance/README.md">the format</a>); what only the command line shows, in the
 toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>PackageTests</code>).</p>
 <ol>
 <li>A <strong>package</strong> is a directory with a manifest, <code>lyric.toml</code>; its modules are the <code>.lyr</code> files
@@ -172,14 +172,22 @@ call. A <code>private</code> member without a body is refused (<code>LYR-SEM0118
 <li>An <strong><code>extend</code> block's</strong> word is the default of the methods in it: <code>private extend Point { … }</code>
 keeps them to its module; a method's own word wins. A method of a block that a module may not
 name is not there for it (S5).</li>
-<li>A <strong>conformance</strong> — <code>extend Point :: [Shape] { … }</code> — is visible wherever its type is, its
+</ol>
+<p>9a. A block of methods <strong>reaches</strong> a module that imports the block's module — directly, or
+through a chain of <code>pub import</code>s that pass the module on as they pass on names (§4 rule 2):
+<code>pub import lib.error { Thing }</code> passes on <code>lib.error</code>'s blocks with <code>Thing</code> — and every
+module where the prelude names its module (§4 rule 5); where it does not reach, its methods
+are not there. Where blocks of two modules both reach a call and add
+its name at a count the call takes, the call is refused (<code>LYR-SEM0235</code>): taking one would
+follow the order of the imports
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 S5′</a>).
+10. A <strong>conformance</strong> — <code>extend Point :: [Shape] { … }</code> — is visible wherever its type is, its
 methods with it, whether or not the module that holds the block is imported: the conformance
 is the program's (<a href="../../spec/05-interfaces/">05 §13</a> rule 4), so a type that comes through a
 re-export, a return value or a field brings every conformance its modules give it, the
 synthesized ones (<a href="../../spec/05-interfaces/">05 §14</a> rule 9) among them, and std.codec's blocks on
 std.time's types reach a program that names neither module (the sweep after M10, W7). A
-word on the block or on one of its methods is refused (<code>LYR-SEM0150</code>) (S5).</li>
-</ol>
+word on the block or on one of its methods is refused (<code>LYR-SEM0150</code>) (S5).</p>
 <p>10a. A member that <strong>answers an interface</strong> for its type from outside a conformance block — a
 method, a static function or a constant in the type's body, or in a block of rule 9 — is
 written at least as visible as the conformance, the narrower of its type's word and its

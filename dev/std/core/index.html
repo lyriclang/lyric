@@ -141,35 +141,7 @@
 <li><a href="../../std/core/#fn.todo">todo()</a></li>
 <li><a href="../../std/core/#fn.embed">embed()</a></li>
 <li><a href="../../std/core/#fn.arrayOf">arrayOf()</a></li>
-<li><a href="../../std/core/#fn.repeatArray">repeatArray()</a></li>
 <li><a href="../../std/core/#fn.blackBox">blackBox()</a></li>
-<li><a href="../../std/core/#fn.equalViews">equalViews()</a></li>
-<li><a href="../../std/core/#fn.compareViews">compareViews()</a></li>
-<li><a href="../../std/core/#fn.charAtByte">charAtByte()</a></li>
-<li><a href="../../std/core/#fn.fstringStart">fstringStart()</a></li>
-<li><a href="../../std/core/#fn.fstringEnd">fstringEnd()</a></li>
-<li><a href="../../std/core/#fn.fstringText">fstringText()</a></li>
-<li><a href="../../std/core/#fn.fstringInt">fstringInt()</a></li>
-<li><a href="../../std/core/#fn.fstringUint">fstringUint()</a></li>
-<li><a href="../../std/core/#fn.fstringFloat">fstringFloat()</a></li>
-<li><a href="../../std/core/#fn.fstringFloat32">fstringFloat32()</a></li>
-<li><a href="../../std/core/#fn.fstringBool">fstringBool()</a></li>
-<li><a href="../../std/core/#fn.fstringChar">fstringChar()</a></li>
-<li><a href="../../std/core/#fn.fstringShown">fstringShown()</a></li>
-<li><a href="../../std/core/#fn.fstringFormatted">fstringFormatted()</a></li>
-<li><a href="../../std/core/#fn.fstringPadded">fstringPadded()</a></li>
-<li><a href="../../std/core/#fn.fstringDebugged">fstringDebugged()</a></li>
-<li><a href="../../std/core/#fn.repeatText">repeatText()</a></li>
-<li><a href="../../std/core/#fn.debugArray">debugArray()</a></li>
-<li><a href="../../std/core/#fn.debugSlice">debugSlice()</a></li>
-<li><a href="../../std/core/#fn.debugOptional">debugOptional()</a></li>
-<li><a href="../../std/core/#fn.equalArrays">equalArrays()</a></li>
-<li><a href="../../std/core/#fn.equalSlices">equalSlices()</a></li>
-<li><a href="../../std/core/#fn.equalOptionals">equalOptionals()</a></li>
-<li><a href="../../std/core/#fn.hashOptionalInto">hashOptionalInto()</a></li>
-<li><a href="../../std/core/#fn.hashIdentityInto">hashIdentityInto()</a></li>
-<li><a href="../../std/core/#fn.cloneArray">cloneArray()</a></li>
-<li><a href="../../std/core/#fn.cloneOptional">cloneOptional()</a></li>
 <li><a href="../../std/core/#fn.sequence">sequence()</a></li>
 <li><a href="../../std/core/#fn.fields">fields()</a></li>
 <li><a href="../../std/core/#fn.members">members()</a></li>
@@ -374,135 +346,11 @@ order, once per index.</p>
 <h4 id="errors">Errors</h4>
 <p>What <code>f</code> throws, the call throws, and the array is dropped.</p>
 </section>
-<section class="member" id="fn.repeatArray">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> repeatArray&lt;<span class="ty">T</span> :: [<span class="ty">Clone</span>]&gt;(xs: <span class="ty">T</span>[], n: <span class="ty">int</span>): <span class="ty">T</span>[]</code></pre>
-<p>Repeats <code>xs</code> <code>n</code> times, every slot a <code>clone()</code> of the pattern's element.</p>
-<p>The operator <code>[x] * n</code> over an element that is or holds an object becomes this call, so no
-object is shared into several slots; a value element copies natively.</p>
-<h4 id="panics">Panics</h4>
-<p>When <code>n</code> is negative.</p>
-</section>
 <section class="member" id="fn.blackBox">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> blackBox&lt;<span class="ty">T</span>&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
 <p>Returns <code>x</code> through a point the compiler cannot see through.</p>
 <p>What computed <code>x</code> is not dropped as unused, and the value that comes out is not known in
 advance; for a benchmark's body, whose result nothing reads. It costs a store.</p>
-</section>
-<section class="member" id="fn.equalViews">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> equalViews(a: <span class="ty">StringView</span>, b: <span class="ty">StringView</span>): <span class="ty">bool</span></code></pre>
-<p>Returns whether a string and a view, or two views, hold the same bytes.</p>
-<p>The operator <code>==</code> between them calls it; a program writes <code>==</code>.</p>
-</section>
-<section class="member" id="fn.compareViews">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> compareViews(a: <span class="ty">StringView</span>, b: <span class="ty">StringView</span>): ?<span class="ty">Ordering</span></code></pre>
-<p>Compares a string and a view, or two views, byte by byte, which is the order of the code
-points.</p>
-<p>The operators <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code> and <code>&gt;=</code> between them call it.</p>
-</section>
-<section class="member" id="fn.charAtByte">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> charAtByte(v: <span class="ty">StringView</span>, i: <span class="ty">int</span>): <span class="ty">char</span></code></pre>
-<p>Returns the character that begins at byte <code>i</code>; the index <code>s[i]</code> calls it.</p>
-<h4 id="panics">Panics</h4>
-<p>When <code>i</code> is outside the bytes, or at a byte that continues a character (<code>LYR-RT0003</code>).</p>
-</section>
-<section class="member" id="fn.fstringStart">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringStart(room: <span class="ty">int</span>): <span class="ty">StringBuilder</span></code></pre>
-</section>
-<section class="member" id="fn.fstringEnd">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringEnd(out: <span class="ty">StringBuilder</span>): <span class="ty">string</span></code></pre>
-</section>
-<section class="member" id="fn.fstringText">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringText(out: <span class="ty">StringBuilder</span>, text: <span class="ty">StringView</span>): <span class="ty">void</span></code></pre>
-</section>
-<section class="member" id="fn.fstringInt">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringInt(out: <span class="ty">StringBuilder</span>, value: <span class="ty">int</span>): <span class="ty">void</span></code></pre>
-</section>
-<section class="member" id="fn.fstringUint">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringUint(out: <span class="ty">StringBuilder</span>, value: <span class="ty">uint</span>): <span class="ty">void</span></code></pre>
-</section>
-<section class="member" id="fn.fstringFloat">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringFloat(out: <span class="ty">StringBuilder</span>, value: <span class="ty">float</span>): <span class="ty">void</span></code></pre>
-</section>
-<section class="member" id="fn.fstringFloat32">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringFloat32(out: <span class="ty">StringBuilder</span>, value: <span class="ty">float32</span>): <span class="ty">void</span></code></pre>
-</section>
-<section class="member" id="fn.fstringBool">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringBool(out: <span class="ty">StringBuilder</span>, value: <span class="ty">bool</span>): <span class="ty">void</span></code></pre>
-</section>
-<section class="member" id="fn.fstringChar">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringChar(out: <span class="ty">StringBuilder</span>, value: <span class="ty">char</span>): <span class="ty">void</span></code></pre>
-</section>
-<section class="member" id="fn.fstringShown">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringShown&lt;<span class="ty">T</span> :: [<span class="ty">Display</span>]&gt;(out: <span class="ty">StringBuilder</span>, value: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
-<p>Writes an f-string hole of a <a href="../../std/core/Display/">Display</a> type into <code>out</code>, through <code>showTo</code>.</p>
-</section>
-<section class="member" id="fn.fstringFormatted">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringFormatted&lt;<span class="ty">T</span> :: [<span class="ty">Format</span>]&gt;(out: <span class="ty">StringBuilder</span>, value: <span class="ty">T</span>, spec: <span class="ty">StringView</span>): <span class="ty">void</span></code></pre>
-<p>Writes an f-string hole of a <a href="../../std/core/Format/">Format</a> type with a spec into <code>out</code>; the type reads the spec.</p>
-</section>
-<section class="member" id="fn.fstringPadded">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringPadded&lt;<span class="ty">T</span> :: [<span class="ty">Display</span>]&gt;(out: <span class="ty">StringBuilder</span>, value: <span class="ty">T</span>, spec: <span class="ty">StringView</span>): <span class="ty">void</span></code></pre>
-<p>Writes an f-string hole of another <a href="../../std/core/Display/">Display</a> type with a spec into <code>out</code>.</p>
-<p>What <code>showTo</code> writes is set in the spec's width, alignment and fill; without a width it goes
-straight into <code>out</code>.</p>
-<h4 id="panics">Panics</h4>
-<p>When the spec says more than fill, alignment and width.</p>
-</section>
-<section class="member" id="fn.fstringDebugged">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fstringDebugged&lt;<span class="ty">T</span> :: [<span class="ty">Debug</span>]&gt;(out: <span class="ty">StringBuilder</span>, value: <span class="ty">T</span>, spec: <span class="ty">StringView</span>): <span class="ty">void</span></code></pre>
-<p>Writes an f-string hole under <code>?</code> into <code>out</code>: what <code>debugTo</code> writes, in the spec's width,
-alignment and fill.</p>
-</section>
-<section class="member" id="fn.repeatText">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> repeatText(s: <span class="ty">string</span>, n: <span class="ty">int</span>): <span class="ty">string</span></code></pre>
-<p>Repeats the text <code>s</code> <code>n</code> times; <code>&quot;&quot;</code> for none.</p>
-<p>The operator <code>s * n</code> becomes this call; <code>n * s</code> is refused, as for <code>[x] * n</code>.</p>
-<h4 id="panics">Panics</h4>
-<p>When <code>n</code> is negative (<code>LYR-RT0007</code>), as an array's repetition does.</p>
-</section>
-<section class="member" id="fn.debugArray">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> debugArray&lt;<span class="ty">T</span> :: [<span class="ty">Debug</span>]&gt;(xs: <span class="ty">T</span>[]): <span class="ty">string</span></code></pre>
-<p>Returns the debug text of an array; a synthesized <code>debug()</code> calls it for an array field.</p>
-</section>
-<section class="member" id="fn.debugSlice">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> debugSlice&lt;<span class="ty">T</span> :: [<span class="ty">Debug</span>]&gt;(xs: <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;): <span class="ty">string</span></code></pre>
-<p>Returns the debug text of a view, as <a href="../../std/core/#fn.debugArray">debugArray</a> does for an array.</p>
-</section>
-<section class="member" id="fn.debugOptional">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> debugOptional&lt;<span class="ty">T</span> :: [<span class="ty">Debug</span>]&gt;(o: ?<span class="ty">T</span>): <span class="ty">string</span></code></pre>
-<p>Returns the debug text of an optional: <code>null</code>, or the value's.</p>
-</section>
-<section class="member" id="fn.equalArrays">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> equalArrays&lt;<span class="ty">T</span> :: [<span class="ty">Equatable</span>]&gt;(a: <span class="ty">T</span>[], b: <span class="ty">T</span>[]): <span class="ty">bool</span></code></pre>
-<p>Returns whether two arrays are equal, element by element; a synthesized <code>equals</code> calls it
-for an array field.</p>
-</section>
-<section class="member" id="fn.equalSlices">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> equalSlices&lt;<span class="ty">T</span> :: [<span class="ty">Equatable</span>]&gt;(a: <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;, b: <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;): <span class="ty">bool</span></code></pre>
-<p>Returns whether two views are equal, element by element.</p>
-</section>
-<section class="member" id="fn.equalOptionals">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> equalOptionals&lt;<span class="ty">T</span> :: [<span class="ty">Equatable</span>]&gt;(a: ?<span class="ty">T</span>, b: ?<span class="ty">T</span>): <span class="ty">bool</span></code></pre>
-<p>Returns whether two optionals are equal: both absent, or both present and equal.</p>
-</section>
-<section class="member" id="fn.hashOptionalInto">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> hashOptionalInto&lt;<span class="ty">T</span> :: [<span class="ty">Hashable</span>], <span class="ty">H</span> :: [<span class="ty">Hasher</span>]&gt;(o: ?<span class="ty">T</span>, &amp;h: <span class="ty">H</span>): <span class="ty">void</span></code></pre>
-<p>Writes an optional into a hasher: a 0 for <code>null</code>, a 1 and the value otherwise.</p>
-<p>A synthesized <code>hash</code> calls it. Arrays and views are not <a href="../../std/core/Hashable/">Hashable</a>, since their slots can
-be written.</p>
-</section>
-<section class="member" id="fn.hashIdentityInto">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> hashIdentityInto&lt;<span class="ty">T</span> :: [<span class="ty">Identity</span>], <span class="ty">H</span> :: [<span class="ty">Hasher</span>]&gt;(o: <span class="ty">T</span>, &amp;h: <span class="ty">H</span>): <span class="ty">void</span></code></pre>
-<p>Writes an object's identity into a hasher: its address, as the <code>hash</code> of an <a href="../../std/core/Identity/">Identity</a> does.</p>
-</section>
-<section class="member" id="fn.cloneArray">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cloneArray&lt;<span class="ty">T</span> :: [<span class="ty">Clone</span>]&gt;(xs: <span class="ty">T</span>[]): <span class="ty">T</span>[]</code></pre>
-<p>Returns a copy of an array with every element cloned; a synthesized <code>clone</code> calls it for an
-array field.</p>
-</section>
-<section class="member" id="fn.cloneOptional">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> cloneOptional&lt;<span class="ty">T</span> :: [<span class="ty">Clone</span>]&gt;(o: ?<span class="ty">T</span>): ?<span class="ty">T</span></code></pre>
-<p>Returns a clone of an optional's value, or <code>null</code>.</p>
 </section>
 <section class="member" id="fn.sequence">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sequence&lt;<span class="ty">T</span>&gt;(body: <span class="kw">fn</span>() -&gt; <span class="ty">Coroutine</span>&lt;<span class="ty">T</span>&gt;): <span class="ty">Coroutine</span>&lt;<span class="ty">T</span>&gt;</code></pre>
@@ -2915,35 +2763,7 @@ quadratic.</p>
 <li class="level-3"><a href="#fn.todo">todo</a></li>
 <li class="level-3"><a href="#fn.embed">embed</a></li>
 <li class="level-3"><a href="#fn.arrayOf">arrayOf</a></li>
-<li class="level-3"><a href="#fn.repeatArray">repeatArray</a></li>
 <li class="level-3"><a href="#fn.blackBox">blackBox</a></li>
-<li class="level-3"><a href="#fn.equalViews">equalViews</a></li>
-<li class="level-3"><a href="#fn.compareViews">compareViews</a></li>
-<li class="level-3"><a href="#fn.charAtByte">charAtByte</a></li>
-<li class="level-3"><a href="#fn.fstringStart">fstringStart</a></li>
-<li class="level-3"><a href="#fn.fstringEnd">fstringEnd</a></li>
-<li class="level-3"><a href="#fn.fstringText">fstringText</a></li>
-<li class="level-3"><a href="#fn.fstringInt">fstringInt</a></li>
-<li class="level-3"><a href="#fn.fstringUint">fstringUint</a></li>
-<li class="level-3"><a href="#fn.fstringFloat">fstringFloat</a></li>
-<li class="level-3"><a href="#fn.fstringFloat32">fstringFloat32</a></li>
-<li class="level-3"><a href="#fn.fstringBool">fstringBool</a></li>
-<li class="level-3"><a href="#fn.fstringChar">fstringChar</a></li>
-<li class="level-3"><a href="#fn.fstringShown">fstringShown</a></li>
-<li class="level-3"><a href="#fn.fstringFormatted">fstringFormatted</a></li>
-<li class="level-3"><a href="#fn.fstringPadded">fstringPadded</a></li>
-<li class="level-3"><a href="#fn.fstringDebugged">fstringDebugged</a></li>
-<li class="level-3"><a href="#fn.repeatText">repeatText</a></li>
-<li class="level-3"><a href="#fn.debugArray">debugArray</a></li>
-<li class="level-3"><a href="#fn.debugSlice">debugSlice</a></li>
-<li class="level-3"><a href="#fn.debugOptional">debugOptional</a></li>
-<li class="level-3"><a href="#fn.equalArrays">equalArrays</a></li>
-<li class="level-3"><a href="#fn.equalSlices">equalSlices</a></li>
-<li class="level-3"><a href="#fn.equalOptionals">equalOptionals</a></li>
-<li class="level-3"><a href="#fn.hashOptionalInto">hashOptionalInto</a></li>
-<li class="level-3"><a href="#fn.hashIdentityInto">hashIdentityInto</a></li>
-<li class="level-3"><a href="#fn.cloneArray">cloneArray</a></li>
-<li class="level-3"><a href="#fn.cloneOptional">cloneOptional</a></li>
 <li class="level-3"><a href="#fn.sequence">sequence</a></li>
 <li class="level-3"><a href="#fn.fields">fields</a></li>
 <li class="level-3"><a href="#fn.members">members</a></li>
