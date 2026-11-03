@@ -46,7 +46,7 @@ socket on the thread's completion port.</p>
 <span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
     <span class="kw">let</span> listener = <span class="kw">try</span> <span class="ty">TcpListener</span>.bind(<span class="ty">SocketAddr</span>.parse(<span class="str">"127.0.0.1:8080"</span>));
     <span class="kw">let</span> stream = <span class="kw">try</span> listener.accept();
-    <span class="kw">try</span> stream.write(<span class="str">"hello\n"</span>.toBytes());
+    <span class="kw">try</span> stream.write(<span class="str">"hello\n"</span>.bytes());
     <span class="kw">try</span> stream.close();
 }</code></pre>
 <h2 id="types">Types</h2>

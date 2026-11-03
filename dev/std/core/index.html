@@ -1360,16 +1360,6 @@ kin.</p>
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isControl(): <span class="ty">bool</span></code></pre>
 <p>Returns whether this is a control character: the category Cc.</p>
 </section>
-<section class="member" id="ext.char-4.method.toUpper">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toUpper(): <span class="ty">char</span></code></pre>
-<p>Returns the uppercase character by the simple mapping; the character itself where it has
-none.</p>
-</section>
-<section class="member" id="ext.char-4.method.toLower">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toLower(): <span class="ty">char</span></code></pre>
-<p>Returns the lowercase character by the simple mapping; the character itself where it has
-none.</p>
-</section>
 <section class="member" id="ext.char-4.method.isAsciiDigit">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isAsciiDigit(): <span class="ty">bool</span></code></pre>
 <p>Returns whether this is <code>0</code>–<code>9</code>.</p>
@@ -1386,14 +1376,6 @@ none.</p>
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isAsciiWhitespace(): <span class="ty">bool</span></code></pre>
 <p>Returns whether this is ASCII whitespace as WHATWG counts it.</p>
 <p>The space, tab, line feed, form feed and carriage return; not the vertical tab.</p>
-</section>
-<section class="member" id="ext.char-4.method.toDigit">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toDigit(radix: <span class="ty">int</span>): ?<span class="ty">int</span></code></pre>
-<p>Returns the character's value as a digit in base <code>radix</code>, or <code>null</code> where it is no digit
-of the base.</p>
-<p>The digits are <code>0</code>–<code>9</code>, then <code>a</code>–<code>z</code> or <code>A</code>–<code>Z</code> for 10–35; ASCII alone, as <code>parse</code> reads.</p>
-<h4 id="panics">Panics</h4>
-<p>When <code>radix</code> is outside 2–36.</p>
 </section>
 <section class="member" id="ext.char-4.method.fromDigit">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> fromDigit(n: <span class="ty">int</span>, radix: <span class="ty">int</span>): ?<span class="ty">char</span></code></pre>
@@ -1765,142 +1747,10 @@ elements visible.</p>
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> charCount(): <span class="ty">int</span></code></pre>
 <p>Returns how many characters it holds, <code>O(n)</code>.</p>
 </section>
-<section class="member" id="ext.StringView-2.method.contains">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> contains&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">bool</span></code></pre>
-<p>Returns whether <code>p</code> stands in it.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.startsWith">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> startsWith&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">bool</span></code></pre>
-<p>Returns whether it begins with <code>p</code>.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.endsWith">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> endsWith&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">bool</span></code></pre>
-<p>Returns whether it ends with <code>p</code>.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.find">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> find&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): ?<span class="ty">int</span></code></pre>
-<p>Returns the byte index of the first <code>p</code>, or <code>null</code>; an empty <code>p</code> stands at 0.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.rfind">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> rfind&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): ?<span class="ty">int</span></code></pre>
-<p>Returns the byte index of the last <code>p</code>, or <code>null</code>; an empty <code>p</code> stands at the length.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.count">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> count&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">int</span></code></pre>
-<p>Returns how many times <code>p</code> stands in it, none overlapping another.</p>
-<p>An empty <code>p</code> stands between every two characters and at both ends.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.split">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> split&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(sep: <span class="ty">P</span>): <span class="ty">SplitIter</span>&lt;<span class="ty">P</span>&gt;</code></pre>
-<p>Returns an iterator over the parts between the separators, in order.</p>
-<p><code>&quot;a,b,,c&quot;.split(&quot;,&quot;)</code> gives <code>a</code>, <code>b</code>, ``, <code>c</code>, views with no copies.</p>
-<h4 id="panics">Panics</h4>
-<p>When <code>sep</code> matches the empty text.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.splitN">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> splitN&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(sep: <span class="ty">P</span>, n: <span class="ty">int</span>): <span class="ty">SplitIter</span>&lt;<span class="ty">P</span>&gt;</code></pre>
-<p>Returns an iterator over at most <code>n</code> parts between the separators.</p>
-<p>The first <code>n - 1</code> separators split, the rest is the last part. <code>n</code> of 0 gives none.</p>
-<h4 id="panics">Panics</h4>
-<p>When <code>sep</code> matches the empty text, or <code>n</code> is negative.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.splitOnce">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> splitOnce&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(sep: <span class="ty">P</span>): ?(<span class="ty">StringView</span>, <span class="ty">StringView</span>)</code></pre>
-<p>Returns the part before the first <code>sep</code> and the part after it, or <code>null</code> where there is
-none.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.matches">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> matches&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">MatchesIter</span>&lt;<span class="ty">P</span>&gt;</code></pre>
-<p>Returns an iterator over the matches of <code>p</code> as views, in order, none overlapping another.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.lines">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> lines(): <span class="ty">LinesIter</span></code></pre>
-<p>Returns an iterator over the lines.</p>
-<p>Split at <code>\n</code>, a <code>\r</code> before it taken off, no empty line after a last <code>\n</code>.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.trim">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trim(): <span class="ty">StringView</span></code></pre>
-<p>Returns the text without the white space at both ends.</p>
-<p>White space is the characters with the property White_Space: the ideographic space and
-the no-break space as well as the tab. <code>trimMatches</code> trims a pattern of one's own.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.trimStart">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trimStart(): <span class="ty">StringView</span></code></pre>
-<p>Returns the text without the white space at the start.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.trimEnd">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trimEnd(): <span class="ty">StringView</span></code></pre>
-<p>Returns the text without the white space at the end.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.trimMatches">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trimMatches&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">StringView</span></code></pre>
-<p>Returns the text without the matches of <code>p</code> at both ends, removed again and again.</p>
-<p><code>&quot;xxaxx&quot;.trimMatches('x')</code> is <code>a</code>. A match of the empty text takes nothing.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.trimStartMatches">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trimStartMatches&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">StringView</span></code></pre>
-<p>Returns the text without the matches of <code>p</code> at the start, removed again and again.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.trimEndMatches">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trimEndMatches&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">StringView</span></code></pre>
-<p>Returns the text without the matches of <code>p</code> at the end, removed again and again.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.isBlank">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isBlank(): <span class="ty">bool</span></code></pre>
-<p>Returns whether it holds nothing but white space; true for the empty text too.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.toUpper">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toUpper(): <span class="ty">string</span></code></pre>
-<p>Returns the text with every character by its simple uppercase mapping.</p>
-<p>One character for one and no locale, so <code>&quot;straße&quot;.toUpper()</code> is <code>STRAßE</code>.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.toLower">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toLower(): <span class="ty">string</span></code></pre>
-<p>Returns the text with every character by its simple lowercase mapping.</p>
-<p>One character for one, no locale.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.toBytes">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toBytes(): <span class="ty">uint8</span>[]</code></pre>
+<section class="member" id="ext.StringView-2.method.bytes">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> bytes(): <span class="ty">uint8</span>[]</code></pre>
 <p>Returns a copy of its bytes.</p>
 <p>A copy, since a text may not change through a <code>Slice&lt;uint8&gt;</code>.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.parse">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> parse&lt;<span class="ty">T</span> :: [<span class="ty">Parse</span>]&gt;(): <span class="ty">T</span> <span class="kw">throws</span> <span class="ty">ParseError</span></code></pre>
-<p>Parses the text as <code>T.parse(this)</code>, the type taken from the expected type.</p>
-<p><code>let n: int = try s.parse();</code>.</p>
-<h4 id="errors">Errors</h4>
-<p>The <a href="../../std/core/ParseError/">ParseError</a> <code>T.parse</code> throws.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.stripPrefix">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> stripPrefix&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): ?<span class="ty">StringView</span></code></pre>
-<p>Returns the rest after <code>p</code> where it begins with <code>p</code>, or <code>null</code>.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.stripSuffix">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> stripSuffix&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): ?<span class="ty">StringView</span></code></pre>
-<p>Returns the rest before <code>p</code> where it ends with <code>p</code>, or <code>null</code>.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.replace">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> replace&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>, with: <span class="ty">StringView</span>): <span class="ty">string</span></code></pre>
-<p>Returns the text with every <code>p</code> replaced by <code>with</code>, none overlapping another.</p>
-<h4 id="panics">Panics</h4>
-<p>When <code>p</code> matches the empty text.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.replaceN">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> replaceN&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>, with: <span class="ty">StringView</span>, n: <span class="ty">int</span>): <span class="ty">string</span></code></pre>
-<p>Returns the text with the first <code>n</code> of <code>p</code> replaced by <code>with</code>; all of them where <code>n</code> is
-negative.</p>
-<h4 id="panics">Panics</h4>
-<p>When <code>p</code> matches the empty text.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.padStart">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> padStart(width: <span class="ty">int</span>, fill: <span class="ty">char</span> = <span class="str">' '</span>): <span class="ty">string</span></code></pre>
-<p>Returns the text with <code>fill</code> before it until it is <code>width</code> characters long; a longer one
-as it is.</p>
-</section>
-<section class="member" id="ext.StringView-2.method.padEnd">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> padEnd(width: <span class="ty">int</span>, fill: <span class="ty">char</span> = <span class="str">' '</span>): <span class="ty">string</span></code></pre>
-<p>Returns the text with <code>fill</code> after it until it is <code>width</code> characters long; a longer one
-as it is.</p>
 </section>
 <section class="member" id="ext.StringView-3">
 <pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">StringView</span></code></pre>
@@ -2332,16 +2182,9 @@ not.</p>
 <p>The elements must be sorted in their total order.</p>
 </section>
 <section class="member" id="ext.SliceT-8">
-<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">Display</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
-</section>
-<section class="member" id="ext.SliceT-8.method.join">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> join(sep: <span class="ty">string</span>): <span class="ty">string</span></code></pre>
-<p>Joins the elements' texts, <code>sep</code> between each two.</p>
-</section>
-<section class="member" id="ext.SliceT-9">
 <pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span>&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
 </section>
-<section class="member" id="ext.SliceT-9.method.sortBy">
+<section class="member" id="ext.SliceT-8.method.sortBy">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sortBy&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(cmp: <span class="kw">fn</span>(<span class="ty">T</span>, <span class="ty">T</span>) -&gt; <span class="ty">Ordering</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">E</span></code></pre>
 <p>Sorts the elements in the order <code>cmp</code> gives, equal ones keeping theirs.</p>
 <p>A merge sort: runs of 16 sorted by insertion, then merged pairwise through a buffer of the
@@ -2350,21 +2193,21 @@ length.</p>
 <p>What <code>cmp</code> throws ends the sort, and the call throws it; the elements are then in some
 order, every one still there.</p>
 </section>
-<section class="member" id="ext.SliceT-9.method.sortByKey">
+<section class="member" id="ext.SliceT-8.method.sortByKey">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sortByKey&lt;<span class="ty">K</span> :: [<span class="ty">TotalOrder</span>], <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(key: <span class="kw">fn</span>(<span class="ty">T</span>) -&gt; <span class="ty">K</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">E</span></code></pre>
 <p>Sorts the elements in the order of their keys, equal keys keeping theirs.</p>
 <h4 id="errors">Errors</h4>
 <p>What <code>key</code> throws, as for <code>sortBy</code>'s comparison.</p>
 </section>
-<section class="member" id="ext.SliceT-10">
+<section class="member" id="ext.SliceT-9">
 <pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">TotalOrder</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
 </section>
-<section class="member" id="ext.SliceT-10.method.sort">
+<section class="member" id="ext.SliceT-9.method.sort">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sort(): <span class="ty">void</span></code></pre>
 <p>Sorts the elements in ascending order, equal ones keeping theirs.</p>
 <p><code>sortBy</code>'s merge sort with <code>totalCompare</code> called directly.</p>
 </section>
-<section class="member" id="ext.SliceT-10.method.sortUnstable">
+<section class="member" id="ext.SliceT-9.method.sortUnstable">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sortUnstable(): <span class="ty">void</span></code></pre>
 <p>Sorts the elements in ascending order, equal ones in any order.</p>
 <p>In place, without a buffer: a quicksort, falling back to a heap sort where it would go
@@ -2377,11 +2220,11 @@ quadratic.</p>
 <section class="member" id="ext.T-5.method.equals">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> equals(o: <span class="ty">T</span>[]): <span class="ty">bool</span></code></pre>
 </section>
-<section class="member" id="ext.SliceT-11">
+<section class="member" id="ext.SliceT-10">
 <pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">Equatable</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt; :: [<span class="ty">Equatable</span>]</code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>.</p>
 </section>
-<section class="member" id="ext.SliceT-11.method.equals">
+<section class="member" id="ext.SliceT-10.method.equals">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> equals(o: <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;): <span class="ty">bool</span></code></pre>
 </section>
 <section class="member" id="ext.T-6">
@@ -2400,20 +2243,20 @@ quadratic.</p>
 <section class="member" id="ext.T-6.method.showTo">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> showTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
 </section>
-<section class="member" id="ext.SliceT-12">
+<section class="member" id="ext.SliceT-11">
 <pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">Debug</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt; :: [<span class="ty">Debug</span>, <span class="ty">Display</span>]</code></pre>
 <p class="conforms">Conforms to <code>Debug</code>, <code>Display</code>.</p>
 </section>
-<section class="member" id="ext.SliceT-12.method.debug">
+<section class="member" id="ext.SliceT-11.method.debug">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> debug(): <span class="ty">string</span></code></pre>
 </section>
-<section class="member" id="ext.SliceT-12.method.debugTo">
+<section class="member" id="ext.SliceT-11.method.debugTo">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> debugTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
 </section>
-<section class="member" id="ext.SliceT-12.method.show">
+<section class="member" id="ext.SliceT-11.method.show">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> show(): <span class="ty">string</span></code></pre>
 </section>
-<section class="member" id="ext.SliceT-12.method.showTo">
+<section class="member" id="ext.SliceT-11.method.showTo">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> showTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
 </section>
 <section class="member" id="ext.T-7">
@@ -2874,11 +2717,10 @@ quadratic.</p>
 <li class="level-3"><a href="#ext.SliceT-7">Slice&lt;T&gt;</a></li>
 <li class="level-3"><a href="#ext.SliceT-8">Slice&lt;T&gt;</a></li>
 <li class="level-3"><a href="#ext.SliceT-9">Slice&lt;T&gt;</a></li>
-<li class="level-3"><a href="#ext.SliceT-10">Slice&lt;T&gt;</a></li>
 <li class="level-3"><a href="#ext.T-5">T[]</a></li>
-<li class="level-3"><a href="#ext.SliceT-11">Slice&lt;T&gt;</a></li>
+<li class="level-3"><a href="#ext.SliceT-10">Slice&lt;T&gt;</a></li>
 <li class="level-3"><a href="#ext.T-6">T[]</a></li>
-<li class="level-3"><a href="#ext.SliceT-12">Slice&lt;T&gt;</a></li>
+<li class="level-3"><a href="#ext.SliceT-11">Slice&lt;T&gt;</a></li>
 <li class="level-3"><a href="#ext.T-7">?T</a></li>
 <li class="level-3"><a href="#ext.T-8">?T</a></li>
 <li class="level-3"><a href="#ext.T-9">?T</a></li>

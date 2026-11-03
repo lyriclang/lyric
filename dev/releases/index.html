@@ -464,6 +464,12 @@ in the prelude, and <code>List</code> and <code>Deque</code> conform; on a type 
 <code>x.index(x.length() - n)</code>, written too (<code>x[^1] = v</code>, <code>+=</code>, <code>++</code>), with <code>x</code> evaluated once. Without <code>Length</code> the
 refusal (<code>LYR-SEM0114</code>) names it.</p>
 </li>
+<li><p><strong>Text operations are <code>std.string</code>'s</strong>: what searches in a text, takes it apart or makes a new one of it —
+<code>find</code>, <code>split</code>, <code>trim</code>, <code>replace</code>, <code>startsWith</code>, <code>toUpper</code>, <code>parse</code> … — moved from <code>std.core</code> to <code>std.string</code>, an
+extension the prelude passes on, so <code>s.split(&quot;,&quot;)</code> reads as before; so did <code>char.toUpper/toLower/toDigit</code> and
+a slice's <code>join</code>. On the type stays what describes it: <code>length</code>, <code>isEmpty</code>, <code>chars</code>, <code>charIndices</code>, <code>charCount</code>
+and <strong><code>bytes()</code></strong> (was <code>toBytes()</code>). <code>matches(p)</code> is <strong><code>findAll(p)</code></strong>.</p>
+</li>
 <li><p><strong>An extension travels with <code>pub import</code></strong>: a block of methods reaches where its module is imported or passed
 on by a <code>pub import</code> — a chain of them; <code>pub import lib.error { Thing }</code> now brings <code>lib.error</code>'s methods on
 <code>Thing</code> with it. Two such modules seen at one call that both add the name are refused (<code>LYR-SEM0235</code>);

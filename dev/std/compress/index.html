@@ -50,7 +50,7 @@ is reported as <code>IoError { kind = .InvalidData }</code> carrying a <code>Com
 <span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> [<span class="ty">CompressError</span>, <span class="ty">IoError</span>] {
     <span class="kw">let</span> line = <span class="str">"to be or not to be, that is the question; "</span>;
     <span class="kw">let</span> text = [line, line, line, line, line, line, line, line].iter().join(<span class="str">""</span>);
-    <span class="kw">let</span> packed = <span class="kw">try</span> <span class="ty">Gzip</span>.compress(text.toBytes());
+    <span class="kw">let</span> packed = <span class="kw">try</span> <span class="ty">Gzip</span>.compress(text.bytes());
     println(packed.length() &lt; text.length());
     <span class="kw">let</span> back = <span class="kw">try</span> <span class="ty">Gzip</span>.decompress(packed);
     println(back.length() == text.length());

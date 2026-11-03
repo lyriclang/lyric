@@ -83,6 +83,170 @@ widens to.</p>
 <p>The version of the Unicode Character Database behind <code>char</code>'s answers.</p>
 <p>It governs a character's general category, its simple case mappings and <code>isWhitespace</code>.</p>
 </section>
+<h2 id="extensions">Extensions</h2>
+<section class="member" id="ext.StringView">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extend</span> <span class="ty">StringView</span></code></pre>
+</section>
+<section class="member" id="ext.StringView.method.contains">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> contains&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">bool</span></code></pre>
+<p>Returns whether <code>p</code> stands in it.</p>
+</section>
+<section class="member" id="ext.StringView.method.startsWith">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> startsWith&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">bool</span></code></pre>
+<p>Returns whether it begins with <code>p</code>.</p>
+</section>
+<section class="member" id="ext.StringView.method.endsWith">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> endsWith&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">bool</span></code></pre>
+<p>Returns whether it ends with <code>p</code>.</p>
+</section>
+<section class="member" id="ext.StringView.method.find">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> find&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): ?<span class="ty">int</span></code></pre>
+<p>Returns the byte index of the first <code>p</code>, or <code>null</code>; an empty <code>p</code> stands at 0.</p>
+</section>
+<section class="member" id="ext.StringView.method.rfind">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> rfind&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): ?<span class="ty">int</span></code></pre>
+<p>Returns the byte index of the last <code>p</code>, or <code>null</code>; an empty <code>p</code> stands at the length.</p>
+</section>
+<section class="member" id="ext.StringView.method.count">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> count&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">int</span></code></pre>
+<p>Returns how many times <code>p</code> stands in it, none overlapping another.</p>
+<p>An empty <code>p</code> stands between every two characters and at both ends.</p>
+</section>
+<section class="member" id="ext.StringView.method.split">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> split&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(sep: <span class="ty">P</span>): <span class="ty">SplitIter</span>&lt;<span class="ty">P</span>&gt;</code></pre>
+<p>Returns an iterator over the parts between the separators, in order.</p>
+<p><code>&quot;a,b,,c&quot;.split(&quot;,&quot;)</code> gives <code>a</code>, <code>b</code>, ``, <code>c</code>, views with no copies.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>sep</code> matches the empty text.</p>
+</section>
+<section class="member" id="ext.StringView.method.splitN">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> splitN&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(sep: <span class="ty">P</span>, n: <span class="ty">int</span>): <span class="ty">SplitIter</span>&lt;<span class="ty">P</span>&gt;</code></pre>
+<p>Returns an iterator over at most <code>n</code> parts between the separators.</p>
+<p>The first <code>n - 1</code> separators split, the rest is the last part. <code>n</code> of 0 gives none.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>sep</code> matches the empty text, or <code>n</code> is negative.</p>
+</section>
+<section class="member" id="ext.StringView.method.splitOnce">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> splitOnce&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(sep: <span class="ty">P</span>): ?(<span class="ty">StringView</span>, <span class="ty">StringView</span>)</code></pre>
+<p>Returns the part before the first <code>sep</code> and the part after it, or <code>null</code> where there is
+none.</p>
+</section>
+<section class="member" id="ext.StringView.method.findAll">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> findAll&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">MatchesIter</span>&lt;<span class="ty">P</span>&gt;</code></pre>
+<p>Returns an iterator over the matches of <code>p</code> as views, in order, none overlapping another.</p>
+</section>
+<section class="member" id="ext.StringView.method.lines">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> lines(): <span class="ty">LinesIter</span></code></pre>
+<p>Returns an iterator over the lines.</p>
+<p>Split at <code>\n</code>, a <code>\r</code> before it taken off, no empty line after a last <code>\n</code>.</p>
+</section>
+<section class="member" id="ext.StringView.method.trim">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trim(): <span class="ty">StringView</span></code></pre>
+<p>Returns the text without the white space at both ends.</p>
+<p>White space is the characters with the property White_Space: the ideographic space and
+the no-break space as well as the tab. <code>trimMatches</code> trims a pattern of one's own.</p>
+</section>
+<section class="member" id="ext.StringView.method.trimStart">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trimStart(): <span class="ty">StringView</span></code></pre>
+<p>Returns the text without the white space at the start.</p>
+</section>
+<section class="member" id="ext.StringView.method.trimEnd">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trimEnd(): <span class="ty">StringView</span></code></pre>
+<p>Returns the text without the white space at the end.</p>
+</section>
+<section class="member" id="ext.StringView.method.trimMatches">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trimMatches&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">StringView</span></code></pre>
+<p>Returns the text without the matches of <code>p</code> at both ends, removed again and again.</p>
+<p><code>&quot;xxaxx&quot;.trimMatches('x')</code> is <code>a</code>. A match of the empty text takes nothing.</p>
+</section>
+<section class="member" id="ext.StringView.method.trimStartMatches">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trimStartMatches&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">StringView</span></code></pre>
+<p>Returns the text without the matches of <code>p</code> at the start, removed again and again.</p>
+</section>
+<section class="member" id="ext.StringView.method.trimEndMatches">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trimEndMatches&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): <span class="ty">StringView</span></code></pre>
+<p>Returns the text without the matches of <code>p</code> at the end, removed again and again.</p>
+</section>
+<section class="member" id="ext.StringView.method.isBlank">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> isBlank(): <span class="ty">bool</span></code></pre>
+<p>Returns whether it holds nothing but white space; true for the empty text too.</p>
+</section>
+<section class="member" id="ext.StringView.method.toUpper">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toUpper(): <span class="ty">string</span></code></pre>
+<p>Returns the text with every character by its simple uppercase mapping.</p>
+<p>One character for one and no locale, so <code>&quot;straße&quot;.toUpper()</code> is <code>STRAßE</code>.</p>
+</section>
+<section class="member" id="ext.StringView.method.toLower">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toLower(): <span class="ty">string</span></code></pre>
+<p>Returns the text with every character by its simple lowercase mapping.</p>
+<p>One character for one, no locale.</p>
+</section>
+<section class="member" id="ext.StringView.method.parse">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> parse&lt;<span class="ty">T</span> :: [<span class="ty">Parse</span>]&gt;(): <span class="ty">T</span> <span class="kw">throws</span> <span class="ty">ParseError</span></code></pre>
+<p>Parses the text as <code>T.parse(this)</code>, the type taken from the expected type.</p>
+<p><code>let n: int = try s.parse();</code>.</p>
+<h4 id="errors">Errors</h4>
+<p>The <a href="../../std/core/ParseError/">ParseError</a> <code>T.parse</code> throws.</p>
+</section>
+<section class="member" id="ext.StringView.method.stripPrefix">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> stripPrefix&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): ?<span class="ty">StringView</span></code></pre>
+<p>Returns the rest after <code>p</code> where it begins with <code>p</code>, or <code>null</code>.</p>
+</section>
+<section class="member" id="ext.StringView.method.stripSuffix">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> stripSuffix&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>): ?<span class="ty">StringView</span></code></pre>
+<p>Returns the rest before <code>p</code> where it ends with <code>p</code>, or <code>null</code>.</p>
+</section>
+<section class="member" id="ext.StringView.method.replace">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> replace&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>, with: <span class="ty">StringView</span>): <span class="ty">string</span></code></pre>
+<p>Returns the text with every <code>p</code> replaced by <code>with</code>, none overlapping another.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>p</code> matches the empty text.</p>
+</section>
+<section class="member" id="ext.StringView.method.replaceN">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> replaceN&lt;<span class="ty">P</span> :: [<span class="ty">Pattern</span>]&gt;(p: <span class="ty">P</span>, with: <span class="ty">StringView</span>, n: <span class="ty">int</span>): <span class="ty">string</span></code></pre>
+<p>Returns the text with the first <code>n</code> of <code>p</code> replaced by <code>with</code>; all of them where <code>n</code> is
+negative.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>p</code> matches the empty text.</p>
+</section>
+<section class="member" id="ext.StringView.method.padStart">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> padStart(width: <span class="ty">int</span>, fill: <span class="ty">char</span> = <span class="str">' '</span>): <span class="ty">string</span></code></pre>
+<p>Returns the text with <code>fill</code> before it until it is <code>width</code> characters long; a longer one
+as it is.</p>
+</section>
+<section class="member" id="ext.StringView.method.padEnd">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> padEnd(width: <span class="ty">int</span>, fill: <span class="ty">char</span> = <span class="str">' '</span>): <span class="ty">string</span></code></pre>
+<p>Returns the text with <code>fill</code> after it until it is <code>width</code> characters long; a longer one
+as it is.</p>
+</section>
+<section class="member" id="ext.char">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extend</span> <span class="ty">char</span></code></pre>
+</section>
+<section class="member" id="ext.char.method.toUpper">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toUpper(): <span class="ty">char</span></code></pre>
+<p>Returns the uppercase character by the simple mapping; the character itself where it has
+none.</p>
+</section>
+<section class="member" id="ext.char.method.toLower">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toLower(): <span class="ty">char</span></code></pre>
+<p>Returns the lowercase character by the simple mapping; the character itself where it has
+none.</p>
+</section>
+<section class="member" id="ext.char.method.toDigit">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> toDigit(radix: <span class="ty">int</span>): ?<span class="ty">int</span></code></pre>
+<p>Returns the character's value as a digit in base <code>radix</code>, or <code>null</code> where it is no digit
+of the base.</p>
+<p>The digits are <code>0</code>–<code>9</code>, then <code>a</code>–<code>z</code> or <code>A</code>–<code>Z</code> for 10–35; ASCII alone, as <code>parse</code> reads.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>radix</code> is outside 2–36.</p>
+</section>
+<section class="member" id="ext.SliceT">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">Display</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+</section>
+<section class="member" id="ext.SliceT.method.join">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> join(sep: <span class="ty">string</span>): <span class="ty">string</span></code></pre>
+<p>Joins the elements' texts, <code>sep</code> between each two.</p>
+</section>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -97,6 +261,10 @@ widens to.</p>
 <li class="level-3"><a href="#fn.fromBool">fromBool</a></li>
 <li class="level-2"><a href="#constants">Constants</a></li>
 <li class="level-3"><a href="#const.unicodeVersion">unicodeVersion</a></li>
+<li class="level-2"><a href="#extensions">Extensions</a></li>
+<li class="level-3"><a href="#ext.StringView">StringView</a></li>
+<li class="level-3"><a href="#ext.char">char</a></li>
+<li class="level-3"><a href="#ext.SliceT">Slice&lt;T&gt;</a></li>
 </ul>
 </aside>
 </div>

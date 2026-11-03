@@ -40,7 +40,7 @@ are <a href="../../std/hash/#fn.crc32">crc32</a>, <a href="../../std/hash/#fn.cr
 <pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
 <span class="kw">import</span> std.hash { crc32, <span class="ty">FixedHasher</span> };
 
-println(crc32(<span class="str">"hello"</span>.toBytes()));
+println(crc32(<span class="str">"hello"</span>.bytes()));
 <span class="kw">var</span> a = <span class="ty">FixedHasher</span>.new();
 <span class="str">"hello"</span>.hash(&amp;a);
 <span class="kw">var</span> b = <span class="ty">FixedHasher</span>.new();
@@ -57,20 +57,20 @@ true</code></pre>
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> crc32(bytes: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;, running: <span class="ty">uint32</span> = <span class="num">0</span>): <span class="ty">uint32</span></code></pre>
 <p>Returns the CRC-32 (ISO-HDLC, as in zip, gzip and PNG) of <code>bytes</code>, continued from <code>running</code>.</p>
 <p><code>running</code> is the checksum of what came before, <code>0</code> at the start, so the checksum of the whole
-is that of its pieces, one after the other. <code>crc32(&quot;123456789&quot;.toBytes())</code> is <code>0xCBF43926</code>.</p>
+is that of its pieces, one after the other. <code>crc32(&quot;123456789&quot;.bytes())</code> is <code>0xCBF43926</code>.</p>
 </section>
 <section class="member" id="fn.crc32c">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> crc32c(bytes: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;, running: <span class="ty">uint32</span> = <span class="num">0</span>): <span class="ty">uint32</span></code></pre>
 <p>Returns the CRC-32C (the Castagnoli polynomial, as in iSCSI, RFC 3720) of <code>bytes</code>, continued
 from <code>running</code>.</p>
 <p><code>running</code> is the checksum of what came before, <code>0</code> at the start.
-<code>crc32c(&quot;123456789&quot;.toBytes())</code> is <code>0xE3069283</code>.</p>
+<code>crc32c(&quot;123456789&quot;.bytes())</code> is <code>0xE3069283</code>.</p>
 </section>
 <section class="member" id="fn.adler32">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> adler32(bytes: <span class="ty">Slice</span>&lt;<span class="ty">uint8</span>&gt;, running: <span class="ty">uint32</span> = <span class="num">1</span>): <span class="ty">uint32</span></code></pre>
 <p>Returns the Adler-32 (RFC 1950) of <code>bytes</code>, continued from <code>running</code>.</p>
 <p><code>running</code> is the checksum of what came before, <code>1</code> at the start.
-<code>adler32(&quot;Wikipedia&quot;.toBytes())</code> is <code>0x11E60398</code>.</p>
+<code>adler32(&quot;Wikipedia&quot;.bytes())</code> is <code>0x11E60398</code>.</p>
 </section>
 </main>
 <aside class="on-this-page" aria-label="On this page">

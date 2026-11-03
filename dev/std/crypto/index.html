@@ -47,11 +47,11 @@ differ. Everything is written in Lyric; the system's random bytes come through t
 <span class="kw">import</span> std.encoding { <span class="ty">Hex</span> };
 
 <span class="kw">let</span> h = <span class="ty">Sha256</span>.new();
-h.update(<span class="str">"abc"</span>.toBytes());
+h.update(<span class="str">"abc"</span>.bytes());
 <span class="kw">let</span> digest = h.finish();
 println(<span class="ty">Hex</span>.encode(digest));
 <span class="kw">let</span> again = <span class="ty">Sha256</span>.new();
-again.update(<span class="str">"abc"</span>.toBytes());
+again.update(<span class="str">"abc"</span>.bytes());
 println(constantTimeEq(digest, again.finish()));</code></pre>
 <pre class="output"><code>ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
 true</code></pre>

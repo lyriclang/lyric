@@ -65,7 +65,7 @@ waits without bound.</p>
     print(<span class="str">"one, "</span>);
     println(<span class="str">"two"</span>);
     <span class="kw">let</span> buffer = <span class="ty">ByteBuffer</span>.new();
-    <span class="kw">try</span> buffer.write(<span class="str">"written to memory"</span>.toBytes());
+    <span class="kw">try</span> buffer.write(<span class="str">"written to memory"</span>.bytes());
     println(buffer.length());
 }</code></pre>
 <pre class="output"><code>one, two

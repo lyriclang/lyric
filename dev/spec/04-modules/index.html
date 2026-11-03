@@ -91,7 +91,7 @@ come with <code>comptime</code>.)</em></li>
 (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V1</a>). A package gathers modules under one name
 (<a href="../../spec/15-project/">15 §1</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/04-modules/</code> — a rule about a package as a package case, a
-directory (<a href="https://github.com/lyriclang/lyric-spec/blob/6c2c2fa69cac2cb3374d966ad25426f2d3803c5f/conformance/README.md">the format</a>); what only the command line shows, in the
+directory (<a href="https://github.com/lyriclang/lyric-spec/blob/befc813e077455de276e775ad39f45068883785c/conformance/README.md">the format</a>); what only the command line shows, in the
 toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>PackageTests</code>).</p>
 <ol>
 <li>A <strong>package</strong> is a directory with a manifest, <code>lyric.toml</code>; its modules are the <code>.lyr</code> files
@@ -237,8 +237,9 @@ among it. The prelude grows with the library (<a href="../../spec/12-stdlib/">12
 <li>A name a module declares or imports hides the prelude's of that name in the module, and is
 warned (<code>LYR-SEM0153</code>) (K6). An import of the very symbol the prelude passes on hides nothing.
 A block of a module the prelude takes names from stands in every module, as <code>std.core</code>'s do:
-<code>Map&lt;K, V&gt;.new()</code> is reached wherever <code>Map</code> is — and a module the prelude imports without a
-name, <code>std.iter</code>, whose adapters every iterator has everywhere (<a href="../../spec/12-stdlib/">12</a>).</li>
+<code>Map&lt;K, V&gt;.new()</code> is reached wherever <code>Map</code> is — and the modules the prelude imports without a
+name: <code>std.iter</code>, whose adapters every iterator has everywhere, and <code>std.string</code>, whose
+operations every text has (<a href="../../spec/12-stdlib/">12</a>).</li>
 <li>A <strong>builtin type's</strong> name — <code>int</code>, <code>string</code>, <code>bool</code> … — is no declaration's (<code>LYR-RES0011</code>)
 (K5).</li>
 <li>A name a module declares or imports is <strong>not also one of its submodules</strong>: <code>app.net</code> declaring

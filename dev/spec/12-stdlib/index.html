@@ -424,7 +424,8 @@ slots, as <code>[x] * n</code> shares none (<a href="../../spec/03-types/">03 §
 every one it holds for before every one it does not; a binary search. Of a <code>TotalOrder</code>
 element, <code>binarySearch(x)</code>: the index of an element equal to <code>x</code> in sorted elements, any of
 several equal ones, or <code>null</code>.</li>
-<li>Of a <code>Display</code> element: <code>join(sep)</code>, the elements' texts with <code>sep</code> between each two.</li>
+<li>Of a <code>Display</code> element: <code>join(sep)</code>, the elements' texts with <code>sep</code> between each two —
+<code>std.string</code>'s, as it makes a text (§Strings).</li>
 <li><strong>Clone</strong> (10 K5; N2a): of a <code>Clone</code> element, <code>T[]</code> is <code>Clone</code> — <code>clone()</code> is a new array of the
 elements' clones, and <code>[xs] * n</code> repeats such an array by <code>clone</code> (<a href="../../spec/03-types/">03 §5.1</a>).</li>
 <li><strong>Equality and display</strong> (10 C9; M8a S14): of an <code>Equatable</code> element, <code>T[]</code> and <code>Slice&lt;T&gt;</code> are
@@ -465,10 +466,10 @@ S11). Each continues from a running value, as zlib's do: the checksum of the who
 pieces, one after the other — <code>crc32(rest, crc32(first))</code>.</p>
 <ul>
 <li><strong><code>crc32(bytes, running = 0)</code></strong>, CRC-32 of ISO-HDLC (zip, gzip, PNG):
-<code>crc32(&quot;123456789&quot;.toBytes())</code> is <code>0xCBF43926</code>.</li>
+<code>crc32(&quot;123456789&quot;.bytes())</code> is <code>0xCBF43926</code>.</li>
 <li><strong><code>crc32c(bytes, running = 0)</code></strong>, the Castagnoli polynomial (iSCSI, RFC 3720): <code>0xE3069283</code> over
 the same nine bytes.</li>
-<li><strong><code>adler32(bytes, running = 1)</code></strong>, RFC 1950's (zlib): <code>adler32(&quot;Wikipedia&quot;.toBytes())</code> is
+<li><strong><code>adler32(bytes, running = 1)</code></strong>, RFC 1950's (zlib): <code>adler32(&quot;Wikipedia&quot;.bytes())</code> is
 <code>0x11E60398</code>.</li>
 </ul>
 <h2 id="input-and-output">Input and output</h2>
@@ -564,7 +565,7 @@ or the highest. <code>Slice&lt;uint8&gt;</code> has <code>getUint16LE(at)</code>
 <code>uint8[N]</code> — <code>(258 as uint16).toBytesBE()</code> is <code>[1, 2]</code> (M8c S11). An inline array in a frame
 gives no view (<a href="../../spec/03-types/">03 §5.3</a>): <code>T.fromBytesLE(v.toBytesLE().toArray())</code> is <code>v</code>. They
 are members of the module's blocks, there where <code>std.encoding</code> is imported. <em>(Informative.)</em> A string's bytes
-are <code>toBytes()</code> (§Strings).</li>
+are <code>bytes()</code> (§Strings).</li>
 </ol>
 <h2 id="cryptography">Cryptography</h2>
 <p><code>std.crypto</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 Q4</a>; M8b S4b): the hashes for security, HMAC,
@@ -1099,16 +1100,20 @@ Lm and Lo; <code>isDigit</code> a decimal digit of any script, Nd; <code>isAlpha
 <code>isAsciiWhitespace</code> the space, tab, line feed, form feed and carriage return.</li>
 <li><strong>Case maps one character to one.</strong> <code>toUpper()</code> and <code>toLower()</code> are the database's simple
 case mappings; a character without one maps to itself — <code>'ß'.toUpper()</code> is <code>'ß'</code>. No locale
-takes part.</li>
+takes part. They, and <code>toDigit</code> (rule 4), are <code>std.string</code>'s, a block on <code>char</code> the prelude
+passes on; what classifies a character (rules 1, 2) is <code>std.core</code>'s.</li>
 <li><strong>Digits are ASCII</strong>, as <code>parse</code> reads them: <code>toDigit(radix): ?int</code> reads <code>0</code>–<code>9</code>, then <code>a</code>–<code>z</code>
 or <code>A</code>–<code>Z</code> as 10 to 35, and is <code>null</code> for a character that is no digit of the base;
 <code>char.fromDigit(n, radix): ?char</code> writes the digit <code>n</code>, its letters lowercase, and is <code>null</code>
 where <code>n</code> is no digit of the base. A radix outside 2–36 panics (<code>LYR-RT0008</code>).</li>
 </ol>
 <h2 id="strings">Strings</h2>
-<p>A <code>string</code> is immutable UTF-8 (design 10 S1). Its members are <code>std.core</code>'s and stand <strong>once on
-<code>StringView</code></strong> (below), which a string reaches through a view of all of itself (rule 4); <code>length()</code>
-and <code>isEmpty()</code> it has itself. What cuts gives a <strong>view</strong> of the text, no copy; what builds gives a
+<p>A <code>string</code> is immutable UTF-8 (design 10 S1). Its members stand <strong>once on <code>StringView</code></strong> (below),
+which a string reaches through a view of all of itself (rule 4); <code>length()</code> and <code>isEmpty()</code> it has
+itself. What describes the text — <code>length</code>, <code>isEmpty</code>, <code>charCount</code>, <code>chars</code>, <code>charIndices</code>,
+<code>bytes</code> — is <code>std.core</code>'s; what searches in it, takes it apart or makes a new one of it is
+<strong><code>std.string</code>'s</strong>, a block on <code>StringView</code> that the prelude passes on, so it stands in every module
+(<a href="../../spec/04-modules/">04 §3</a> rule 9a; <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 P1–P5</a>). What cuts gives a <strong>view</strong> of the text, no copy; what builds gives a
 new string. A pattern <code>p</code> is a <strong><code>Pattern</code></strong> (design 10 S2) — a view or a string, a <code>char</code>, a test
 of characters <code>fn(char) -&gt; bool</code> (through the block on its function type, <a href="../../spec/05-interfaces/">05 §13</a>
 rule 6), or a type of the program that conforms:
@@ -1131,7 +1136,7 @@ and at both ends.</li>
 <li><code>split(sep)</code>, the parts between the separators in order, views, empty ones kept — a separator
 that matches the empty text panics; <code>splitN(sep, n)</code>, at most <code>n</code> parts, the last one the rest,
 none for <code>n</code> of 0; <code>splitOnce(sep)</code>, the views before and after the first, or <code>null</code>;
-<code>matches(p)</code>, the matches in order, views, none overlapping another; <code>lines()</code>, views split at
+<code>findAll(p)</code>, the matches in order, views, none overlapping another; <code>lines()</code>, views split at
 <code>\n</code> with a <code>\r</code> before it taken off and no empty line after a last <code>\n</code>.</li>
 <li><code>trim()</code>, <code>trimStart()</code>, <code>trimEnd()</code>, the view without the white space — the characters with
 the property White_Space (§Characters); <code>trimMatches(p)</code>, <code>trimStartMatches(p)</code>,
@@ -1141,7 +1146,7 @@ empty text too; <code>stripPrefix(p)</code> and <code>stripSuffix(p)</code>, the
 <code>p</code> is not there.</li>
 <li><code>toUpper()</code>, <code>toLower()</code>, a new string, each character by its simple case mapping
 (§Characters rule 3): <code>&quot;straße&quot;.toUpper()</code> is <code>&quot;STRAßE&quot;</code>, and a final sigma is no context.</li>
-<li><code>toBytes()</code>, the bytes, a new <code>uint8[]</code> — a copy, since a string does not change (design 10
+<li><code>bytes()</code>, the bytes, a new <code>uint8[]</code> — a copy, since a string does not change (design 10
 S12d); <code>string.fromChars(chars)</code>, the text of an iterator's characters in order, throwing what
 the iterator throws; <code>parse&lt;T :: [Parse]&gt;()</code>, <code>T.parse(s)</code> with <code>T</code> from where the result goes
 — <code>let n: int = try s.parse();</code>.</li>

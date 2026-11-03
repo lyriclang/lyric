@@ -43,7 +43,7 @@ bits past the last byte, and accepts no whitespace. Input that is not the encodi
 <span class="kw">import</span> std.encoding { <span class="ty">Base64</span>, <span class="ty">Hex</span>, <span class="ty">EncodingError</span> };
 
 <span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodingError</span> {
-    <span class="kw">let</span> bytes = <span class="str">"Lyric"</span>.toBytes();
+    <span class="kw">let</span> bytes = <span class="str">"Lyric"</span>.bytes();
     println(<span class="ty">Base64</span>.encode(bytes));
     println(<span class="ty">Hex</span>.encode(bytes));
     <span class="kw">let</span> back = <span class="kw">try</span> <span class="ty">Base64</span>.decode(<span class="str">"THlyaWM="</span>);
