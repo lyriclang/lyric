@@ -29,11 +29,13 @@ import std.core {
     SplitIter,
     MatchesIter,
     LinesIter,
+    byteAt,
     byteCount,
     charAtByte,
     matchesNothing,
     nextChar,
     previousChar,
+    repeatText,
     unicodeLower,
     unicodeUpper,
 };
@@ -415,4 +417,204 @@ pub extend<T :: [Display]> Slice<T> {
         }
         return out.toString();
     }
+}
+
+// ----------------------------------------------------------------- counted in characters
+//
+// A text is indexed by bytes in O(1) (`s[a..b]`, `s[i]`); these count characters, as a reader
+// does, and walk the bytes to get there.
+
+pub extend StringView {
+    /// Returns the view of the characters from `start` up to but not including `end`, counted in
+    /// characters: `"héllo".substring(1, 3)` is `"él"`.
+    ///
+    /// It walks the bytes up to `end`, `O(end)`; `s[a..b]` cuts by bytes in `O(1)`.
+    ///
+    /// # Panics
+    /// When `0 ≤ start ≤ end ≤ charCount()` does not hold.
+    pub fn substring(start: int, end: int): StringView {
+        if (start >= 0 && end >= start) {
+            if (let from = byteOfChar(this, 0, start)) {
+                if (let to = byteOfChar(this, from, end - start)) {
+                    return this[from..to];
+                }
+            }
+        }
+        panic(f"substring({start}, {end}) of a text of {this.charCount()} characters");
+    }
+
+    /// Returns character `i`, counted in characters: `"héllo".charAt(1)` is `'é'`.
+    ///
+    /// It walks the bytes up to `i`, `O(i)`; `s[i]` takes the character at byte `i` in `O(1)`.
+    ///
+    /// # Panics
+    /// When `0 ≤ i < charCount()` does not hold.
+    pub fn charAt(i: int): char {
+        if (i >= 0) {
+            if (let at = byteOfChar(this, 0, i)) {
+                if (at < byteCount(this)) {
+                    return charAtByte(this, at);
+                }
+            }
+        }
+        panic(f"charAt({i}) of a text of {this.charCount()} characters");
+    }
+
+    /// Returns the number of characters before byte `byte`: `"héllo".charIndex(3)` is `2`.
+    ///
+    /// # Panics
+    /// When `byte` is no character's first byte and not the length.
+    pub fn charIndex(byte: int): int {
+        if (!this.isCharBoundary(byte)) {
+            panic(f"charIndex({byte}): no character begins at the byte");
+        }
+        var at = 0;
+        var count = 0;
+        while (at < byte) {
+            at = nextChar(this, at);
+            count = count + 1;
+        }
+        return count;
+    }
+
+    /// Returns whether a character begins at byte `byte`, or `byte` is the length — where a text
+    /// can be cut. Outside `0…length()` it is `false`.
+    pub fn isCharBoundary(byte: int): bool {
+        let n = byteCount(this);
+        if (byte < 0 || byte > n) {
+            return false;
+        }
+        return byte == n || (byteAt(this, byte) & 192) != 128;
+    }
+
+    /// Returns the byte index of the first `p` at or after byte `from`, or `null`.
+    ///
+    /// # Panics
+    /// When `from` is no character's first byte and not the length.
+    pub fn findFrom<P :: [Pattern]>(p: P, from: int): ?int {
+        if (!this.isCharBoundary(from)) {
+            panic(f"findFrom: no character begins at byte {from}");
+        }
+        return p.nextIn(this, from);
+    }
+
+    /// Returns the byte index of the first character that is one of `chars`, or `null`.
+    pub fn firstOf(chars: StringView): ?int {
+        let n = byteCount(this);
+        var at = 0;
+        while (at < n) {
+            if (chars.contains(charAtByte(this, at))) {
+                return at;
+            }
+            at = nextChar(this, at);
+        }
+        return null;
+    }
+
+    /// Returns an iterator over the runs of characters between white space, as views; no empty
+    /// one — leading, trailing and repeated white space separates nothing.
+    pub fn splitWhitespace(): SplitWhitespaceIter {
+        return SplitWhitespaceIter { s = this, at = 0 };
+    }
+
+    /// Returns the part before the last `sep` and the part after it, or `null` where there is
+    /// none.
+    pub fn rsplitOnce<P :: [Pattern]>(sep: P): ?(StringView, StringView) {
+        if (let at = this.rfind(sep)) {
+            let parts: (StringView, StringView) = (this[..at], this[sep.matchAt(this, at)!..]);
+            return parts;
+        }
+        return null;
+    }
+
+    /// Returns the text `n` times over; `"ab".repeat(3)` is `"ababab"`.
+    ///
+    /// # Panics
+    /// When `n` is negative.
+    pub fn repeat(n: int): string {
+        return repeatText(this.toString(), n);
+    }
+
+    /// Returns whether every character is ASCII, below U+0080; the empty text is.
+    pub fn isAscii(): bool {
+        var i = 0;
+        while (i < byteCount(this)) {
+            if (byteAt(this, i) >= 128) {
+                return false;
+            }
+            i = i + 1;
+        }
+        return true;
+    }
+
+    /// Returns whether the two texts are equal when each character is taken by its simple
+    /// lowercase mapping: `"Straße".equalsIgnoreCase("STRASSE")` is `false`, as `ß` maps to itself.
+    pub fn equalsIgnoreCase(o: StringView): bool {
+        return this.compareIgnoreCase(o) == Ordering.Equal;
+    }
+
+    /// Compares the two texts character by character, each taken by its simple lowercase mapping;
+    /// a text that ends first comes first.
+    pub fn compareIgnoreCase(o: StringView): Ordering {
+        var a = this.chars();
+        var b = o.chars();
+        while (true) {
+            let x = a.next();
+            let y = b.next();
+            if (let l = x) {
+                if (let r = y) {
+                    let lower = l.toLower();
+                    let other = r.toLower();
+                    if (lower < other) {
+                        return Ordering.Less;
+                    }
+                    if (lower > other) {
+                        return Ordering.Greater;
+                    }
+                } else {
+                    return Ordering.Greater;
+                }
+            } else {
+                return if (y == null) Ordering.Equal else Ordering.Less;
+            }
+        }
+    }
+}
+
+/// Iterates over the runs of characters between white space, as views of the text.
+pub struct SplitWhitespaceIter :: [Iterator] {
+    type Item = StringView;
+    s: StringView,
+    var at: int,
+
+    pub mut fn next(): ?StringView {
+        let n = byteCount(this.s);
+        while (this.at < n && charAtByte(this.s, this.at).isWhitespace()) {
+            this.at = nextChar(this.s, this.at);
+        }
+        if (this.at >= n) {
+            return null;
+        }
+        let start = this.at;
+        while (this.at < n && !charAtByte(this.s, this.at).isWhitespace()) {
+            this.at = nextChar(this.s, this.at);
+        }
+        return this.s[start..this.at];
+    }
+}
+
+/// Returns the byte `n` characters after byte `from` — the length after the last one —, or `null`
+/// where the text has fewer.
+fn byteOfChar(s: StringView, from: int, n: int): ?int {
+    let length = byteCount(s);
+    var at = from;
+    var left = n;
+    while (left > 0) {
+        if (at >= length) {
+            return null;
+        }
+        at = nextChar(s, at);
+        left = left - 1;
+    }
+    return at;
 }

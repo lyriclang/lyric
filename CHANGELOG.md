@@ -344,6 +344,11 @@ promise. This entry fills with the milestones.
   in the prelude, and `List` and `Deque` conform; on a type with its own `Index<int>` and `Length`, `x[^n]` is
   `x.index(x.length() - n)`, written too (`x[^1] = v`, `+=`, `++`), with `x` evaluated once. Without `Length` the
   refusal (`LYR-SEM0114`) names it.
+- **Text counted in characters, and more of it**: `substring(start, end)` and `charAt(i)` count characters (a
+  slice `s[a..b]` and `s[i]` count bytes), `charIndex(byte)` and `isCharBoundary(byte)` convert; `findFrom(p,
+  from)`, `firstOf(chars)`, `splitWhitespace()`, `rsplitOnce(sep)`, `repeat(n)`, `isAscii()`,
+  `equalsIgnoreCase`/`compareIgnoreCase`. A forward search is linear in the text and the pattern together:
+  `"a"×100 000 + "b"` in a million `a` took 4.6 s for three searches, now 1 ms (Two-Way past a budget).
 - **Text operations are `std.string`'s**: what searches in a text, takes it apart or makes a new one of it —
   `find`, `split`, `trim`, `replace`, `startsWith`, `toUpper`, `parse` … — moved from `std.core` to `std.string`, an
   extension the prelude passes on, so `s.split(",")` reads as before; so did `char.toUpper/toLower/toDigit` and

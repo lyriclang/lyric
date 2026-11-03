@@ -108,18 +108,28 @@ static inline bool lyr_bytes_match_at(const uint8_t *s, int64_t slen, const uint
 }
 #define LYR_VIEW_MATCHES_AT(s, p, at) lyr_bytes_match_at((s).ptr, (s).len, (p).ptr, (p).len, (int64_t)(at))
 
+/* The same search by the Two-Way algorithm (Crochemore and Perrin): linear in the text and the pattern
+ * together, whatever the two hold. In string.c. */
+int64_t lyr_bytes_find_two_way(const uint8_t *s, int64_t slen, const uint8_t *p, int64_t plen, int64_t from);
+
 /* Where `p`'s bytes first stand in `s` at or after byte `from` (a negative `from` counts as 0), or -1:
  * memchr to each place the first byte stands, memcmp for the rest there — not memcmp at every place,
- * which cost `strings` a third of its time. The empty pattern stands at `from` while it is in `s`. */
+ * which cost `strings` a third of its time. That is a place times the pattern's length where the first
+ * byte stands everywhere (`"aaab"` in `"aaaa…"`), so the bytes it compares are counted, and past twice
+ * the text the rest is Two-Way's: an ordinary search keeps memchr's speed, none grows with the product.
+ * The empty pattern stands at `from` while it is in `s`. */
 static inline int64_t lyr_bytes_find(const uint8_t *s, int64_t slen, const uint8_t *p, int64_t plen, int64_t from) {
     if (from < 0) from = 0;
     if (plen == 0) return from <= slen ? from : -1;
     const int64_t last = slen - plen;
+    int64_t budget = 2 * slen;
     while (from <= last) {
         const uint8_t *hit = memchr(s + from, p[0], (size_t)(last - from + 1));
         if (hit == NULL) return -1;
         const int64_t at = hit - s;
         if (plen == 1 || memcmp(hit + 1, p + 1, (size_t)(plen - 1)) == 0) return at;
+        budget -= plen;
+        if (budget < 0) return lyr_bytes_find_two_way(s, slen, p, plen, at + 1);
         from = at + 1;
     }
     return -1;

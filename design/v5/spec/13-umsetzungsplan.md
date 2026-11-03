@@ -2029,3 +2029,23 @@ sichtbar machte. Die ganze Regel kostet bei Text fast nichts, weil Lyric die Emp
 schon kann (C#/Kotlin statt Gos freier Funktionen); bei der Mathematik ändert sie Aufrufe, und das ist gewollt:
 `clamp(x, lo, hi)` steht neben `min(a, b)`. Die Gefahr ist ein Umzug, der Namen bricht, ohne dass ein Test es merkt —
 darum zählt P-S6 die Inventur ein zweites Mal.
+
+**P-S1 bis P-S3, beim Bauen entschieden** (2026-11-03):
+
+- **P-S1**: ein `pub import` reicht die Blöcke seines Moduls weiter — auch die im eigenen Modul des Typs
+  (`pub import lib.error { Thing }` bringt `lib.error`s Methoden auf `Thing` mit); vorher ließ der Re-Export sie
+  zurück. Zwei gleichnamige Blöcke an einem Aufruf: `LYR-SEM0235` (vorher gewann still der erste Import). Die
+  Compiler-Hilfen von `std.core` sind `internal`; was der Compiler schreibt, erreicht sie über `_compilerWritten`.
+- **P-S2**: das Prelude importiert `std.string` **als `text`** — `import std.string;` bände `string` über den Typ
+  (`LYR-SEM0077`); seine Importe sind seine Quellen und keine unbenutzten (`WarningAnalyzer` lässt es aus). Modulzyklen
+  sind ein Fehler, also ruft `std.core` nichts aus `std.string` (das Vorzeichen eines Zahltexts liest das Byte). Die
+  Iterator-Structs (`SplitIter`, `MatchesIter`, `LinesIter`) bleiben in `std.core`.
+- **P-S3**: `substring(start, end)` gibt eine **Sicht** (was schneidet, gibt eine Sicht) mit exklusivem Ende, wie
+  `s[a..b]`; außerhalb der Zeichen eine Panik, wie der Index. `charIndex(byte)` zählt die Zeichen vor dem Byte;
+  `byteIndex(char)` gibt es nicht — `substring(0, i).length()` ist es. `firstOf` nimmt die Zeichen als Text.
+  **Die Suche**: nicht Two-Way allein, sondern `memchr`+`memcmp` mit einem Budget von zweimal der Textlänge an
+  verglichenen Bytes, danach Two-Way ab der Stelle — gemessen: drei Suchen von `"a"×m + "b"` in einer Million `a`
+  43/275/4649 ms für m = 1000/10 000/100 000 vorher, je 1 ms danach; gewöhnlicher Text unverändert (6–7 ms). Ein
+  Zufallsvergleich gegen die naive Suche (20 000 Fälle über `ab`, `aab`, `abc`) mit zwei Kontrollen: Two-Way kaputt
+  → 367 falsch, Budget 0 (Two-Way allein) → 0 falsch. **`rfind` bleibt O(n·m)** im schlimmsten Fall — es sucht
+  rückwärts über `matchBefore`; ein rückwärts laufendes Two-Way ist eine Tür.
