@@ -4,7 +4,7 @@
 //   15 cases, 0 differ
 import std.io { println };
 import std.core { ParseError };
-import std.math { abs, ceil, floor, round, sqrt, trunc };
+import std.math { abs, ceil, checkedAdd, checkedDiv, checkedMul, checkedSub, floor, leadingZeros, popCount, rotateLeft, rotateRight, round, saturatingAdd, saturatingMul, saturatingSub, sqrt, trailingZeros, trunc, wrappingAdd };
 
 fn tower(): string {
     let w1 = 128 as int8;
@@ -26,8 +26,8 @@ fn tower(): string {
 fn checked(): string {
     let m = 9223372036854775807;
     let n: int8 = -128;
-    let adds = f"{m.checkedAdd(1) ?? -1} {m.checkedSub(1) ?? -1} {n.checkedMul(-1) ?? 1} {n.checkedDiv(-1) ?? 2}";
-    let sats = f"{m.saturatingAdd(5)} {n.saturatingSub(1)} {(200 as uint8).saturatingMul(2)} {m.wrappingAdd(1)}";
+    let adds = f"{checkedAdd(m, 1) ?? -1} {checkedSub(m, 1) ?? -1} {checkedMul(n, -1) ?? 1} {checkedDiv(n, -1) ?? 2}";
+    let sats = f"{saturatingAdd(m, 5)} {saturatingSub(n, 1)} {saturatingMul((200 as uint8), 2)} {wrappingAdd(m, 1)}";
     let exact = f"{int8.exact(300) ?? 0} {int8.exact(-100) ?? 0} {uint8.clamping(-5)} {uint8.clamping(999)}";
     return f"{adds} | {sats} | {exact}";
 }
@@ -36,8 +36,8 @@ fn bits(): string {
     let x: uint8 = 0b0001_0110;
     let y: int32 = -1;
     let z: uint64 = 0x8000_0000_0000_0001u64;
-    let counts = f"{x.leadingZeros()} {x.trailingZeros()} {x.popCount()} {y.popCount()} {z.leadingZeros()} {(0 as uint16).leadingZeros()}";
-    let rotations = f"{x.rotateLeft(3)} {x.rotateRight(3)} {z.rotateLeft(1)} {y.rotateLeft(7)} {x.rotateLeft(-1)}";
+    let counts = f"{leadingZeros(x)} {trailingZeros(x)} {popCount(x)} {popCount(y)} {leadingZeros(z)} {leadingZeros((0 as uint16))}";
+    let rotations = f"{rotateLeft(x, 3)} {rotateRight(x, 3)} {rotateLeft(z, 1)} {rotateLeft(y, 7)} {rotateLeft(x, -1)}";
     let others = f"{abs(-17)} {(3).pow(13)} {(2 as uint64).pow(63)} {0xF0 & 0x3C} {0xF0 | 0x0F} {0xF0 ^ 0xFF}";
     return f"{counts} | {rotations} | {others}";
 }

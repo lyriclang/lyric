@@ -46,6 +46,7 @@ import std.core {
     StringBuilder,
 };
 import std.hash { DefaultHasher };
+import std.math { trailingZeros };
 
 // --- List ----------------------------------------------------------------------------------------
 // The elements lie at the front of a buffer that doubles when full. The slots past the length hold
@@ -680,7 +681,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
             let x = word ^ pattern;
             var hits = (x -% lowBits) & ~x & highBits;
             while (hits != 0) {
-                let slot = g * 8 + hits.trailingZeros() / 8;
+                let slot = g * 8 + trailingZeros(hits) / 8;
                 // unwrapped: the key's own equality, not the optionals' — the cheaper comparison
                 if (let full = this.slots[slot]) {
                     if (full.key == k) {
@@ -712,7 +713,7 @@ pub class Map<K :: [Hashable], V, H :: [Hasher] = DefaultHasher> :: [Iterable] {
             let word = this.controls[g];
             let open = word & highBits;
             if (open != 0) {
-                let j = open.trailingZeros() / 8;
+                let j = trailingZeros(open) / 8;
                 let shift = (8 * j) as uint64;
                 if (((word >> shift) & 255) == 128) {
                     this.free = this.free - 1;

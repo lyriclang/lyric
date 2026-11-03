@@ -513,7 +513,7 @@ LyrStr * lyr_std_core__extend__int_2__debug_3672eef7(lyr_inl2_i64 this);
 void lyr_std_hash__extend__Sip_absorb_4ecdbb45(lyr_ty_std_hash_Sip *this, uint64_t m);
 void lyr_std_hash__extend__Sip_round_74bc8960(lyr_ty_std_hash_Sip *this);
 LyrStr * lyr_app_main__extend__P_debug_fe5884fe(lyr_ty_app_main_P *this);
-uint64_t lyr_std_core__default__Integer_uint_rotateLeft_48b0fa66(uint64_t this, int64_t n);
+uint64_t lyr_std_math_rotateLeft_uint__16454490(uint64_t x, int64_t n);
 LyrStr * lyr_std_core_debugText_1_int__d36daf36(lyr_slice_i64 xs);
 void lyr_std_core__extend__int_4__debugTo_7332feb8(lyr_inl4_i64 this, lyr_ty_std_core_StringBuilder *out);
 void lyr_std_core__extend__int_2__debugTo_87242142(lyr_inl2_i64 this, lyr_ty_std_core_StringBuilder *out);
@@ -13654,13 +13654,13 @@ void lyr_std_hash__extend__Sip_round_74bc8960(lyr_ty_std_hash_Sip *this) {
 #line _
     lyr_ty_std_hash_Sip *t6 = &t6_s;
 #line _
-    int64_t t7 = 0;
+    lyr_ty_std_hash_Sip t7_s = {0};
 #line _
-    lyr_ty_std_hash_Sip t8_s = {0};
+    lyr_ty_std_hash_Sip *t7 = &t7_s;
 #line _
-    lyr_ty_std_hash_Sip *t8 = &t8_s;
+    uint64_t t8 = 0;
 #line _
-    uint64_t t9 = 0;
+    int64_t t9 = 0;
 #line _
     uint64_t t10 = 0;
 #line _
@@ -13676,13 +13676,13 @@ void lyr_std_hash__extend__Sip_round_74bc8960(lyr_ty_std_hash_Sip *this) {
 #line _
     lyr_ty_std_hash_Sip *t14 = &t14_s;
 #line _
-    int64_t t15 = 0;
+    lyr_ty_std_hash_Sip t15_s = {0};
 #line _
-    lyr_ty_std_hash_Sip t16_s = {0};
+    lyr_ty_std_hash_Sip *t15 = &t15_s;
 #line _
-    lyr_ty_std_hash_Sip *t16 = &t16_s;
+    uint64_t t16 = 0;
 #line _
-    uint64_t t17 = 0;
+    int64_t t17 = 0;
 #line _
     uint64_t t18 = 0;
 #line _
@@ -13708,13 +13708,13 @@ void lyr_std_hash__extend__Sip_round_74bc8960(lyr_ty_std_hash_Sip *this) {
 #line _
     lyr_ty_std_hash_Sip *t25 = &t25_s;
 #line _
-    int64_t t26 = 0;
+    lyr_ty_std_hash_Sip t26_s = {0};
 #line _
-    lyr_ty_std_hash_Sip t27_s = {0};
+    lyr_ty_std_hash_Sip *t26 = &t26_s;
 #line _
-    lyr_ty_std_hash_Sip *t27 = &t27_s;
+    uint64_t t27 = 0;
 #line _
-    uint64_t t28 = 0;
+    int64_t t28 = 0;
 #line _
     uint64_t t29 = 0;
 #line _
@@ -13748,13 +13748,13 @@ void lyr_std_hash__extend__Sip_round_74bc8960(lyr_ty_std_hash_Sip *this) {
 #line _
     lyr_ty_std_hash_Sip *t39 = &t39_s;
 #line _
-    int64_t t40 = 0;
+    lyr_ty_std_hash_Sip t40_s = {0};
 #line _
-    lyr_ty_std_hash_Sip t41_s = {0};
+    lyr_ty_std_hash_Sip *t40 = &t40_s;
 #line _
-    lyr_ty_std_hash_Sip *t41 = &t41_s;
+    uint64_t t41 = 0;
 #line _
-    uint64_t t42 = 0;
+    int64_t t42 = 0;
 #line _
     uint64_t t43 = 0;
 #line _
@@ -13788,13 +13788,13 @@ void lyr_std_hash__extend__Sip_round_74bc8960(lyr_ty_std_hash_Sip *this) {
 #line _
     lyr_ty_std_hash_Sip *t53 = &t53_s;
 #line _
-    int64_t t54 = 0;
+    lyr_ty_std_hash_Sip t54_s = {0};
 #line _
-    lyr_ty_std_hash_Sip t55_s = {0};
+    lyr_ty_std_hash_Sip *t54 = &t54_s;
 #line _
-    lyr_ty_std_hash_Sip *t55 = &t55_s;
+    uint64_t t55 = 0;
 #line _
-    uint64_t t56 = 0;
+    int64_t t56 = 0;
 #line _
     uint64_t t57 = 0;
 #line _
@@ -13810,13 +13810,13 @@ void lyr_std_hash__extend__Sip_round_74bc8960(lyr_ty_std_hash_Sip *this) {
 #line _
     lyr_ty_std_hash_Sip *t61 = &t61_s;
 #line _
-    int64_t t62 = 0;
+    lyr_ty_std_hash_Sip t62_s = {0};
 #line _
-    lyr_ty_std_hash_Sip t63_s = {0};
+    lyr_ty_std_hash_Sip *t62 = &t62_s;
 #line _
-    lyr_ty_std_hash_Sip *t63 = &t63_s;
+    uint64_t t63 = 0;
 #line _
-    uint64_t t64 = 0;
+    int64_t t64 = 0;
 #line _
     uint64_t t65 = 0;
 bb0:;
@@ -13837,13 +13837,13 @@ bb0:;
 #line _
     t6 = this;
 #line _
-    t7 = (int64_t)INT64_C(13);
+    t7 = this;
 #line _
-    t8 = this;
+    t8 = t7->v1;
 #line _
-    t9 = t8->v1;
+    t9 = (int64_t)INT64_C(13);
 #line _
-    t10 = lyr_std_core__default__Integer_uint_rotateLeft_48b0fa66(t9, t7);
+    t10 = lyr_std_math_rotateLeft_uint__16454490(t8, t9);
 #line _
     t11 = this;
 #line _
@@ -13855,13 +13855,13 @@ bb0:;
 #line _
     t14 = this;
 #line _
-    t15 = (int64_t)INT64_C(32);
+    t15 = this;
 #line _
-    t16 = this;
+    t16 = t15->v0;
 #line _
-    t17 = t16->v0;
+    t17 = (int64_t)INT64_C(32);
 #line _
-    t18 = lyr_std_core__default__Integer_uint_rotateLeft_48b0fa66(t17, t15);
+    t18 = lyr_std_math_rotateLeft_uint__16454490(t16, t17);
 #line _
     t14->v0 = t18;
 #line _
@@ -13881,13 +13881,13 @@ bb0:;
 #line _
     t25 = this;
 #line _
-    t26 = (int64_t)INT64_C(16);
+    t26 = this;
 #line _
-    t27 = this;
+    t27 = t26->v3;
 #line _
-    t28 = t27->v3;
+    t28 = (int64_t)INT64_C(16);
 #line _
-    t29 = lyr_std_core__default__Integer_uint_rotateLeft_48b0fa66(t28, t26);
+    t29 = lyr_std_math_rotateLeft_uint__16454490(t27, t28);
 #line _
     t30 = this;
 #line _
@@ -13913,13 +13913,13 @@ bb0:;
 #line _
     t39 = this;
 #line _
-    t40 = (int64_t)INT64_C(21);
+    t40 = this;
 #line _
-    t41 = this;
+    t41 = t40->v3;
 #line _
-    t42 = t41->v3;
+    t42 = (int64_t)INT64_C(21);
 #line _
-    t43 = lyr_std_core__default__Integer_uint_rotateLeft_48b0fa66(t42, t40);
+    t43 = lyr_std_math_rotateLeft_uint__16454490(t41, t42);
 #line _
     t44 = this;
 #line _
@@ -13945,13 +13945,13 @@ bb0:;
 #line _
     t53 = this;
 #line _
-    t54 = (int64_t)INT64_C(17);
+    t54 = this;
 #line _
-    t55 = this;
+    t55 = t54->v1;
 #line _
-    t56 = t55->v1;
+    t56 = (int64_t)INT64_C(17);
 #line _
-    t57 = lyr_std_core__default__Integer_uint_rotateLeft_48b0fa66(t56, t54);
+    t57 = lyr_std_math_rotateLeft_uint__16454490(t55, t56);
 #line _
     t58 = this;
 #line _
@@ -13963,13 +13963,13 @@ bb0:;
 #line _
     t61 = this;
 #line _
-    t62 = (int64_t)INT64_C(32);
+    t62 = this;
 #line _
-    t63 = this;
+    t63 = t62->v2;
 #line _
-    t64 = t63->v2;
+    t64 = (int64_t)INT64_C(32);
 #line _
-    t65 = lyr_std_core__default__Integer_uint_rotateLeft_48b0fa66(t64, t62);
+    t65 = lyr_std_math_rotateLeft_uint__16454490(t63, t64);
 #line _
     t61->v2 = t65;
 #line _
@@ -14047,27 +14047,6 @@ bb0:;
     t14 = lyr_c_lyr_str_concat(t12, t13);
 #line 3
     return t14;
-}
-
-#line _ "stdlib5/std/core.lyr"
-uint64_t lyr_std_core__default__Integer_uint_rotateLeft_48b0fa66(uint64_t this, int64_t n) {
-#line _
-    LYR_STACK_CHECK();
-#line _
-    uint64_t t0 = 0;
-#line _
-    int64_t t1 = 0;
-#line _
-    uint64_t t2 = 0;
-bb0:;
-#line _
-    t0 = this;
-#line _
-    t1 = n;
-#line _
-    t2 = LYR_ROTL(t0, t1);
-#line _
-    return t2;
 }
 
 #line 9 "<synthesized Debug and Display for T[4]>"
@@ -16471,5 +16450,37 @@ bb0:;
     lyr_std_io_put(t6, t9);
 #line _
     return;
+}
+
+
+/* ==== unit: std.math.rotateLeft<uint> ==== */
+/* Generated by lyric5 from the IR of this module. Do not edit: the source is the .lyr. */
+/* The unit of the generic instance 'std.math.rotateLeft<uint>': its functions, the types they reach, and nothing else. */
+#include "lyr/lyr.h"
+#include <stdint.h>
+#include <math.h>
+
+/* prototypes */
+uint64_t lyr_std_math_rotateLeft_uint__16454490(uint64_t x, int64_t n);
+
+#line _ "stdlib5/std/math.lyr"
+uint64_t lyr_std_math_rotateLeft_uint__16454490(uint64_t x, int64_t n) {
+#line _
+    LYR_STACK_CHECK();
+#line _
+    uint64_t t0 = 0;
+#line _
+    int64_t t1 = 0;
+#line _
+    uint64_t t2 = 0;
+bb0:;
+#line _
+    t0 = x;
+#line _
+    t1 = n;
+#line _
+    t2 = LYR_ROTL(t0, t1);
+#line _
+    return t2;
 }
 

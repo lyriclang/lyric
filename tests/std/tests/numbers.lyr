@@ -1,5 +1,26 @@
 // std.core's numbers: the tower, its static members, the defaults on it.
-import std.math { abs, signum };
+import std.math {
+    abs,
+    checkedAdd,
+    checkedDiv,
+    checkedMul,
+    checkedRem,
+    checkedSub,
+    leadingZeros,
+    popCount,
+    rotateLeft,
+    rotateRight,
+    saturatingAdd,
+    saturatingMul,
+    saturatingSub,
+    signum,
+    trailingZeros,
+    wrappingAdd,
+    wrappingDiv,
+    wrappingMul,
+    wrappingRem,
+    wrappingSub,
+};
 import std.test { assertEq, assertTrue, assertFalse, assertNull, assertNotNull };
 import std.core { Signed };
 
@@ -55,50 +76,50 @@ fn checkedArithmeticSaysWhereItLeavesTheType(): void {
     let top: int8 = 127;
     let bottom: int8 = -128;
     let one: int8 = 1;
-    assertNull(top.checkedAdd(one));
-    assertNull(bottom.checkedSub(one));
-    assertNull(top.checkedMul(2));
-    assertNull(bottom.checkedDiv(-1));
-    assertNull(top.checkedDiv(0));
-    assertEq(assertNotNull(bottom.checkedRem(-1)), 0);
-    assertEq(assertNotNull(bottom.checkedDiv(top)), -1);
-    assertEq(assertNotNull(top.checkedRem(top)), 0);
-    assertEq(assertNotNull((100 as int8).checkedAdd(27)), 127);
+    assertNull(checkedAdd(top, one));
+    assertNull(checkedSub(bottom, one));
+    assertNull(checkedMul(top, 2));
+    assertNull(checkedDiv(bottom, -1));
+    assertNull(checkedDiv(top, 0));
+    assertEq(assertNotNull(checkedRem(bottom, -1)), 0);
+    assertEq(assertNotNull(checkedDiv(bottom, top)), -1);
+    assertEq(assertNotNull(checkedRem(top, top)), 0);
+    assertEq(assertNotNull(checkedAdd((100 as int8), 27)), 127);
     let max: uint = 18446744073709551615;
-    assertNull(max.checkedAdd(1));
-    assertEq(assertNotNull(0.checkedSub(1)), -1);
+    assertNull(checkedAdd(max, 1));
+    assertEq(assertNotNull(checkedSub(0, 1)), -1);
     let zero: uint8 = 0;
-    assertNull(zero.checkedSub(1));
+    assertNull(checkedSub(zero, 1));
 }
 
 @Test
 fn saturatingArithmeticHoldsAtTheBounds(): void {
     let top: int8 = 127;
     let bottom: int8 = -128;
-    assertEq(top.saturatingAdd(1), 127);
-    assertEq(bottom.saturatingAdd(-1), -128);
-    assertEq(bottom.saturatingSub(1), -128);
-    assertEq(top.saturatingSub(-1), 127);
-    assertEq(top.saturatingMul(2), 127);
-    assertEq(top.saturatingMul(-2), -128);
+    assertEq(saturatingAdd(top, 1), 127);
+    assertEq(saturatingAdd(bottom, -1), -128);
+    assertEq(saturatingSub(bottom, 1), -128);
+    assertEq(saturatingSub(top, -1), 127);
+    assertEq(saturatingMul(top, 2), 127);
+    assertEq(saturatingMul(top, -2), -128);
     let byte: uint8 = 250;
-    assertEq(byte.saturatingAdd(10), 255);
-    assertEq(byte.saturatingSub(255), 0);
+    assertEq(saturatingAdd(byte, 10), 255);
+    assertEq(saturatingSub(byte, 255), 0);
 }
 
 @Test
 fn wrappingArithmeticWrapsAtTheWidth(): void {
     let top: int8 = 127;
     let bottom: int8 = -128;
-    assertEq(top.wrappingAdd(1), -128);
-    assertEq(bottom.wrappingSub(1), 127);
-    assertEq(top.wrappingMul(2), -2);
-    assertEq(bottom.wrappingDiv(-1), -128);
-    assertEq(bottom.wrappingRem(-1), 0);
-    assertEq(bottom.wrappingDiv(top), -1);
-    assertEq(top.wrappingRem(top), 0);
+    assertEq(wrappingAdd(top, 1), -128);
+    assertEq(wrappingSub(bottom, 1), 127);
+    assertEq(wrappingMul(top, 2), -2);
+    assertEq(wrappingDiv(bottom, -1), -128);
+    assertEq(wrappingRem(bottom, -1), 0);
+    assertEq(wrappingDiv(bottom, top), -1);
+    assertEq(wrappingRem(top, top), 0);
     let byte: uint8 = 255;
-    assertEq(byte.wrappingAdd(1), 0);
+    assertEq(wrappingAdd(byte, 1), 0);
 }
 
 @Test
@@ -113,31 +134,31 @@ fn powSquares(): void {
 @Test
 fn theBitsCountAtTheTypesWidth(): void {
     let eight: uint8 = 8;
-    assertEq(eight.leadingZeros(), 4);
-    assertEq(eight.trailingZeros(), 3);
-    assertEq(eight.popCount(), 1);
+    assertEq(leadingZeros(eight), 4);
+    assertEq(trailingZeros(eight), 3);
+    assertEq(popCount(eight), 1);
     let zero: uint16 = 0;
-    assertEq(zero.leadingZeros(), 16);
-    assertEq(zero.trailingZeros(), 16);
+    assertEq(leadingZeros(zero), 16);
+    assertEq(trailingZeros(zero), 16);
     let minus: int8 = -1;
-    assertEq(minus.popCount(), 8);
-    assertEq(minus.leadingZeros(), 0);
-    assertEq(1.leadingZeros(), 63);
+    assertEq(popCount(minus), 8);
+    assertEq(leadingZeros(minus), 0);
+    assertEq(leadingZeros(1), 63);
 }
 
 @Test
 fn rotationsGoRoundTheWidth(): void {
     let high: uint8 = 128;
-    assertEq(high.rotateLeft(1), 1);
-    assertEq(high.rotateRight(7), 1);
+    assertEq(rotateLeft(high, 1), 1);
+    assertEq(rotateRight(high, 7), 1);
     let one: uint8 = 1;
-    assertEq(one.rotateLeft(9), 2);
-    assertEq(one.rotateLeft(-1), 128);
-    assertEq(one.rotateRight(-1), 2);
-    assertEq(high.rotateRight(15), 1);
-    assertEq(one.rotateRight(int.min), 1);
+    assertEq(rotateLeft(one, 9), 2);
+    assertEq(rotateLeft(one, -1), 128);
+    assertEq(rotateRight(one, -1), 2);
+    assertEq(rotateRight(high, 15), 1);
+    assertEq(rotateRight(one, int.min), 1);
     let minus: int8 = -128;
-    assertEq(minus.rotateLeft(1), 1);
+    assertEq(rotateLeft(minus, 1), 1);
 }
 
 @Test

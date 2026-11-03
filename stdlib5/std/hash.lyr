@@ -26,6 +26,7 @@
 //! ```
 pub import std.core { Hasher };
 import std.core { arrayOf };
+import std.math { rotateLeft };
 
 extern "C" fn lyr_hash_key(which: int): uint64;
 
@@ -58,15 +59,15 @@ fn sip(k0: uint64, k1: uint64): Sip {
 extend Sip {
     mut fn round(): void {
         this.v0 = this.v0 +% this.v1;
-        this.v1 = this.v1.rotateLeft(13) ^ this.v0;
-        this.v0 = this.v0.rotateLeft(32);
+        this.v1 = rotateLeft(this.v1, 13) ^ this.v0;
+        this.v0 = rotateLeft(this.v0, 32);
         this.v2 = this.v2 +% this.v3;
-        this.v3 = this.v3.rotateLeft(16) ^ this.v2;
+        this.v3 = rotateLeft(this.v3, 16) ^ this.v2;
         this.v0 = this.v0 +% this.v3;
-        this.v3 = this.v3.rotateLeft(21) ^ this.v0;
+        this.v3 = rotateLeft(this.v3, 21) ^ this.v0;
         this.v2 = this.v2 +% this.v1;
-        this.v1 = this.v1.rotateLeft(17) ^ this.v2;
-        this.v2 = this.v2.rotateLeft(32);
+        this.v1 = rotateLeft(this.v1, 17) ^ this.v2;
+        this.v2 = rotateLeft(this.v2, 32);
     }
 
     mut fn absorb(m: uint64): void {
