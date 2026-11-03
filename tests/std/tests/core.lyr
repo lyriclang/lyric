@@ -1,16 +1,21 @@
-// std.core: what the language binds without an import, and the helpers synthesized members call.
+// std.core: what the language binds without an import, and through what it binds the helpers
+// synthesized members call — they are std.core's own, so a conformance or an operator reaches them.
 import std.test { assertEq, assertTrue, assertFalse };
-import std.core {
-    arrayOf,
-    repeatArray,
-    debugArray,
-    debugOptional,
-    equalArrays,
-    equalOptionals,
-    hashOptionalInto,
-    cloneArray,
-};
+import std.core { arrayOf };
 import std.hash { FixedHasher };
+
+struct Row :: [Equatable, Debug, Clone] {
+    cells: int[],
+    note: ?int,
+}
+
+struct Note :: [Equatable, Hashable] {
+    value: ?int,
+}
+
+struct Tag :: [Clone] {
+    name: string,
+}
 
 @Test
 fn arrayOfMakesEachElementFromItsIndex(): void {
@@ -26,40 +31,38 @@ fn arrayOfZeroIsEmpty(): void {
 }
 
 @Test
-fn equalArraysComparesElementByElement(): void {
-    assertTrue(equalArrays([1, 2, 3], [1, 2, 3]));
-    assertFalse(equalArrays([1, 2, 3], [1, 2]));
-    assertFalse(equalArrays([1, 2, 3], [1, 2, 4]));
+fn aSynthesizedEqualsComparesAnArrayElementByElement(): void {
+    assertTrue(Row { cells = [1, 2, 3], note = null } == Row { cells = [1, 2, 3], note = null });
+    assertFalse(Row { cells = [1, 2, 3], note = null } == Row { cells = [1, 2], note = null });
+    assertFalse(Row { cells = [1, 2, 3], note = null } == Row { cells = [1, 2, 4], note = null });
 }
 
 @Test
-fn equalOptionalsHoldsForBothAbsent(): void {
-    let none: ?int = null;
-    let five: ?int = 5;
-    assertTrue(equalOptionals(none, none));
-    assertFalse(equalOptionals(none, five));
-    assertTrue(equalOptionals(five, five));
+fn aSynthesizedEqualsHoldsForBothOptionalsAbsent(): void {
+    assertTrue(Row { cells = [], note = null } == Row { cells = [], note = null });
+    assertFalse(Row { cells = [], note = null } == Row { cells = [], note = 5 });
+    assertTrue(Row { cells = [], note = 5 } == Row { cells = [], note = 5 });
 }
 
 @Test
-fn debugWritesStringsQuoted(): void {
-    assertEq(debugArray(["a", "b"]), "[\"a\", \"b\"]");
-    assertEq(debugArray([1, 2]), "[1, 2]");
-    let none: ?int = null;
-    assertEq(debugOptional(none), "null");
+fn aSynthesizedDebugWritesTheArrayAndTheOptional(): void {
+    assertEq(f"{Row { cells = [1, 2], note = null }:?}", "Row { cells = [1, 2], note = null }");
+    let words = ["a", "b"];
+    assertEq(f"{words:?}", "[\"a\", \"b\"]");
 }
 
-fn optionalHash(o: ?int): uint64 {
+fn noteHash(value: ?int): uint64 {
     var h = FixedHasher.new();
-    hashOptionalInto(o, &h);
+    let note = Note { value = value };
+    note.hash(&h);
     return h.finish();
 }
 
 @Test
-fn anOptionalHashesItsMarkAndValue(): void {
-    assertEq(optionalHash(3), optionalHash(3));
-    assertTrue(optionalHash(3) != optionalHash(null));
-    assertTrue(optionalHash(0) != optionalHash(null));
+fn aSynthesizedHashWritesAnOptionalsMarkAndValue(): void {
+    assertEq(noteHash(3), noteHash(3));
+    assertTrue(noteHash(3) != noteHash(null));
+    assertTrue(noteHash(0) != noteHash(null));
 }
 
 @Test
@@ -84,9 +87,10 @@ fn hashOfOrdering(o: Ordering): uint64 {
 }
 
 @Test
-fn aRepeatedArrayClonesEachSlot(): void {
-    let xs = repeatArray(["a", "b"], 2);
+fn aRepeatedArrayOfObjectsClonesEachSlot(): void {
+    let xs = [Tag { name = "a" }, Tag { name = "b" }] * 2;
     assertEq(xs.length(), 4);
-    assertEq(xs[2], "a");
-    assertEq(cloneArray(xs).length(), 4);
+    assertEq(xs[2].name, "a");
+    let row = Row { cells = [1, 2], note = null };
+    assertEq(row.clone().cells.length(), 2);
 }

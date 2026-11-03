@@ -1,6 +1,6 @@
 // The format language (spec 12 §2): a hole's spec, checked where it
 // is written, applied by std.core — numbers, text, Debug, a Display type, a type's own formats.
-import std.core { Format, fstringStart, fstringFormatted, fstringEnd };
+import std.core { Format };
 import std.string { StringBuilder };
 import std.test { assertEq };
 
@@ -159,10 +159,9 @@ fn debugDisplayAndOwnFormats(): void {
 }
 
 @Test
-fn theHelpersAreStdCores(): void {
-    let out = fstringStart(4);
-    fstringFormatted(out, 255, "#x");
-    assertEq(fstringEnd(out), "0xff");
+fn aHoleWithASpecGoesThroughFormat(): void {
+    let n = 255;
+    assertEq(f"{n:#x}", "0xff");
 }
 
 @Test
