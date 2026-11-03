@@ -81,12 +81,12 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | T08 | `int32`/`int64`/`float64` distinkt neben `int`/`float`; `x as int64` | `int` = `int64`-Alias: `int64` → `int`, `as` zwischen gleich breiten entfällt | M | Typen |
 | T09 | Überlauf wrappt still (Spec §3.2) | Panik (T2); Stellen, die Wrap wollen: `+%` | R | Bericht |
 | T10 | `abs(-3)` → `float` (Literal-Adaption) | `abs(-3)` → `int`; `fix` schreibt `-3.0`, wo `float` erwartet war | M | Kontexttyp |
-| T11 | `absInt`/`minInt`/`maxInt`/`clampInt`/`signInt`, `sum`/`sumFloat` | `abs`/`min`/`max`/`clamp`/`signum`, `sum()` | M | — |
+| T11 | `absInt`/`minInt`/`maxInt`/`clampInt`/`signInt`, `sum`/`sumFloat` | `abs`/`min`/`max`/`clamp(x, lo, hi)`/`signum` frei in `std.math` (10 P8, 2026-11-03), `sum()` | M | — |
 | T12 | `s.length()` in Codepoints, O(n) (guide 13) | Bytes, O(1); `charCount()`, wo Zeichen gezählt werden | R | — |
-| T13 | `s.charAt(i)`, `s.substring(start, count)` (Codepoint-Indizes) | `s[i]` (Byte), `s[a..b]` (Byte) — andere Semantik; Vorschlag `s.chars().nth(i)` / Byte-Grenzen aus `find` | R | — |
+| T13 | `s.charAt(i)`, `s.substring(start, count)` (Codepoint-Indizes) | `s.charAt(i)`, `s.substring(start, start + count)` — in Zeichen wie in 4.6 (10 P7, 2026-11-03; zuvor: `s[i]`/`s[a..b]` nach Bytes, R) | M | — |
 | T14 | `s.split(",")`, `splitLines()` → `string[]` | `split(",")`, `lines()` → Iterator (`.toArray()` anhängen, wo ein Array gebraucht wird) | M | Nutzungstyp |
-| T15 | `s.indexOf(n): int` (−1) | `find(p): ?int` | R | — |
-| T16 | `s.toChars()`, `s.utf8Encode()`, `utf8Decode(bytes): ?string` | `chars().toArray()`, `asBytes().toArray()`, `try? string.fromUtf8(bytes)` | M | — |
+| T15 | `s.indexOf(n): int` (−1) | `find(p): ?int` — ein Byte-Index, 4.6 zählte Zeichen | R | — |
+| T16 | `s.toChars()`, `s.utf8Encode()`, `utf8Decode(bytes): ?string` | `chars().toArray()`, `bytes()` (10 P5), `try? string.fromUtf8(bytes)` | M | — |
 | T17 | `?T` nicht schachtelbar; `Iterator<?T>` verboten | `??T` erlaubt — nichts zu tun | — | — |
 | T18 | `T[]` als `Map`-Schlüssel (war Lowering-Loch) | Übersetzungsfehler → Wrapper | H | — |
 | **Fehler** (guide 10, 13) | | | | |
