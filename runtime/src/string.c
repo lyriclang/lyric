@@ -25,6 +25,85 @@ LyrStr *lyr_str_from_cstr(const char *text) {
     return lyr_str_from_bytes(text, (int64_t)strlen(text));
 }
 
+/* The maximal suffix of the pattern under the byte order (`flip` false) or its reverse: where it
+ * begins less one, and its period in `*period` (Crochemore and Rytter, "Text Algorithms" 7.2). */
+static int64_t lyr_maximal_suffix(const uint8_t *p, int64_t m, bool flip, int64_t *period) {
+    int64_t ms = -1, j = 0, k = 1, per = 1;
+    while (j + k < m) {
+        const uint8_t a = p[j + k], b = p[ms + k];
+        if (flip ? a > b : a < b) {
+            j += k;
+            k = 1;
+            per = j - ms;
+        } else if (a == b) {
+            if (k != per) {
+                k++;
+            } else {
+                j += per;
+                k = 1;
+            }
+        } else {
+            ms = j++;
+            k = per = 1;
+        }
+    }
+    *period = per;
+    return ms;
+}
+
+int64_t lyr_bytes_find_two_way(const uint8_t *s, int64_t slen, const uint8_t *p, int64_t m, int64_t from) {
+    if (from < 0) from = 0;
+    if (m == 0) return from <= slen ? from : -1;
+    /* The critical factorization: the later of the two maximal suffixes splits the pattern into
+     * p[0..cut) and p[cut..m), with the period of the whole as far as the split lets one say. */
+    int64_t period, flipped_period;
+    const int64_t ms = lyr_maximal_suffix(p, m, false, &period);
+    const int64_t flipped = lyr_maximal_suffix(p, m, true, &flipped_period);
+    int64_t cut;
+    if (ms > flipped) {
+        cut = ms + 1;
+    } else {
+        cut = flipped + 1;
+        period = flipped_period;
+    }
+    int64_t j = from;
+    if (memcmp(p, p + period, (size_t)cut) == 0) {
+        /* A periodic pattern: after a shift by the period, the part matched before still matches,
+         * and `memory` remembers how much of the left half needs no second look. */
+        int64_t memory = 0;
+        while (j <= slen - m) {
+            int64_t i = cut > memory ? cut : memory;
+            while (i < m && p[i] == s[i + j]) i++;
+            if (i >= m) {
+                i = cut - 1;
+                while (i >= memory && p[i] == s[i + j]) i--;
+                if (i < memory) return j;
+                j += period;
+                memory = m - period;
+            } else {
+                j += i - cut + 1;
+                memory = 0;
+            }
+        }
+    } else {
+        /* No period that short: a mismatch shifts past the larger half. */
+        const int64_t shift = (cut > m - cut ? cut : m - cut) + 1;
+        while (j <= slen - m) {
+            int64_t i = cut;
+            while (i < m && p[i] == s[i + j]) i++;
+            if (i >= m) {
+                i = cut - 1;
+                while (i >= 0 && p[i] == s[i + j]) i--;
+                if (i < 0) return j;
+                j += shift;
+            } else {
+                j += i - cut + 1;
+            }
+        }
+    }
+    return -1;
+}
+
 /* Unicode 3.9 table D3-7: the well-formed byte sequences. */
 bool lyr_utf8_valid(const void *bytes, int64_t len, int64_t *error_offset) {
     const unsigned char *s = bytes;
