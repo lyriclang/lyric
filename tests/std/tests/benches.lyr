@@ -107,7 +107,7 @@ fn sha256OfAPage(&b: Bench): void {
 @Bench
 fn charsOfAText(&b: Bench): void {
     let text = "Grüße aus Zürich — 東京 und São Paulo, ünd zurück. " * 20;
-    b.bytes(text.toBytes().length());
+    b.bytes(text.bytes().length());
     b.iter {
         var n = 0;
         for (_ in text.chars()) {

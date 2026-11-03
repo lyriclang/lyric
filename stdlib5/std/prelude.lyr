@@ -82,3 +82,6 @@ pub import std.core {
 pub import std.collections { List, Map, Set };
 // The iterator adapters' module, named here so its blocks reach every iterator in every module; the structs are imported where a type is written, `import std.iter { MapIter }`.
 import std.iter;
+// The operations on text, for the same reason: `s.split(",")` stands in every module. Named `text`,
+// as `std.string` would bind `string` over the type.
+import std.string as text;

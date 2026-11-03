@@ -37,7 +37,7 @@ fn main(): int throws Error {
         counts[word] = (counts[word] ?? 0) + 1;
     }
 
-    let bytes = text.toBytes();
+    let bytes = text.bytes();
     println(f"{lines} lines, {words} words, {text.charCount()} characters, {bytes.length()} bytes");
     let ranked = counts.entries().sortedBy((a, b) => if (a.1 != b.1) b.1.totalCompare(a.1) else a.0.totalCompare(b.0));
     for (i in 0..min(5, ranked.length())) {

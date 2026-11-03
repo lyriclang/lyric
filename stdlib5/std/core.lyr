@@ -2371,18 +2371,6 @@ extend char {
         return unicodeCategory(this) == 25;
     }
 
-    /// Returns the uppercase character by the simple mapping; the character itself where it has
-    /// none.
-    pub fn toUpper(): char {
-        return unicodeUpper(this);
-    }
-
-    /// Returns the lowercase character by the simple mapping; the character itself where it has
-    /// none.
-    pub fn toLower(): char {
-        return unicodeLower(this);
-    }
-
     /// Returns whether this is `0`–`9`.
     pub fn isAsciiDigit(): bool {
         return this >= '0' && this <= '9';
@@ -2404,32 +2392,6 @@ extend char {
     pub fn isAsciiWhitespace(): bool {
         let n = this as uint32;
         return n == 32 || n == 9 || n == 10 || n == 12 || n == 13;
-    }
-
-    /// Returns the character's value as a digit in base `radix`, or `null` where it is no digit
-    /// of the base.
-    ///
-    /// The digits are `0`–`9`, then `a`–`z` or `A`–`Z` for 10–35; ASCII alone, as `parse` reads.
-    ///
-    /// # Panics
-    /// When `radix` is outside 2–36.
-    pub fn toDigit(radix: int): ?int {
-        if (radix < 2 || radix > 36) {
-            panic(f"radix {radix} is outside 2…36");
-        }
-        let n = this as uint32;
-        var d = 36;
-        if (n >= 48 && n <= 57) {
-            d = (n - 48) as int;
-        } else if (n >= 97 && n <= 122) {
-            d = (n - 87) as int;
-        } else if (n >= 65 && n <= 90) {
-            d = (n - 55) as int;
-        }
-        if (d < radix) {
-            return d;
-        }
-        return null;
     }
 
     /// Returns the character of the digit `n` in base `radix`, or `null` where `n` is no digit
@@ -3717,303 +3679,13 @@ extend StringView {
         return count;
     }
 
-    /// Returns whether `p` stands in it.
-    pub fn contains<P :: [Pattern]>(p: P): bool {
-        return this.find(p) != null;
-    }
-
-    /// Returns whether it begins with `p`.
-    pub fn startsWith<P :: [Pattern]>(p: P): bool {
-        return p.matchAt(this, 0) != null;
-    }
-
-    /// Returns whether it ends with `p`.
-    pub fn endsWith<P :: [Pattern]>(p: P): bool {
-        return p.matchBefore(this, byteCount(this)) != null;
-    }
-
-    /// Returns the byte index of the first `p`, or `null`; an empty `p` stands at 0.
-    pub fn find<P :: [Pattern]>(p: P): ?int {
-        return p.nextIn(this, 0);
-    }
-
-    /// Returns the byte index of the last `p`, or `null`; an empty `p` stands at the length.
-    pub fn rfind<P :: [Pattern]>(p: P): ?int {
-        var end = byteCount(this);
-        while (end >= 0) {
-            if (let start = p.matchBefore(this, end)) {
-                return start;
-            }
-            end = previousChar(this, end);
-        }
-        return null;
-    }
-
-    /// Returns how many times `p` stands in it, none overlapping another.
-    ///
-    /// An empty `p` stands between every two characters and at both ends.
-    pub fn count<P :: [Pattern]>(p: P): int {
-        let n = byteCount(this);
-        var count = 0;
-        var from = 0;
-        while (from <= n) {
-            if (let at = p.nextIn(this, from)) {
-                let end = p.matchAt(this, at)!;
-                count = count + 1;
-                from = if (end > at) end else nextChar(this, at);
-            } else {
-                return count;
-            }
-        }
-        return count;
-    }
-
-    /// Returns an iterator over the parts between the separators, in order.
-    ///
-    /// `"a,b,,c".split(",")` gives `a`, `b`, ``, `c`, views with no copies.
-    ///
-    /// # Panics
-    /// When `sep` matches the empty text.
-    pub fn split<P :: [Pattern]>(sep: P): SplitIter<P> {
-        if (matchesNothing(sep)) {
-            panic("split: a separator that matches the empty text");
-        }
-        return SplitIter<P> { s = this, sep = sep, at = 0, left = -1 };
-    }
-
-    /// Returns an iterator over at most `n` parts between the separators.
-    ///
-    /// The first `n - 1` separators split, the rest is the last part. `n` of 0 gives none.
-    ///
-    /// # Panics
-    /// When `sep` matches the empty text, or `n` is negative.
-    pub fn splitN<P :: [Pattern]>(sep: P, n: int): SplitIter<P> {
-        if (matchesNothing(sep)) {
-            panic("splitN: a separator that matches the empty text");
-        }
-        if (n < 0) {
-            panic(f"splitN: {n} parts");
-        }
-        return SplitIter<P> { s = this, sep = sep, at = if (n == 0) -1 else 0, left = n };
-    }
-
-    /// Returns the part before the first `sep` and the part after it, or `null` where there is
-    /// none.
-    pub fn splitOnce<P :: [Pattern]>(sep: P): ?(StringView, StringView) {
-        if (let at = sep.nextIn(this, 0)) {
-            let parts: (StringView, StringView) = (this[..at], this[sep.matchAt(this, at)!..]);
-            return parts;
-        }
-        return null;
-    }
-
-    /// Returns an iterator over the matches of `p` as views, in order, none overlapping another.
-    pub fn matches<P :: [Pattern]>(p: P): MatchesIter<P> {
-        return MatchesIter<P> { s = this, p = p, at = 0 };
-    }
-
-    /// Returns an iterator over the lines.
-    ///
-    /// Split at `\n`, a `\r` before it taken off, no empty line after a last `\n`.
-    pub fn lines(): LinesIter {
-        return LinesIter { s = this, at = 0 };
-    }
-
-    /// Returns the text without the white space at both ends.
-    ///
-    /// White space is the characters with the property White_Space: the ideographic space and
-    /// the no-break space as well as the tab. `trimMatches` trims a pattern of one's own.
-    pub fn trim(): StringView {
-        return this.trimStart().trimEnd();
-    }
-
-    /// Returns the text without the white space at the start.
-    pub fn trimStart(): StringView {
-        let n = byteCount(this);
-        var i = 0;
-        while (i < n && charAtByte(this, i).isWhitespace()) {
-            i = nextChar(this, i);
-        }
-        return this[i..];
-    }
-
-    /// Returns the text without the white space at the end.
-    pub fn trimEnd(): StringView {
-        var n = byteCount(this);
-        while (n > 0) {
-            let before = previousChar(this, n);
-            if (!charAtByte(this, before).isWhitespace()) {
-                break;
-            }
-            n = before;
-        }
-        return this[..n];
-    }
-
-    /// Returns the text without the matches of `p` at both ends, removed again and again.
-    ///
-    /// `"xxaxx".trimMatches('x')` is `a`. A match of the empty text takes nothing.
-    pub fn trimMatches<P :: [Pattern]>(p: P): StringView {
-        return this.trimStartMatches(p).trimEndMatches(p);
-    }
-
-    /// Returns the text without the matches of `p` at the start, removed again and again.
-    pub fn trimStartMatches<P :: [Pattern]>(p: P): StringView {
-        let n = byteCount(this);
-        var i = 0;
-        while (i < n) {
-            let end = p.matchAt(this, i) ?? i;
-            if (end == i) {
-                break;
-            }
-            i = end;
-        }
-        return this[i..];
-    }
-
-    /// Returns the text without the matches of `p` at the end, removed again and again.
-    pub fn trimEndMatches<P :: [Pattern]>(p: P): StringView {
-        var n = byteCount(this);
-        while (n > 0) {
-            let start = p.matchBefore(this, n) ?? n;
-            if (start == n) {
-                break;
-            }
-            n = start;
-        }
-        return this[..n];
-    }
-
-    /// Returns whether it holds nothing but white space; true for the empty text too.
-    pub fn isBlank(): bool {
-        return this.trimStart().isEmpty();
-    }
-
-    /// Returns the text with every character by its simple uppercase mapping.
-    ///
-    /// One character for one and no locale, so `"straße".toUpper()` is `STRAßE`.
-    pub fn toUpper(): string {
-        let out = StringBuilder.new();
-        for (c in this.chars()) {
-            out.appendChar(c.toUpper());
-        }
-        return out.toString();
-    }
-
-    /// Returns the text with every character by its simple lowercase mapping.
-    ///
-    /// One character for one, no locale.
-    pub fn toLower(): string {
-        let out = StringBuilder.new();
-        for (c in this.chars()) {
-            out.appendChar(c.toLower());
-        }
-        return out.toString();
-    }
-
     /// Returns a copy of its bytes.
     ///
     /// A copy, since a text may not change through a `Slice<uint8>`.
-    pub fn toBytes(): uint8[] {
+    pub fn bytes(): uint8[] {
         let bytes: uint8[] = [0u8] * byteCount(this);
         viewBytes(this).copyInto(bytes[..]);
         return bytes;
-    }
-
-    /// Parses the text as `T.parse(this)`, the type taken from the expected type.
-    ///
-    /// `let n: int = try s.parse();`.
-    ///
-    /// # Errors
-    /// The [ParseError] `T.parse` throws.
-    pub fn parse<T :: [Parse]>(): T throws ParseError {
-        return try T.parse(this);
-    }
-
-    /// Returns the rest after `p` where it begins with `p`, or `null`.
-    pub fn stripPrefix<P :: [Pattern]>(p: P): ?StringView {
-        if (let end = p.matchAt(this, 0)) {
-            return this[end..];
-        }
-        return null;
-    }
-
-    /// Returns the rest before `p` where it ends with `p`, or `null`.
-    pub fn stripSuffix<P :: [Pattern]>(p: P): ?StringView {
-        if (let start = p.matchBefore(this, byteCount(this))) {
-            return this[..start];
-        }
-        return null;
-    }
-
-    /// Returns the text with every `p` replaced by `with`, none overlapping another.
-    ///
-    /// # Panics
-    /// When `p` matches the empty text.
-    pub fn replace<P :: [Pattern]>(p: P, with: StringView): string {
-        return this.replaceN(p, with, -1);
-    }
-
-    /// Returns the text with the first `n` of `p` replaced by `with`; all of them where `n` is
-    /// negative.
-    ///
-    /// # Panics
-    /// When `p` matches the empty text.
-    pub fn replaceN<P :: [Pattern]>(p: P, with: StringView, n: int): string {
-        if (matchesNothing(p)) {
-            panic("replace: a pattern that matches the empty text");
-        }
-        let out = StringBuilder.new();
-        let length = byteCount(this);
-        var left = n;
-        var from = 0;
-        while (from < length && left != 0) {
-            if (let at = p.nextIn(this, from)) {
-                let end = p.matchAt(this, at)!;
-                out.appendStr(this[from..at]);
-                out.appendStr(with);
-                from = end;
-                left = left - 1;
-            } else {
-                left = 0;
-            }
-        }
-        out.appendStr(this[from..]);
-        return out.toString();
-    }
-
-    /// Returns the text with `fill` before it until it is `width` characters long; a longer one
-    /// as it is.
-    pub fn padStart(width: int, fill: char = ' '): string {
-        let missing = width - this.charCount();
-        if (missing <= 0) {
-            return this.toString();
-        }
-        let out = StringBuilder.new();
-        var i = 0;
-        while (i < missing) {
-            out.appendChar(fill);
-            i = i + 1;
-        }
-        out.appendStr(this);
-        return out.toString();
-    }
-
-    /// Returns the text with `fill` after it until it is `width` characters long; a longer one
-    /// as it is.
-    pub fn padEnd(width: int, fill: char = ' '): string {
-        let missing = width - this.charCount();
-        if (missing <= 0) {
-            return this.toString();
-        }
-        let out = StringBuilder.new();
-        out.appendStr(this);
-        var i = 0;
-        while (i < missing) {
-            out.appendChar(fill);
-            i = i + 1;
-        }
-        return out.toString();
     }
 }
 
@@ -4835,7 +4507,7 @@ fn formatFloat(v: float, narrow: bool, spec: StringView, out: StringBuilder): vo
     } else {
         text = f"{v}";
     }
-    let negative = text.startsWith("-");
+    let negative = byteCount(text) > 0 && byteAt(text, 0) == 45; // '-'
     let body = if (negative) byteSlice(text, 1, byteCount(text)) else text;
     let sign = if (negative) "-" else if (s.plus) "+" else "";
     var least = 0;
@@ -5613,22 +5285,6 @@ extend<T :: [TotalOrder]> Slice<T> {
             return at;
         }
         return null;
-    }
-}
-
-extend<T :: [Display]> Slice<T> {
-    /// Joins the elements' texts, `sep` between each two.
-    pub fn join(sep: string): string {
-        let out = StringBuilder.new();
-        var i = 0;
-        while (i < this.length()) {
-            if (i > 0) {
-                out.append(sep);
-            }
-            out.append(this[i]);
-            i = i + 1;
-        }
-        return out.toString();
     }
 }
 

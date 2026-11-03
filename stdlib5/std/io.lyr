@@ -15,7 +15,7 @@
 //!     print("one, ");
 //!     println("two");
 //!     let buffer = ByteBuffer.new();
-//!     try buffer.write("written to memory".toBytes());
+//!     try buffer.write("written to memory".bytes());
 //!     println(buffer.length());
 //! }
 //! ```

@@ -40,7 +40,7 @@ fn caseMapsEachCharacterAlone(): void {
 @Test
 fn toBytesIsACopy(): void {
     let s = "aé";
-    let bytes = s.toBytes();
+    let bytes = s.bytes();
     assertEq(bytes, [97u8, 195u8, 169u8]);
     bytes[0] = 98u8;
     assertEq(s, "aé");

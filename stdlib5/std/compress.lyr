@@ -18,7 +18,7 @@
 //! fn main(): void throws [CompressError, IoError] {
 //!     let line = "to be or not to be, that is the question; ";
 //!     let text = [line, line, line, line, line, line, line, line].iter().join("");
-//!     let packed = try Gzip.compress(text.toBytes());
+//!     let packed = try Gzip.compress(text.bytes());
 //!     println(packed.length() < text.length());
 //!     let back = try Gzip.decompress(packed);
 //!     println(back.length() == text.length());

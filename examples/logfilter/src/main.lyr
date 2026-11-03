@@ -24,7 +24,7 @@ fn highlighted(re: Regex, line: string, style: Style): string {
     var out = "";
     var last = 0;
     var it = re.findAll(line);
-    let bytes = line.toBytes();
+    let bytes = line.bytes();
     while (let m = it.next()) {
         out = out + string.fromUtf8Lossy(bytes[last..m.start]) + style.force(m.value);
         last = m.end;

@@ -689,6 +689,9 @@ internal sealed partial class WarningAnalyzer
         foreach (var module in _comp.Modules)
         {
             if (_comp.Unwatched(module)) continue;
+            // the prelude's imports are its sources: what it names, and the modules whose blocks it
+            // puts in every module — it calls none of them itself
+            if (ReferenceEquals(module, _comp.Prelude)) continue;
 
             var ast = _comp.AstOf(module);
             var inFile = _usedByFile.GetValueOrDefault(ast.Span.File);

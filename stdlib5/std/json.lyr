@@ -1014,7 +1014,7 @@ class Parser {
     }
 
     mut fn expectWord(word: string): void throws JsonError {
-        let w = word.toBytes();
+        let w = word.bytes();
         var i = 0;
         while (i < w.length()) {
             if (this.at + i >= this.bytes.length() || this.bytes[this.at + i] != w[i]) {
@@ -1315,7 +1315,7 @@ class Parser {
 /// Throws `JsonError` with the line and column where the text is no JSON, text follows the value,
 /// or the document nests deeper than 512 levels.
 pub fn parse(text: StringView): JsonValue throws JsonError {
-    var p = Parser { bytes = text.toBytes() };
+    var p = Parser { bytes = text.bytes() };
     let v = try p.value(1);
     p.skipWhitespace();
     if (p.at < p.bytes.length()) {

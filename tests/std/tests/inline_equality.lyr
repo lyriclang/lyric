@@ -29,8 +29,8 @@ fn anInlineArrayComparesElementByElement(): void {
 
 @Test
 fn aDigestComparesWithEquals(): void {
-    let x = "lyric".toBytes();
-    let y = "Lyric".toBytes();
+    let x = "lyric".bytes();
+    let y = "Lyric".bytes();
     assertTrue(sha256(x[..]) == sha256(x[..]));
     assertFalse(sha256(x[..]) == sha256(y[..]));
 }

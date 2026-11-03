@@ -16,7 +16,7 @@
 //! fn main(): void throws Error {
 //!     let listener = try TcpListener.bind(SocketAddr.parse("127.0.0.1:8080"));
 //!     let stream = try listener.accept();
-//!     try stream.write("hello\n".toBytes());
+//!     try stream.write("hello\n".bytes());
 //!     try stream.close();
 //! }
 //! ```

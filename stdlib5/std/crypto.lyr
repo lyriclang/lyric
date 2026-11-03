@@ -14,11 +14,11 @@
 //! import std.encoding { Hex };
 //!
 //! let h = Sha256.new();
-//! h.update("abc".toBytes());
+//! h.update("abc".bytes());
 //! let digest = h.finish();
 //! println(Hex.encode(digest));
 //! let again = Sha256.new();
-//! again.update("abc".toBytes());
+//! again.update("abc".bytes());
 //! println(constantTimeEq(digest, again.finish()));
 //! ```
 //!

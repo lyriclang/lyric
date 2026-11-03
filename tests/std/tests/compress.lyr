@@ -52,8 +52,8 @@ fn sampleText(): uint8[] {
     while (i < 20000) {
         x = (x * 1103515245 + 12345) & 0x7FFFFFFF;
         let w = words[(x >> 8) % words.length()];
-        try! out.write(w.toBytes()[..]);
-        try! out.write((if (i % 7 == 0) "\n" else " ").toBytes()[..]);
+        try! out.write(w.bytes()[..]);
+        try! out.write((if (i % 7 == 0) "\n" else " ").bytes()[..]);
         i = i + 1;
     }
     return out.toArray();
@@ -81,14 +81,7 @@ fn everyLevelRoundTrips(): void throws Error {
         i = i + 1;
     }
     let empty: uint8[] = [];
-    for (data in [
-        empty,
-        "a".toBytes(),
-        "hello hello hello hello, world".toBytes(),
-        text,
-        run,
-        noise,
-    ]) {
+    for (data in [empty, "a".bytes(), "hello hello hello hello, world".bytes(), text, run, noise]) {
         for (level in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
             let packed = try Gzip.compress(data[..], level);
             assertTrue(
@@ -123,7 +116,7 @@ fn everyLevelRoundTrips(): void throws Error {
 
 @Test
 fn theFormatsHaveTheirHeadersAndTrailers(): void throws Error {
-    let data = "hello hello hello hello, world".toBytes();
+    let data = "hello hello hello hello, world".bytes();
     let g = try Gzip.compress(data[..], 6);
     assertEq(g[0], 0x1Fu8);
     assertEq(g[1], 0x8Bu8);
@@ -156,19 +149,19 @@ fn theFormatsHaveTheirHeadersAndTrailers(): void throws Error {
         try Zlib.decompress((Hex.decode("78dacb48cdc9c957c840277514caf38b725200ad6f0b25"))[..]),
         data
     );
-    assertEq(try Deflate.decompress((Hex.decode("4b0400"))[..]), "a".toBytes());
+    assertEq(try Deflate.decompress((Hex.decode("4b0400"))[..]), "a".bytes());
     assertEq(
         try Gzip.decompress((Hex.decode("1f8b08000000000002ff4b040043beb7e801000000"))[..]),
-        "a".toBytes()
+        "a".bytes()
     );
     // a gzip header with an extra field, a name and a comment is skipped
     let named = try Hex.decode(
         "1f8b081c0000000002ff0300010203686900636f6d6d656e74004b040043beb7e801000000"
     );
-    assertEq(try Gzip.decompress(named[..]), "a".toBytes());
+    assertEq(try Gzip.decompress(named[..]), "a".bytes());
     // two members in a row read as one
-    let two = (try Gzip.compress("one,".toBytes()[..], 6))
-        + (try Gzip.compress("two".toBytes()[..], 6));
+    let two = (try Gzip.compress("one,".bytes()[..], 6))
+        + (try Gzip.compress("two".bytes()[..], 6));
     assertEq(string.fromUtf8Lossy((try Gzip.decompress(two[..]))[..]), "one,two");
 }
 
@@ -211,9 +204,9 @@ fn theAdaptersStream(): void throws Error {
     // a flush in the middle leaves a stream a reader can take whole
     let mid = ByteBuffer.new();
     var zw = try ZlibWriter<ByteBuffer>.new(mid, 6);
-    try zw.write("first half ".toBytes()[..]);
+    try zw.write("first half ".bytes()[..]);
     try zw.flush();
-    try zw.write("second half".toBytes()[..]);
+    try zw.write("second half".bytes()[..]);
     try zw.close();
     var zr = ZlibReader<ByteBuffer>.new(mid);
     assertEq(try zr.readToString(), "first half second half");
@@ -230,7 +223,7 @@ fn theAdaptersStream(): void throws Error {
     }
     // a writer takes nothing after close
     try {
-        w.write("x".toBytes()[..]);
+        w.write("x".bytes()[..]);
         fail("wrote after close");
     } catch (e: IoError) {
         assertTrue(e.kind == IoErrorKind.Closed);
@@ -239,9 +232,9 @@ fn theAdaptersStream(): void throws Error {
 
 @Test
 fn whatIsNotTheFormatIsRefused(): void throws Error {
-    let data = "hello hello hello hello, world".toBytes();
+    let data = "hello hello hello hello, world".bytes();
     let g = try Gzip.compress(data[..], 6);
-    assertEq(refused("hello".toBytes()[..]), "not a gzip stream: the magic bytes are missing");
+    assertEq(refused("hello".bytes()[..]), "not a gzip stream: the magic bytes are missing");
     assertEq(refused(g[0..g.length() - 3]), "the stream ends inside the gzip trailer");
     assertEq(refused(g[0..12]), "the deflate stream ends inside a block");
     var badCrc: uint8[] = [0u8] * g.length();
@@ -295,7 +288,7 @@ fn whatIsNotTheFormatIsRefused(): void throws Error {
         assertEq(e.message(), "the level 10 is none: 0 to 9");
     }
     assertEq(
-        (try Gzip.compress("x".toBytes()[..], -1)).length(),
-        (try Gzip.compress("x".toBytes()[..], 6)).length()
+        (try Gzip.compress("x".bytes()[..], -1)).length(),
+        (try Gzip.compress("x".bytes()[..], 6)).length()
     );
 }

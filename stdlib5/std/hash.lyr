@@ -12,7 +12,7 @@
 //! import std.io { println };
 //! import std.hash { crc32, FixedHasher };
 //!
-//! println(crc32("hello".toBytes()));
+//! println(crc32("hello".bytes()));
 //! var a = FixedHasher.new();
 //! "hello".hash(&a);
 //! var b = FixedHasher.new();
@@ -191,7 +191,7 @@ pub struct Fnv1a64 :: [Hasher] {
 /// Returns the CRC-32 (ISO-HDLC, as in zip, gzip and PNG) of `bytes`, continued from `running`.
 ///
 /// `running` is the checksum of what came before, `0` at the start, so the checksum of the whole
-/// is that of its pieces, one after the other. `crc32("123456789".toBytes())` is `0xCBF43926`.
+/// is that of its pieces, one after the other. `crc32("123456789".bytes())` is `0xCBF43926`.
 pub fn crc32(bytes: Slice<uint8>, running: uint32 = 0): uint32 {
     return crcOver(ieeeTable, bytes, running);
 }
@@ -200,7 +200,7 @@ pub fn crc32(bytes: Slice<uint8>, running: uint32 = 0): uint32 {
 /// from `running`.
 ///
 /// `running` is the checksum of what came before, `0` at the start.
-/// `crc32c("123456789".toBytes())` is `0xE3069283`.
+/// `crc32c("123456789".bytes())` is `0xE3069283`.
 pub fn crc32c(bytes: Slice<uint8>, running: uint32 = 0): uint32 {
     return crcOver(castagnoliTable, bytes, running);
 }
@@ -208,7 +208,7 @@ pub fn crc32c(bytes: Slice<uint8>, running: uint32 = 0): uint32 {
 /// Returns the Adler-32 (RFC 1950) of `bytes`, continued from `running`.
 ///
 /// `running` is the checksum of what came before, `1` at the start.
-/// `adler32("Wikipedia".toBytes())` is `0x11E60398`.
+/// `adler32("Wikipedia".bytes())` is `0x11E60398`.
 pub fn adler32(bytes: Slice<uint8>, running: uint32 = 1): uint32 {
     var a = running & 0xFFFF;
     var b = running >> 16;

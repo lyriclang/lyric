@@ -50,12 +50,12 @@ fn handle(req: Request): Response throws Error {
     }
     if (path == "/stream") {
         let src = ByteBuffer.new();
-        try src.write("streamed in chunks".toBytes()[..]);
+        try src.write("streamed in chunks".bytes()[..]);
         return Response.stream(200, src, null, "text/plain");
     }
     if (path == "/sized") {
         let src = ByteBuffer.new();
-        try src.write("sized".toBytes()[..]);
+        try src.write("sized".bytes()[..]);
         return Response.stream(200, src, 5, "text/plain");
     }
     if (path == "/created") {
@@ -91,7 +91,7 @@ fn handle(req: Request): Response throws Error {
         var r = Response.of(
             200,
             (try Gzip.compress(
-                "the body was gzipped, and the client saw none of it".toBytes()[..],
+                "the body was gzipped, and the client saw none of it".bytes()[..],
                 6
             ))[..],
             "text/plain"
@@ -127,7 +127,7 @@ fn raw(base: string, text: string): string throws Error {
     var conn = try TcpStream.connect(
         SocketAddr { ip = IpAddr.V4(127, 0, 0, 1), port = port as uint16 }
     );
-    try conn.writeAll(text.toBytes()[..]);
+    try conn.writeAll(text.bytes()[..]);
     try conn.shutdown(.Write);
     let back = try conn.readToString();
     try conn.close();
@@ -149,7 +149,7 @@ fn aServerAnswersAndKeepsTheConnection(): void throws Error {
     assertEq(items, [Item { id = 1, name = "one" }, Item { id = 2, name = "zwei" }]);
     // the request's parts and body reach the handler
     let e = try (client.send(
-        Request.post(uri(base, "/echo?x=1"), "payload".toBytes()[..], "text/plain")
+        Request.post(uri(base, "/echo?x=1"), "payload".bytes()[..], "text/plain")
     )).json<Echo>();
     assertEq(
         e,
@@ -158,7 +158,7 @@ fn aServerAnswersAndKeepsTheConnection(): void throws Error {
     // a chunked request body
     var put = Request { method = Method.Put, uri = uri(base, "/echo") };
     let src = ByteBuffer.new();
-    try src.write("chunked in".toBytes()[..]);
+    try src.write("chunked in".bytes()[..]);
     put.body = src;
     assertEq((try (client.send(put)).json<Echo>()).text, "chunked in");
     // a streamed response in chunks, and one with its length
@@ -189,7 +189,7 @@ fn aServerAnswersAndKeepsTheConnection(): void throws Error {
     assertEq(try failed.text(), "not found (the thing is not there)");
     // all of it over one connection: the server read the unread body away too - the next request
     // starts clean (its method is seen whole, not glued to the body's bytes)
-    let u = try client.send(Request.post(uri(base, "/unread"), "ignored".toBytes()[..]));
+    let u = try client.send(Request.post(uri(base, "/unread"), "ignored".bytes()[..]));
     assertEq(try u.text(), "left it");
     let after = try (client.get(uri(base, "/echo"))).json<Echo>();
     assertEq(after, Echo { method = "GET", path = "/echo", query = null, length = 0, text = "" });

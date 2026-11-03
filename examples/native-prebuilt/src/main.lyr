@@ -12,7 +12,7 @@ extern "C" {
 
 /// The CRC-32 of a text's UTF-8 bytes, by the prebuilt library.
 fn crc32(text: string): uint32 {
-    let bytes = text.toBytes();
+    let bytes = text.bytes();
     return crc32_update(0, bytes.asPtr(), bytes.length() as uint);
 }
 
