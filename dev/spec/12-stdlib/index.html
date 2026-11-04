@@ -191,21 +191,20 @@ arithmetic stays in the type:</p>
 with a number — its absolute value, its sign, a root, an angle — is no member of the type but
 <code>std.math</code>'s (design 10 B5 Z2, &quot;Review 2026-10-12&quot;; below): what a number <em>is</em> stands at its
 type, what one <em>does</em> with numbers in <code>std.math</code>.</p>
-<p><code>Integer</code> says where its arithmetic would leave the type, each a default:</p>
+<p>Where an integer's arithmetic would leave the type, and its bits, are <code>std.math</code>'s — free
+functions over <code>Integer</code>, as computing with a number is (below; design 10 P8):</p>
 <ul>
-<li><code>checkedAdd</code>, <code>checkedSub</code>, <code>checkedMul</code>, <code>checkedDiv</code>, <code>checkedRem</code> (<code>o: Self</code>) give <code>?Self</code>:
-<code>null</code> where the result does not fit, or the divisor is zero; <code>min / -1</code> does not fit, and a
+<li><code>checkedAdd(a, b)</code>, <code>checkedSub</code>, <code>checkedMul</code>, <code>checkedDiv</code>, <code>checkedRem</code> give <code>?T</code>: <code>null</code>
+where the result does not fit, or the divisor is zero; <code>min / -1</code> does not fit, and a
 remainder by <code>-1</code> is <code>0</code>.</li>
-<li><code>saturatingAdd</code>, <code>saturatingSub</code>, <code>saturatingMul</code> hold at <code>min</code> or <code>max</code>, by the sign the
+<li><code>saturatingAdd(a, b)</code>, <code>saturatingSub</code>, <code>saturatingMul</code> hold at <code>min</code> or <code>max</code>, by the sign the
 result would have.</li>
-<li><code>wrappingAdd</code>, <code>wrappingSub</code>, <code>wrappingMul</code> reduce modulo 2^<code>bitWidth</code>, as <code>+%</code>, <code>-%</code>, <code>*%</code> do a
-builtin's (<a href="../../spec/08-expressions/">08</a>); <code>wrappingDiv</code> gives <code>min</code> for <code>min / -1</code> and
+<li><code>wrappingAdd(a, b)</code>, <code>wrappingSub</code>, <code>wrappingMul</code> reduce modulo 2^<code>bitWidth</code>, as <code>+%</code>, <code>-%</code>, <code>*%</code>
+do a builtin's (<a href="../../spec/08-expressions/">08</a>); <code>wrappingDiv</code> gives <code>min</code> for <code>min / -1</code> and
 <code>wrappingRem</code> <code>0</code> for a remainder by <code>-1</code> — a zero divisor panics as <code>/</code> does.</li>
-<li><code>pow(n: uint): Self</code> multiplies by squaring; an overflow is one of <code>*</code>
-(<a href="../../spec/03-types/">03</a>).</li>
-<li><code>leadingZeros</code>, <code>trailingZeros</code> and <code>popCount</code> count bits at the type's width (<code>bitWidth</code> for
-zero); <code>rotateLeft(n)</code> and <code>rotateRight(n)</code> rotate modulo the width, a negative <code>n</code> the other
-way.</li>
+<li><code>leadingZeros(x)</code>, <code>trailingZeros(x)</code> and <code>popCount(x)</code> count bits at the type's width
+(<code>bitWidth</code> for zero); <code>rotateLeft(x, n)</code> and <code>rotateRight(x, n)</code> rotate modulo the width, a
+negative <code>n</code> the other way.</li>
 </ul>
 <p><code>Float</code> describes the type in its statics (design 10 B5 Z2): <code>epsilon</code> the distance from <code>1.0</code>
 to the next value above it, <code>min</code> the most negative finite value, <code>max</code> the greatest,
@@ -232,9 +231,14 @@ program would (<a href="../../spec/11-metaprogramming/">11 §2</a>):</p>
 <li><code>floor(x)</code>, <code>ceil(x)</code>, <code>round(x)</code> — a half away from zero —, <code>trunc(x)</code>;</li>
 <li><code>sqrt(x)</code>, <code>cbrt(x)</code>, <code>exp(x)</code>, <code>ln(x)</code>, <code>log2(x)</code>, <code>log10(x)</code>; <code>sin</code>, <code>cos</code>, <code>tan</code>, <code>asin</code>,
 <code>acos</code>, <code>atan</code>, <code>sinh</code>, <code>cosh</code>, <code>tanh</code>, in radians; <code>atan2(y, x)</code>, the angle of the point
-(x, y), -π to π; <code>hypot(x, y)</code>; <code>pow(x, e)</code> — an integer's power by squaring is its own
-<code>x.pow(n)</code>, arithmetic in the type.</li>
+(x, y), -π to π; <code>hypot(x, y)</code>.</li>
 </ul>
+<p><strong>Powers</strong>: <code>pow(x, e)</code> over <strong><code>Pow</code></strong>, <code>std.math</code>'s interface
+<code>Pow { type Exponent; fn pow(e: Self.Exponent): Self; }</code>, whose exponent is the number's own
+answer (design 10 P8): every integer type conforms with <code>Exponent = uint</code> and multiplies by
+squaring, an overflow being one of <code>*</code> (<a href="../../spec/03-types/">03</a>); <code>float32</code> and <code>float</code> conform with the
+float itself as the exponent, the C library's <code>pow</code>. So <code>pow(2, 10)</code> is <code>1024</code> and
+<code>pow(2.0, 0.5)</code> the square root of two, and <code>x.pow(e)</code> is the same call.</p>
 <p>Over <code>Signed</code>: <code>abs(x)</code>, <code>0.0</code> for <code>-0.0</code>, which <code>&lt;</code> does not tell from <code>0.0</code>; <code>signum(x)</code>,
 <code>-1</code>, <code>0</code> or <code>1</code> in the type, a float's NaN staying NaN. <code>uint</code> is no <code>Signed</code>, and has neither.</p>
 <p>What describes the world rather than a type: <code>pi</code>, <code>e</code> and <code>tau</code>, typed <code>float</code> —
@@ -250,8 +254,8 @@ integer <code>v</code> of any type names, or <code>null</code> where it does not
 <code>min</code> or <code>max</code> instead. They are members of <code>Integer</code> (the review's M8a-7): each integer type
 answers them, and a type parameter bounded by <code>Integer</code> reaches them — <code>U.exact(v)</code>,
 <code>U.clamping(v)</code>.</p>
-<p><code>x.clamp(lo, hi)</code> is a default of <code>Ordered</code>: <code>lo</code> below it, <code>hi</code> above it, the value itself
-between; <code>lo</code> above <code>hi</code> is the program's error and panics, and a value unordered with the bounds
+<p><code>clamp(x, lo, hi)</code> over <code>Ordered</code>, beside <code>min</code> and <code>max</code>: <code>lo</code> below it, <code>hi</code> above it, the value
+itself between; <code>lo</code> above <code>hi</code> is the program's error and panics, and a value unordered with the bounds
 comes back as it is. A <code>char</code>'s code point is <code>c as uint32</code> (the review's A9e: the method that
 said the same is gone), and <code>char.fromUint32(n): ?char</code> is
 <code>null</code> for a surrogate or beyond <code>0x10FFFF</code> (Z8), where <code>n as char</code> panics

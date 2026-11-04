@@ -464,6 +464,12 @@ in the prelude, and <code>List</code> and <code>Deque</code> conform; on a type 
 <code>x.index(x.length() - n)</code>, written too (<code>x[^1] = v</code>, <code>+=</code>, <code>++</code>), with <code>x</code> evaluated once. Without <code>Length</code> the
 refusal (<code>LYR-SEM0114</code>) names it.</p>
 </li>
+<li><p><strong>An integer's arithmetic is <code>std.math</code>'s</strong>: <code>checkedAdd(a, b)</code> … <code>checkedRem</code>, <code>saturatingAdd</code> …,
+<code>wrappingAdd</code> … <code>wrappingRem</code>, <code>leadingZeros(x)</code>, <code>trailingZeros(x)</code>, <code>popCount(x)</code>, <code>rotateLeft(x, n)</code>,
+<code>rotateRight(x, n)</code> and <code>clamp(x, lo, hi)</code> are free functions there — were members of <code>Integer</code> and <code>Ordered</code>.
+<strong>One <code>pow</code></strong>: <code>pow(x, e)</code> over the interface <code>Pow</code>, its exponent the number's own (<code>uint</code> for an integer, the
+float for a float) — <code>pow(2, 10)</code> and <code>pow(2.0, 0.5)</code>; <code>x.pow(e)</code> is the same call.</p>
+</li>
 <li><p><strong>Text counted in characters, and more of it</strong>: <code>substring(start, end)</code> and <code>charAt(i)</code> count characters (a
 slice <code>s[a..b]</code> and <code>s[i]</code> count bytes), <code>charIndex(byte)</code> and <code>isCharBoundary(byte)</code> convert; <code>findFrom(p, from)</code>, <code>firstOf(chars)</code>, <code>splitWhitespace()</code>, <code>rsplitOnce(sep)</code>, <code>repeat(n)</code>, <code>isAscii()</code>,
 <code>equalsIgnoreCase</code>/<code>compareIgnoreCase</code>. A forward search is linear in the text and the pattern together:

@@ -184,88 +184,6 @@
 <pre class="signature"><code class="language-lyric"><span class="kw">static</span> <span class="kw">fn</span> clamping&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(v: <span class="ty">T</span>): <span class="ty">Self</span></code></pre>
 <p>Returns <code>v</code> as this type, held at <code>min</code> or <code>max</code> where it does not fit.</p>
 </section>
-<section class="member" id="method.checkedAdd">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> checkedAdd(o: <span class="ty">Self</span>): ?<span class="ty">Self</span></code></pre>
-<p>Returns the sum, or <code>null</code> where it does not fit the type.</p>
-</section>
-<section class="member" id="method.checkedSub">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> checkedSub(o: <span class="ty">Self</span>): ?<span class="ty">Self</span></code></pre>
-<p>Returns the difference, or <code>null</code> where it does not fit.</p>
-</section>
-<section class="member" id="method.checkedMul">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> checkedMul(o: <span class="ty">Self</span>): ?<span class="ty">Self</span></code></pre>
-<p>Returns the product, or <code>null</code> where it does not fit.</p>
-</section>
-<section class="member" id="method.checkedDiv">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> checkedDiv(o: <span class="ty">Self</span>): ?<span class="ty">Self</span></code></pre>
-<p>Returns the quotient, or <code>null</code> for a zero divisor and for <code>min / -1</code>, which does not fit.</p>
-</section>
-<section class="member" id="method.checkedRem">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> checkedRem(o: <span class="ty">Self</span>): ?<span class="ty">Self</span></code></pre>
-<p>Returns the remainder, or <code>null</code> for a zero divisor; a remainder by <code>-1</code> is <code>0</code>.</p>
-</section>
-<section class="member" id="method.saturatingAdd">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> saturatingAdd(o: <span class="ty">Self</span>): <span class="ty">Self</span></code></pre>
-<p>Returns the sum, held at <code>min</code> or <code>max</code> where it does not fit.</p>
-</section>
-<section class="member" id="method.saturatingSub">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> saturatingSub(o: <span class="ty">Self</span>): <span class="ty">Self</span></code></pre>
-<p>Returns the difference, held at <code>min</code> or <code>max</code> where it does not fit.</p>
-</section>
-<section class="member" id="method.saturatingMul">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> saturatingMul(o: <span class="ty">Self</span>): <span class="ty">Self</span></code></pre>
-<p>Returns the product, held at <code>min</code> or <code>max</code> by the sign it would have.</p>
-</section>
-<section class="member" id="method.wrappingAdd">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> wrappingAdd(o: <span class="ty">Self</span>): <span class="ty">Self</span></code></pre>
-<p>Returns the sum modulo 2^bitWidth, as <code>+%</code> on the type.</p>
-</section>
-<section class="member" id="method.wrappingSub">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> wrappingSub(o: <span class="ty">Self</span>): <span class="ty">Self</span></code></pre>
-<p>Returns the difference modulo 2^bitWidth, as <code>-%</code>.</p>
-</section>
-<section class="member" id="method.wrappingMul">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> wrappingMul(o: <span class="ty">Self</span>): <span class="ty">Self</span></code></pre>
-<p>Returns the product modulo 2^bitWidth, as <code>*%</code>.</p>
-</section>
-<section class="member" id="method.wrappingDiv">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> wrappingDiv(o: <span class="ty">Self</span>): <span class="ty">Self</span></code></pre>
-<p>Returns the quotient, where <code>min / -1</code> wraps to <code>min</code>.</p>
-<h4 id="panics">Panics</h4>
-<p>When <code>o</code> is zero, as <code>/</code> does.</p>
-</section>
-<section class="member" id="method.wrappingRem">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> wrappingRem(o: <span class="ty">Self</span>): <span class="ty">Self</span></code></pre>
-<p>Returns the remainder, where a remainder by <code>-1</code> is <code>0</code>.</p>
-<h4 id="panics">Panics</h4>
-<p>When <code>o</code> is zero, as <code>%</code> does.</p>
-</section>
-<section class="member" id="method.pow">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> pow(n: <span class="ty">uint</span>): <span class="ty">Self</span></code></pre>
-<p>Returns <code>this</code> to the <code>n</code>th power, computed by squaring.</p>
-<h4 id="panics">Panics</h4>
-<p>When the power does not fit the type, as <code>*</code> panics on an overflow.</p>
-</section>
-<section class="member" id="method.leadingZeros">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> leadingZeros(): <span class="ty">int</span></code></pre>
-<p>Returns the number of zero bits above the highest one bit; <code>bitWidth</code> for zero.</p>
-</section>
-<section class="member" id="method.trailingZeros">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> trailingZeros(): <span class="ty">int</span></code></pre>
-<p>Returns the number of zero bits below the lowest one bit; <code>bitWidth</code> for zero.</p>
-</section>
-<section class="member" id="method.popCount">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> popCount(): <span class="ty">int</span></code></pre>
-<p>Returns the number of one bits.</p>
-</section>
-<section class="member" id="method.rotateLeft">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> rotateLeft(n: <span class="ty">int</span>): <span class="ty">Self</span></code></pre>
-<p>Returns the bits rotated left by <code>n</code>, modulo <code>bitWidth</code>; a negative <code>n</code> rotates right.</p>
-</section>
-<section class="member" id="method.rotateRight">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> rotateRight(n: <span class="ty">int</span>): <span class="ty">Self</span></code></pre>
-<p>Returns the bits rotated right by <code>n</code>, modulo <code>bitWidth</code>; a negative <code>n</code> rotates left.</p>
-</section>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -273,25 +191,6 @@
 <li class="level-2"><a href="#methods">Methods</a></li>
 <li class="level-3"><a href="#method.exact">exact</a></li>
 <li class="level-3"><a href="#method.clamping">clamping</a></li>
-<li class="level-3"><a href="#method.checkedAdd">checkedAdd</a></li>
-<li class="level-3"><a href="#method.checkedSub">checkedSub</a></li>
-<li class="level-3"><a href="#method.checkedMul">checkedMul</a></li>
-<li class="level-3"><a href="#method.checkedDiv">checkedDiv</a></li>
-<li class="level-3"><a href="#method.checkedRem">checkedRem</a></li>
-<li class="level-3"><a href="#method.saturatingAdd">saturatingAdd</a></li>
-<li class="level-3"><a href="#method.saturatingSub">saturatingSub</a></li>
-<li class="level-3"><a href="#method.saturatingMul">saturatingMul</a></li>
-<li class="level-3"><a href="#method.wrappingAdd">wrappingAdd</a></li>
-<li class="level-3"><a href="#method.wrappingSub">wrappingSub</a></li>
-<li class="level-3"><a href="#method.wrappingMul">wrappingMul</a></li>
-<li class="level-3"><a href="#method.wrappingDiv">wrappingDiv</a></li>
-<li class="level-3"><a href="#method.wrappingRem">wrappingRem</a></li>
-<li class="level-3"><a href="#method.pow">pow</a></li>
-<li class="level-3"><a href="#method.leadingZeros">leadingZeros</a></li>
-<li class="level-3"><a href="#method.trailingZeros">trailingZeros</a></li>
-<li class="level-3"><a href="#method.popCount">popCount</a></li>
-<li class="level-3"><a href="#method.rotateLeft">rotateLeft</a></li>
-<li class="level-3"><a href="#method.rotateRight">rotateRight</a></li>
 </ul>
 </aside>
 </div>

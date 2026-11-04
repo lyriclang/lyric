@@ -20,6 +20,7 @@
 <div class="sidebar-bar"><span class="where">std.math</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
 <ul class="sidebar-box" id="sidebar-box">
 <li><a class="current" href="../../std/math/">std.math</a></li>
+<li><a href="../../std/math/Pow/">Pow</a></li>
 <li><a href="../../std/math/#fn.min">min()</a></li>
 <li><a href="../../std/math/#fn.max">max()</a></li>
 <li><a href="../../std/math/#fn.gcd">gcd()</a></li>
@@ -46,9 +47,28 @@
 <li><a href="../../std/math/#fn.tanh">tanh()</a></li>
 <li><a href="../../std/math/#fn.atan2">atan2()</a></li>
 <li><a href="../../std/math/#fn.hypot">hypot()</a></li>
-<li><a href="../../std/math/#fn.pow">pow()</a></li>
 <li><a href="../../std/math/#fn.abs">abs()</a></li>
 <li><a href="../../std/math/#fn.signum">signum()</a></li>
+<li><a href="../../std/math/#fn.pow">pow()</a></li>
+<li><a href="../../std/math/#fn.checkedAdd">checkedAdd()</a></li>
+<li><a href="../../std/math/#fn.checkedSub">checkedSub()</a></li>
+<li><a href="../../std/math/#fn.checkedMul">checkedMul()</a></li>
+<li><a href="../../std/math/#fn.checkedDiv">checkedDiv()</a></li>
+<li><a href="../../std/math/#fn.checkedRem">checkedRem()</a></li>
+<li><a href="../../std/math/#fn.saturatingAdd">saturatingAdd()</a></li>
+<li><a href="../../std/math/#fn.saturatingSub">saturatingSub()</a></li>
+<li><a href="../../std/math/#fn.saturatingMul">saturatingMul()</a></li>
+<li><a href="../../std/math/#fn.wrappingAdd">wrappingAdd()</a></li>
+<li><a href="../../std/math/#fn.wrappingSub">wrappingSub()</a></li>
+<li><a href="../../std/math/#fn.wrappingMul">wrappingMul()</a></li>
+<li><a href="../../std/math/#fn.wrappingDiv">wrappingDiv()</a></li>
+<li><a href="../../std/math/#fn.wrappingRem">wrappingRem()</a></li>
+<li><a href="../../std/math/#fn.leadingZeros">leadingZeros()</a></li>
+<li><a href="../../std/math/#fn.trailingZeros">trailingZeros()</a></li>
+<li><a href="../../std/math/#fn.popCount">popCount()</a></li>
+<li><a href="../../std/math/#fn.rotateLeft">rotateLeft()</a></li>
+<li><a href="../../std/math/#fn.rotateRight">rotateRight()</a></li>
+<li><a href="../../std/math/#fn.clamp">clamp()</a></li>
 </ul>
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
@@ -73,6 +93,8 @@ println(math.max(<span class="num">7</span>, <span class="num">3</span>));</code
 5.0
 12
 7</code></pre>
+<h2 id="types">Types</h2>
+<div class="listed"><a href="../../std/math/Pow/">Pow</a> <span class="kind">interface</span> <span class="summary">— A number to a power: an integer to a whole one, computed by squaring; a float to any.</span></div>
 <h2 id="functions">Functions</h2>
 <section class="member" id="fn.min">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> min&lt;<span class="ty">T</span> :: [<span class="ty">Ordered</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
@@ -190,11 +212,6 @@ extrapolates beyond the two.</p>
 <p>Returns the length of the hypotenuse of a right triangle with legs <code>x</code> and <code>y</code>.</p>
 <p>Unlike <code>sqrt(x * x + y * y)</code>, it does not overflow in the intermediate squares.</p>
 </section>
-<section class="member" id="fn.pow">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> pow&lt;<span class="ty">T</span> :: [<span class="ty">Float</span>]&gt;(x: <span class="ty">T</span>, e: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
-<p>Returns <code>x</code> to the power <code>e</code>.</p>
-<p>For an integer power of an integer, use the integer's own <code>x.pow(n)</code>.</p>
-</section>
 <section class="member" id="fn.abs">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> abs&lt;<span class="ty">T</span> :: [<span class="ty">Signed</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
 <p>Returns the magnitude of <code>x</code>, the value without its sign.</p>
@@ -206,6 +223,93 @@ extrapolates beyond the two.</p>
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> signum&lt;<span class="ty">T</span> :: [<span class="ty">Signed</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
 <p>Returns the sign of <code>x</code>: <code>-1</code>, <code>0</code> or <code>1</code> as a value of its type.</p>
 <p>A float's NaN gives NaN.</p>
+</section>
+<section class="member" id="fn.pow">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> pow&lt;<span class="ty">T</span> :: [<span class="ty">Pow</span>]&gt;(x: <span class="ty">T</span>, e: <span class="ty">T</span>.<span class="ty">Exponent</span>): <span class="ty">T</span></code></pre>
+<p>Returns <code>x</code> to the power <code>e</code>: <code>pow(2, 10)</code> is <code>1024</code>, <code>pow(2.0, 0.5)</code> the square root of two.</p>
+</section>
+<section class="member" id="fn.checkedAdd">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> checkedAdd&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): ?<span class="ty">T</span></code></pre>
+<p>Returns the sum, or <code>null</code> where it does not fit the type.</p>
+</section>
+<section class="member" id="fn.checkedSub">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> checkedSub&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): ?<span class="ty">T</span></code></pre>
+<p>Returns the difference, or <code>null</code> where it does not fit.</p>
+</section>
+<section class="member" id="fn.checkedMul">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> checkedMul&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): ?<span class="ty">T</span></code></pre>
+<p>Returns the product, or <code>null</code> where it does not fit.</p>
+</section>
+<section class="member" id="fn.checkedDiv">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> checkedDiv&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): ?<span class="ty">T</span></code></pre>
+<p>Returns the quotient, or <code>null</code> for a zero divisor and for <code>min / -1</code>, which does not fit.</p>
+</section>
+<section class="member" id="fn.checkedRem">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> checkedRem&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): ?<span class="ty">T</span></code></pre>
+<p>Returns the remainder, or <code>null</code> for a zero divisor; a remainder by <code>-1</code> is <code>0</code>.</p>
+</section>
+<section class="member" id="fn.saturatingAdd">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> saturatingAdd&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the sum, held at <code>min</code> or <code>max</code> where it does not fit.</p>
+</section>
+<section class="member" id="fn.saturatingSub">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> saturatingSub&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the difference, held at <code>min</code> or <code>max</code> where it does not fit.</p>
+</section>
+<section class="member" id="fn.saturatingMul">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> saturatingMul&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the product, held at <code>min</code> or <code>max</code> by the sign it would have.</p>
+</section>
+<section class="member" id="fn.wrappingAdd">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> wrappingAdd&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the sum modulo 2^bitWidth, as <code>+%</code> on the type.</p>
+</section>
+<section class="member" id="fn.wrappingSub">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> wrappingSub&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the difference modulo 2^bitWidth, as <code>-%</code>.</p>
+</section>
+<section class="member" id="fn.wrappingMul">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> wrappingMul&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the product modulo 2^bitWidth, as <code>*%</code>.</p>
+</section>
+<section class="member" id="fn.wrappingDiv">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> wrappingDiv&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the quotient, where <code>min / -1</code> wraps to <code>min</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>b</code> is zero, as <code>/</code> does.</p>
+</section>
+<section class="member" id="fn.wrappingRem">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> wrappingRem&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(a: <span class="ty">T</span>, b: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns the remainder, where a remainder by <code>-1</code> is <code>0</code>.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>b</code> is zero, as <code>%</code> does.</p>
+</section>
+<section class="member" id="fn.leadingZeros">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> leadingZeros&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">int</span></code></pre>
+<p>Returns the number of zero bits above the highest one bit; <code>bitWidth</code> for zero.</p>
+</section>
+<section class="member" id="fn.trailingZeros">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> trailingZeros&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">int</span></code></pre>
+<p>Returns the number of zero bits below the lowest one bit; <code>bitWidth</code> for zero.</p>
+</section>
+<section class="member" id="fn.popCount">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> popCount&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(x: <span class="ty">T</span>): <span class="ty">int</span></code></pre>
+<p>Returns the number of one bits.</p>
+</section>
+<section class="member" id="fn.rotateLeft">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> rotateLeft&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(x: <span class="ty">T</span>, n: <span class="ty">int</span>): <span class="ty">T</span></code></pre>
+<p>Returns the bits rotated left by <code>n</code>, modulo <code>bitWidth</code>; a negative <code>n</code> rotates right.</p>
+</section>
+<section class="member" id="fn.rotateRight">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> rotateRight&lt;<span class="ty">T</span> :: [<span class="ty">Integer</span>]&gt;(x: <span class="ty">T</span>, n: <span class="ty">int</span>): <span class="ty">T</span></code></pre>
+<p>Returns the bits rotated right by <code>n</code>, modulo <code>bitWidth</code>; a negative <code>n</code> rotates left.</p>
+</section>
+<section class="member" id="fn.clamp">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> clamp&lt;<span class="ty">T</span> :: [<span class="ty">Ordered</span>]&gt;(x: <span class="ty">T</span>, lo: <span class="ty">T</span>, hi: <span class="ty">T</span>): <span class="ty">T</span></code></pre>
+<p>Returns <code>x</code> held to <code>lo</code>…<code>hi</code>: <code>lo</code> below it, <code>hi</code> above it.</p>
+<p>A value unordered with the bounds, such as a NaN, comes back as it is.</p>
+<h4 id="panics">Panics</h4>
+<p>When <code>lo</code> is above <code>hi</code>.</p>
 </section>
 <h2 id="constants">Constants</h2>
 <section class="member" id="const.pi">
@@ -220,10 +324,82 @@ extrapolates beyond the two.</p>
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">let</span> tau: <span class="ty">float</span> = <span class="num">6.283185307179586</span></code></pre>
 <p>τ = 2π, a full turn in radians.</p>
 </section>
+<h2 id="extensions">Extensions</h2>
+<section class="member" id="ext.int">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">int</span> :: [<span class="ty">Pow</span>]</code></pre>
+<p class="conforms">Conforms to <code>Pow</code>.</p>
+</section>
+<section class="member" id="ext.int.method.pow">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> pow(n: <span class="ty">uint</span>): <span class="ty">int</span></code></pre>
+</section>
+<section class="member" id="ext.int8">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">int8</span> :: [<span class="ty">Pow</span>]</code></pre>
+<p class="conforms">Conforms to <code>Pow</code>.</p>
+</section>
+<section class="member" id="ext.int8.method.pow">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> pow(n: <span class="ty">uint</span>): <span class="ty">int8</span></code></pre>
+</section>
+<section class="member" id="ext.int16">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">int16</span> :: [<span class="ty">Pow</span>]</code></pre>
+<p class="conforms">Conforms to <code>Pow</code>.</p>
+</section>
+<section class="member" id="ext.int16.method.pow">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> pow(n: <span class="ty">uint</span>): <span class="ty">int16</span></code></pre>
+</section>
+<section class="member" id="ext.int32">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">int32</span> :: [<span class="ty">Pow</span>]</code></pre>
+<p class="conforms">Conforms to <code>Pow</code>.</p>
+</section>
+<section class="member" id="ext.int32.method.pow">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> pow(n: <span class="ty">uint</span>): <span class="ty">int32</span></code></pre>
+</section>
+<section class="member" id="ext.uint">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">uint</span> :: [<span class="ty">Pow</span>]</code></pre>
+<p class="conforms">Conforms to <code>Pow</code>.</p>
+</section>
+<section class="member" id="ext.uint.method.pow">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> pow(n: <span class="ty">uint</span>): <span class="ty">uint</span></code></pre>
+</section>
+<section class="member" id="ext.uint8">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">uint8</span> :: [<span class="ty">Pow</span>]</code></pre>
+<p class="conforms">Conforms to <code>Pow</code>.</p>
+</section>
+<section class="member" id="ext.uint8.method.pow">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> pow(n: <span class="ty">uint</span>): <span class="ty">uint8</span></code></pre>
+</section>
+<section class="member" id="ext.uint16">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">uint16</span> :: [<span class="ty">Pow</span>]</code></pre>
+<p class="conforms">Conforms to <code>Pow</code>.</p>
+</section>
+<section class="member" id="ext.uint16.method.pow">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> pow(n: <span class="ty">uint</span>): <span class="ty">uint16</span></code></pre>
+</section>
+<section class="member" id="ext.uint32">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">uint32</span> :: [<span class="ty">Pow</span>]</code></pre>
+<p class="conforms">Conforms to <code>Pow</code>.</p>
+</section>
+<section class="member" id="ext.uint32.method.pow">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> pow(n: <span class="ty">uint</span>): <span class="ty">uint32</span></code></pre>
+</section>
+<section class="member" id="ext.float">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">float</span> :: [<span class="ty">Pow</span>]</code></pre>
+<p class="conforms">Conforms to <code>Pow</code>.</p>
+</section>
+<section class="member" id="ext.float.method.pow">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> pow(e: <span class="ty">float</span>): <span class="ty">float</span></code></pre>
+</section>
+<section class="member" id="ext.float32">
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span> <span class="ty">float32</span> :: [<span class="ty">Pow</span>]</code></pre>
+<p class="conforms">Conforms to <code>Pow</code>.</p>
+</section>
+<section class="member" id="ext.float32.method.pow">
+<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> pow(e: <span class="ty">float32</span>): <span class="ty">float32</span></code></pre>
+</section>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
 <ul>
+<li class="level-2"><a href="#types">Types</a></li>
 <li class="level-2"><a href="#functions">Functions</a></li>
 <li class="level-3"><a href="#fn.min">min</a></li>
 <li class="level-3"><a href="#fn.max">max</a></li>
@@ -251,13 +427,43 @@ extrapolates beyond the two.</p>
 <li class="level-3"><a href="#fn.tanh">tanh</a></li>
 <li class="level-3"><a href="#fn.atan2">atan2</a></li>
 <li class="level-3"><a href="#fn.hypot">hypot</a></li>
-<li class="level-3"><a href="#fn.pow">pow</a></li>
 <li class="level-3"><a href="#fn.abs">abs</a></li>
 <li class="level-3"><a href="#fn.signum">signum</a></li>
+<li class="level-3"><a href="#fn.pow">pow</a></li>
+<li class="level-3"><a href="#fn.checkedAdd">checkedAdd</a></li>
+<li class="level-3"><a href="#fn.checkedSub">checkedSub</a></li>
+<li class="level-3"><a href="#fn.checkedMul">checkedMul</a></li>
+<li class="level-3"><a href="#fn.checkedDiv">checkedDiv</a></li>
+<li class="level-3"><a href="#fn.checkedRem">checkedRem</a></li>
+<li class="level-3"><a href="#fn.saturatingAdd">saturatingAdd</a></li>
+<li class="level-3"><a href="#fn.saturatingSub">saturatingSub</a></li>
+<li class="level-3"><a href="#fn.saturatingMul">saturatingMul</a></li>
+<li class="level-3"><a href="#fn.wrappingAdd">wrappingAdd</a></li>
+<li class="level-3"><a href="#fn.wrappingSub">wrappingSub</a></li>
+<li class="level-3"><a href="#fn.wrappingMul">wrappingMul</a></li>
+<li class="level-3"><a href="#fn.wrappingDiv">wrappingDiv</a></li>
+<li class="level-3"><a href="#fn.wrappingRem">wrappingRem</a></li>
+<li class="level-3"><a href="#fn.leadingZeros">leadingZeros</a></li>
+<li class="level-3"><a href="#fn.trailingZeros">trailingZeros</a></li>
+<li class="level-3"><a href="#fn.popCount">popCount</a></li>
+<li class="level-3"><a href="#fn.rotateLeft">rotateLeft</a></li>
+<li class="level-3"><a href="#fn.rotateRight">rotateRight</a></li>
+<li class="level-3"><a href="#fn.clamp">clamp</a></li>
 <li class="level-2"><a href="#constants">Constants</a></li>
 <li class="level-3"><a href="#const.pi">pi</a></li>
 <li class="level-3"><a href="#const.e">e</a></li>
 <li class="level-3"><a href="#const.tau">tau</a></li>
+<li class="level-2"><a href="#extensions">Extensions</a></li>
+<li class="level-3"><a href="#ext.int">int</a></li>
+<li class="level-3"><a href="#ext.int8">int8</a></li>
+<li class="level-3"><a href="#ext.int16">int16</a></li>
+<li class="level-3"><a href="#ext.int32">int32</a></li>
+<li class="level-3"><a href="#ext.uint">uint</a></li>
+<li class="level-3"><a href="#ext.uint8">uint8</a></li>
+<li class="level-3"><a href="#ext.uint16">uint16</a></li>
+<li class="level-3"><a href="#ext.uint32">uint32</a></li>
+<li class="level-3"><a href="#ext.float">float</a></li>
+<li class="level-3"><a href="#ext.float32">float32</a></li>
 </ul>
 </aside>
 </div>

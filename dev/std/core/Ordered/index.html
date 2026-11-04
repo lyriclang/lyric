@@ -175,20 +175,12 @@ with nothing), in which case every one of the four is false.</p>
 and an unordered field (<code>null</code>) is the answer; an enum by the variant's position first,
 then its payload.</p>
 </section>
-<section class="member" id="method.clamp">
-<pre class="signature"><code class="language-lyric"><span class="kw">fn</span> clamp(lo: <span class="ty">Self</span>, hi: <span class="ty">Self</span>): <span class="ty">Self</span></code></pre>
-<p>Returns this held to <code>lo</code>…<code>hi</code>: <code>lo</code> below it, <code>hi</code> above it.</p>
-<p>A value unordered with the bounds, such as a NaN, comes back as it is.</p>
-<h4 id="panics">Panics</h4>
-<p>When <code>lo</code> is above <code>hi</code>.</p>
-</section>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
 <ul>
 <li class="level-2"><a href="#methods">Methods</a></li>
 <li class="level-3"><a href="#method.compare">compare</a></li>
-<li class="level-3"><a href="#method.clamp">clamp</a></li>
 </ul>
 </aside>
 </div>
