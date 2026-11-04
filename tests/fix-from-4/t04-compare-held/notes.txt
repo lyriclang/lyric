@@ -1,0 +1,2 @@
+proposal[LYR-MIG0304] main.lyr:5:8: 'Size.compare' returned an int; Lyric 5's returns '?Ordering', 'null' where two values have no order, and 'totalCompare' gives the total order that 'sort' takes — where the order has no gap, 'totalCompare' alone is enough
+by hand[LYR-MIG0304] main.lyr:11:17: 'compare' returns '?Ordering' in Lyric 5, not an int — compare the values with '<', '==' or '>', or match the 'Ordering'

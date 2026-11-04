@@ -1,0 +1,15 @@
+
+struct Size :: [Ordered, TotalOrder] {
+    n: int,
+    fn compare(other: Size): ?Ordering {
+        return (this.n - other.n).compare(0);
+    }
+    fn totalCompare(other: Size): Ordering {
+        return this.compare(other)!;
+    }
+}
+
+fn main(): int {
+    let order = Size { n = 1 }.compare(Size { n = 2 });
+    return if (order < 0) 0 else 1;
+}

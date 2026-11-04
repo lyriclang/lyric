@@ -1,0 +1,32 @@
+import std.io { println };
+
+struct Version :: [Ordered, TotalOrder] {
+    major: int,
+    minor: int,
+    fn compare(other: Version): ?Ordering {
+        if (this.major != other.major) {
+            return if (this.major < other.major) .Less else .Greater;
+        }
+        return (this.minor - other.minor).compare(0);
+    }
+    fn totalCompare(other: Version): Ordering {
+        return this.compare(other)!;
+    }
+}
+
+struct Name :: [Ordered, TotalOrder] {
+    text: string,
+    fn compare(other: Name): ?Ordering {
+        return this.text.compare(other.text);
+    }
+    fn totalCompare(other: Name): Ordering {
+        return this.compare(other)!;
+    }
+}
+
+fn main(): int {
+    let old = Version { major = 1, minor = 4 };
+    let new = Version { major = 1, minor = 5 };
+    println(f"{old < new} {old < new} {new >= old} {Name { text = "b" } > Name { text = "a" }}");
+    return 0;
+}

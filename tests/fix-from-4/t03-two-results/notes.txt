@@ -1,0 +1,1 @@
+by hand[LYR-MIG0303] main.lyr:3:37: 'Money' gives 'float' and 'int' from its operators; Lyric 5 names one 'type Out' a declaration — move one of the conformances into an 'extend' block of its own, with its 'type Out'

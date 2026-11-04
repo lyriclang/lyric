@@ -1,0 +1,16 @@
+import std.core { Div, Mul };
+
+struct Money :: [Div<Money, float>, Mul<int, int>] {
+    cents: int,
+    fn div(other: Money): float {
+        return (this.cents as float) / (other.cents as float);
+    }
+    fn mul(other: int): int {
+        return this.cents * other;
+    }
+}
+
+fn main(): int {
+    let m = Money { cents = 150 };
+    return if (m / Money { cents = 600 } == 0.25 && m * 2 == 300) 0 else 1;
+}

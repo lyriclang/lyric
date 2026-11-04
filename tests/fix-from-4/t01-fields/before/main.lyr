@@ -1,0 +1,31 @@
+import std.io.console { println };
+
+struct Point {
+    x: int,
+    y: int
+}
+
+struct Line {
+    from: Point,
+    to: Point
+}
+
+struct Counter {
+    value: int,
+    label: string,
+    mut fn bump(): void {
+        this.value = this.value + 1;
+    }
+}
+
+fn main(): int {
+    var p = Point { x = 1, y = 2 };
+    p.x = 99;
+    var l = Line { from = p, to = p };
+    l.to.y += 5;
+    var c = Counter { value = 0, label = "c" };
+    c.bump();
+    c.value++;
+    println(f"{p.x} {p.y} {l.to.y} {c.value} {c.label}");
+    return 0;
+}

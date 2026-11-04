@@ -1,0 +1,27 @@
+import std.core { Ordered };
+import std.io.console { println };
+
+struct Version :: [Ordered<Version>] {
+    major: int,
+    minor: int,
+    fn compare(other: Version): int {
+        if (this.major != other.major) {
+            return if (this.major < other.major) -1 else 1;
+        }
+        return this.minor - other.minor;
+    }
+}
+
+struct Name :: [Ordered<Name>] {
+    text: string,
+    fn compare(other: Name): int {
+        return this.text.compare(other.text);
+    }
+}
+
+fn main(): int {
+    let old = Version { major = 1, minor = 4 };
+    let new = Version { major = 1, minor = 5 };
+    println(f"{old < new} {old.compare(new) < 0} {new.compare(old) >= 0} {Name { text = "b" } > Name { text = "a" }}");
+    return 0;
+}

@@ -1558,6 +1558,80 @@ example = '''
 proposal[LYR-MIG0211] main.lyr:16:13: 'Indexable<int>' as a type has no counterpart: Lyric 5's 'Indexable' names its element by an associated type — take the concrete type, or a type parameter with '[IndexSet<int>]'
 '''
 
+[LYR-MIG0301]
+title = "a written field became 'var'"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a field of the program's own type is written, so the migration declares it `var`."
+explanation = '''
+A field without a modifier could be written in Lyric 4; Lyric 5 writes a field only where it is declared `var`. The migration declares `var` every field that is written — by `=`, a compound assignment, `++` or `--`, or a `mut fn` called on it — and each struct field the write reaches through: `l.to.y += 5` writes `to` as well, because a struct is a value.
+
+Where a field is written only while the value is built, it may rather stay without `var`: build a new value instead of changing the old one.
+'''
+example = '''
+proposal[LYR-MIG0301] main.lyr:4:5: the field 'x' is written (line 23); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value
+'''
+
+[LYR-MIG0302]
+title = "an equality or order with another type"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: `Equatable<U>`, `Ordered<U>` or `Hashable<U>` names a type other than its own, which Lyric 5's interfaces cannot say."
+explanation = '''
+Lyric 4's `Equatable<T>`, `Ordered<T>` and `Hashable<T>` took the type to compare with; Lyric 5's compare values of one type, `Self`. The migration drops the argument where it names the type itself — `:: [Equatable<Point>]` is `:: [Equatable]`, `T :: [Hashable<T>]` is `T :: [Hashable]`.
+
+One that names another type, `Tag :: [Equatable<int>]`, is left as written: compare what the two have in common (`t.id == 3`), or give the method a name of its own.
+'''
+example = '''
+by hand[LYR-MIG0302] main.lyr:3:32: 'Equatable<int>' compares 'Tag' with 'int'; Lyric 5's 'Equatable' compares values of one type — compare what the two have in common, or give the method a name of its own
+'''
+
+[LYR-MIG0303]
+title = "two operator results in one declaration"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: one declaration conforms to operator interfaces with two different results, and Lyric 5 names one `type Out` a declaration."
+explanation = '''
+Lyric 4's `Add<Rhs, Out>` took the result as a type argument; Lyric 5's `Add<Rhs>` names it by `type Out`, `Self` where it is left out. The migration writes `:: [Add]` for `Add<Vec2, Vec2>` on a `Vec2`, `:: [Mul<float>]` for `Mul<float, Vec2>`, adds `type Out = float;` to the body where the result is another type, and writes a constraint `T :: [Add<T, T>]` as `T :: [Add<T, Out = T>]`.
+
+Where one declaration gives two different results from its operators, the second `type Out` has no place: move one conformance into an `extend` block of its own, with its `type Out`.
+'''
+example = '''
+by hand[LYR-MIG0303] main.lyr:3:37: 'Money' gives 'float' and 'int' from its operators; Lyric 5 names one 'type Out' a declaration — move one of the conformances into an 'extend' block of its own, with its 'type Out'
+'''
+
+[LYR-MIG0304]
+title = "a compare that returned an int"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: `compare` returned an `int` in Lyric 4 and returns `?Ordering` in Lyric 5; the migration rewrites the method and the calls compared with 0, and says the others."
+explanation = '''
+Lyric 4's `Ordered<T>` had one method, `compare(other: T): int`, negative, zero or positive. Lyric 5's `Ordered` returns `?Ordering` — `null` where two values have no order, as two NaN floats — and `TotalOrder`'s `totalCompare` returns the total order that `sort` takes.
+
+The migration writes the method's result as an `Ordering`: a literal `-1`, `0` or `1` is `.Less`, `.Equal` or `.Greater`, another value is compared with 0 (`(a - b).compare(0)`). It adds `TotalOrder` with a `totalCompare` that unwraps `compare`, and writes a call compared with 0 as the operator: `a.compare(b) < 0` is `a < b`.
+
+Said by hand: a call whose `int` is kept (`let order = a.compare(b);`) — compare the values with `<`, `==` or `>`, or match the `Ordering`.
+'''
+example = '''
+proposal[LYR-MIG0304] main.lyr:7:8: 'Version.compare' returned an int; Lyric 5's returns '?Ordering', 'null' where two values have no order, and 'totalCompare' gives the total order that 'sort' takes — where the order has no gap, 'totalCompare' alone is enough
+'''
+
+[LYR-MIG0305]
+title = "a hash that returned an int"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: `hash()` returned an `int` in Lyric 4; Lyric 5's `hash` writes the value into a hasher, and the migration rewrites the method."
+explanation = '''
+Lyric 4's `Hashable<T>` had `hash(): int`, built with `combineHash`; Lyric 5's `Hashable` has `hash<H :: [Hasher]>(&h: H)`, which writes the value into the hasher. The migration writes the signature anew; a returned `combineHash` chain over `x.hash()` becomes each `x.hash(&h);` in its order, any other returned value `h.writeInt(value);`. The import of `combineHash` names `Hasher` instead.
+
+The hash values differ from Lyric 4's, and a program that stored them stores others. Where the method hashes every field the way `equals` compares them, leave it out: Lyric 5 writes it.
+
+Said by hand: a hash computed from other hashes in another shape, and a call of `hash()` that used the `int` — make a hasher and read its value.
+'''
+example = '''
+proposal[LYR-MIG0305] main.lyr:10:8: 'Key.hash' returned an int; Lyric 5's writes the value into a hasher, so the hashes differ from Lyric 4's — where it hashes every field the way 'equals' compares them, leave the method out: Lyric 5 writes it
+'''
+
 [LYR-PAR0001]
 title = "a token after one whole expression, pattern or statement"
 severity = "error"

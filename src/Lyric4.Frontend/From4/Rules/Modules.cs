@@ -154,6 +154,14 @@ internal sealed partial class Imports : IRule
         ["std.iter"] = ["Iterator", "Iterable"],
     };
 
+    /// <summary>Names of Lyric 4 that another rule writes away, by module, and what the import
+    /// names instead: where T05 writes a hash into a <c>Hasher</c>, <c>combineHash</c> is gone.</summary>
+    private static readonly Dictionary<string, Dictionary<string, string>> Renamed = new(StringComparer.Ordinal)
+    {
+        ["std.core"] = new(StringComparer.Ordinal) { ["combineHash"] = "Hasher" },
+        ["std.hash"] = new(StringComparer.Ordinal) { ["hashCombine"] = "Hasher" },
+    };
+
     [GeneratedRegex(@"\Gimport\s+([A-Za-z_][A-Za-z0-9_]*(?:\s*\.\s*[A-Za-z_][A-Za-z0-9_]*)*)")]
     private static partial Regex PathOfImport();
 
@@ -173,15 +181,19 @@ internal sealed partial class Imports : IRule
                     context.Replace("K09", import.Span.File, group.Index, group.Index + group.Length, renamed);
                     continue;
                 }
-                if (Prelude.TryGetValue(path, out var prelude) && import.Clause is ImportSelective selective)
+                if (import.Clause is ImportSelective selective && (Prelude.TryGetValue(path, out var prelude) | Renamed.ContainsKey(path)))
                 {
-                    var kept = selective.Names.Where(name => !prelude.Contains(name)).ToList();
+                    var renames = Hashing.NeedsHasher(context, module) ? Renamed.GetValueOrDefault(path) : null;
+                    var kept = selective.Names.Where(name => prelude is null || !prelude.Contains(name))
+                        .Select(name => renames is not null && renames.TryGetValue(name, out var to) ? to : name)
+                        .Distinct(StringComparer.Ordinal)
+                        .ToList();
                     if (kept.Count == 0)
                     {
                         context.Replace("K05", import.Span.File, import.Span.Start, LineEnd(text, import.Span.End), "");
                         continue;
                     }
-                    if (kept.Count < selective.Names.Length)
+                    if (!kept.SequenceEqual(selective.Names, StringComparer.Ordinal))
                         context.Replace("K05", selective.Span, "{ " + string.Join(", ", kept) + " }");
                 }
                 if (Modules.TryGetValue(path, out var to) && PathOfImport().Match(text, import.Span.Start) is { Success: true } written)

@@ -143,6 +143,11 @@ public static class Migrator
         new Rules.FormatSpecs(),
         new Rules.Length(),
         new Rules.GenericInterfaces(),
+        new Rules.Fields(),
+        new Rules.SelfInterfaces(),
+        new Rules.OperatorInterfaces(),
+        new Rules.Compare(),
+        new Rules.Hashing(),
     ];
 
     /// <exception cref="InvalidOperationException">The program does not check with 4.6.</exception>

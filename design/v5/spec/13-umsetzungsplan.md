@@ -1952,6 +1952,36 @@ sein eigenes Repo; ein Migrator für Erato (Lyricpp, Z-Reihe); `--edition` (mit 
 - **Codes**: je Regel der Art R/H der Bereich `MIG02nn` mit der Nummer der Regel (`MIG0205`, `MIG0208`,
   `MIG0211`); S01, S04, S06, S07 und S10 schreiben und sagen nichts.
 
+**S4, geschnitten** (2026-11-04): vierzehn Regeln in drei Teilen, je ein PR — **S4a** die Interfaces (T01–T05),
+**S4b** die Zahlen (T08–T10, T18), **S4c** die Bibliothek (T11–T16; mit ihr beginnt `from4.toml`, P3). Der
+Schnitt folgt dem, was die Regeln lesen: S4a die Deklarationen und ihre Konformanzen, S4b die Typen der Ausdrücke,
+S4c die Aufrufe der 4.6-Bibliothek.
+
+**S4a, beim Bauen entschieden** (2026-11-04):
+
+- **T01 schreibt `var` auch an die Felder, durch die ein Schreiben geht**: `l.to.y += 5` braucht in Lyric 5 `var`
+  an `y` *und* an `to` (gemessen: `LYR-SEM0019` nennt `to`) — ein Struct ist ein Wert; durch eine Klasse geht es
+  nicht weiter. Ein Aufruf einer `mut fn` auf einem Struct-Feld schreibt das Feld. Ein Index in ein Array-Feld
+  (`b.xs[0] = 5`) braucht kein `var` (gemessen).
+- **T02 an einem fremden Typ** (`Tag :: [Equatable<int>]`): kein Gegenstück, von Hand (`LYR-MIG0302`); 4.6 gab
+  dafür nicht einmal `==`, nur `t.equals(3)`.
+- **T03**: der rechte Typ fällt, wo er der eigene ist (`Add<Vec2, Vec2>` → `Add`); ein anderes Ergebnis wird
+  `type Out = …;` im Rumpf, eine Bedingung `T :: [Add<T, Out = T>]` (gemessen: baut). Zwei verschiedene Ergebnisse
+  in einer Deklaration haben einen `type Out` zu wenig: von Hand (`LYR-MIG0303`), mit dem `extend`-Block als
+  Ausweg. `Add`, `Sub`, `Mul` und `Div` stehen nicht im Prelude — 4.6s Import bleibt stehen.
+- **T04 schreibt mehr als die Zeile in 12 R2**: ein Vergleich mit 0 (`a.compare(b) < 0`, auch `0 < …`) ist genau
+  der Operator, den Lyric 5 über `compare` liest, und wird `a < b` (Art M); nur ein gehaltenes `int` wird von Hand
+  gesagt. Im Rumpf werden `-1`/`0`/`1` zu `.Less`/`.Equal`/`.Greater`, auch in den Armen eines `if`; ein Aufruf von
+  `compare` bleibt (er gibt schon `?Ordering`), alles andere wird mit 0 verglichen. `totalCompare` packt `compare`
+  aus.
+- **T05**: eine Kette `combineHash(combineHash(0, a.hash()), b.hash())` wird `a.hash(&h); b.hash(&h);` in ihrer
+  Reihenfolge, jeder andere Wert `h.writeInt(…)`; ein früher `return` bekommt `return;` dahinter. Den Import macht
+  K05: `combineHash` (aus `std.core`) und `hashCombine` (aus `std.hash`, das `Hasher` weiterreicht) heißen dort
+  `Hasher`, wo T05 im Modul ein `hash` schreibt — zwei Regeln an derselben Importliste wären ein Fehler des
+  Katalogs. Ein freier Aufruf von `combineHash` bleibt und wird von Hand gesagt: der Precheck fing es an
+  `k05-partial`, dessen `combineHash` die erste Fassung still zu `Hasher` umbenannte.
+- **Codes**: `MIG03nn` mit der Nummer der Regel (0301–0305).
+
 ## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
 
 **Anlass** (Maintainer, 2026-10-29): ein Bau mit einer eingebundenen C-Bibliothek (raylib, sieben Quellen) sagte

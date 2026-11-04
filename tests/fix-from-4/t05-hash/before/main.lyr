@@ -1,0 +1,32 @@
+import std.core { Hashable, combineHash };
+import std.io.console { println };
+
+struct Key :: [Hashable<Key>] {
+    x: int,
+    y: int,
+    fn equals(other: Key): bool {
+        return this.x == other.x && this.y == other.y;
+    }
+    fn hash(): int {
+        return combineHash(combineHash(0, this.x.hash()), this.y.hash());
+    }
+}
+
+struct Id :: [Hashable<Id>] {
+    n: int,
+    fn equals(other: Id): bool {
+        return this.n == other.n;
+    }
+    fn hash(): int {
+        if (this.n < 0) {
+            return 0;
+        }
+        return this.n * 31;
+    }
+}
+
+fn main(): int {
+    let a = Key { x = 1, y = 2 };
+    println(f"{a == Key { x = 1, y = 2 }} {Id { n = 4 } == Id { n = 4 }}");
+    return 0;
+}

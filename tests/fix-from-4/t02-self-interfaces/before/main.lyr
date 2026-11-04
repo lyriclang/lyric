@@ -1,0 +1,30 @@
+import std.core { Equatable, Hashable };
+import std.io.console { println };
+
+struct Point :: [Equatable<Point>] {
+    x: int,
+    y: int,
+    fn equals(other: Point): bool {
+        return this.x == other.x && this.y == other.y;
+    }
+}
+
+fn contains<T :: [Equatable<T>]>(xs: T[], wanted: T): bool {
+    for (x in xs) {
+        if (x == wanted) {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn alike<K :: [Hashable<K>]>(a: K, b: K): bool {
+    return a == b;
+}
+
+fn main(): int {
+    let a = Point { x = 1, y = 2 };
+    let b = Point { x = 1, y = 2 };
+    println(f"{a == b} {contains([1, 2, 3], 2)} {alike("a", "a")}");
+    return 0;
+}

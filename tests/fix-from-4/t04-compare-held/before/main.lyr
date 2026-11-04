@@ -1,0 +1,13 @@
+import std.core { Ordered };
+
+struct Size :: [Ordered<Size>] {
+    n: int,
+    fn compare(other: Size): int {
+        return this.n - other.n;
+    }
+}
+
+fn main(): int {
+    let order = Size { n = 1 }.compare(Size { n = 2 });
+    return if (order < 0) 0 else 1;
+}

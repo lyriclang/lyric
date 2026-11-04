@@ -1,0 +1,2 @@
+by hand[LYR-MIG0305] main.lyr:5:12: 'combineHash' is gone in Lyric 5: a hash is written into a hasher — write the parts into a hasher: 'var h = FixedHasher.new(); a.hash(&h); b.hash(&h); h.finish()'
+by hand[LYR-MIG0305] main.lyr:5:32: 'combineHash' is gone in Lyric 5: a hash is written into a hasher — write the parts into a hasher: 'var h = FixedHasher.new(); a.hash(&h); b.hash(&h); h.finish()'
