@@ -496,6 +496,11 @@ on by a <code>pub import</code> — a chain of them; <code>pub import lib.error 
 before, the first import won and the second was called unused. The compiler's own helpers in <code>std.core</code>
 (<code>fstring…</code>, <code>equalArrays</code>, <code>cloneArray</code> …) are no longer public API.</p>
 </li>
+<li><p><strong>A build says more of what it does</strong>: the front end's phases each have a status line (<code>Parsing</code>, <code>Analyzing</code>,
+<code>Evaluating</code>, <code>Lowering</code>, <code>Emitting</code>), a timed step ends with its time on a terminal and a log gets a <code>Timings</code>
+line, <code>Produced</code> names what came of the build with its size, and <code>Summary</code> the warnings and the C units from the
+cache. <code>-v</code> adds each package, <code>std</code> among them, and each C unit with its time.</p>
+</li>
 <li><p><strong><code>lyric fix --from-4</code> (M16, in progress)</strong>: migrates a Lyric 4 package (its <code>lyric.json</code>) or a file. The program
 is read with Lyric 4.6's frozen front end — one 4.6 refuses is not changed (<code>LYR-MIG0001</code>) —, the rules rewrite
 spans so comments and layout stay, and what a person decides is said as a hint (<code>LYR-MIG</code>) and written to

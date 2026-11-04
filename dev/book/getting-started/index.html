@@ -102,15 +102,24 @@ version = "0.1.0"</code></pre>
 <pre><code class="language-text">$ cd hello
 $ lyric run
    Compiling hello v0.1.0 (src/main.lyr)
-   Compiling 3 of 3 C units of hello
-     Linking hello (out/debug/x86_64-linux-gnu/hello)
-    Finished debug [opt 0, debug info] in 1.12s
+     Parsing 13 modules 0.21s
+   Analyzing 13 modules 0.70s
+  Evaluating compile-time sites 0.24s
+    Lowering 10 functions 0.07s
+    Emitting 3 C units 0.04s
+   Compiling 3 of 3 C units of hello 0.31s
+     Linking hello (out/debug/x86_64-linux-gnu/hello) 0.05s
+    Finished debug [opt 0, debug info] in 1.72s
+    Produced out/debug/x86_64-linux-gnu/hello (558.4 KB)
      Running out/debug/x86_64-linux-gnu/hello
 Hello, world!</code></pre>
 <p>The lines before the greeting are the build's, on the standard error: each step that does work
-says what it works on, and the last how long it all took. Run it again and nothing has changed —
-only <code>Finished</code> and <code>Running</code> are said. The first build of a profile also compiles the runtime,
-once for every program on the machine; <code>-q</code> says none of these lines, only the findings.</p>
+says what it works on and, when it is done, how long it took; <code>Finished</code> says how long it all took,
+<code>Produced</code> what came of it. Run it again and nothing has changed — no step is said, and a <code>Summary</code>
+says the C units came from the cache. In a log, where a line cannot be finished later, each step
+says its line as it starts and a <code>Timings</code> line gives the times at the end. The first build of a
+profile also compiles the runtime, once for every program on the machine. <code>-v</code> says more: each
+package, each C unit with its time, each command; <code>-q</code> says none of these lines, only the findings.</p>
 <p><code>lyric build</code> builds without running; the binary lands under <code>out/</code>, by profile and target —
 <code>out/debug/x86_64-linux-gnu/hello</code> on Linux. The default profile is <code>debug</code>: quick to build, with
 checks and debug information. <code>--profile release</code> builds the optimized program:</p>

@@ -119,13 +119,19 @@ work on the standard error as it starts, one line each — a word right-aligned 
 columns, then what it works on —, whether or not the standard error is a terminal:
 <code>Fetching</code> and <code>Updating</code> a package or a source tree read from git, <code>Running</code> a build script,
 <code>Binding</code> a module made from a header, <code>Compiling</code> a program's front end (<code>app v0.1.0 (src/main.lyr)</code>), the runtime, and the C units — <code>3 of 14 C units of app</code>, the ones whose
-object is not cached —, <code>Checking</code> a program (<code>check</code>), <code>Linking</code> a binary or a shared library,
-<code>Archiving</code> a static one. What is up to date says nothing. A <code>build</code>, <code>run</code> or <code>check</code> that
-succeeds ends with <strong><code>Finished</code></strong>, the profile, its level and debug information, and the time the command took
-(<code>Finished debug [opt 0, debug info] in 0.42s</code>); one that fails ends with its findings. <code>run</code>
-then says the binary it runs (<code>Running out/debug/&lt;target&gt;/app</code>). Where the standard error is
-a terminal, the C units compiled so far are counted on a line drawn over itself and erased
-when they are done (<code>Building [3/14] app</code>), unless <code>-v</code> says commands. The word is coloured
+object is not cached —, <code>Checking</code> a program (<code>check</code>), the front end's phases <code>Parsing</code>,
+<code>Expanding</code>, <code>Analyzing</code>, <code>Evaluating</code> and <code>Lowering</code>, <code>Emitting</code> its C, <code>Linking</code> a binary or
+a shared library, <code>Archiving</code> a static one. What is up to date says nothing. A <code>build</code>, <code>run</code>
+or <code>check</code> that succeeds says <strong><code>Finished</code></strong>, the profile, its level and debug information, and
+the time the command took (<code>Finished debug [opt 0, debug info] in 0.42s</code>), a <code>build</code> or <code>run</code>
+<strong><code>Produced</code></strong>, the file it made with its size, and <strong><code>Summary</code></strong> where there are warnings or C
+units from the cache; one that fails ends with its findings. <code>run</code> then says the binary it
+runs (<code>Running out/debug/&lt;target&gt;/app</code>). Where the standard error is a terminal, a phase, the C
+units, a link and an archive each stay one line, drawn over itself: the C units compiled so far
+are counted on it (<code>Compiling [3/14] app</code>), and its end adds its time (<code>Linking app 0.05s</code>);
+elsewhere, or under <code>-v</code>, each says a whole line as it starts, and a last line <strong><code>Timings</code></strong>
+gives their times. <strong><code>-v</code></strong> also says each package (<code>Package std v5.0.0</code>), each C unit with its
+time (<code>Compiled …</code>) and each command. The word is coloured
 as the diagnostics are (<a href="../../spec/16-diagnostics/">16 §1</a>). <strong><code>-q</code></strong> (<code>--quiet</code>) says no status line,
 and <code>--json</code> none (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C6</a>):
 the findings stay. The lines are text for a reader, not a format: their words and their
