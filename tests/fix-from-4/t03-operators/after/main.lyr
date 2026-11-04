@@ -1,0 +1,39 @@
+import std.core { Add, Sub, Mul, Div };
+import std.io { println };
+
+struct Vec2 :: [Add, Sub] {
+    x: float,
+    y: float,
+    fn add(other: Vec2): Vec2 {
+        return Vec2 { x = this.x + other.x, y = this.y + other.y };
+    }
+    fn sub(other: Vec2): Vec2 {
+        return Vec2 { x = this.x - other.x, y = this.y - other.y };
+    }
+}
+
+extend Vec2 :: [Mul<float>] {
+    fn mul(other: float): Vec2 {
+        return Vec2 { x = this.x * other, y = this.y * other };
+    }
+}
+
+struct Money :: [Div] {
+    type Out = float;
+    cents: int,
+    fn div(other: Money): float {
+        return (this.cents as float) / (other.cents as float);
+    }
+}
+
+fn total<T :: [Add<T, Out = T>]>(a: T, b: T): T {
+    return a + b;
+}
+
+fn main(): int {
+    let v = Vec2 { x = 1.0, y = 2.0 } + Vec2 { x = 3.0, y = 4.0 };
+    let w = (v - Vec2 { x = 1.0, y = 1.0 }) * 2.0;
+    let share = Money { cents = 150 } / Money { cents = 600 };
+    println(f"{v.x} {w.y} {share} {total(40, 2)}");
+    return 0;
+}

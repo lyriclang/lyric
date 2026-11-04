@@ -1,0 +1,1 @@
+by hand[LYR-MIG0302] main.lyr:3:32: 'Equatable<int>' compares 'Tag' with 'int'; Lyric 5's 'Equatable' compares values of one type — compare what the two have in common, or give the method a name of its own

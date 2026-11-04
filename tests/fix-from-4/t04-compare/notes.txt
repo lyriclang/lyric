@@ -1,0 +1,2 @@
+proposal[LYR-MIG0304] main.lyr:7:8: 'Version.compare' returned an int; Lyric 5's returns '?Ordering', 'null' where two values have no order, and 'totalCompare' gives the total order that 'sort' takes — where the order has no gap, 'totalCompare' alone is enough
+proposal[LYR-MIG0304] main.lyr:17:8: 'Name.compare' returned an int; Lyric 5's returns '?Ordering', 'null' where two values have no order, and 'totalCompare' gives the total order that 'sort' takes — where the order has no gap, 'totalCompare' alone is enough

@@ -1,0 +1,2 @@
+proposal[LYR-MIG0305] main.lyr:10:8: 'Key.hash' returned an int; Lyric 5's writes the value into a hasher, so the hashes differ from Lyric 4's — where it hashes every field the way 'equals' compares them, leave the method out: Lyric 5 writes it
+proposal[LYR-MIG0305] main.lyr:20:8: 'Id.hash' returned an int; Lyric 5's writes the value into a hasher, so the hashes differ from Lyric 4's — where it hashes every field the way 'equals' compares them, leave the method out: Lyric 5 writes it

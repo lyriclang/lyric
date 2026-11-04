@@ -379,8 +379,12 @@ promise. This entry fills with the milestones.
   `xs: int...` (an array passed whole is spread, `f(xs...)`), `resume c` → `c.next()!`, an opaque type → a struct
   with one field, a bare variant in a pattern → `.Red`, `\xNN` → `\u{NN}`, .NET format specs → the format language
   (`{x:N2}` → `{x:,.2f}`, a width → an alignment), an array's `.length` → `.length()`, `Iterator<T>` →
-  `Iterator<Item = T>` and the conformances to `Iterator`, `Iterable` and `Indexable` with their associated types.
-  The rules for interfaces, errors and the library follow.
+  `Iterator<Item = T>` and the conformances to `Iterator`, `Iterable` and `Indexable` with their associated types;
+  the interfaces — a written field becomes `var` (with each struct field the write reaches through),
+  `Equatable<Point>` → `Equatable`, `Add<Vec2, Vec2>` → `Add` with `type Out` where the result is another type,
+  `compare(): int` → `?Ordering` with `TotalOrder` and `a.compare(b) < 0` → `a < b`, `hash(): int` →
+  `hash(&h)` with each `combineHash` part written into the hasher. The rules for numbers, errors and the library
+  follow.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
 
 ---
