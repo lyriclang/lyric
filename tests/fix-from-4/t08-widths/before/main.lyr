@@ -1,0 +1,16 @@
+import std.io.console { println };
+
+fn wide(x: int64): float64 {
+    return (x as float64) * 0.5;
+}
+
+fn main(): int {
+    let n: int = 7;
+    let w: int64 = n as int64;
+    let back = w as int;
+    let u: uint64 = 5u64;
+    let half: float64 = wide(w);
+    let total: float = half as float;
+    println(f"{back} {u} {total}");
+    return 0;
+}

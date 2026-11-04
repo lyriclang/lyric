@@ -1,0 +1,1 @@
+by hand[LYR-MIG0318] main.lyr:3:12: 'int[]' is no key in Lyric 5: an array is not 'Hashable' — wrap the array in a struct that conforms to 'Hashable', or key by a value made of its elements

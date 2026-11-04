@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.math { abs, sqrt };
+
+fn main(): int {
+    let a = abs(-3);
+    let b: float = 2;
+    let c = sqrt(16);
+    println(f"{a} {b} {c}");
+    return 0;
+}

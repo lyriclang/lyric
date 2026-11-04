@@ -1,0 +1,2 @@
+proposal[LYR-MIG0309] main.lyr:4:13: 'mix' computes with a constant beyond 32 bits; an overflow wrapped in Lyric 4 and panics in Lyric 5 — where the arithmetic is meant to wrap, write '*%'
+proposal[LYR-MIG0309] main.lyr:8:12: 'next' computes with a constant beyond 32 bits; an overflow wrapped in Lyric 4 and panics in Lyric 5 — where the arithmetic is meant to wrap, write '+%' and '*%'

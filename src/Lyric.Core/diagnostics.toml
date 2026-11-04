@@ -1632,6 +1632,34 @@ example = '''
 proposal[LYR-MIG0305] main.lyr:10:8: 'Key.hash' returned an int; Lyric 5's writes the value into a hasher, so the hashes differ from Lyric 4's — where it hashes every field the way 'equals' compares them, leave the method out: Lyric 5 writes it
 '''
 
+[LYR-MIG0309]
+title = "arithmetic that may have meant to wrap"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a function computes with an integer constant beyond 32 bits — a hash, a generator —, whose overflow wrapped in Lyric 4 and panics in Lyric 5."
+explanation = '''
+An integer that overflowed wrapped silently in Lyric 4; in Lyric 5 it panics (`LYR-RT0002`), and the operators `+%`, `-%` and `*%` wrap. Which arithmetic was meant to wrap is written nowhere, so the migration changes no operator. It says, once a function, where one computes with a constant beyond 32 bits — the mark of a hash or a pseudo-random generator, whose arithmetic wraps on purpose — and names the operators to write there.
+
+An overflow elsewhere was a fault in Lyric 4 that went unseen; Lyric 5's panic shows it.
+'''
+example = '''
+proposal[LYR-MIG0309] main.lyr:8:12: 'next' computes with a constant beyond 32 bits; an overflow wrapped in Lyric 4 and panics in Lyric 5 — where the arithmetic is meant to wrap, write '+%' and '*%'
+'''
+
+[LYR-MIG0318]
+title = "an array as a key"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: an array is the key of a `Map` or the element of a `Set`, which Lyric 4's checker passed and Lyric 5 refuses."
+explanation = '''
+Lyric 4's checker took `Map<int[], V>`; the program failed later, in the lowering. In Lyric 5 an array is not `Hashable`, and the type is refused (`LYR-SEM0028`).
+
+Wrap the array in a struct that conforms to `Hashable` — its synthesized `hash` and `equals` go over the elements —, or key by a value made of the elements, a string.
+'''
+example = '''
+by hand[LYR-MIG0318] main.lyr:3:12: 'int[]' is no key in Lyric 5: an array is not 'Hashable' — wrap the array in a struct that conforms to 'Hashable', or key by a value made of its elements
+'''
+
 [LYR-PAR0001]
 title = "a token after one whole expression, pattern or statement"
 severity = "error"

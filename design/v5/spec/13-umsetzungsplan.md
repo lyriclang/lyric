@@ -1982,6 +1982,21 @@ S4c die Aufrufe der 4.6-Bibliothek.
   `k05-partial`, dessen `combineHash` die erste Fassung still zu `Hasher` umbenannte.
 - **Codes**: `MIG03nn` mit der Nummer der Regel (0301–0305).
 
+**S4b, beim Bauen entschieden** (2026-11-04):
+
+- **T08**: in Lyric 5 sind `int64`, `uint64` und `float64` dieselben Typen wie `int`, `uint`, `float` (gemessen:
+  `let b: int = a` mit `a: int64` baut). Geschrieben wird der kurze Name; ein `as` innerhalb eines Paars fällt
+  mitsamt seinem Typ, eines zwischen den Paaren (`x as float` aus `int64`) bleibt. Die Suffixe (`7i64`) bleiben:
+  Lyric 5 liest sie.
+- **T09 sagt nicht jede Rechnung**: welche Arithmetik wrappen soll, steht nirgends. Gesagt wird je Funktion
+  einmal, wo sie mit einer Konstante jenseits von 32 Bit rechnet (`+`, `-`, `*`) — das Zeichen eines Hashs
+  oder Generators —, mit den Operatoren, die dort wrappen (`LYR-MIG0309`). Jeder andere Überlauf war in 4.6
+  ein ungesehener Fehler, und Lyric 5s Panik zeigt ihn; eine Notiz an jeder Rechnung wäre Rauschen.
+- **T10**: jedes ganzzahlige Literal ohne Suffix, das 4.6 als Float las, bekommt `.0` — nicht nur die
+  Argumente von `abs`: `let b: float = 2` und `sqrt(16)` (4.6s `sqrt` nahm nur `float`) gehen denselben Weg.
+- **T18**: nur der geschriebene Typ `Map<T[], …>` oder `Set<T[]>` wird gesagt (`LYR-MIG0318`); ein
+  erschlossener ohne Typargumente meldet Lyric 5 selbst (`LYR-SEM0028`).
+
 ## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
 
 **Anlass** (Maintainer, 2026-10-29): ein Bau mit einer eingebundenen C-Bibliothek (raylib, sieben Quellen) sagte
