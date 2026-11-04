@@ -1,0 +1,1 @@
+proposal[LYR-MIG0315] main.lyr:4:14: '"hello".indexOf("l")' gave a character's index or -1; 'find' gives a byte's index or 'null' — take the 'null' with '??' or 'if', and 'charIndex(byte)' gives the character's index

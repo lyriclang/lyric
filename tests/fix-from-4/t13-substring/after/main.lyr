@@ -1,0 +1,17 @@
+import std.io { println };
+import std.string as strings;
+
+fn at(): int {
+    return 1;
+}
+
+fn show(s: string): string {
+    return s;
+}
+
+fn main(): int {
+    let s = "h\u{e9}llo";
+    let i = 1;
+    println(f"{show(s.substring(i, i + 2).toString())} {s.charAt(1)} {s.substring(at(), at() + 3).toString()} {s.substring(i + 1, i + 1 + 2).toString()}");
+    return 0;
+}

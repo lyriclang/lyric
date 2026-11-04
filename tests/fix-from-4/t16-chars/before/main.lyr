@@ -1,0 +1,10 @@
+import std.io.console { println };
+import std.string { utf8Decode };
+
+fn main(): int {
+    let c = "abc".toChars();
+    let b = "abc".utf8Encode();
+    let d = utf8Decode(b);
+    println(f"{c.length} {b.length} {d!}");
+    return 0;
+}

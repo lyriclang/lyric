@@ -1,0 +1,11 @@
+import std.io { println };
+import std.math { abs, min, max, clamp, signum };
+
+fn main(): int {
+    let f = (value: int) => abs(value);
+    let xs = [1, 2, 3];
+    let ys = [1.5, 2.5];
+    println(f"{f(-3)} {min(1, 2)} {max(1, 2)} {clamp(9, 0, 5)} {signum(-4)} {signum(-4.0)}");
+    println(f"{xs.iter().sum()} {ys.iter().sum()}");
+    return 0;
+}

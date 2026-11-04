@@ -1997,6 +1997,30 @@ S4c die Aufrufe der 4.6-Bibliothek.
 - **T18**: nur der geschriebene Typ `Map<T[], …>` oder `Set<T[]>` wird gesagt (`LYR-MIG0318`); ein
   erschlossener ohne Typargumente meldet Lyric 5 selbst (`LYR-SEM0028`).
 
+**S4c, beim Bauen entschieden** (2026-11-05):
+
+- **`from4.toml`** (P3): je Eintrag Regel, 4.6-Funktion und `name` (derselbe Aufruf unter neuem Namen, auch im
+  Import) oder `form` (der Aufruf neu, `{this}`/`{0}` in ihrer Reihenfolge, `{0!}` eine Kopie des Texts). Eine Form
+  ersetzt nur die Stücke **zwischen** Empfänger und Argumenten — ganze Aufrufe zu ersetzen stieße mit jeder Regel
+  zusammen, die im Argument schreibt (`over` in `sum`, `-3` aus T10). `From4` liest die Tabelle mit dem TOML-Leser von
+  `Lyric.Core`; die eingefrorene Kopie bleibt bei ihrem `Lyric4.Core`. K05 liest dieselbe Tabelle für die Importe.
+- **Eine Sicht ist kein `string`** (gemessen: `LYR-SEM0001`, auch `StringView[]` gegen `string[]`), darum schreibt die
+  Tabelle mehr als die Zeilen in 12 R2: `substring(a, n)` → `substring(a, a + n).toString()`, `split`/`splitLines` →
+  `.map((part) => part.toString()).toArray()`, als Quelle eines `for` ohne `toArray`. So baut das Ergebnis und gibt,
+  was 4.6 gab; wer Sichten will, nimmt die Kopie von Hand heraus.
+- **`over`** gehört nicht zu T11, aber ohne es baut kein `sum(over(xs))`: 4.6s Arrays haben kein `iter`, und es
+  steht deshalb schon hier in der Tabelle.
+- **T11 als Wert**: `let f = absInt;` wird ein Lambda mit den Parametern von 4.6, `(value: int) => abs(value)` —
+  `abs` ist in Lyric 5 generisch und kein Wert (`LYR-SEM0052`). Eine Funktion mit Form als Wert wird von Hand gesagt
+  (`LYR-MIG0311`).
+- **T12 schreibt `charCount()`**, nicht nur einen Vorschlag: so zählt das Programm wie vorher, und `substring`/`charAt`
+  zählen ebenfalls Zeichen (10 P7). Gesagt wird es einmal je Modul (`LYR-MIG0312`). **T15**: ein Vergleich gegen -1
+  oder 0 ist genau `contains`; jedes andere `indexOf` wird `find` und gesagt (`LYR-MIG0315`), kompiliert aber nicht von
+  selbst — die Entscheidung über `null` und Bytes gehört dem Menschen. **T13**: ein Startausdruck mit Aufruf läuft
+  zweimal, gesagt (`LYR-MIG0313`).
+- **Offen für S6**: `import std.string as strings;` machte in 4.6 die Methoden sichtbar und bleibt stehen; ohne
+  weitere Nutzung ist er in Lyric 5 nur noch `LYR-SEM0072`. Er fällt mit den `strings.…`-Regeln von S6.
+
 ## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
 
 **Anlass** (Maintainer, 2026-10-29): ein Bau mit einer eingebundenen C-Bibliothek (raylib, sieben Quellen) sagte

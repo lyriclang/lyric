@@ -1,0 +1,9 @@
+import std.io { println };
+
+fn main(): int {
+    let c = "abc".chars().toArray();
+    let b = "abc".bytes();
+    let d = (try? string.fromUtf8(b));
+    println(f"{c.length()} {b.length()} {d!}");
+    return 0;
+}

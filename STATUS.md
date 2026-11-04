@@ -60,7 +60,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M14 | FFI and embedding | L | **done** 2026-10-28 |
 | M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | **done** 2026-10-29 |
 | M15 | Distribution | M | **done** 2026-10-29 but its halts (S6 signing; S7 mirror set aside by the maintainer 2026-11-04) |
-| M16 | Migration (`lyric fix --from-4`) | L | open: S1–S3 done (S3 2026-11-02); S4 next, on the std after Block P |
+| M16 | Migration (`lyric fix --from-4`) | L | open: S1–S4 done (S4 2026-11-05, in three parts); S5 next |
 | P | std by subject module (design 10 P1–P12, plan in 13) | L | **done** 2026-11-04 |
 | M17 | Spec 5.0, suite, guide | L | — |
 | M18 | Release 5.0.0 | M | — |
@@ -1393,8 +1393,10 @@ The plan is design 13's addendum "der Plan für M16" (#618; S1–S8).
 - **S3** (#641 + spec#401): the syntax rules S01, S04–S08, S10, S11 — `params` → `T...`, `resume` → `next()!`, an
   opaque type → a struct, `.Red`, `\u{NN}`, .NET format specs → the format language (4.6's output kept), `.length()`,
   the generic interfaces with their associated types; `LYR-MIG0205/0208/0211`.
-- **Next**: S4 — T01–T05, T08–T10, T18, and the library rules T11–T16 on the std as Block P left it (T13, the
-  math calls, is now mechanical: `x.clamp(lo, hi)` → `clamp(x, lo, hi)`). Then S5–S7, S8 closes.
+- **S4** (#649 + spec#408, #650 + spec#409, and T11–T16 with `from4.toml`): the interfaces (T01–T05,
+  `LYR-MIG0301`–`0305`), the numbers (T08–T10, T18, `LYR-MIG0309`, `0318`), the first of the library
+  (`LYR-MIG0311`–`0313`, `0315`).
+- **Next**: S5, the errors and coroutines (E01–E09, N01–N02). Then S6–S7, S8 closes.
 
 ### Block P — done (2026-11-04)
 

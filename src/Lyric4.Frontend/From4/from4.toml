@@ -1,0 +1,85 @@
+# What 4.6's library is in Lyric 5, by function: the rule of 12 R2, the function, and its form.
+#
+# `name`: the same call under another name, in the import too. `form`: the call written anew — `{this}`
+# the receiver, `{0}` an argument, in their order and each once, so what stands in them stays as it is
+# written and other rules may change it; `{0!}` a copy of an argument's text. A function with a form
+# leaves the imports. `iterator`: it gave an array of strings and gives an iterator of views now, which
+# the rule writes back to what 4.6 gave.
+
+[[free]]
+rule = "T11"
+from = "std.math.absInt"
+name = "abs"
+
+[[free]]
+rule = "T11"
+from = "std.math.minInt"
+name = "min"
+
+[[free]]
+rule = "T11"
+from = "std.math.maxInt"
+name = "max"
+
+[[free]]
+rule = "T11"
+from = "std.math.clampInt"
+name = "clamp"
+
+[[free]]
+rule = "T11"
+from = "std.math.signInt"
+name = "signum"
+
+[[free]]
+rule = "T11"
+from = "std.math.sign"
+name = "signum"
+
+# what sum and sumFloat took an array through
+[[free]]
+rule = "T11"
+from = "std.iter.over"
+form = "{0}.iter()"
+
+[[free]]
+rule = "T11"
+from = "std.iter.sum"
+form = "{0}.sum()"
+
+[[free]]
+rule = "T11"
+from = "std.iter.sumFloat"
+form = "{0}.sum()"
+
+[[method]]
+rule = "T13"
+from = "string.substring"
+form = "{this}.substring({0}, {0!} + {1}).toString()"
+
+[[method]]
+rule = "T14"
+from = "string.split"
+form = "{this}.split({0})"
+iterator = true
+
+[[method]]
+rule = "T14"
+from = "string.splitLines"
+form = "{this}.lines()"
+iterator = true
+
+[[method]]
+rule = "T16"
+from = "string.toChars"
+form = "{this}.chars().toArray()"
+
+[[method]]
+rule = "T16"
+from = "string.utf8Encode"
+form = "{this}.bytes()"
+
+[[free]]
+rule = "T16"
+from = "std.string.utf8Decode"
+form = "(try? string.fromUtf8({0}))"

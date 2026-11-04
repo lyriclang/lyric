@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.iter { over, sum, sumFloat };
+import std.math { absInt, minInt, maxInt, clampInt, signInt, sign };
+
+fn main(): int {
+    let f = absInt;
+    let xs = [1, 2, 3];
+    let ys = [1.5, 2.5];
+    println(f"{f(-3)} {minInt(1, 2)} {maxInt(1, 2)} {clampInt(9, 0, 5)} {signInt(-4)} {sign(-4.0)}");
+    println(f"{sum(over(xs))} {sumFloat(over(ys))}");
+    return 0;
+}

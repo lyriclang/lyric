@@ -1,0 +1,9 @@
+import std.io { println };
+import std.string as strings;
+
+fn main(): int {
+    let s = "h\u{e9}llo";
+    let xs = [1, 2];
+    println(f"{s.charCount()} {"abc".charCount()} {xs.length()}");
+    return 0;
+}

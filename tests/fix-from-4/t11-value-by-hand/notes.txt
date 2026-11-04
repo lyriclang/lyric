@@ -1,0 +1,1 @@
+by hand[LYR-MIG0311] main.lyr:4:13: 'sum' is written as a method in Lyric 5, and no function stands for it — pass a lambda that calls it: (it) => it.sum()

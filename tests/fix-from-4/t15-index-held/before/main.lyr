@@ -1,0 +1,6 @@
+import std.string as strings;
+
+fn main(): int {
+    let at = "hello".indexOf("l");
+    return at - 2;
+}

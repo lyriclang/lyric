@@ -1,0 +1,15 @@
+import std.io { println };
+import std.string as strings;
+
+fn count(parts: string[]): int {
+    return parts.length();
+}
+
+fn main(): int {
+    let parts = "a,b".split(",").map((part) => part.toString()).toArray();
+    println(f"{count(parts)} {parts[1]} {"x\ny".lines().map((part) => part.toString()).toArray().length()}");
+    for (word in "c d".split(" ").map((part) => part.toString())) {
+        println(word);
+    }
+    return 0;
+}

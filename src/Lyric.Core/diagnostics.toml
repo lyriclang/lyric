@@ -1646,6 +1646,64 @@ example = '''
 proposal[LYR-MIG0309] main.lyr:8:12: 'next' computes with a constant beyond 32 bits; an overflow wrapped in Lyric 4 and panics in Lyric 5 — where the arithmetic is meant to wrap, write '+%' and '*%'
 '''
 
+[LYR-MIG0311]
+title = "a library function used as a value"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a function of Lyric 4's library that is a method in Lyric 5, `sum` or `over`, is used as a value, and no function stands for it."
+explanation = '''
+Where a free function of Lyric 4 became a method in Lyric 5 — `sum(it)` is `it.sum()`, `over(xs)` is `xs.iter()` — the migration rewrites each call. Used as a value, the function has no call to rewrite, and no function of that name is left.
+
+Pass a lambda that calls the method: `(it) => it.sum()`. The import of the old name goes either way.
+
+A function that only changed its name becomes such a lambda by itself: `let f = absInt;` is `let f = (value: int) => abs(value);`, because `abs` is generic in Lyric 5 and no value.
+'''
+example = '''
+by hand[LYR-MIG0311] main.lyr:4:13: 'sum' is written as a method in Lyric 5, and no function stands for it — pass a lambda that calls it: (it) => it.sum()
+'''
+
+[LYR-MIG0312]
+title = "a string's length in characters"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a string's `length()` counted characters in Lyric 4 and counts bytes in Lyric 5; the migration writes `charCount()`."
+explanation = '''
+Lyric 4's `s.length()` counted code points, in O(n); Lyric 5's counts bytes, in O(1), and `charCount()` counts what Lyric 4 counted. The migration writes `charCount()` everywhere, so the program counts as it did, and says so once a module.
+
+Where bytes are what is meant — beside a slice `s[a..b]` or an index from `find`, which count bytes — write `length()`: it is faster, and it is what those positions count in.
+'''
+example = '''
+proposal[LYR-MIG0312] main.lyr:7:16: a string's 'length()' counted characters in Lyric 4 and counts bytes in Lyric 5; the migration writes 'charCount()', which counts what it counted, in O(n) — where bytes are what is meant, as beside a slice or a 'find', write 'length()'
+'''
+
+[LYR-MIG0313]
+title = "an argument written twice"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: `s.substring(start, count)` is written with an end, `start + count`, and a `start` that calls something now runs twice."
+explanation = '''
+Lyric 4's `substring` took a start and a count; Lyric 5's takes a start and an end, both in characters, and gives a view. The migration writes `s.substring(start, start + count).toString()`, which gives what Lyric 4 gave. An argument that calls a function is written twice and runs twice.
+
+Where the call does more than compute, keep its value in a `let` first.
+'''
+example = '''
+proposal[LYR-MIG0313] main.lyr:15:68: 'at()' is written twice and runs twice: 'substring' takes an end in Lyric 5, not a count — where it does more than compute, keep its value in a 'let' first
+'''
+
+[LYR-MIG0315]
+title = "an index that changed twice"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: `s.indexOf(n)` gave a character's index or -1; `find` gives a byte's index or `null`."
+explanation = '''
+A test of the result is exactly `contains`, and the migration writes it: `s.indexOf(n) >= 0` is `s.contains(n)`, `s.indexOf(n) == -1` is `!s.contains(n)`.
+
+Any other `indexOf` is written `find`, and what it gives has changed twice: a byte's index in place of a character's, and `null` in place of -1. Take the `null` with `??` or `if`, and where the position goes on to count characters, `charIndex(byte)` gives the character's index.
+'''
+example = '''
+proposal[LYR-MIG0315] main.lyr:4:14: '"hello".indexOf("l")' gave a character's index or -1; 'find' gives a byte's index or 'null' — take the 'null' with '??' or 'if', and 'charIndex(byte)' gives the character's index
+'''
+
 [LYR-MIG0318]
 title = "an array as a key"
 severity = "hint"
