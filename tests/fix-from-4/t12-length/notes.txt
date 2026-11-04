@@ -1,0 +1,1 @@
+proposal[LYR-MIG0312] main.lyr:7:16: a string's 'length()' counted characters in Lyric 4 and counts bytes in Lyric 5; the migration writes 'charCount()', which counts what it counted, in O(n) — where bytes are what is meant, as beside a slice or a 'find', write 'length()'

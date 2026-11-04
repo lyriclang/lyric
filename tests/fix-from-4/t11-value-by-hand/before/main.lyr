@@ -1,0 +1,6 @@
+import std.iter { over, sum };
+
+fn main(): int {
+    let f = sum;
+    return f(over([1]));
+}

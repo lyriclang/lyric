@@ -152,6 +152,9 @@ public static class Migrator
         new Rules.Overflow(),
         new Rules.FloatLiterals(),
         new Rules.ArrayKeys(),
+        new Rules.Library(),
+        new Rules.StringLength(),
+        new Rules.StringIndexOf(),
     ];
 
     /// <exception cref="InvalidOperationException">The program does not check with 4.6.</exception>

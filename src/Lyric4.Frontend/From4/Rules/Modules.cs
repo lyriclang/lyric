@@ -181,11 +181,12 @@ internal sealed partial class Imports : IRule
                     context.Replace("K09", import.Span.File, group.Index, group.Index + group.Length, renamed);
                     continue;
                 }
-                if (import.Clause is ImportSelective selective && (Prelude.TryGetValue(path, out var prelude) | Renamed.ContainsKey(path)))
+                if (import.Clause is ImportSelective selective && (Prelude.TryGetValue(path, out var prelude) | Renamed.ContainsKey(path) | LibraryTable.HasModule(path)))
                 {
                     var renames = Hashing.NeedsHasher(context, module) ? Renamed.GetValueOrDefault(path) : null;
                     var kept = selective.Names.Where(name => prelude is null || !prelude.Contains(name))
-                        .Select(name => renames is not null && renames.TryGetValue(name, out var to) ? to : name)
+                        .Select(name => renames is not null && renames.TryGetValue(name, out var to) ? to : LibraryTable.ImportName(path, name))
+                        .OfType<string>()
                         .Distinct(StringComparer.Ordinal)
                         .ToList();
                     if (kept.Count == 0)

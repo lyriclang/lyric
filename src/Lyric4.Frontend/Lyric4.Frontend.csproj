@@ -15,6 +15,12 @@
 
   <ItemGroup>
     <EmbeddedResource Include="stdlib\**\*.lyr" LogicalName="stdlib/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="From4\from4.toml" LogicalName="from4.toml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- From4 alone reads it: the TOML reader for from4.toml. The frozen copy keeps to its own Lyric4.Core. -->
+    <ProjectReference Include="..\Lyric.Core\Lyric.Core.csproj" />
   </ItemGroup>
 
 </Project>

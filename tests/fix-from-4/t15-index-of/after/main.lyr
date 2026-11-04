@@ -1,0 +1,8 @@
+import std.io { println };
+import std.string as strings;
+
+fn main(): int {
+    let s = "hello";
+    println(f"{s.contains("l")} {!s.contains("z")} {s.contains("h")} {!s.contains("q")}");
+    return 0;
+}

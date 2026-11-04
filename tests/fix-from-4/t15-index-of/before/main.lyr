@@ -1,0 +1,8 @@
+import std.io.console { println };
+import std.string as strings;
+
+fn main(): int {
+    let s = "hello";
+    println(f"{s.indexOf("l") >= 0} {s.indexOf("z") == -1} {s.indexOf("h") != -1} {s.indexOf("q") < 0}");
+    return 0;
+}

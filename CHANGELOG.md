@@ -390,7 +390,11 @@ promise. This entry fills with the milestones.
   `hash(&h)` with each `combineHash` part written into the hasher; the numbers — `int64`/`uint64`/`float64` →
   `int`/`uint`/`float` with the `as` between them gone, an integer literal 4.6 read as a float written as one
   (`abs(-3)` → `abs(-3.0)`), arithmetic with a constant beyond 32 bits said for `+%`/`*%`, an array as a key
-  said. The rules for errors and the library follow.
+  said; the first library rules, from a table (`from4.toml`) — `absInt` … `signInt`, `sign` → `abs` … `signum`,
+  `sum(over(xs))` → `xs.iter().sum()`, a string's `length()` → `charCount()`, `substring(a, n)` →
+  `substring(a, a + n).toString()`, `split` and `splitLines` written back to the array of strings they gave,
+  `indexOf(n) >= 0` → `contains(n)`, `toChars`, `utf8Encode`, `utf8Decode`. The rules for errors and the rest of
+  the library follow.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
 
 ---

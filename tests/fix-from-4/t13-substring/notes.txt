@@ -1,0 +1,1 @@
+proposal[LYR-MIG0313] main.lyr:15:68: 'at()' is written twice and runs twice: 'substring' takes an end in Lyric 5, not a count — where it does more than compute, keep its value in a 'let' first
