@@ -1,7 +1,7 @@
 // std.uri: RFC 3986 strictly - the five parts and their text,
 // the reference resolution of §5.4, the normalization of §6.2, the percent-encoding per component,
 // the query as pairs, what the grammar refuses.
-import std.uri { Uri, Query, percentEncode, percentDecode, removeDotSegments };
+import std.uri { Uri, Query, Percent, removeDotSegments };
 import std.core { ParseError, ParseErrorKind };
 import std.codec { DecodeError };
 import std.json;
@@ -156,18 +156,18 @@ fn normalizeAndThePercentEncoding(): void throws Error {
     // a relative path keeps its dot segments: they mean something against a base
     assertEq((try Uri.parse("../a/./b")).normalize().show(), "../a/./b");
     // per component
-    assertEq(percentEncode("a b/c?d=\u{e9}", .Segment), "a%20b%2Fc%3Fd=%C3%A9");
-    assertEq(percentEncode("a b/c?d=\u{e9}", .Path), "a%20b/c%3Fd=%C3%A9");
-    assertEq(percentEncode("a b/c?d=\u{e9}", .Query), "a%20b/c?d=%C3%A9");
-    assertEq(percentEncode("a b/c?d=\u{e9}", .Pair), "a%20b%2Fc%3Fd%3D%C3%A9");
-    assertEq(percentEncode("u:p@h", .Userinfo), "u:p%40h");
-    assertEq(percentEncode("h st:1", .Host), "h%20st%3A1");
-    assertEq(percentEncode("a#b", .Fragment), "a%23b");
-    assertEq(try percentDecode("a%20b%C3%A9+c"), "a b\u{e9}+c");
-    assertEq(try percentDecode("%7e%7E"), "~~");
+    assertEq(Percent.encode("a b/c?d=\u{e9}", .Segment), "a%20b%2Fc%3Fd=%C3%A9");
+    assertEq(Percent.encode("a b/c?d=\u{e9}", .Path), "a%20b/c%3Fd=%C3%A9");
+    assertEq(Percent.encode("a b/c?d=\u{e9}", .Query), "a%20b/c?d=%C3%A9");
+    assertEq(Percent.encode("a b/c?d=\u{e9}", .Pair), "a%20b%2Fc%3Fd%3D%C3%A9");
+    assertEq(Percent.encode("u:p@h", .Userinfo), "u:p%40h");
+    assertEq(Percent.encode("h st:1", .Host), "h%20st%3A1");
+    assertEq(Percent.encode("a#b", .Fragment), "a%23b");
+    assertEq(try Percent.decode("a%20b%C3%A9+c"), "a b\u{e9}+c");
+    assertEq(try Percent.decode("%7e%7E"), "~~");
     for (bad in ["%zz", "%C3", "%4", "100%"]) {
         try {
-            let _ = percentDecode(bad);
+            let _ = Percent.decode(bad);
             fail(f"decoded {bad}");
         } catch (_: ParseError) { }
     }
@@ -280,7 +280,7 @@ fn aRefusalSaysWhereAndWhy(): void {
         }
     }
     try {
-        let _ = percentDecode("a%2");
+        let _ = Percent.decode("a%2");
         fail("took a%2");
     } catch (e: ParseError) {
         assertEq(e.detail, "a '%' without two hexadecimal digits after it");

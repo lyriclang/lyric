@@ -2030,7 +2030,7 @@ schon kann (C#/Kotlin statt Gos freier Funktionen); bei der Mathematik ändert s
 `clamp(x, lo, hi)` steht neben `min(a, b)`. Die Gefahr ist ein Umzug, der Namen bricht, ohne dass ein Test es merkt —
 darum zählt P-S6 die Inventur ein zweites Mal.
 
-**P-S1 bis P-S5, beim Bauen entschieden** (2026-11-03/04):
+**P-S1 bis P-S6, beim Bauen entschieden** (2026-11-03/04):
 
 - **P-S1**: ein `pub import` reicht die Blöcke seines Moduls weiter — auch die im eigenen Modul des Typs
   (`pub import lib.error { Thing }` bringt `lib.error`s Methoden auf `Thing` mit); vorher ließ der Re-Export sie
@@ -2061,3 +2061,21 @@ darum zählt P-S6 die Inventur ein zweites Mal.
   `find` und `binarySearch` auf `Slice<T>` stehen in `std.collections`; `Contains` in `std.core` sucht selbst (eine
   Schleife). **Abweichend von P9 bleiben `chunks`/`windows` in `std.collections`**: sie bauen `List`s wie `toList`
   und `sorted`, in `std.iter` machten sie es von `std.collections` abhängig.
+- **P-S6**: P12 je Befund in 10 entschieden — **gebaut** nur `percentEncode`/`percentDecode` → `Percent.encode`/
+  `Percent.decode` (ein Modul mehrerer Formate nennt jedes mit einem Struct); `reasonOf`, `toBytesLE`, `plusDays`,
+  `toString` neben `show` **bleiben**, je mit Grund. `plusDays` hatte zuerst den falschen Grund („ein Tag ist keine
+  feste Dauer“) — der Maintainer widersprach zu Recht: an `Date` ist der Grund der Typ (der Parameter `int` hält
+  angebrochene Tage fern), an `DateTime` die Zone (ein Kalendertag ist dort 23 bis 25 Stunden). Das Book bekommt
+  „Where a function lives“ im ersten Programm; der Guide ist der von 4.x und bleibt (M17).
+
+**Bericht, Block P** (2026-11-04). Sechs Slices, #643–#647 und dieser, jeder mit seinem Spec-PR. **Die zweite
+Inventur** (`lyric api --std`, 1124 öffentliche Funktionen in 32 Modulen): `std.core` hält 62 Member — was einen Wert
+beschreibt (`length`, `bytes`, `chars`, `charCount`, die Klassifikation von `char`), was einen Slice an Ort und
+Stelle ändert (`sort…`, `reverse`, `fill`, `swap`, `copyInto`), Konstruktoren (`string.fromUtf8`, `char.fromDigit`)
+und die `next` seiner Iteratoren — und 19 freie, die Fragen von `std.meta` (09 S10: dort deklariert, von `std.meta`
+weitergereicht), `arrayOf`, `blackBox`, `embed`, `sequence`. Von `Integer` und `Ordered` steht keine Rechnung mehr
+am Typ. `std.string` hat 44 Funktionen, `std.math` 48 freie, `std.collections` 101. **Bewusst frei, nicht
+Empfänger**: `std.path` (`fileName(p)`, `join(…)` über `StringView` — ein Pfad ist ein Text in einer Rolle, als
+Methoden stünden sie an jedem Text) und `std.http.reasonOf`. **Was der Block kostete**: die Testauswahl verfehlte
+zweimal eine Folge (die Lint-Abhängigkeiten in P-S2, das API-Golden in P-S5) — bei einem Umzug in der std läuft die
+ganze Suite vor dem Ausliefern. **Türen**: `rfind` in O(n+m) (P-S3), die Türen von P7.
