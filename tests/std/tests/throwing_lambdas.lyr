@@ -84,7 +84,7 @@ fn predicatesThatThrow(): void {
         }
     );
     assertEq(c.message(), "boom");
-    assertEq(xs.iter().position((x: int) => x == 3)!, 2);
+    assertEq(xs.iter().find((x: int) => x == 3)!, 2);
 }
 
 @Test

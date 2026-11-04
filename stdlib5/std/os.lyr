@@ -57,10 +57,10 @@ pub fn envs(): Map<string, string> {
     let block = bytes[..length];
     var at = 0;
     while (at < block.length()) {
-        let end = at + (block[at..].indexOf(0u8) ?? (block.length() - at));
+        let end = at + (block[at..].find(0u8) ?? (block.length() - at));
         let entry = block[at..end];
         // the name ends at the first '=' after its first byte (Windows' own entries begin with one)
-        if (let eq = entry[1..].indexOf(61u8)) {
+        if (let eq = entry[1..].find(61u8)) {
             let _ = all.insert(
                 string.fromUtf8Lossy(entry[..(eq + 1)]),
                 string.fromUtf8Lossy(entry[(eq + 2)..])

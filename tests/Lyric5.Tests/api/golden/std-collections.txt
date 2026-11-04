@@ -195,6 +195,10 @@ pub fn std.collections.Set.symmetricDifference(other: Set<T, H>): Set<T, H>
 pub fn std.collections.Set.union(other: Set<T, H>): Set<T, H>
 pub static fn std.collections.Set.withCapacity(n: int): Set<T, DefaultHasher>
 pub static fn std.collections.Set.withHasher(seed: H): Set<T, H>
+pub fn std.collections.Slice<T>.binarySearch(x: T): ?int
+pub fn std.collections.Slice<T>.find(x: T): ?int
+pub fn std.collections.Slice<T>.partitionPoint<E :: [Error]>(p: fn(T) -> bool throws E): int throws E
+pub fn std.collections.Slice<T>.reversed(): T[]
 pub struct std.collections.WindowsIter<I :: [Iterator]>
 std.collections.WindowsIter :: Closeable
 std.collections.WindowsIter :: Iterator

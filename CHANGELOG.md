@@ -344,6 +344,10 @@ promise. This entry fills with the milestones.
   in the prelude, and `List` and `Deque` conform; on a type with its own `Index<int>` and `Length`, `x[^n]` is
   `x.index(x.length() - n)`, written too (`x[^1] = v`, `+=`, `++`), with `x` evaluated once. Without `Length` the
   refusal (`LYR-SEM0114`) names it.
+- **`find` gives an index wherever it stands**: a slice's `indexOf(x)` and an iterator's `position(p)` are
+  `find`, as a text's `find` is; what an iterator's `find(p)` gave, the value, is **`firstWhere(p)`**. A slice's
+  `find`, `binarySearch`, `partitionPoint` and `reversed` are `std.collections`', which the prelude passes on, so
+  `xs.reversed()` reads as before.
 - **An integer's arithmetic is `std.math`'s**: `checkedAdd(a, b)` … `checkedRem`, `saturatingAdd` …,
   `wrappingAdd` … `wrappingRem`, `leadingZeros(x)`, `trailingZeros(x)`, `popCount(x)`, `rotateLeft(x, n)`,
   `rotateRight(x, n)` and `clamp(x, lo, hi)` are free functions there — were members of `Integer` and `Ordered`.

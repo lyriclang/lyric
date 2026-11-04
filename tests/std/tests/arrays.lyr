@@ -31,9 +31,9 @@ fn containsAndIndexOf(): void {
     assertTrue(xs.contains(1));
     assertFalse(xs.contains(2));
     assertTrue(xs[1..].contains(3));
-    assertEq(xs.indexOf(3) ?? -1, 0);
-    assertEq(xs[1..].indexOf(3) ?? -1, 1);
-    assertNull(xs.indexOf(7));
+    assertEq(xs.find(3) ?? -1, 0);
+    assertEq(xs[1..].find(3) ?? -1, 1);
+    assertNull(xs.find(7));
     assertTrue(["a", "b"].contains("b"));
 }
 

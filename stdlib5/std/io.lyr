@@ -821,7 +821,7 @@ pub class TextReader<R :: [Reader]> {
                 return null;
             }
             let held = s.held[s.start..s.end];
-            if (let i = held.indexOf(10u8)) {
+            if (let i = held.find(10u8)) {
                 s.start = s.start + i + 1;
                 if (let l = line) {
                     l.append(held[..i]);
