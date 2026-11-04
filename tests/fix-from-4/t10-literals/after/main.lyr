@@ -1,0 +1,10 @@
+import std.io { println };
+import std.math { abs, sqrt };
+
+fn main(): int {
+    let a = abs(-3.0);
+    let b: float = 2.0;
+    let c = sqrt(16.0);
+    println(f"{a} {b} {c}");
+    return 0;
+}

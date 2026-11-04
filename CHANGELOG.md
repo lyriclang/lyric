@@ -383,8 +383,10 @@ promise. This entry fills with the milestones.
   the interfaces — a written field becomes `var` (with each struct field the write reaches through),
   `Equatable<Point>` → `Equatable`, `Add<Vec2, Vec2>` → `Add` with `type Out` where the result is another type,
   `compare(): int` → `?Ordering` with `TotalOrder` and `a.compare(b) < 0` → `a < b`, `hash(): int` →
-  `hash(&h)` with each `combineHash` part written into the hasher. The rules for numbers, errors and the library
-  follow.
+  `hash(&h)` with each `combineHash` part written into the hasher; the numbers — `int64`/`uint64`/`float64` →
+  `int`/`uint`/`float` with the `as` between them gone, an integer literal 4.6 read as a float written as one
+  (`abs(-3)` → `abs(-3.0)`), arithmetic with a constant beyond 32 bits said for `+%`/`*%`, an array as a key
+  said. The rules for errors and the library follow.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
 
 ---

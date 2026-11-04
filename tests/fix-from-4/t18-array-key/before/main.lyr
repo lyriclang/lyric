@@ -1,0 +1,9 @@
+import std.collections { Map };
+
+fn size(m: Map<int[], string>): int {
+    return 0;
+}
+
+fn main(): int {
+    return 0;
+}
