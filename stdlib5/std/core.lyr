@@ -750,25 +750,6 @@ pub interface Ordered :: [Equatable] {
             return Ordering.Equal;
         }
     }
-
-    /// Returns this held to `lo`…`hi`: `lo` below it, `hi` above it.
-    ///
-    /// A value unordered with the bounds, such as a NaN, comes back as it is.
-    ///
-    /// # Panics
-    /// When `lo` is above `hi`.
-    fn clamp(lo: Self, hi: Self): Self {
-        if (hi < lo) {
-            panic("clamp: lo is above hi");
-        }
-        if (this < lo) {
-            return lo;
-        }
-        if (this > hi) {
-            return hi;
-        }
-        return this;
-    }
 }
 
 /// A total order, what sorting and keys need; `float` has none of its own.
@@ -2597,139 +2578,6 @@ pub interface Integer :: [
 
     /// Returns `v` as this type, held at `min` or `max` where it does not fit.
     static fn clamping<T :: [Integer]>(v: T): Self;
-
-    /// Returns the sum, or `null` where it does not fit the type.
-    fn checkedAdd(o: Self): ?Self {
-        return if (addOverflows(this, o)) null else addWrapping(this, o);
-    }
-
-    /// Returns the difference, or `null` where it does not fit.
-    fn checkedSub(o: Self): ?Self {
-        return if (subOverflows(this, o)) null else subWrapping(this, o);
-    }
-
-    /// Returns the product, or `null` where it does not fit.
-    fn checkedMul(o: Self): ?Self {
-        return if (mulOverflows(this, o)) null else mulWrapping(this, o);
-    }
-
-    /// Returns the quotient, or `null` for a zero divisor and for `min / -1`, which does not fit.
-    fn checkedDiv(o: Self): ?Self {
-        if (o == Self.zero || (Self.isSigned && this == Self.min && o == Self.zero - Self.one)) {
-            return null;
-        }
-        return this / o;
-    }
-
-    /// Returns the remainder, or `null` for a zero divisor; a remainder by `-1` is `0`.
-    fn checkedRem(o: Self): ?Self {
-        if (o == Self.zero) {
-            return null;
-        }
-        if (Self.isSigned && o == Self.zero - Self.one) {
-            return Self.zero;
-        }
-        return this % o;
-    }
-
-    /// Returns the sum, held at `min` or `max` where it does not fit.
-    fn saturatingAdd(o: Self): Self {
-        return this.checkedAdd(o) ?? (if (o < Self.zero) Self.min else Self.max);
-    }
-
-    /// Returns the difference, held at `min` or `max` where it does not fit.
-    fn saturatingSub(o: Self): Self {
-        return this.checkedSub(o) ?? (if (o < Self.zero) Self.max else Self.min);
-    }
-
-    /// Returns the product, held at `min` or `max` by the sign it would have.
-    fn saturatingMul(o: Self): Self {
-        return this.checkedMul(o)
-            ?? (if ((this < Self.zero) != (o < Self.zero)) Self.min else Self.max);
-    }
-
-    /// Returns the sum modulo 2^bitWidth, as `+%` on the type.
-    fn wrappingAdd(o: Self): Self {
-        return addWrapping(this, o);
-    }
-
-    /// Returns the difference modulo 2^bitWidth, as `-%`.
-    fn wrappingSub(o: Self): Self {
-        return subWrapping(this, o);
-    }
-
-    /// Returns the product modulo 2^bitWidth, as `*%`.
-    fn wrappingMul(o: Self): Self {
-        return mulWrapping(this, o);
-    }
-
-    /// Returns the quotient, where `min / -1` wraps to `min`.
-    ///
-    /// # Panics
-    /// When `o` is zero, as `/` does.
-    fn wrappingDiv(o: Self): Self {
-        if (Self.isSigned && this == Self.min && o == Self.zero - Self.one) {
-            return Self.min;
-        }
-        return this / o;
-    }
-
-    /// Returns the remainder, where a remainder by `-1` is `0`.
-    ///
-    /// # Panics
-    /// When `o` is zero, as `%` does.
-    fn wrappingRem(o: Self): Self {
-        if (Self.isSigned && o == Self.zero - Self.one) {
-            return Self.zero;
-        }
-        return this % o;
-    }
-
-    /// Returns `this` to the `n`th power, computed by squaring.
-    ///
-    /// # Panics
-    ///
-    /// When the power does not fit the type, as `*` panics on an overflow.
-    fn pow(n: uint): Self {
-        var result = Self.one;
-        var base = this;
-        var k = n;
-        while (k > 0) {
-            if (k % 2 == 1) {
-                result = result * base;
-            }
-            k = k / 2;
-            if (k > 0) {
-                base = base * base;
-            }
-        }
-        return result;
-    }
-
-    /// Returns the number of zero bits above the highest one bit; `bitWidth` for zero.
-    fn leadingZeros(): int {
-        return countLeadingZeros(this);
-    }
-
-    /// Returns the number of zero bits below the lowest one bit; `bitWidth` for zero.
-    fn trailingZeros(): int {
-        return countTrailingZeros(this);
-    }
-
-    /// Returns the number of one bits.
-    fn popCount(): int {
-        return countOnes(this);
-    }
-
-    /// Returns the bits rotated left by `n`, modulo `bitWidth`; a negative `n` rotates right.
-    fn rotateLeft(n: int): Self {
-        return rotateBitsLeft(this, n);
-    }
-
-    /// Returns the bits rotated right by `n`, modulo `bitWidth`; a negative `n` rotates left.
-    fn rotateRight(n: int): Self {
-        return rotateBitsLeft(this, -(n % Self.bitWidth));
-    }
 }
 
 // The natives the defaults stand on: one each, generic, a C builtin serving every integer width —
@@ -3293,15 +3141,15 @@ fn parseInteger<T :: [Integer]>(s: StringView, radix: int): T throws ParseError 
         afterDigit = true;
         if (!overflowed) {
             let digit = asTypeOf(d, T.zero);
-            let scaled = value.checkedMul(base);
-            if (scaled == null) {
+            if (mulOverflows(value, base)) {
                 overflowed = true;
             } else {
-                let next = if (negative) scaled.checkedSub(digit) else scaled.checkedAdd(digit);
-                if (next == null) {
+                let scaled = mulWrapping(value, base);
+                if (if (negative) subOverflows(scaled, digit) else addOverflows(scaled, digit)) {
                     overflowed = true;
                 } else {
-                    value = next;
+                    value = if (negative) subWrapping(scaled, digit)
+                        else addWrapping(scaled, digit);
                 }
             }
         }

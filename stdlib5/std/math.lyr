@@ -27,7 +27,20 @@
 //! 12
 //! 7
 //! ```
-import std.core { Signed, asTypeOf };
+import std.core {
+    Signed,
+    asTypeOf,
+    addOverflows,
+    subOverflows,
+    mulOverflows,
+    addWrapping,
+    subWrapping,
+    mulWrapping,
+    countLeadingZeros,
+    countTrailingZeros,
+    countOnes,
+    rotateBitsLeft,
+};
 
 /// π, a half turn in radians.
 pub let pi: float = 3.141592653589793;
@@ -64,7 +77,7 @@ pub fn gcd<T :: [Integer]>(a: T, b: T): T {
     var x = a;
     var y = b;
     while (y != T.zero) {
-        let r = x.wrappingRem(y);
+        let r = wrappingRem(x, y);
         x = y;
         y = r;
     }
@@ -206,13 +219,6 @@ pub fn hypot<T :: [Float]>(x: T, y: T): T {
     return asTypeOf(libmHypot(asTypeOf(x, 0.0), asTypeOf(y, 0.0)), x);
 }
 
-/// Returns `x` to the power `e`.
-///
-/// For an integer power of an integer, use the integer's own `x.pow(n)`.
-pub fn pow<T :: [Float]>(x: T, e: T): T {
-    return asTypeOf(libmPow(asTypeOf(x, 0.0), asTypeOf(e, 0.0)), x);
-}
-
 /// Returns the magnitude of `x`, the value without its sign.
 ///
 /// A float's `-0.0` gives `0.0`.
@@ -269,3 +275,256 @@ extern "C" fn libmTanh(x: float): float = "lyr_tanh";
 extern "C" fn libmAtan2(y: float, x: float): float = "lyr_atan2";
 extern "C" fn libmHypot(x: float, y: float): float = "lyr_hypot";
 extern "C" fn libmPow(x: float, e: float): float = "lyr_pow";
+
+// ======================================================================================= powers
+
+/// A number to a power: an integer to a whole one, computed by squaring; a float to any.
+///
+/// The exponent's type is the number's own answer — `uint` for an integer, the float itself for a
+/// float —, so `pow(2, 10)` and `pow(2.0, 0.5)` are one function.
+pub interface Pow {
+    type Exponent;
+
+    /// Returns `this` to the power `e`.
+    fn pow(e: Self.Exponent): Self;
+}
+
+/// An integer to the `n`th power, computed by squaring; the integers' `pow` call it.
+///
+/// # Panics
+/// When the power does not fit the type, as `*` panics on an overflow.
+fn powBySquaring<T :: [Integer]>(x: T, n: uint): T {
+    var result = T.one;
+    var base = x;
+    var k = n;
+    while (k > 0) {
+        if (k % 2 == 1) {
+            result = result * base;
+        }
+        k = k / 2;
+        if (k > 0) {
+            base = base * base;
+        }
+    }
+    return result;
+}
+
+extend int :: [Pow] {
+    type Exponent = uint;
+
+    fn pow(n: uint): int {
+        return powBySquaring(this, n);
+    }
+}
+
+extend int8 :: [Pow] {
+    type Exponent = uint;
+
+    fn pow(n: uint): int8 {
+        return powBySquaring(this, n);
+    }
+}
+
+extend int16 :: [Pow] {
+    type Exponent = uint;
+
+    fn pow(n: uint): int16 {
+        return powBySquaring(this, n);
+    }
+}
+
+extend int32 :: [Pow] {
+    type Exponent = uint;
+
+    fn pow(n: uint): int32 {
+        return powBySquaring(this, n);
+    }
+}
+
+extend uint :: [Pow] {
+    type Exponent = uint;
+
+    fn pow(n: uint): uint {
+        return powBySquaring(this, n);
+    }
+}
+
+extend uint8 :: [Pow] {
+    type Exponent = uint;
+
+    fn pow(n: uint): uint8 {
+        return powBySquaring(this, n);
+    }
+}
+
+extend uint16 :: [Pow] {
+    type Exponent = uint;
+
+    fn pow(n: uint): uint16 {
+        return powBySquaring(this, n);
+    }
+}
+
+extend uint32 :: [Pow] {
+    type Exponent = uint;
+
+    fn pow(n: uint): uint32 {
+        return powBySquaring(this, n);
+    }
+}
+
+extend float :: [Pow] {
+    type Exponent = float;
+
+    fn pow(e: float): float {
+        return asTypeOf(libmPow(asTypeOf(this, 0.0), asTypeOf(e, 0.0)), this);
+    }
+}
+
+extend float32 :: [Pow] {
+    type Exponent = float32;
+
+    fn pow(e: float32): float32 {
+        return asTypeOf(libmPow(asTypeOf(this, 0.0), asTypeOf(e, 0.0)), this);
+    }
+}
+
+/// Returns `x` to the power `e`: `pow(2, 10)` is `1024`, `pow(2.0, 0.5)` the square root of two.
+pub fn pow<T :: [Pow]>(x: T, e: T.Exponent): T {
+    return x.pow(e);
+}
+
+// ============================================================ the arithmetic of the integers
+//
+// What an integer type's `+`, `-` and `*` leave open: an overflow said, held or wrapped, and the
+// bits counted and rotated. Free functions over `Integer`, as `min` and `max` are over `Ordered`.
+
+/// Returns the sum, or `null` where it does not fit the type.
+pub fn checkedAdd<T :: [Integer]>(a: T, b: T): ?T {
+    return if (addOverflows(a, b)) null else addWrapping(a, b);
+}
+
+/// Returns the difference, or `null` where it does not fit.
+pub fn checkedSub<T :: [Integer]>(a: T, b: T): ?T {
+    return if (subOverflows(a, b)) null else subWrapping(a, b);
+}
+
+/// Returns the product, or `null` where it does not fit.
+pub fn checkedMul<T :: [Integer]>(a: T, b: T): ?T {
+    return if (mulOverflows(a, b)) null else mulWrapping(a, b);
+}
+
+/// Returns the quotient, or `null` for a zero divisor and for `min / -1`, which does not fit.
+pub fn checkedDiv<T :: [Integer]>(a: T, b: T): ?T {
+    if (b == T.zero || (T.isSigned && a == T.min && b == T.zero - T.one)) {
+        return null;
+    }
+    return a / b;
+}
+
+/// Returns the remainder, or `null` for a zero divisor; a remainder by `-1` is `0`.
+pub fn checkedRem<T :: [Integer]>(a: T, b: T): ?T {
+    if (b == T.zero) {
+        return null;
+    }
+    if (T.isSigned && b == T.zero - T.one) {
+        return T.zero;
+    }
+    return a % b;
+}
+
+/// Returns the sum, held at `min` or `max` where it does not fit.
+pub fn saturatingAdd<T :: [Integer]>(a: T, b: T): T {
+    return checkedAdd(a, b) ?? (if (b < T.zero) T.min else T.max);
+}
+
+/// Returns the difference, held at `min` or `max` where it does not fit.
+pub fn saturatingSub<T :: [Integer]>(a: T, b: T): T {
+    return checkedSub(a, b) ?? (if (b < T.zero) T.max else T.min);
+}
+
+/// Returns the product, held at `min` or `max` by the sign it would have.
+pub fn saturatingMul<T :: [Integer]>(a: T, b: T): T {
+    return checkedMul(a, b) ?? (if ((a < T.zero) != (b < T.zero)) T.min else T.max);
+}
+
+/// Returns the sum modulo 2^bitWidth, as `+%` on the type.
+pub fn wrappingAdd<T :: [Integer]>(a: T, b: T): T {
+    return addWrapping(a, b);
+}
+
+/// Returns the difference modulo 2^bitWidth, as `-%`.
+pub fn wrappingSub<T :: [Integer]>(a: T, b: T): T {
+    return subWrapping(a, b);
+}
+
+/// Returns the product modulo 2^bitWidth, as `*%`.
+pub fn wrappingMul<T :: [Integer]>(a: T, b: T): T {
+    return mulWrapping(a, b);
+}
+
+/// Returns the quotient, where `min / -1` wraps to `min`.
+///
+/// # Panics
+/// When `b` is zero, as `/` does.
+pub fn wrappingDiv<T :: [Integer]>(a: T, b: T): T {
+    if (T.isSigned && a == T.min && b == T.zero - T.one) {
+        return T.min;
+    }
+    return a / b;
+}
+
+/// Returns the remainder, where a remainder by `-1` is `0`.
+///
+/// # Panics
+/// When `b` is zero, as `%` does.
+pub fn wrappingRem<T :: [Integer]>(a: T, b: T): T {
+    if (T.isSigned && b == T.zero - T.one) {
+        return T.zero;
+    }
+    return a % b;
+}
+
+/// Returns the number of zero bits above the highest one bit; `bitWidth` for zero.
+pub fn leadingZeros<T :: [Integer]>(x: T): int {
+    return countLeadingZeros(x);
+}
+
+/// Returns the number of zero bits below the lowest one bit; `bitWidth` for zero.
+pub fn trailingZeros<T :: [Integer]>(x: T): int {
+    return countTrailingZeros(x);
+}
+
+/// Returns the number of one bits.
+pub fn popCount<T :: [Integer]>(x: T): int {
+    return countOnes(x);
+}
+
+/// Returns the bits rotated left by `n`, modulo `bitWidth`; a negative `n` rotates right.
+pub fn rotateLeft<T :: [Integer]>(x: T, n: int): T {
+    return rotateBitsLeft(x, n);
+}
+
+/// Returns the bits rotated right by `n`, modulo `bitWidth`; a negative `n` rotates left.
+pub fn rotateRight<T :: [Integer]>(x: T, n: int): T {
+    return rotateBitsLeft(x, -(n % T.bitWidth));
+}
+
+/// Returns `x` held to `lo`…`hi`: `lo` below it, `hi` above it.
+///
+/// A value unordered with the bounds, such as a NaN, comes back as it is.
+///
+/// # Panics
+/// When `lo` is above `hi`.
+pub fn clamp<T :: [Ordered]>(x: T, lo: T, hi: T): T {
+    if (hi < lo) {
+        panic("clamp: lo is above hi");
+    }
+    if (x < lo) {
+        return lo;
+    }
+    if (x > hi) {
+        return hi;
+    }
+    return x;
+}

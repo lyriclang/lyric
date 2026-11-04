@@ -344,6 +344,11 @@ promise. This entry fills with the milestones.
   in the prelude, and `List` and `Deque` conform; on a type with its own `Index<int>` and `Length`, `x[^n]` is
   `x.index(x.length() - n)`, written too (`x[^1] = v`, `+=`, `++`), with `x` evaluated once. Without `Length` the
   refusal (`LYR-SEM0114`) names it.
+- **An integer's arithmetic is `std.math`'s**: `checkedAdd(a, b)` … `checkedRem`, `saturatingAdd` …,
+  `wrappingAdd` … `wrappingRem`, `leadingZeros(x)`, `trailingZeros(x)`, `popCount(x)`, `rotateLeft(x, n)`,
+  `rotateRight(x, n)` and `clamp(x, lo, hi)` are free functions there — were members of `Integer` and `Ordered`.
+  **One `pow`**: `pow(x, e)` over the interface `Pow`, its exponent the number's own (`uint` for an integer, the
+  float for a float) — `pow(2, 10)` and `pow(2.0, 0.5)`; `x.pow(e)` is the same call.
 - **Text counted in characters, and more of it**: `substring(start, end)` and `charAt(i)` count characters (a
   slice `s[a..b]` and `s[i]` count bytes), `charIndex(byte)` and `isCharBoundary(byte)` convert; `findFrom(p,
   from)`, `firstOf(chars)`, `splitWhitespace()`, `rsplitOnce(sep)`, `repeat(n)`, `isAscii()`,

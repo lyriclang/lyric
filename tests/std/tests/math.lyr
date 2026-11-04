@@ -1,4 +1,4 @@
-// std.math, Ordered's clamp, char's code point.
+// std.math, clamp, char's code point.
 import std.test { assertEq, assertTrue, assertPanics, assertNull, assertNotNull, assertClose };
 import std.math;
 
@@ -62,16 +62,16 @@ fn lerpHitsItsEnds(): void {
 
 @Test
 fn clampHoldsToTheBounds(): void {
-    assertEq(5.clamp(0, 3), 3);
-    assertEq((-2).clamp(0, 3), 0);
-    assertEq(2.clamp(0, 3), 2);
-    assertEq(2.5.clamp(0.0, 1.0), 1.0);
-    assertTrue(float.nan.clamp(0.0, 1.0).isNan());
+    assertEq(math.clamp(5, 0, 3), 3);
+    assertEq(math.clamp(-2, 0, 3), 0);
+    assertEq(math.clamp(2, 0, 3), 2);
+    assertEq(math.clamp(2.5, 0.0, 1.0), 1.0);
+    assertTrue(math.clamp(float.nan, 0.0, 1.0).isNan());
     let c = 'q';
-    assertEq(c.clamp('a', 'f'), 'f');
+    assertEq(math.clamp(c, 'a', 'f'), 'f');
     assertPanics(
         () => {
-            1.clamp(3, 0);
+            math.clamp(1, 3, 0);
         }
     );
 }

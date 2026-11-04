@@ -2049,3 +2049,9 @@ darum zählt P-S6 die Inventur ein zweites Mal.
   Zufallsvergleich gegen die naive Suche (20 000 Fälle über `ab`, `aab`, `abc`) mit zwei Kontrollen: Two-Way kaputt
   → 367 falsch, Budget 0 (Two-Way allein) → 0 falsch. **`rfind` bleibt O(n·m)** im schlimmsten Fall — es sucht
   rückwärts über `matchBefore`; ein rückwärts laufendes Two-Way ist eine Tür.
+- **P-S4**: die 13 Überlauf-Arithmetiken und die 5 Bit-Funktionen von `Integer` und `clamp` von `Ordered` sind freie
+  Funktionen in `std.math` (`checkedAdd(a, b)`, `rotateLeft(x, n)`, `clamp(x, lo, hi)`), ihre Rümpfe die alten über die
+  Intrinsics (`addOverflows` …, intern, also paketweit). `std.core` behält nichts davon: der Zahlparser rechnet direkt
+  mit den Intrinsics (ein Import von `std.math` wäre ein Zyklus). **`Pow`** steht in `std.math` (10 P8); `x.pow(e)` bleibt
+  als Methode des Interfaces gültig, darum ändern sich seine Aufrufer nicht. Rund 95 Aufrufer der übrigen in std,
+  `tests/std` und einem Orakel umgeschrieben, je Datei mit dem Import.
