@@ -226,6 +226,25 @@ seven: write: number operator number</code></pre>
 <p><code>parse</code> throws two kinds of error, so its <code>throws</code> lists both. Inside the <code>try</code> block every call
 that throws is covered, and <code>catch (err)</code> takes whichever comes; <code>err.message()</code> says what it was.
 <code>throw</code> is an expression too: the <code>.Div</code> arm is a value or an error.</p>
+<h2 id="where-a-function-lives">Where a function lives</h2>
+<p><code>split</code> is no member of <code>string</code>. On a type stands what describes a value — <code>length()</code>,
+<code>bytes()</code>, <code>chars()</code>, <code>isEmpty()</code> —; what searches in it, takes it apart or computes with it
+stands in the module of its subject: text in <code>std.string</code>, numbers in <code>std.math</code>, collections in
+<code>std.collections</code>. Text and collection operations are written as methods there and the prelude
+passes them on, so <code>line.split(' ')</code> needs no import. <code>std.math</code>'s functions are free and
+imported by name:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.math { clamp, pow };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> line = <span class="str">"  6 * 7  "</span>;
+    println(<span class="str">f"</span>{line.trim()}<span class="str"> </span>{line.length()}<span class="str"> </span>{line.find(<span class="str">"*"</span>)!}<span class="str">"</span>);
+    println(<span class="str">f"</span>{clamp(<span class="num">12</span>, <span class="num">0</span>, <span class="num">10</span>)}<span class="str"> </span>{pow(<span class="num">2</span>, <span class="num">10</span>)}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>6 * 7 9 4
+10 1024</code></pre>
+<p><code>find</code> gives an index wherever it stands — the byte of a text, the place in an array or of an
+iterator's value —, or <code>null</code> where there is none; <code>firstWhere</code> gives the value itself.</p>
 <h2 id="reading-input">Reading input</h2>
 <p>The last step reads the lines from the standard input instead of an array. <code>stdin().lines()</code> gives
 them one by one until the input ends; reading can fail, so the loop is marked <code>try</code> too:</p>

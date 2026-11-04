@@ -21,10 +21,9 @@
 <ul class="sidebar-box" id="sidebar-box">
 <li><a href="../../../std/uri/">std.uri</a></li>
 <li><a href="../../../std/uri/Component/">Component</a></li>
+<li><a href="../../../std/uri/Percent/">Percent</a></li>
 <li><a href="../../../std/uri/Uri/">Uri</a></li>
 <li><a class="current" href="../../../std/uri/Query/">Query</a></li>
-<li><a href="../../../std/uri/#fn.percentEncode">percentEncode()</a></li>
-<li><a href="../../../std/uri/#fn.percentDecode">percentDecode()</a></li>
 <li><a href="../../../std/uri/#fn.removeDotSegments">removeDotSegments()</a></li>
 </ul>
 </nav>
@@ -49,7 +48,7 @@ servers see); <code>show</code> percent-encodes each key and value for <code>Com
 <p>Parses <code>a=1&amp;b=2&amp;a=3</code>: a part without <code>=</code> is a key with an empty value; an empty part is
 skipped.</p>
 <h4 id="errors">Errors</h4>
-<p>Throws <a href="../../../std/core/ParseError/">ParseError</a> as <a href="../../../std/uri/#fn.percentDecode">percentDecode</a> does, for a key or value that does not decode.</p>
+<p>Throws <a href="../../../std/core/ParseError/">ParseError</a> as <a href="../../../std/uri/Percent/#method.decode">Percent.decode</a> does, for a key or value that does not decode.</p>
 </section>
 <section class="member" id="method.get">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> get(key: <span class="ty">string</span>): ?<span class="ty">string</span></code></pre>

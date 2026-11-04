@@ -371,7 +371,7 @@ no text, <code>Invalid</code> for a text not of the type's form, <code>Overflow<
 range. All three are <code>std.core</code>'s. Beside the kind a parser says what it can: <strong><code>detail</code></strong> — what
 it expected where it stopped, empty where it says nothing more — and <strong><code>offset</code></strong>, the byte of
 the text the refusal points at, <code>null</code> where it knows none; <code>message()</code> carries both. The number
-parsers say nothing more; <code>Uri.parse</code>, <code>percentDecode</code>, the address parsers and the time parsers
+parsers say nothing more; <code>Uri.parse</code>, <code>Percent.decode</code>, the address parsers and the time parsers
 fill them.</p>
 <ul>
 <li>An <strong>integer</strong> is an optional <code>+</code> or <code>-</code> and ASCII digits, <code>_</code> only between two digits.
@@ -930,7 +930,7 @@ resolver knows, or an address's own text — each once, in the resolver's order,
 <h2 id="uris">URIs</h2>
 <p><strong><code>std.uri</code></strong> (design 10 O11; M10 S5) is RFC 3986, strictly: <code>Uri</code> is a reference in its five
 parts, <code>Uri.parse</code> reads one as the grammar allows, <code>show</code> writes it back, <code>resolve</code> and
-<code>normalize</code> are the RFC's algorithms, <code>percentEncode</code>/<code>percentDecode</code> the encoding per
+<code>normalize</code> are the RFC's algorithms, <code>Percent.encode</code>/<code>Percent.decode</code> the encoding per
 component, <code>Query</code> the pairs of a query. WHATWG's URL is a browser's leniency and not this.</p>
 <ol>
 <li><strong>The parts.</strong> <code>Uri { scheme: ?string, userinfo: ?string, host: ?string, port: ?int, path: string, query: ?string, fragment: ?string }</code>, each <code>null</code> where it was not written; the host
@@ -960,12 +960,12 @@ and the host in small letters, a percent-encoding of an unreserved character dec
 others' digits in capitals, the dot segments of a path removed where there is a scheme or an
 authority, an empty path with an authority <code>/</code>, the scheme's default port dropped — 80 for
 <code>http</code> and <code>ws</code>, 443 for <code>https</code> and <code>wss</code>, 21 for <code>ftp</code>.</li>
-<li><strong>The encoding.</strong> <code>percentEncode(text, component)</code> keeps what the component takes as it is and
+<li><strong>The encoding.</strong> <code>Percent.encode(text, component)</code> keeps what the component takes as it is and
 writes every other byte as <code>%</code> and two capital hex digits, a character beyond ASCII as the
 bytes of its UTF-8: <code>Component.Userinfo</code> keeps unreserved, sub-delims and <code>:</code>; <code>Host</code>
 unreserved and sub-delims; <code>Path</code> pchar and <code>/</code>; <code>Segment</code> pchar (a <code>/</code> is encoded); <code>Query</code>
 and <code>Fragment</code> pchar, <code>/</code> and <code>?</code>; <code>Pair</code> unreserved alone, for a key or a value of a query.
-<code>percentDecode(text)</code> reads <code>%XX</code> back and is <code>ParseError { kind = .Invalid }</code> for a <code>%</code>
+<code>Percent.decode(text)</code> reads <code>%XX</code> back and is <code>ParseError { kind = .Invalid }</code> for a <code>%</code>
 without two hex digits or bytes that are no UTF-8; a <code>+</code> stays. <strong><code>Query</code></strong> is the pairs of a
 query in the order written, a key more than once allowed: <code>Query.parse(text)</code> splits at <code>&amp;</code>
 and the first <code>=</code> (a part without <code>=</code> is a key with an empty value, an empty part is skipped),
