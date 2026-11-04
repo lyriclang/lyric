@@ -5030,33 +5030,6 @@ extend<T> Slice<T> {
             j = j - 1;
         }
     }
-
-    /// Returns a new array of the elements, the last first.
-    pub fn reversed(): T[] {
-        let n = this.length();
-        return arrayOf(n, (i: int) => this[n - 1 - i]);
-    }
-
-    /// Returns the first index whose element fails `p`, by binary search.
-    ///
-    /// The elements must be partitioned by `p`: every one it holds for before every one it does
-    /// not.
-    ///
-    /// # Errors
-    /// What `p` throws.
-    pub fn partitionPoint<E :: [Error]>(p: fn(T) -> bool throws E): int throws E {
-        var lo = 0;
-        var hi = this.length();
-        while (lo < hi) {
-            let mid = lo + (hi - lo) / 2;
-            if (try p(this[mid])) {
-                lo = mid + 1;
-            } else {
-                hi = mid;
-            }
-        }
-        return lo;
-    }
 }
 
 /// Concatenates two views: `a + b` is a new array of the elements of both, as `xs + ys` of two
@@ -5078,7 +5051,12 @@ extend<T> Slice<T> :: [Add<Out = T[]>] {
 /// Makes `x in xs` true where an element equals `x`.
 extend<T :: [Equatable]> Slice<T> :: [Contains<T>] {
     fn contains(x: T): bool {
-        return this.indexOf(x) != null;
+        for (e in this) {
+            if (e == x) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
@@ -5098,20 +5076,6 @@ extend StringView :: [Contains<char>] { }
 /// the members of its view.
 extend string :: [Contains<char>] { }
 
-extend<T :: [Equatable]> Slice<T> {
-    /// Returns the index of the first element equal to `x`, or `null`.
-    pub fn indexOf(x: T): ?int {
-        var i = 0;
-        while (i < this.length()) {
-            if (this[i] == x) {
-                return i;
-            }
-            i = i + 1;
-        }
-        return null;
-    }
-}
-
 extend<T :: [Clone]> Slice<T> {
     /// Sets every element to a clone of `v`, so no object is shared into several slots.
     pub fn fill(v: T): void {
@@ -5120,19 +5084,6 @@ extend<T :: [Clone]> Slice<T> {
             this[i] = v.clone();
             i = i + 1;
         }
-    }
-}
-
-extend<T :: [TotalOrder]> Slice<T> {
-    /// Returns the index of an element equal to `x` in sorted elements, or `null`.
-    ///
-    /// The elements must be sorted in their total order.
-    pub fn binarySearch(x: T): ?int {
-        let at = this.partitionPoint((e: T) => e < x);
-        if (at < this.length() && this[at] == x) {
-            return at;
-        }
-        return null;
     }
 }
 

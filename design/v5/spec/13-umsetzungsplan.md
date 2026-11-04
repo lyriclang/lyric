@@ -2030,7 +2030,7 @@ schon kann (C#/Kotlin statt Gos freier Funktionen); bei der Mathematik ändert s
 `clamp(x, lo, hi)` steht neben `min(a, b)`. Die Gefahr ist ein Umzug, der Namen bricht, ohne dass ein Test es merkt —
 darum zählt P-S6 die Inventur ein zweites Mal.
 
-**P-S1 bis P-S3, beim Bauen entschieden** (2026-11-03):
+**P-S1 bis P-S5, beim Bauen entschieden** (2026-11-03/04):
 
 - **P-S1**: ein `pub import` reicht die Blöcke seines Moduls weiter — auch die im eigenen Modul des Typs
   (`pub import lib.error { Thing }` bringt `lib.error`s Methoden auf `Thing` mit); vorher ließ der Re-Export sie
@@ -2055,3 +2055,9 @@ darum zählt P-S6 die Inventur ein zweites Mal.
   mit den Intrinsics (ein Import von `std.math` wäre ein Zyklus). **`Pow`** steht in `std.math` (10 P8); `x.pow(e)` bleibt
   als Methode des Interfaces gültig, darum ändern sich seine Aufrufer nicht. Rund 95 Aufrufer der übrigen in std,
   `tests/std` und einem Orakel umgeschrieben, je Datei mit dem Import.
+- **P-S5**: `find` gibt überall einen Index — `slice.indexOf(x)` und `iter.position(p)` heißen `find`, das alte
+  `iter.find(p)` (den Wert) heißt `firstWhere`. Umbenannt in zwei Schritten: erst das alte `find` fort, damit jeder
+  übersehene Aufrufer nicht kompiliert statt still den Index zu bekommen, dann das neue. `reversed`, `partitionPoint`,
+  `find` und `binarySearch` auf `Slice<T>` stehen in `std.collections`; `Contains` in `std.core` sucht selbst (eine
+  Schleife). **Abweichend von P9 bleiben `chunks`/`windows` in `std.collections`**: sie bauen `List`s wie `toList`
+  und `sorted`, in `std.iter` machten sie es von `std.collections` abhängig.

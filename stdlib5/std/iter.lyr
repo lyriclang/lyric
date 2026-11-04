@@ -794,7 +794,7 @@ extend<I :: [Iterator]> I {
     ///
     /// Throws what a pull of the iterator or `p` throws.
     pub fn any<E :: [Error]>(p: fn(I.Item) -> bool throws E): bool throws Join<I.Error, E> {
-        return try this.find(p) != null;
+        return try this.firstWhere(p) != null;
     }
 
     /// Returns whether `p` holds for every value.
@@ -805,7 +805,7 @@ extend<I :: [Iterator]> I {
     ///
     /// Throws what a pull of the iterator or `p` throws.
     pub fn all<E :: [Error]>(p: fn(I.Item) -> bool throws E): bool throws Join<I.Error, E> {
-        return try this.find((v) => !(try p(v))) == null;
+        return try this.firstWhere((v) => !(try p(v))) == null;
     }
 
     /// Returns whether `p` holds for no value.
@@ -816,7 +816,7 @@ extend<I :: [Iterator]> I {
     ///
     /// Throws what a pull of the iterator or `p` throws.
     pub fn none<E :: [Error]>(p: fn(I.Item) -> bool throws E): bool throws Join<I.Error, E> {
-        return try this.find(p) == null;
+        return try this.firstWhere(p) == null;
     }
 
     /// Returns the first value for which `p` holds, or `null` where there is none.
@@ -824,7 +824,9 @@ extend<I :: [Iterator]> I {
     /// # Errors
     ///
     /// Throws what a pull of the iterator or `p` throws.
-    pub fn find<E :: [Error]>(p: fn(I.Item) -> bool throws E): ?I.Item throws Join<I.Error, E> {
+    pub fn firstWhere<E :: [Error]>(
+        p: fn(I.Item) -> bool throws E
+    ): ?I.Item throws Join<I.Error, E> {
         var it = this;
         var x = try it.next();
         while (x != null && !(try p(x))) {
@@ -833,13 +835,13 @@ extend<I :: [Iterator]> I {
         return x;
     }
 
-    /// Returns the position, counted from 0, of the first value for which `p` holds, or `null`
-    /// where there is none.
+    /// Returns the index, counted from 0, of the first value for which `p` holds, or `null` where
+    /// there is none — as a text's and a slice's `find` give an index. `firstWhere` gives the value.
     ///
     /// # Errors
     ///
     /// Throws what a pull of the iterator or `p` throws.
-    pub fn position<E :: [Error]>(p: fn(I.Item) -> bool throws E): ?int throws Join<I.Error, E> {
+    pub fn find<E :: [Error]>(p: fn(I.Item) -> bool throws E): ?int throws Join<I.Error, E> {
         var it = this;
         var i = 0;
         var x = try it.next();

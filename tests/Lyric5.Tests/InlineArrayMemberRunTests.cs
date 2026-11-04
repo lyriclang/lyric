@@ -71,8 +71,8 @@ public class InlineArrayMemberRunTests
                 let rows: Row[] = [Row { cells = [5, 6] }];
                 let first = b.cells.first() ?? -1;
                 let last = b.cells.last() ?? -1;
-                let at = b.cells.indexOf(1) ?? -1;
-                let inRows = rows[0].cells.indexOf(6) ?? -1;
+                let at = b.cells.find(1) ?? -1;
+                let inRows = rows[0].cells.find(6) ?? -1;
                 let grid: int[2][] = [[7, 8]];
                 println(f"{b.cells.contains(3)} {b.cells.contains(9)} {first} {last} | {at} {inRows} | {grid[0].first() ?? -1}");
             }
@@ -120,7 +120,7 @@ public class InlineArrayMemberRunTests
     /// <summary>The frame in its forms: a local, a parameter, a field of a struct that is a
     /// local. Each is refused where the member is called, and each has the three built in.</summary>
     [Theory]
-    [InlineData("fn main(): void {\n    let xs: int[3] = [3, 1, 2];\n    let n = xs.indexOf(1);\n}\n", "xs.toArray().indexOf(")]
+    [InlineData("fn main(): void {\n    let xs: int[3] = [3, 1, 2];\n    let n = xs.find(1);\n}\n", "xs.toArray().find(")]
     [InlineData("fn f(xs: int[3]): bool {\n    return xs.contains(1);\n}\nfn main(): void {\n}\n", "xs.toArray().contains(")]
     [InlineData("struct Row {\n    cells: int[2],\n}\nfn main(): void {\n    let r = Row { cells = [5, 6] };\n    let n = r.cells.first();\n}\n", "r.cells.toArray().first(")]
     public void A_frame_has_no_view_of_its_inline_array(string program, string wayOut)
