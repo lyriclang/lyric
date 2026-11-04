@@ -14,7 +14,7 @@ namespace Lyric.Core;
 ///
 /// <para>The display is plain ASCII.</para>
 /// </summary>
-public sealed class TerminalOutput : IDisposable
+public sealed class TerminalOutput : ICompilerProgress, IDisposable
 {
     /// <summary>Clears from the cursor to the end of the line (ANSI EL).</summary>
     private const string EraseToEndOfLine = "\u001b[K";

@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Lyric5.Toolchain;
 using static Lyric5.Tests.PackageFixture;
 
 namespace Lyric5.Tests;
@@ -6,7 +7,7 @@ namespace Lyric5.Tests;
 /// <summary>
 /// The status lines of a build on the standard error (spec 14 §1.1): each step that does work says
 /// one line as it starts, what is up to date says nothing, a build that succeeds ends with
-/// <c>Finished</c>; <c>-q</c> and <c>--json</c> say none. A build said nothing but its findings, so
+/// <c>Finished</c> and what it made; <c>-q</c> and <c>--json</c> say none. A build said nothing but its findings, so
 /// a long one — a vendored C library — looked hung.
 ///
 /// <para>Through <c>Main</c>, so in the console collection; the standard error is no terminal here,
@@ -50,6 +51,100 @@ public partial class BuildStatusTests
         Assert.Equal(0, again);
         Assert.Matches(Finished(), Assert.Single(Lines(said)));
     }
+
+    /// <summary>The whole of a log's lines: the front end's phases, what the build made with its
+    /// size, the warnings and the cache, and the times together — a log's lines carry none.</summary>
+    [Fact]
+    public void A_log_says_the_phases_the_result_and_the_times()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", "fn main(): void {\n    let unused = 1;\n}\n"));
+        var (exit, _, error) = RunRaw("build", "-C", dir, "--color", "never");
+        Assert.True(exit == 0, error);
+        var text = error.Replace("\r\n", "\n").Replace('\\', '/');
+        Assert.Contains("     Parsing the program\n", text);
+        Assert.Matches(@"(?m)^   Analyzing \d+ modules$", text);
+        Assert.Contains("    Lowering the program\n", text);
+        Assert.Contains("    Emitting the C\n", text);
+        Assert.Matches(@"(?m)^    Produced out/debug/[^ ]+/app(\.exe)? \(\d+(\.\d)? [KM]?B\)$", text);
+        Assert.Matches(@"(?m)^     Summary \d+ warnings?$", text);
+        Assert.Matches(@"(?m)^     Timings parsing \d+\.\d\ds, analyzing \d+\.\d\ds, .*lowering \d+\.\d\ds, emitting \d+\.\d\ds, .*linking \d+\.\d\ds$", text);
+
+        // up to date: no step, so no times; the warnings said again and the units from the cache
+        var (again, _, said) = RunRaw("build", "-C", dir, "--color", "never");
+        Assert.Equal(0, again);
+        Assert.Matches(@"(?m)^     Summary \d+ warnings?; \d+ of \d+ C units from the cache\r?$", said);
+        Assert.DoesNotContain("Timings", said);
+    }
+
+    /// <summary><c>check</c> makes nothing, so it says nothing made.</summary>
+    [Fact]
+    public void Check_says_no_result()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", Main));
+        var (exit, _, error) = RunRaw("check", "-C", dir, "--color", "never");
+        Assert.True(exit == 0, error);
+        Assert.Contains("Analyzing", error);
+        Assert.DoesNotContain("Produced", error);
+    }
+
+    /// <summary><c>-v</c> names the packages and each C unit with its time.</summary>
+    [Fact]
+    public void Verbose_says_the_packages_and_each_unit()
+    {
+        var dir = Native();
+        var (exit, _, error) = RunRaw("build", "-C", dir, "-v", "--color", "never");
+        Assert.True(exit == 0, error);
+        Assert.Matches(@"(?m)^     Package std v", error);
+        Assert.Matches(@"(?m)^    Compiled twice\.c \(twice\.c\) \d+\.\d\ds\r?$", error);
+    }
+
+    /// <summary>What is quiet stays quiet: none of the new lines under <c>-q</c>.</summary>
+    [Fact]
+    public void Quiet_says_no_phase_and_no_result()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", Main));
+        var (exit, _, error) = RunRaw("build", "-C", dir, "-q", "--color", "never");
+        Assert.True(exit == 0, error);
+        Assert.Empty(Lines(error));
+        Assert.DoesNotContain("Produced", error);
+        Assert.DoesNotContain("Timings", error);
+    }
+
+    /// <summary>On a terminal a timed step stays one line: drawn as it starts, its count over it,
+    /// its time at its end; another line closes it. The driver sees no terminal in a test, so the
+    /// class is driven by hand.</summary>
+    [Fact]
+    public void On_a_terminal_a_step_is_one_line_with_its_time()
+    {
+        var output = new StringWriter { NewLine = "\n" };
+        BuildStatus.Writer = output;
+        BuildStatus.Live = true;
+        try
+        {
+            using (var step = BuildStatus.Begin("Compiling", "3 of 3 C units of app"))
+            {
+                BuildStatus.Count(1, 3, "app");
+                BuildStatus.Done();
+            }
+            var open = BuildStatus.Begin("Analyzing", "2 modules");
+            BuildStatus.Say("Finished", "debug");
+            open.Dispose();
+            BuildStatus.Summary();
+        }
+        finally { BuildStatus.Reset(); }
+        const string Erase = "\u001b\\[K";
+        Assert.Matches("^   Compiling 3 of 3 C units of app"
+            + $"\\r   Compiling \\[1/3\\] app{Erase}"
+            + $"\\r   Compiling 3 of 3 C units of app \\d+\\.\\d\\ds{Erase}\\n"
+            + $"   Analyzing 2 modules\\r   Analyzing 2 modules{Erase}\\n"
+            + "    Finished debug\\n$", output.ToString());
+    }
+
+    [Theory]
+    [InlineData(512, "512 B")]
+    [InlineData(2048, "2.0 KB")]
+    [InlineData(1258291, "1.2 MB")]
+    public void A_size_reads_as_a_reader_takes_it(long bytes, string said) => Assert.Equal(said, BuildStatus.Size(bytes));
 
     /// <summary>A changed C file compiles that unit alone: the front end's C is up to date, and
     /// says nothing.</summary>

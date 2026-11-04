@@ -371,6 +371,10 @@ promise. This entry fills with the milestones.
   `Thing` with it. Two such modules seen at one call that both add the name are refused (`LYR-SEM0235`);
   before, the first import won and the second was called unused. The compiler's own helpers in `std.core`
   (`fstring…`, `equalArrays`, `cloneArray` …) are no longer public API.
+- **A build says more of what it does**: the front end's phases each have a status line (`Parsing`, `Analyzing`,
+  `Evaluating`, `Lowering`, `Emitting`), a timed step ends with its time on a terminal and a log gets a `Timings`
+  line, `Produced` names what came of the build with its size, and `Summary` the warnings and the C units from the
+  cache. `-v` adds each package, `std` among them, and each C unit with its time.
 - **`lyric fix --from-4` (M16, in progress)**: migrates a Lyric 4 package (its `lyric.json`) or a file. The program
   is read with Lyric 4.6's frozen front end — one 4.6 refuses is not changed (`LYR-MIG0001`) —, the rules rewrite
   spans so comments and layout stay, and what a person decides is said as a hint (`LYR-MIG`) and written to

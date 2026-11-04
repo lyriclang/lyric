@@ -141,15 +141,21 @@ public sealed partial class CBuild
     {
         var objects = units.Select(ObjectOf).ToArray();
         var stale = Enumerable.Range(0, units.Count).Where(i => !File.Exists(objects[i])).ToList();
-        if (of is not null && stale.Count > 0)
-            BuildStatus.Say("Compiling", $"{stale.Count} of {units.Count} C unit{(units.Count == 1 ? "" : "s")} of {of}");
+        if (of is not null) BuildStatus.Units(units.Count, units.Count - stale.Count);
+        // the runtime's units count under its own step, which its caller says
+        using var step = of is not null && stale.Count > 0
+            ? BuildStatus.Begin("Compiling", $"{stale.Count} of {units.Count} C unit{(units.Count == 1 ? "" : "s")} of {of}")
+            : null;
         var errors = new System.Collections.Concurrent.ConcurrentBag<string>();
         var done = 0;
         Parallel.ForEach(stale, i =>
         {
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
             try { CompileTo(units[i], objects[i]); }
             catch (CBuildException exception) { errors.Add(exception.Message); }
-            BuildStatus.Count(Interlocked.Increment(ref done), stale.Count, units[i].Shown ?? Path.GetFileName(units[i].Source));
+            var name = units[i].Shown ?? Path.GetFileName(units[i].Source);
+            BuildStatus.SayVerbose("Compiled", $"{name} ({Path.GetFileName(units[i].Source)}) {BuildStatus.Seconds(System.Diagnostics.Stopwatch.GetElapsedTime(started))}");
+            BuildStatus.Count(Interlocked.Increment(ref done), stale.Count, name);
         });
         BuildStatus.Done();
         if (!errors.IsEmpty) throw new CBuildException(string.Join("\n\n", errors));

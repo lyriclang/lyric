@@ -161,21 +161,23 @@ public static partial class Program
             var exit = 0;
             foreach (var program in programs)
                 exit = Math.Max(exit, Pipeline.CheckProgram(program, profile, target, DisplayVersion(), Console.Error));
-            if (exit == 0) Finished(profile, clock);
+            if (exit == 0) Finished(profile, clock, []);
             return exit;
         }
 
         if (CompilerFor(profile) is not { } compiler) return 2;
 
         string? executable = null;
+        var produced = new List<string>();
         foreach (var program in programs)
         {
             var (exit, built) = Pipeline.Build(new BuildRequest(program, profile, target, compiler, DisplayVersion()), Console.Error);
             if (exit != 0 || built is null) return exit;
             executable = built;
+            produced.Add(built);
             Lyric.Core.Rendering.RenderStyle.Current.Events?.Artifact("binary", program.BinaryName, built);
         }
-        Finished(profile, clock);
+        Finished(profile, clock, produced);
         if (!run) return 0;
         if (!target.IsHost)
         {
@@ -188,11 +190,15 @@ public static partial class Program
         return ProcessRunner.RunInherited(executable!, programArgs);
     }
 
-    /// <summary>The last status line of a build that succeeded: the profile, what it compiles with,
-    /// and how long the command took.</summary>
-    private static void Finished(BuildProfile profile, System.Diagnostics.Stopwatch clock) =>
-        BuildStatus.Say("Finished", $"{profile.Name} [opt {profile.Opt}{(profile.DebugInfo ? ", debug info" : "")}] in "
-            + clock.Elapsed.TotalSeconds.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + "s");
+    /// <summary>The last status lines of a build that succeeded: the profile, what it compiles with,
+    /// and how long the command took; what it made, with its size; what else there is to say of it.</summary>
+    private static void Finished(BuildProfile profile, System.Diagnostics.Stopwatch clock, IReadOnlyList<string> produced)
+    {
+        BuildStatus.Say("Finished", $"{profile.Name} [opt {profile.Opt}{(profile.DebugInfo ? ", debug info" : "")}] in {BuildStatus.Seconds(clock.Elapsed)}");
+        foreach (var file in produced)
+            BuildStatus.Say("Produced", $"{Pipeline.Shown(file)} ({BuildStatus.Size(new FileInfo(file).Length)})");
+        BuildStatus.Summary();
+    }
 
     /// <summary>
     /// <c>build --lib</c>: the package's <c>src/lib.lyr</c> and what it imports as a library C links
@@ -239,7 +245,7 @@ public static partial class Program
         var (exit, built, linkArgs) = Pipeline.BuildLibrary(
             new BuildRequest(project with { LintArgs = lints }, profile, target, compiler, DisplayVersion()), Console.Error);
         if (exit != 0 || built is null) return exit;
-        Finished(profile, clock);
+        Finished(profile, clock, [built]);
         // what a C program links beside the archive, the target's (spec 13 §4 rule 9)
         var shared = project.Library == LibraryKind.Shared;
         if (Lyric.Core.Rendering.RenderStyle.Current.Events is { } events)

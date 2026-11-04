@@ -59,7 +59,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M13b | LSP, DAP, clients | XL | **done** 2026-10-26 |
 | M14 | FFI and embedding | L | **done** 2026-10-28 |
 | M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | **done** 2026-10-29 |
-| M15 | Distribution | M | **done** 2026-10-29 but its halts (S6 signing, S7 mirror) |
+| M15 | Distribution | M | **done** 2026-10-29 but its halts (S6 signing; S7 mirror set aside by the maintainer 2026-11-04) |
 | M16 | Migration (`lyric fix --from-4`) | L | open: S1–S3 done (S3 2026-11-02); S4 next, on the std after Block P |
 | P | std by subject module (design 10 P1–P12, plan in 13) | L | **done** 2026-11-04 |
 | M17 | Spec 5.0, suite, guide | L | — |

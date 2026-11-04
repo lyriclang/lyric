@@ -66,6 +66,7 @@ public static partial class Program
             BuildStatus.Writer = Console.Error;
             BuildStatus.Color = Lyric.Core.Rendering.RenderStyle.Current.Color;
             BuildStatus.Live = !verbose && !Console.IsErrorRedirected;
+            BuildStatus.Verbose = verbose;
         }
         try { return Dispatched(verb, rest, lints); }
         finally
