@@ -227,16 +227,18 @@ the next value.</p>
 <h4 id="errors">Errors</h4>
 <p>Throws what a pull of the iterator or <code>p</code> throws.</p>
 </section>
-<section class="member" id="ext.I.method.find">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> find&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): ?<span class="ty">I</span>.<span class="ty">Item</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<section class="member" id="ext.I.method.firstWhere">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> firstWhere&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(
+    p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>
+): ?<span class="ty">I</span>.<span class="ty">Item</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
 <p>Returns the first value for which <code>p</code> holds, or <code>null</code> where there is none.</p>
 <h4 id="errors">Errors</h4>
 <p>Throws what a pull of the iterator or <code>p</code> throws.</p>
 </section>
-<section class="member" id="ext.I.method.position">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> position&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): ?<span class="ty">int</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
-<p>Returns the position, counted from 0, of the first value for which <code>p</code> holds, or <code>null</code>
-where there is none.</p>
+<section class="member" id="ext.I.method.find">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> find&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">I</span>.<span class="ty">Item</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): ?<span class="ty">int</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">I</span>.<span class="ty">Error</span>, <span class="ty">E</span>&gt;</code></pre>
+<p>Returns the index, counted from 0, of the first value for which <code>p</code> holds, or <code>null</code> where
+there is none — as a text's and a slice's <code>find</code> give an index. <code>firstWhere</code> gives the value.</p>
 <h4 id="errors">Errors</h4>
 <p>Throws what a pull of the iterator or <code>p</code> throws.</p>
 </section>

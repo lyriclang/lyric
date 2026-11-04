@@ -332,7 +332,9 @@ without.</li>
 throw what it throws: <code>count()</code>; <code>fold(init, f)</code> and <code>reduce(f)</code>, the latter <code>null</code> without a
 value; <code>first()</code>, <code>last()</code> and <code>nth(n)</code>, <code>null</code> where there is no such value, a negative <code>n</code>
 included; <code>any(p)</code>, <code>all(p)</code> (<code>true</code> for none) and <code>none(p)</code>, stopping at the value that
-decides; <code>find(p)</code> and <code>position(p)</code>; <code>forEach(f)</code>, inline
+decides; <code>find(p)</code>, the index of the first value <code>p</code> holds for, and <code>firstWhere(p)</code>, that
+value — <code>find</code> gives an index wherever it stands, a text's, a slice's, an iterator's (design 10
+P6); <code>forEach(f)</code>, inline
 (<a href="../../spec/03-types/#85-inline-functions">03 §8.5</a>): a lambda written at the call is set in place, its
 <code>return</code> the caller's; <code>toArray()</code>, in one pass; <code>minBy(key)</code>
 and <code>maxBy(key)</code>, the value whose <code>TotalOrder</code> key is least or greatest, the first of equal
@@ -414,14 +416,16 @@ through one reaches the array. <code>length()</code> and the index are the primi
 <li><code>isEmpty()</code>; <code>get(i)</code>, <code>null</code> outside <code>0 ≤ i &lt; length()</code>; <code>first()</code> and <code>last()</code>, <code>null</code>
 where there is no element.</li>
 <li><code>swap(i, j)</code>, an index outside panicking as <code>[i]</code> does; <code>reverse()</code> in place; <code>reversed()</code>, a
-new array.</li>
+new array — <code>std.collections</code>'s, with <code>find</code>, <code>partitionPoint</code> and <code>binarySearch</code> below: what
+searches in a slice or makes a new one of it is that module's, a block on <code>Slice&lt;T&gt;</code> the prelude
+passes on; what describes the slice and what changes it in place is <code>std.core</code>'s (design 10 P9).</li>
 <li><code>copyInto(into)</code>: the elements into the view <code>into</code>, which is at least as long — a shorter
 one panics as an index outside does (<code>LYR-RT0003</code>), a longer one keeps its rest; the two may
 overlap either way (the review's B16). One copy, not an element at a time: what the
 collections grow and shift with.</li>
 <li>Of an <code>Equatable</code> element: <code>contains(x)</code>, through which <code>T[]</code> and <code>Slice&lt;T&gt;</code> are
 <code>Contains&lt;T&gt;</code> (10 C12) — what <code>x in xs</code> asks (<a href="../../spec/05-interfaces/">05 §12</a> rule 10) — and
-<code>indexOf(x)</code>, the first index or <code>null</code>.</li>
+<code>find(x)</code>, the first index or <code>null</code>.</li>
 <li>Of a <code>Clone</code> element: <code>fill(v)</code>, every element a clone of <code>v</code> — no object shared into several
 slots, as <code>[x] * n</code> shares none (<a href="../../spec/03-types/">03 §5.1</a>).</li>
 <li><code>partitionPoint(p)</code>: the first index whose element fails <code>p</code>, for elements <code>p</code> partitions —

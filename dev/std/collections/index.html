@@ -157,6 +157,36 @@ println(distinct.length());</code></pre>
 <h4 id="errors">Errors</h4>
 <p>Throws what a pull of the iterator throws.</p>
 </section>
+<section class="member" id="ext.SliceT">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extend</span>&lt;<span class="ty">T</span>&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+</section>
+<section class="member" id="ext.SliceT.method.reversed">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> reversed(): <span class="ty">T</span>[]</code></pre>
+<p>Returns a new array of the elements, the last first.</p>
+</section>
+<section class="member" id="ext.SliceT.method.partitionPoint">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> partitionPoint&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">T</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">int</span> <span class="kw">throws</span> <span class="ty">E</span></code></pre>
+<p>Returns the first index whose element fails <code>p</code>, by binary search.</p>
+<p>The elements must be partitioned by <code>p</code>: every one it holds for before every one it does
+not.</p>
+<h4 id="errors">Errors</h4>
+<p>What <code>p</code> throws.</p>
+</section>
+<section class="member" id="ext.SliceT-2">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">Equatable</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+</section>
+<section class="member" id="ext.SliceT-2.method.find">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> find(x: <span class="ty">T</span>): ?<span class="ty">int</span></code></pre>
+<p>Returns the index of the first element equal to <code>x</code>, or <code>null</code>.</p>
+</section>
+<section class="member" id="ext.SliceT-3">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">TotalOrder</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
+</section>
+<section class="member" id="ext.SliceT-3.method.binarySearch">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> binarySearch(x: <span class="ty">T</span>): ?<span class="ty">int</span></code></pre>
+<p>Returns the index of an element equal to <code>x</code> in sorted elements, or <code>null</code>.</p>
+<p>The elements must be sorted in their total order.</p>
+</section>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -168,6 +198,9 @@ println(distinct.length());</code></pre>
 <li class="level-3"><a href="#ext.I-3">I</a></li>
 <li class="level-3"><a href="#ext.I-4">I</a></li>
 <li class="level-3"><a href="#ext.I-5">I</a></li>
+<li class="level-3"><a href="#ext.SliceT">Slice&lt;T&gt;</a></li>
+<li class="level-3"><a href="#ext.SliceT-2">Slice&lt;T&gt;</a></li>
+<li class="level-3"><a href="#ext.SliceT-3">Slice&lt;T&gt;</a></li>
 </ul>
 </aside>
 </div>

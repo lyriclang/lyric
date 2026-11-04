@@ -2118,18 +2118,6 @@ end.</p>
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> reverse(): <span class="ty">void</span></code></pre>
 <p>Reverses the elements in place.</p>
 </section>
-<section class="member" id="ext.SliceT-2.method.reversed">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> reversed(): <span class="ty">T</span>[]</code></pre>
-<p>Returns a new array of the elements, the last first.</p>
-</section>
-<section class="member" id="ext.SliceT-2.method.partitionPoint">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> partitionPoint&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(p: <span class="kw">fn</span>(<span class="ty">T</span>) -&gt; <span class="ty">bool</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">int</span> <span class="kw">throws</span> <span class="ty">E</span></code></pre>
-<p>Returns the first index whose element fails <code>p</code>, by binary search.</p>
-<p>The elements must be partitioned by <code>p</code>: every one it holds for before every one it does
-not.</p>
-<h4 id="errors">Errors</h4>
-<p>What <code>p</code> throws.</p>
-</section>
 <section class="member" id="ext.SliceT-3">
 <pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span>&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt; :: [<span class="ty">Add</span>&lt;<span class="ty">Out</span> = <span class="ty">T</span>[]&gt;]</code></pre>
 <p class="conforms">Conforms to <code>Add&lt;Out = T[]&gt;</code>.</p>
@@ -2160,31 +2148,16 @@ not.</p>
 <p class="conforms">Conforms to <code>Contains&lt;char&gt;</code>.</p>
 </section>
 <section class="member" id="ext.SliceT-5">
-<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">Equatable</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
-</section>
-<section class="member" id="ext.SliceT-5.method.indexOf">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> indexOf(x: <span class="ty">T</span>): ?<span class="ty">int</span></code></pre>
-<p>Returns the index of the first element equal to <code>x</code>, or <code>null</code>.</p>
-</section>
-<section class="member" id="ext.SliceT-6">
 <pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">Clone</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
 </section>
-<section class="member" id="ext.SliceT-6.method.fill">
+<section class="member" id="ext.SliceT-5.method.fill">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fill(v: <span class="ty">T</span>): <span class="ty">void</span></code></pre>
 <p>Sets every element to a clone of <code>v</code>, so no object is shared into several slots.</p>
 </section>
-<section class="member" id="ext.SliceT-7">
-<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">TotalOrder</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
-</section>
-<section class="member" id="ext.SliceT-7.method.binarySearch">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> binarySearch(x: <span class="ty">T</span>): ?<span class="ty">int</span></code></pre>
-<p>Returns the index of an element equal to <code>x</code> in sorted elements, or <code>null</code>.</p>
-<p>The elements must be sorted in their total order.</p>
-</section>
-<section class="member" id="ext.SliceT-8">
+<section class="member" id="ext.SliceT-6">
 <pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span>&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
 </section>
-<section class="member" id="ext.SliceT-8.method.sortBy">
+<section class="member" id="ext.SliceT-6.method.sortBy">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sortBy&lt;<span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(cmp: <span class="kw">fn</span>(<span class="ty">T</span>, <span class="ty">T</span>) -&gt; <span class="ty">Ordering</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">E</span></code></pre>
 <p>Sorts the elements in the order <code>cmp</code> gives, equal ones keeping theirs.</p>
 <p>A merge sort: runs of 16 sorted by insertion, then merged pairwise through a buffer of the
@@ -2193,21 +2166,21 @@ length.</p>
 <p>What <code>cmp</code> throws ends the sort, and the call throws it; the elements are then in some
 order, every one still there.</p>
 </section>
-<section class="member" id="ext.SliceT-8.method.sortByKey">
+<section class="member" id="ext.SliceT-6.method.sortByKey">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sortByKey&lt;<span class="ty">K</span> :: [<span class="ty">TotalOrder</span>], <span class="ty">E</span> :: [<span class="ty">Error</span>]&gt;(key: <span class="kw">fn</span>(<span class="ty">T</span>) -&gt; <span class="ty">K</span> <span class="kw">throws</span> <span class="ty">E</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">E</span></code></pre>
 <p>Sorts the elements in the order of their keys, equal keys keeping theirs.</p>
 <h4 id="errors">Errors</h4>
 <p>What <code>key</code> throws, as for <code>sortBy</code>'s comparison.</p>
 </section>
-<section class="member" id="ext.SliceT-9">
+<section class="member" id="ext.SliceT-7">
 <pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">TotalOrder</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;</code></pre>
 </section>
-<section class="member" id="ext.SliceT-9.method.sort">
+<section class="member" id="ext.SliceT-7.method.sort">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sort(): <span class="ty">void</span></code></pre>
 <p>Sorts the elements in ascending order, equal ones keeping theirs.</p>
 <p><code>sortBy</code>'s merge sort with <code>totalCompare</code> called directly.</p>
 </section>
-<section class="member" id="ext.SliceT-9.method.sortUnstable">
+<section class="member" id="ext.SliceT-7.method.sortUnstable">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sortUnstable(): <span class="ty">void</span></code></pre>
 <p>Sorts the elements in ascending order, equal ones in any order.</p>
 <p>In place, without a buffer: a quicksort, falling back to a heap sort where it would go
@@ -2220,11 +2193,11 @@ quadratic.</p>
 <section class="member" id="ext.T-5.method.equals">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> equals(o: <span class="ty">T</span>[]): <span class="ty">bool</span></code></pre>
 </section>
-<section class="member" id="ext.SliceT-10">
+<section class="member" id="ext.SliceT-8">
 <pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">Equatable</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt; :: [<span class="ty">Equatable</span>]</code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>.</p>
 </section>
-<section class="member" id="ext.SliceT-10.method.equals">
+<section class="member" id="ext.SliceT-8.method.equals">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> equals(o: <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt;): <span class="ty">bool</span></code></pre>
 </section>
 <section class="member" id="ext.T-6">
@@ -2243,20 +2216,20 @@ quadratic.</p>
 <section class="member" id="ext.T-6.method.showTo">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> showTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
 </section>
-<section class="member" id="ext.SliceT-11">
+<section class="member" id="ext.SliceT-9">
 <pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">Debug</span>]&gt; <span class="ty">Slice</span>&lt;<span class="ty">T</span>&gt; :: [<span class="ty">Debug</span>, <span class="ty">Display</span>]</code></pre>
 <p class="conforms">Conforms to <code>Debug</code>, <code>Display</code>.</p>
 </section>
-<section class="member" id="ext.SliceT-11.method.debug">
+<section class="member" id="ext.SliceT-9.method.debug">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> debug(): <span class="ty">string</span></code></pre>
 </section>
-<section class="member" id="ext.SliceT-11.method.debugTo">
+<section class="member" id="ext.SliceT-9.method.debugTo">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> debugTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
 </section>
-<section class="member" id="ext.SliceT-11.method.show">
+<section class="member" id="ext.SliceT-9.method.show">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> show(): <span class="ty">string</span></code></pre>
 </section>
-<section class="member" id="ext.SliceT-11.method.showTo">
+<section class="member" id="ext.SliceT-9.method.showTo">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> showTo(out: <span class="ty">StringBuilder</span>): <span class="ty">void</span></code></pre>
 </section>
 <section class="member" id="ext.T-7">
@@ -2715,12 +2688,10 @@ quadratic.</p>
 <li class="level-3"><a href="#ext.SliceT-5">Slice&lt;T&gt;</a></li>
 <li class="level-3"><a href="#ext.SliceT-6">Slice&lt;T&gt;</a></li>
 <li class="level-3"><a href="#ext.SliceT-7">Slice&lt;T&gt;</a></li>
-<li class="level-3"><a href="#ext.SliceT-8">Slice&lt;T&gt;</a></li>
-<li class="level-3"><a href="#ext.SliceT-9">Slice&lt;T&gt;</a></li>
 <li class="level-3"><a href="#ext.T-5">T[]</a></li>
-<li class="level-3"><a href="#ext.SliceT-10">Slice&lt;T&gt;</a></li>
+<li class="level-3"><a href="#ext.SliceT-8">Slice&lt;T&gt;</a></li>
 <li class="level-3"><a href="#ext.T-6">T[]</a></li>
-<li class="level-3"><a href="#ext.SliceT-11">Slice&lt;T&gt;</a></li>
+<li class="level-3"><a href="#ext.SliceT-9">Slice&lt;T&gt;</a></li>
 <li class="level-3"><a href="#ext.T-7">?T</a></li>
 <li class="level-3"><a href="#ext.T-8">?T</a></li>
 <li class="level-3"><a href="#ext.T-9">?T</a></li>
