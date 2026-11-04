@@ -268,6 +268,34 @@ seven: write: number operator number
 that throws is covered, and `catch (err)` takes whichever comes; `err.message()` says what it was.
 `throw` is an expression too: the `.Div` arm is a value or an error.
 
+## Where a function lives
+
+`split` is no member of `string`. On a type stands what describes a value — `length()`,
+`bytes()`, `chars()`, `isEmpty()` —; what searches in it, takes it apart or computes with it
+stands in the module of its subject: text in `std.string`, numbers in `std.math`, collections in
+`std.collections`. Text and collection operations are written as methods there and the prelude
+passes them on, so `line.split(' ')` needs no import. `std.math`'s functions are free and
+imported by name:
+
+```lyric
+import std.io { println };
+import std.math { clamp, pow };
+
+fn main(): void {
+    let line = "  6 * 7  ";
+    println(f"{line.trim()} {line.length()} {line.find("*")!}");
+    println(f"{clamp(12, 0, 10)} {pow(2, 10)}");
+}
+```
+
+```output
+6 * 7 9 4
+10 1024
+```
+
+`find` gives an index wherever it stands — the byte of a text, the place in an array or of an
+iterator's value —, or `null` where there is none; `firstWhere` gives the value itself.
+
 ## Reading input
 
 The last step reads the lines from the standard input instead of an array. `stdin().lines()` gives

@@ -4,7 +4,7 @@
 //! character beyond ASCII, a `%` without two hex digits, a host in brackets that is not an IPv6
 //! address), `show` writes them back (§5.3), [Uri.resolve] resolves a reference against a base
 //! (§5.2), and [Uri.normalize] normalizes the case, the percent-encoding and the dot segments
-//! (§6.2). [percentEncode] and [percentDecode] encode a text for a [Component] and decode it
+//! (§6.2). [Percent.encode] and [Percent.decode] encode a text for a [Component] and decode it
 //! again; [Query] holds the pairs of a query in their order.
 //!
 //! # Examples
@@ -154,58 +154,66 @@ fn ascii(text: Slice<uint8>, from: int, to: int): string {
     return out.toString();
 }
 
-/// Returns `s` percent-encoded for the component `c` (§2.1): every byte the component does not
-/// keep becomes `%` and two hex digits in capitals; a character beyond ASCII is encoded as the
-/// bytes of its UTF-8.
-pub fn percentEncode(s: StringView, c: Component): string {
-    let text = viewBytes(s);
-    let out = StringBuilder.new();
-    for (b in text) {
-        if (keeps(c, b)) {
-            out.appendChar((b as uint32) as char);
-        } else {
-            out.appendChar('%');
-            out.appendChar(hexDigit((b >> 4) as int));
-            out.appendChar(hexDigit((b & 15u8) as int));
-        }
-    }
-    return out.toString();
-}
-
-/// Returns `s` with its percent-encodings decoded, each `%` and two hex digits one byte. A `+`
-/// stays a `+`; [Query.parse] is the one that reads it as a space, the form convention.
-///
-/// # Errors
-/// Throws [ParseError] with kind `Invalid` for a `%` without two hex digits after it, and for
-/// decoded bytes that are not UTF-8.
-pub fn percentDecode(s: StringView): string throws ParseError {
-    let text = viewBytes(s);
-    let n = text.length();
-    var out: uint8[] = [0u8] * n;
-    var i = 0;
-    var o = 0;
-    while (i < n) {
-        let b = text[i];
-        if (b == 37u8) {
-            if (i + 2 >= n || !isHex(text[i + 1]) || !isHex(text[i + 2])) {
-                throw ParseError {
-                    kind = .Invalid,
-                    detail = "a '%' without two hexadecimal digits after it",
-                    offset = i,
-                };
+/// Percent-encoding (§2.1): a text for one [Component], each byte the component does not keep
+/// written as `%` and two hex digits.
+pub struct Percent {
+    /// Returns `s` percent-encoded for the component `c` (§2.1): every byte the component does not
+    /// keep becomes `%` and two hex digits in capitals; a character beyond ASCII is encoded as the
+    /// bytes of its UTF-8.
+    pub static fn encode(s: StringView, c: Component): string {
+        let text = viewBytes(s);
+        let out = StringBuilder.new();
+        for (b in text) {
+            if (keeps(c, b)) {
+                out.appendChar((b as uint32) as char);
+            } else {
+                out.appendChar('%');
+                out.appendChar(hexDigit((b >> 4) as int));
+                out.appendChar(hexDigit((b & 15u8) as int));
             }
-            out[o] = (hexValue(text[i + 1]) * 16 + hexValue(text[i + 2])) as uint8;
-            i = i + 3;
-        } else {
-            out[o] = b;
-            i = i + 1;
         }
-        o = o + 1;
+        return out.toString();
     }
-    try {
-        return string.fromUtf8(out[0..o]);
-    } catch (_: Utf8Error) {
-        throw ParseError { kind = .Invalid, detail = "the decoded bytes are no UTF-8", offset = 0 };
+
+    /// Returns `s` with its percent-encodings decoded, each `%` and two hex digits one byte. A `+`
+    /// stays a `+`; [Query.parse] is the one that reads it as a space, the form convention.
+    ///
+    /// # Errors
+    /// Throws [ParseError] with kind `Invalid` for a `%` without two hex digits after it, and for
+    /// decoded bytes that are not UTF-8.
+    pub static fn decode(s: StringView): string throws ParseError {
+        let text = viewBytes(s);
+        let n = text.length();
+        var out: uint8[] = [0u8] * n;
+        var i = 0;
+        var o = 0;
+        while (i < n) {
+            let b = text[i];
+            if (b == 37u8) {
+                if (i + 2 >= n || !isHex(text[i + 1]) || !isHex(text[i + 2])) {
+                    throw ParseError {
+                        kind = .Invalid,
+                        detail = "a '%' without two hexadecimal digits after it",
+                        offset = i,
+                    };
+                }
+                out[o] = (hexValue(text[i + 1]) * 16 + hexValue(text[i + 2])) as uint8;
+                i = i + 3;
+            } else {
+                out[o] = b;
+                i = i + 1;
+            }
+            o = o + 1;
+        }
+        try {
+            return string.fromUtf8(out[0..o]);
+        } catch (_: Utf8Error) {
+            throw ParseError {
+                kind = .Invalid,
+                detail = "the decoded bytes are no UTF-8",
+                offset = 0,
+            };
+        }
     }
 }
 
@@ -784,7 +792,7 @@ pub class Query {
     /// skipped.
     ///
     /// # Errors
-    /// Throws [ParseError] as [percentDecode] does, for a key or value that does not decode.
+    /// Throws [ParseError] as [Percent.decode] does, for a key or value that does not decode.
     pub static fn parse(s: StringView): Query throws ParseError {
         let q = Query.new();
         for (part in s.split('&')) {
@@ -881,7 +889,7 @@ fn formDecode(s: StringView): string throws ParseError {
     for (b in text) {
         out.appendChar(if (b == 43u8) ' ' else (b as uint32) as char);
     }
-    return try percentDecode(out.toString());
+    return try Percent.decode(out.toString());
 }
 
 extend Query :: [Display] {
@@ -893,9 +901,9 @@ extend Query :: [Display] {
                 out.appendChar('&');
             }
             first = false;
-            out.appendStr(percentEncode(k, .Pair));
+            out.appendStr(Percent.encode(k, .Pair));
             out.appendChar('=');
-            out.appendStr(percentEncode(v, .Pair));
+            out.appendStr(Percent.encode(v, .Pair));
         }
         return out.toString();
     }

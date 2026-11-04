@@ -60,8 +60,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M14 | FFI and embedding | L | **done** 2026-10-28 |
 | M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | **done** 2026-10-29 |
 | M15 | Distribution | M | **done** 2026-10-29 but its halts (S6 signing, S7 mirror) |
-| M16 | Migration (`lyric fix --from-4`) | L | open: S1–S3 done (S3 2026-11-02); Block P before S4's library rules |
-| P | std by subject module (design 10 P1–P12, plan in 13) | L | planned 2026-11-03 |
+| M16 | Migration (`lyric fix --from-4`) | L | open: S1–S3 done (S3 2026-11-02); S4 next, on the std after Block P |
+| P | std by subject module (design 10 P1–P12, plan in 13) | L | **done** 2026-11-04 |
 | M17 | Spec 5.0, suite, guide | L | — |
 | M18 | Release 5.0.0 | M | — |
 
@@ -1393,8 +1393,24 @@ The plan is design 13's addendum "der Plan für M16" (#618; S1–S8).
 - **S3** (#641 + spec#401): the syntax rules S01, S04–S08, S10, S11 — `params` → `T...`, `resume` → `next()!`, an
   opaque type → a struct, `.Red`, `\u{NN}`, .NET format specs → the format language (4.6's output kept), `.length()`,
   the generic interfaces with their associated types; `LYR-MIG0205/0208/0211`.
-- **Next**: Block P (the std by subject module, design 10 "Nachtrag 2026-11-03", plan in 13), then S4's library rules
-  (T11–T16) on the new std; S4's other rules go on meanwhile. Then S5–S7, S8 closes.
+- **Next**: S4 — T01–T05, T08–T10, T18, and the library rules T11–T16 on the std as Block P left it (T13, the
+  math calls, is now mechanical: `x.clamp(lo, hi)` → `clamp(x, lo, hi)`). Then S5–S7, S8 closes.
+
+### Block P — done (2026-11-04)
+
+The std by subject module (design 10 "Nachtrag 2026-11-03" P1–P12, plan and report in 13 "Block P"): on a type
+stands what describes it, what computes, searches or reshapes stands in its subject's module, as a block of
+methods there or free.
+
+- **P-S1** (#643 + spec#402): a `pub import` passes a module's blocks of methods on (`LYR-SEM0235` for two at one
+  call); std.core's helpers `internal`.
+- **P-S2** (#644 + spec#403): text operations to `std.string`, the prelude passing it on; `bytes()`, `findAll`.
+- **P-S3** (#645 + spec#404): `substring`/`charAt` in characters and ten more; the forward search linear.
+- **P-S4** (#646 + spec#405): an integer's arithmetic, its bits and `clamp` free in `std.math`; one `pow` over `Pow`.
+- **P-S5** (#647 + spec#406): `find` an index everywhere, `firstWhere` the value; a slice's search in
+  `std.collections`.
+- **P-S6** (this): P12's names — `Percent.encode`/`decode`, the rest kept with reasons; the Book's "Where a
+  function lives"; the second inventory.
 
 ### The open points, decided (2026-10-30)
 
