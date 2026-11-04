@@ -1,3 +1,4 @@
+using Lyric5.Toolchain;
 using System.Text.Json;
 using Lyric.Core;
 
@@ -140,5 +141,6 @@ public static class DiagnosticStore
             });
         }
         engine.RenderText(error);
+        BuildStatus.Warned(engine.Diagnostics.Count(d => d.Severity == Severity.Warning));
     }
 }

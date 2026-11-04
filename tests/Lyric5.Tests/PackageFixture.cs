@@ -94,7 +94,7 @@ internal static partial class PackageFixture
     public static string WithoutStatus(string error) =>
         string.Join('\n', error.Split('\n').Where(line => !StatusLine().IsMatch(line)));
 
-    [System.Text.RegularExpressions.GeneratedRegex(@"^ *(Compiling|Checking|Linking|Archiving|Running|Binding|Fetching|Updating|Finished) ")]
+    [System.Text.RegularExpressions.GeneratedRegex(@"^ *(Compiling|Checking|Linking|Archiving|Running|Binding|Fetching|Updating|Finished|Parsing|Expanding|Analyzing|Evaluating|Lowering|Emitting|Produced|Summary|Timings|Package|Compiled) ")]
     private static partial System.Text.RegularExpressions.Regex StatusLine();
 
     /// <summary>The driver with <paramref name="args"/>, its standard error as it was written.</summary>

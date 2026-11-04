@@ -35,7 +35,7 @@ internal static class Verbs
     private static readonly Opt Profile = new("--profile", "<name>", "the build profile: debug, release, asan, tsan, or one of the manifest's (default: LYRIC_PROFILE, else debug)");
     private static readonly Opt Target = new("--target", "<triple>", "a Tier 1 target (default: this machine)");
     private static readonly Opt Bin = new("--bin", "<name>", "the package's program");
-    private static readonly Opt Verbose = new("-v", null, "say each command of the C compiler, the archiver and the linker as it starts", Alias: "--verbose");
+    private static readonly Opt Verbose = new("-v", null, "say each package, each C unit with its time, and each command of the C compiler, the archiver and the linker as it starts", Alias: "--verbose");
     private static readonly Opt Quiet = new("-q", null, "say no status lines: what is compiled, linked and run", Alias: "--quiet");
 
     /// <summary>The profile's fields, for one build (spec 15 §4).</summary>

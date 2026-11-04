@@ -54,6 +54,10 @@ public static class SourceCompiler
 
     private enum Stage { Check, Lower, Expand }
 
+    /// <summary>The detail of the check that expands macros, and of the one that runs the
+    /// <c>comptime</c> sites: what a progress display tells them from the program's check by.</summary>
+    public const string MacrosDetail = "macros", SitesDetail = "compile-time sites";
+
     private static CompileResult Run(ScriptSource source, Stage stage, CompilerOptions options)
     {
         var report = options.Progress;
@@ -140,7 +144,7 @@ public static class SourceCompiler
         // without a site pays nothing
         if (compilation.Lyric5Modules && !diagnostics.HasErrors && MacroExpander.Sites(compilation).Count > 0)
         {
-            report?.BeginPhase(Phase.Check, "macros");
+            report?.BeginPhase(Phase.Check, MacrosDetail);
             var expanded = MacroExpander.Expand(compilation, binding, diagnostics, sources, options, embed, trees =>
             {
                 var again = Build(trees);
@@ -173,8 +177,10 @@ public static class SourceCompiler
         // it, and the real lowering writes each site's value as a constant. Lyric 5's: the 4.x
         // tools lower a site as its inner expression, as they did since their VM went.
         types.SourcePlace = SourcePlaceFor(sources, options);
-        if (!EvaluateSites(compilation, binding, types, diagnostics, options, embed, report, out var comptime))
-            return new CompileResult(sources, diagnostics, null, model);
+        if (types.ComptimeSites.Count > 0) report?.BeginPhase(Phase.Check, SitesDetail);
+        var evaluated = EvaluateSites(compilation, binding, types, diagnostics, options, embed, out var comptime);
+        if (types.ComptimeSites.Count > 0) report?.EndPhase();
+        if (!evaluated) return new CompileResult(sources, diagnostics, null, model);
         WarnDeprecated(compilation, binding, types, diagnostics, options, comptime);
         if (diagnostics.HasErrors) return new CompileResult(sources, diagnostics, null, model); // an 'until' come due
         if (!options.Lower) return Unlowered(compilation, types, diagnostics, options, sources, model, embed, comptime);
@@ -285,16 +291,14 @@ public static class SourceCompiler
     /// the 4.x tools, which lower a site as its inner expression. False after reporting.
     /// </summary>
     private static bool EvaluateSites(Compilation compilation, BindingResult binding, TypeResult types,
-        DiagnosticEngine diagnostics, CompilerOptions options, EmbedReader embed, TerminalOutput? report,
+        DiagnosticEngine diagnostics, CompilerOptions options, EmbedReader embed,
         out ComptimeTable? comptime)
     {
         comptime = null;
         if (!compilation.Lyric5Modules || types.ComptimeSites.Count == 0) return true;
-        report?.BeginPhase(Phase.Lower);
         var hoisting = new ComptimeTable { Hoist = true };
         var hoisted = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
             optimize: false, libraryRoots: false, passes: options.Passes, comptime: hoisting);
-        report?.EndPhase();
         if (hoisted is null || diagnostics.HasErrors) return false;
 
         // '@When' first: what it leaves out is checked, but its sites are not evaluated
@@ -593,7 +597,7 @@ public static class SourceCompiler
         // attribute's value is read from here ('lyric test' its '@Test').
         var embed = EmbedReaderFor(sources, options);
         types.SourcePlace = SourcePlaceFor(sources, options);
-        var evaluated = EvaluateSites(compilation, binding, types, diagnostics, options, embed, report: null, out var comptime);
+        var evaluated = EvaluateSites(compilation, binding, types, diagnostics, options, embed, out var comptime);
         times.Mark(PhaseClock.Evaluate);
         if (!evaluated) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
         WarnDeprecated(compilation, binding, types, diagnostics, options, comptime);
@@ -743,7 +747,7 @@ public sealed record CompilerOptions
     /// <summary>Where phase reports go. <c>null</c> means nobody is listening, and the compiler
     /// then runs with no output dependency at all, which is what the embedding API needs.
     /// benutzbar haelt.</summary>
-    public TerminalOutput? Progress { get; init; }
+    public ICompilerProgress? Progress { get; init; }
 
     /// <summary>
     /// Additional NATIVE modules that do not live on disk, by module path.

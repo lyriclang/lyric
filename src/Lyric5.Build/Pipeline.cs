@@ -50,9 +50,21 @@ public static class Pipeline
     /// optimizer — inlining, scalar replacement, devirtualization — runs where the profile
     /// optimizes C at <c>-O2</c> and above: release, and a profile of the
     /// manifest's that asks as much; debug and the sanitizers' profiles see the code as written.</summary>
-    public static CompileResult? Compile(Project project, TextWriter error, BuildProfile? profile = null, Target? target = null)
+    public static CompileResult? Compile(Project project, TextWriter error, BuildProfile? profile = null, Target? target = null) =>
+        Compile(project, error, null, profile, target);
+
+    /// <summary>As above, the front end's phases said as status lines (spec 14 §1.1).</summary>
+    private static CompileResult? CompileSaying(Project project, TextWriter error, BuildProfile? profile, Target? target)
     {
-        var result = SourceCompiler.Lower(SourceOf(project), OptionsFor(project, profile, target));
+        using var phases = new StatusProgress();
+        return Compile(project, error, phases, profile, target);
+    }
+
+    private static CompileResult? Compile(Project project, TextWriter error, StatusProgress? phases, BuildProfile? profile, Target? target)
+    {
+        var result = SourceCompiler.Lower(SourceOf(project), OptionsFor(project, profile, target) with { Progress = phases });
+        phases?.Dispose();
+        BuildStatus.Warned(phases is null ? 0 : result.Diagnostics.Diagnostics.Count(d => d.Severity == Severity.Warning));
         if (!result.Render(error) || result.Ir is null) return null;
         if (SubsetGate.Check(result.Ir, result.Diagnostics)) return result;
         result.Diagnostics.RenderText(error);
@@ -168,6 +180,16 @@ public static class Pipeline
     public static string Described(Project project) =>
         $"{project.BinaryName}{(project.Manifest is { } manifest ? " v" + manifest.Version : "")} ({Shown(project.Source)})";
 
+    /// <summary>What <c>-v</c> says beside the program: the packages it is built of, <c>std</c> too.</summary>
+    private static void SayPackages(Project project, string toolchainVersion)
+    {
+        BuildStatus.SayVerbose("Package", $"std v{toolchainVersion}");
+        if (project.Graph is not { } graph) return;
+        foreach (var (name, package) in graph.Packages.OrderBy(p => p.Key, StringComparer.Ordinal))
+            if (package.Root != project.Root)
+                BuildStatus.SayVerbose("Package", $"{name} v{package.Version} ({Shown(package.Root)})");
+    }
+
     /// <summary>A path as the status lines and the diagnostics say it.</summary>
     public static string Shown(string path) => Lyric.Core.Rendering.RenderStyle.Current.Display(path);
 
@@ -241,19 +263,24 @@ public static class Pipeline
         else
         {
             BuildStatus.Say("Compiling", Described(project));
-            var result = Compile(project, error, request.Profile, request.Target);
+            SayPackages(project, request.ToolchainVersion);
+            var result = CompileSaying(project, error, request.Profile, request.Target);
             if (result is null) return (1, null);
             compiled = result;
             var read = result.Embedded.Select(file => $"{FileKey(file)} {file}").ToList();
             var unitKey = read.Count == 0 ? key : Key(key, string.Join("\n", read));
             var paths = new List<string>();
-            foreach (var unit in CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot, request.Profile.OverflowChecks))
+            using (var emitting = BuildStatus.Begin("Emitting", "the C"))
             {
-                var path = unit.Instance is null
-                    ? Path.Combine(project.CacheDir, $"{project.BinaryName}-{unitKey}.c")
-                    : Path.Combine(project.CacheDir, "units", $"inst-{Key(Placeless(project, unit.Text))}.c");
-                WriteOnce(path, unit.Text);
-                paths.Add(path);
+                foreach (var unit in CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot, request.Profile.OverflowChecks))
+                {
+                    var path = unit.Instance is null
+                        ? Path.Combine(project.CacheDir, $"{project.BinaryName}-{unitKey}.c")
+                        : Path.Combine(project.CacheDir, "units", $"inst-{Key(Placeless(project, unit.Text))}.c");
+                    WriteOnce(path, unit.Text);
+                    paths.Add(path);
+                }
+                emitting.What = paths.Count == 1 ? "1 C unit" : $"{paths.Count} C units";
             }
             WriteOnce(names, string.Concat(CEmitter.DebugNames(result.Ir!, result.Sources).Select(line => line + "\n")));
             if (project.Library is not null && RuntimeArchive.SourceRoot() is { } api)
@@ -321,7 +348,7 @@ public static class Pipeline
                 // linked against all of it itself.
                 var file = project.LibraryFile(request.Profile, request.Target);
                 Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-                BuildStatus.Say(libraryKind == LibraryKind.Static ? "Archiving" : "Linking", Shown(file));
+                using var step = BuildStatus.Begin(libraryKind == LibraryKind.Static ? "Archiving" : "Linking", Shown(file));
                 if (libraryKind == LibraryKind.Static)
                 {
                     var runtime = RuntimeArchive.Objects(request.Compiler, request.Target, profile, request.ToolchainVersion);
@@ -355,7 +382,7 @@ public static class Pipeline
             var lines = LinkLines(inputs, libraries, linkPaths, prebuiltFiles);
             if (!UpToDate(executable, record, inputs, lines))
             {
-                BuildStatus.Say("Linking", $"{project.BinaryName} ({Shown(executable)})");
+                using var step = BuildStatus.Begin("Linking", $"{project.BinaryName} ({Shown(executable)})");
                 build.LinkExecutable(inputs, executable, libraries, linkPaths);
                 File.WriteAllText(record, lines);
             }
@@ -745,7 +772,7 @@ public static class Pipeline
             if (directives is null) return ran;
         }
         BuildStatus.Say("Checking", Described(project));
-        return Compile(project, error, profile, target) is null ? 1 : 0;
+        return CompileSaying(project, error, profile, target) is null ? 1 : 0;
     }
 
     /// <summary>The front end on a program's source, nothing rendered: what <c>lyric fix</c> reads.</summary>

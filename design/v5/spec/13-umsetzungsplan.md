@@ -2015,6 +2015,30 @@ nach 5.0 gesetzt; der Maintainer öffnet sie jetzt, und entscheidet die beiden F
 Spec 14 §1.1 Regel 11 (die Zeilen sind Text für einen Leser, kein Format); `-q`/`--quiet` auf den Verben, die bauen.
 Tests: `BuildStatusTests`; die übrigen Tests lesen die gefaltete stderr ohne Statuszeilen (`PackageFixture.Run`).
 
+## Nachtrag 2026-11-04 — mehr Statuszeilen
+
+**Anlass** (Maintainer, 2026-11-04): der Bau sagt ihm „immer noch zu wenig“; vier Lücken gezeigt, die Wahl fiel so
+aus. Mirror (M15 S7) legt er beiseite. Verfeinert den Nachtrag 2026-10-29, ersetzt ihn nicht.
+
+- **Immer**: die **Phasen des Frontends** als Zeilen — `Parsing` (Lesen, Parsen und das Laden der Importe zusammen:
+  der Lader parst, was er lädt, erst danach steht ihre Zahl fest), `Expanding`, `Analyzing`, `Evaluating`, `Lowering`,
+  und `Emitting` aus dem Pipeline-Code. **Zeiten je Schritt**. **`Produced`** mit Pfad und Größe, **`Summary`** mit
+  Warnungen und den C-Einheiten aus dem Cache.
+- **Am Terminal** bleibt ein Schritt eine Zeile: sie steht, solange er läuft, der Zähler der C-Einheiten über ihr (das
+  bisherige `Building` entfällt, wo ein Schritt läuft), und bekommt am Ende ihre Zeit und ihren genauen Gegenstand
+  (`Parsing 13 modules 0.23s`). **Im Log** bleibt die ganze Zeile am Anfang, denn ein Log soll einen hängenden Schritt
+  zeigen; die Zeiten stehen zusammen in `Timings` am Ende. Verworfen: die Zeile im Log erst am Ende schreiben (ein
+  Hänger stünde nirgends — genau der Anlass von 2026-10-29); eine halbe Zeile im Log (zeilenweise Leser sähen sie erst
+  fertig, und Befunde landeten mitten darin).
+- **Nur mit `-v`**: `Package` je Paket samt `std`, `Compiled` je C-Einheit mit Zeit. `-v` ist der vorhandene Schalter
+  für mehr; ein eigener `--packages` wäre ein zweiter Mechanismus. Die Absage vom 2026-10-29 an eine Zeile je C-Datei
+  bleibt für die normale Ausgabe.
+- **Mechanik**: `options.Progress` war die feste Klasse `TerminalOutput` und von keinem Lyric-5-Verb gesetzt; es ist
+  jetzt ein Interface `ICompilerProgress`, `StatusProgress` setzt die Phasen auf `BuildStatus` um. Die Auswertung der
+  `comptime`-Stellen ist ein Schritt für sich (vorher war nur ihr Hoisting als `Lower` gemeldet). Was ein Schritt
+  zwischen Anfang und Ende schreibt, sind nur Statuszeilen: Befunde kommen erst nach dem Frontend, ein Fehler des
+  C-Compilers erst nach dem Ende des Schritts (`using`).
+
 ## Nachtrag 2026-10-30 — die wartenden Punkte entschieden
 
 **Anlass** (Maintainer, 2026-10-30): die offenen Punkte aus M13b, M14, M15 und M14b, die je „entscheiden oder Tür“
