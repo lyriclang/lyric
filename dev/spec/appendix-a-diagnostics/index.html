@@ -2463,6 +2463,34 @@ code is no longer reported, and its number is not given again.</p>
 <td>A note of <code>lyric fix --from-4</code>: a function computes with an integer constant beyond 32 bits — a hash, a generator —, whose overflow wrapped in Lyric 4 and panics in Lyric 5.</td>
 </tr>
 <tr>
+<td>LYR-MIG0311</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a library function used as a value</td>
+<td>A note of <code>lyric fix --from-4</code>: a function of Lyric 4's library that is a method in Lyric 5, <code>sum</code> or <code>over</code>, is used as a value, and no function stands for it.</td>
+</tr>
+<tr>
+<td>LYR-MIG0312</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a string's length in characters</td>
+<td>A note of <code>lyric fix --from-4</code>: a string's <code>length()</code> counted characters in Lyric 4 and counts bytes in Lyric 5; the migration writes <code>charCount()</code>.</td>
+</tr>
+<tr>
+<td>LYR-MIG0313</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>an argument written twice</td>
+<td>A note of <code>lyric fix --from-4</code>: <code>s.substring(start, count)</code> is written with an end, <code>start + count</code>, and a <code>start</code> that calls something now runs twice.</td>
+</tr>
+<tr>
+<td>LYR-MIG0315</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>an index that changed twice</td>
+<td>A note of <code>lyric fix --from-4</code>: <code>s.indexOf(n)</code> gave a character's index or -1; <code>find</code> gives a byte's index or <code>null</code>.</td>
+</tr>
+<tr>
 <td>LYR-MIG0318</td>
 <td>H</td>
 <td><a href="../../spec/14-cli/">14-cli</a></td>
