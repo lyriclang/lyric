@@ -2455,6 +2455,20 @@ code is no longer reported, and its number is not given again.</p>
 <td>a hash that returned an int</td>
 <td>A note of <code>lyric fix --from-4</code>: <code>hash()</code> returned an <code>int</code> in Lyric 4; Lyric 5's <code>hash</code> writes the value into a hasher, and the migration rewrites the method.</td>
 </tr>
+<tr>
+<td>LYR-MIG0309</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>arithmetic that may have meant to wrap</td>
+<td>A note of <code>lyric fix --from-4</code>: a function computes with an integer constant beyond 32 bits — a hash, a generator —, whose overflow wrapped in Lyric 4 and panics in Lyric 5.</td>
+</tr>
+<tr>
+<td>LYR-MIG0318</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>an array as a key</td>
+<td>A note of <code>lyric fix --from-4</code>: an array is the key of a <code>Map</code> or the element of a <code>Set</code>, which Lyric 4's checker passed and Lyric 5 refuses.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a7-ct--compile-time-evaluation">A.7 CT — Compile-time evaluation</h2>

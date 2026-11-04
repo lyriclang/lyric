@@ -508,8 +508,10 @@ with one field, a bare variant in a pattern → <code>.Red</code>, <code>\xNN</c
 the interfaces — a written field becomes <code>var</code> (with each struct field the write reaches through),
 <code>Equatable&lt;Point&gt;</code> → <code>Equatable</code>, <code>Add&lt;Vec2, Vec2&gt;</code> → <code>Add</code> with <code>type Out</code> where the result is another type,
 <code>compare(): int</code> → <code>?Ordering</code> with <code>TotalOrder</code> and <code>a.compare(b) &lt; 0</code> → <code>a &lt; b</code>, <code>hash(): int</code> →
-<code>hash(&amp;h)</code> with each <code>combineHash</code> part written into the hasher. The rules for numbers, errors and the library
-follow.</p>
+<code>hash(&amp;h)</code> with each <code>combineHash</code> part written into the hasher; the numbers — <code>int64</code>/<code>uint64</code>/<code>float64</code> →
+<code>int</code>/<code>uint</code>/<code>float</code> with the <code>as</code> between them gone, an integer literal 4.6 read as a float written as one
+(<code>abs(-3)</code> → <code>abs(-3.0)</code>), arithmetic with a constant beyond 32 bits said for <code>+%</code>/<code>*%</code>, an array as a key
+said. The rules for errors and the library follow.</p>
 </li>
 <li><p><strong>The language server answers a held hover after the diagnostics</strong> it waited for, not before them.</p>
 </li>
