@@ -504,8 +504,12 @@ modules' new names, what the prelude holds, the package's own imports; the synta
 <code>xs: int...</code> (an array passed whole is spread, <code>f(xs...)</code>), <code>resume c</code> → <code>c.next()!</code>, an opaque type → a struct
 with one field, a bare variant in a pattern → <code>.Red</code>, <code>\xNN</code> → <code>\u{NN}</code>, .NET format specs → the format language
 (<code>{x:N2}</code> → <code>{x:,.2f}</code>, a width → an alignment), an array's <code>.length</code> → <code>.length()</code>, <code>Iterator&lt;T&gt;</code> →
-<code>Iterator&lt;Item = T&gt;</code> and the conformances to <code>Iterator</code>, <code>Iterable</code> and <code>Indexable</code> with their associated types.
-The rules for interfaces, errors and the library follow.</p>
+<code>Iterator&lt;Item = T&gt;</code> and the conformances to <code>Iterator</code>, <code>Iterable</code> and <code>Indexable</code> with their associated types;
+the interfaces — a written field becomes <code>var</code> (with each struct field the write reaches through),
+<code>Equatable&lt;Point&gt;</code> → <code>Equatable</code>, <code>Add&lt;Vec2, Vec2&gt;</code> → <code>Add</code> with <code>type Out</code> where the result is another type,
+<code>compare(): int</code> → <code>?Ordering</code> with <code>TotalOrder</code> and <code>a.compare(b) &lt; 0</code> → <code>a &lt; b</code>, <code>hash(): int</code> →
+<code>hash(&amp;h)</code> with each <code>combineHash</code> part written into the hasher. The rules for numbers, errors and the library
+follow.</p>
 </li>
 <li><p><strong>The language server answers a held hover after the diagnostics</strong> it waited for, not before them.</p>
 </li>
