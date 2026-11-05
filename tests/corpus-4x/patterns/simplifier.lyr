@@ -1,0 +1,73 @@
+// Nested patterns: an expression simplifier.
+//
+// An enum is a value and cannot hold itself, so the tree stands behind 'Box<Expr>'. A pattern
+// stops at a box — it is a reference — and the match goes on over what the boxes hold: a tuple
+// of two expressions, where '(Lit(0), x)' and '(Lit(a), Lit(b))' reach into both at once.
+// Or-patterns bind too: '(Lit(0), x) | (x, Lit(0))' names the surviving side from either
+// alternative and stores it into ONE local.
+import std.core { Box };
+import std.io.console { println };
+
+enum Expr {
+    Lit(int),
+    Neg(Box<Expr>),
+    Add(Box<Expr>, Box<Expr>),
+    Mul(Box<Expr>, Box<Expr>),
+}
+
+fn lit(n: int): Expr {
+    return Expr.Lit(n);
+}
+
+fn neg(e: Expr): Expr {
+    return Expr.Neg(Box<Expr> { value = e });
+}
+
+fn add(l: Expr, r: Expr): Expr {
+    return Expr.Add(Box<Expr> { value = l }, Box<Expr> { value = r });
+}
+
+fn mul(l: Expr, r: Expr): Expr {
+    return Expr.Mul(Box<Expr> { value = l }, Box<Expr> { value = r });
+}
+
+fn simplify(e: Expr): Expr {
+    return match (e) {
+        Lit(n) => lit(n),
+        Neg(inner) => match (inner.value) {
+            Neg(x) => simplify(x.value),
+            Lit(0) => lit(0),
+            other => neg(simplify(other)),
+        },
+        Add(l, r) => match ((l.value, r.value)) {
+            (Lit(0), x) | (x, Lit(0)) => simplify(x),
+            (Lit(a), Lit(b)) => lit(a + b),
+            (x, y) => add(simplify(x), simplify(y)),
+        },
+        Mul(l, r) => match ((l.value, r.value)) {
+            (Lit(1), x) | (x, Lit(1)) => simplify(x),
+            (Lit(0), _) | (_, Lit(0)) => lit(0),
+            (x, y) => mul(simplify(x), simplify(y)),
+        },
+    };
+}
+
+fn show(e: Expr): string {
+    return match (e) {
+        Lit(n) => f"{n}",
+        Neg(x) => "-" + show(x.value),
+        Add(l, r) => "(" + show(l.value) + " + " + show(r.value) + ")",
+        Mul(l, r) => "(" + show(l.value) + " * " + show(r.value) + ")",
+    };
+}
+
+fn main(): int {
+    let zero = lit(0);
+    let one = lit(1);
+    let x = neg(neg(lit(7)));
+    println(show(simplify(x))); // 7
+    println(show(simplify(add(zero, mul(one, lit(5)))))); // 5
+    println(show(simplify(mul(add(lit(2), lit(3)), zero)))); // 0
+    println(show(simplify(add(lit(2), neg(lit(3)))))); // (2 + -3)
+    return 0;
+}

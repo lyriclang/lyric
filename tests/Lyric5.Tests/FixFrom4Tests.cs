@@ -20,6 +20,32 @@ public class FixFrom4Tests
     [Fact]
     public void Every_line_of_the_table_names_a_function_of_4_6s_library() => Assert.Empty(Migrator.TableFaults());
 
+    /// <summary>A function of 4.6 that neither the table nor another rule speaks for, and that Lyric 5 has no
+    /// function of that name for, would reach the user as a bare <c>SEM0012</c>.</summary>
+    [Fact]
+    public void Every_public_function_of_4_6_is_spoken_for_or_stands_in_Lyric_5()
+    {
+        var error = new StringWriter();
+        var surface = Lyric5.Build.DocRun.StdSurface("0", error);
+        Assert.True(surface is not null, error.ToString());
+        var lines = Lyric5.Doc.Api.ApiSurface.Text(Lyric5.Doc.Api.ApiSurface.Entries(surface!)).Split('\n');
+        Assert.True(lines.Length > 1000, $"the surface has {lines.Length} lines");
+        Assert.Empty(Migrator.TableGaps(lines));
+    }
+
+    /// <summary>The test above says nothing if it looks at nothing: against a surface with no functions, every
+    /// function without a line comes up, a free one, a method and one of a string.</summary>
+    [Fact]
+    public void Against_an_empty_surface_the_functions_without_a_line_come_up()
+    {
+        var gaps = Migrator.TableGaps([]);
+        Assert.Contains("std.io.console.println", gaps);
+        Assert.Contains("std.io.path.fileName", gaps);
+        Assert.Contains("string.toUpper", gaps);
+        Assert.DoesNotContain("std.fmt.padLeft", gaps);
+        Assert.DoesNotContain("string.indexOf", gaps);
+    }
+
     public static TheoryData<string> Names() => [.. Directory.EnumerateDirectories(Cases)
         .Select(Path.GetFileName).OfType<string>()
         .Where(name => name != "examples-4.6")

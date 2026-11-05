@@ -1,10 +1,10 @@
 // arrays.lyr — complexity: simple
-// Shows: T[] as a real array, the literal, repetition, concatenation, indexing and .length.
+// Shows: T[] as a real array, the literal, repetition, concatenation, indexing and .length().
 //
 // Uses `while` rather than `for-in`, which needs the `Iterator` interface. `stats.lyr` is the same
 // subject fully built out, with optionals, `params` and format specs.
 
-import std.io.console { println };
+import std.io { println };
 
 // The length of an array is fixed at creation. Only `std.collections.List<T>` grows.
 fn sum(xs: int[]): int {

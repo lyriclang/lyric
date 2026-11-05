@@ -1,0 +1,39 @@
+# What `lyric fix --from-4` says of 4.6's examples, and what a person did about it.
+#
+# A line of the tool: proposal[...] is a change it made for a person to confirm, by hand[...] one it left.
+# Lines with a '#' are this report's; FixFrom4AcceptanceTests compares the others with the tool.
+#
+# Every proposal below stands as the tool wrote it. LYR-MIG0301: each field is written where it says, so
+# 'var' is what the program needs. LYR-MIG0312: 'wc' counts characters, and 'charCount()' does.
+#
+# By hand, in examples/:
+#   vectors.lyr              LYR-MIG0321: 'var copy = v;', as the note says. Output unchanged.
+#   patterns/simplifier.lyr  LYR-MIG0322: 'Unary' and 'Binary' end the cycle, and the matches name their
+#                            fields, so the nesting the example shows stays one pattern. Output unchanged.
+# Prose only, what the tool does not read: arith, arrays, fibonacci, greet, stats, vectors.
+#
+# Not placed in examples/:
+#   embedded.lyr             LYR-MIG0110: a library of a host, which examples/embedded-host shows in Lyric 5.
+#   ffi/dotnet.lyr           LYR-MIG0616: .NET; examples/ffi binds C.
+#   macros/comptime.lyr      migrates, runs and prints what 4.6 printed; examples/macros is the package.
+#
+# One difference of output: lambdas/destructuring prints a map's two entries in another order. A map's
+# order is unspecified in both languages, and the program's own comment says so.
+#
+proposal[LYR-MIG0301] bank.lyr:18:5: the field 'balance' is written (line 26); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value
+by hand[LYR-MIG0110] embedded.lyr:1:1: this file has no 'main': Lyric 4 ran it as a library of a host, and Lyric 5 asks a single file for its entry — make it a package with a library target, as 'lyric new --lib' does, or give it a 'main'
+by hand[LYR-MIG0616] ffi/dotnet.lyr:9:8: 'cbrt' binds a function of .NET, and Lyric 5 runs without it — use the function of std that does this, or bind a C library with 'extern "C"'
+by hand[LYR-MIG0616] ffi/dotnet.lyr:10:8: 'clamp' binds a function of .NET, and Lyric 5 runs without it — use the function of std that does this, or bind a C library with 'extern "C"'
+by hand[LYR-MIG0616] ffi/dotnet.lyr:11:8: 'tempPath' binds a function of .NET, and Lyric 5 runs without it — use the function of std that does this, or bind a C library with 'extern "C"'
+by hand[LYR-MIG0616] ffi/dotnet.lyr:12:8: 'hostName' binds a function of .NET, and Lyric 5 runs without it — use the function of std that does this, or bind a C library with 'extern "C"'
+by hand[LYR-MIG0616] ffi/dotnet.lyr:13:8: 'isWhite' binds a function of .NET, and Lyric 5 runs without it — use the function of std that does this, or bind a C library with 'extern "C"'
+by hand[LYR-MIG0616] ffi/dotnet.lyr:14:8: 'env' binds a function of .NET, and Lyric 5 runs without it — use the function of std that does this, or bind a C library with 'extern "C"'
+proposal[LYR-MIG0301] interfaces.lyr:19:5: the field 'hp' is written (line 26); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value
+proposal[LYR-MIG0301] interfaces.lyr:38:5: the field 'hp' is written (line 46); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value
+proposal[LYR-MIG0301] objects.lyr:8:5: the field 'value' is written (line 18); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value
+by hand[LYR-MIG0322] patterns/simplifier.lyr:9:1: the enum 'Expr' holds itself; an enum is a value in Lyric 5 and would have no size — put the recursive part behind a class: one of the program's own, whose fields a pattern can name, or 'Box<T>'
+proposal[LYR-MIG0301] vectors.lyr:8:5: the field 'x' is written (line 26); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value
+proposal[LYR-MIG0301] vectors.lyr:9:5: the field 'y' is written (line 27); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value
+proposal[LYR-MIG0301] vectors.lyr:33:5: the field 'from' is written (line 58); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value
+by hand[LYR-MIG0321] vectors.lyr:39:5: the parameter 'v' is written; it was a copy in Lyric 4, and in Lyric 5 a parameter is a 'let' — copy it into a 'var' of another name, 'var copy = v;', and write that
+proposal[LYR-MIG0312] wc.lyr:34:13: a string's 'length()' counted characters in Lyric 4 and counts bytes in Lyric 5; the migration writes 'charCount()', which counts what it counted, in O(n) — where bytes are what is meant, as beside a slice or a 'find', write 'length()'

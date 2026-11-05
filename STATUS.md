@@ -1406,7 +1406,11 @@ The plan is design 13's addendum "der Plan für M16" (#618; S1–S8).
   added on the maintainer's word, the inverse of `epochMillis()`; a 4.6 call stays as it is.
 - **S6c**: `stream`, `process`, `net` (B05, B12, B13); `std.io.stream` becomes `std.fs`, where `File` lives; a type of 4.6's
   library has its line in the table now.
-- **Next**: S6d, the test that holds every public function of 4.6 against the table, and what it finds
+- **S7**: the acceptance. `examples/` is what the tool makes of 4.6's examples, and each prints what 4.6 printed, against the output of 4.6 itself built from its tag (`tests/fix-from-4-acceptance/`, with the report). It found K03's lost module name and K10, S12, T19–T22 (`LYR-MIG0110`, `0320`–`0322`), and B16's missing rule (`LYR-MIG0616`). The mixed forms the 4.x suites read moved to `tests/corpus-4x/`.
+- **S6d**: every public function of 4.6 held against the table by a test; what it found stood nowhere in design 12 and
+  reached the user as a bare `SEM0012`: `std.fmt`, the rest of `std.math` and `std.io.console`, `joinPath`, `parentDir`, `bytes`
+  (B18–B22). The test compares names, so a function that kept its name and changed its meaning passes it.
+- **Next**: S7, acceptance
   and the test that holds every public function of 4.6 against the table. Then S7, S8 closes.
 
 ### Block P — done (2026-11-04)

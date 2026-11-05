@@ -1,11 +1,11 @@
 // stats.lyr — complexity: simple to medium
-// Shows: free functions, variadic `params`, arrays (.length, indexing), a nullable return with
+// Shows: free functions, variadic parameters, arrays (.length(), indexing), a nullable return with
 // `??`, an `as` conversion, and a format spec.
 
-import std.io.console { println };
+import std.io { println };
 
 // `params` collects any number of arguments into an int[].
-fn sum(params nums: int[]): int {
+fn sum(nums: int...): int {
     var total = 0;
     for (n in nums) {
         total += n;
@@ -35,6 +35,6 @@ fn main(): int {
 
     println(f"Summe:        {total}");
     println(f"Maximum:      {biggest}");
-    println(f"Durchschnitt: {avg:N2}");
+    println(f"Durchschnitt: {avg:,.2f}");
     return 0;
 }

@@ -2,7 +2,7 @@
 // Shows: an enum with unit, tuple and struct variants, methods, and `match` as an expression and as
 // a statement. `shapes.lyr` is the same subject fully built out, with `for-in` and `std.math`.
 
-import std.io.console { println };
+import std.io { println };
 
 pub enum Shape {
     Circle(int),

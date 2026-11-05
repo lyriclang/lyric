@@ -9,8 +9,7 @@
 // 'Name { field = … }' stay initializers (§6.8), everything else in braces after a callee is a
 // lambda. A statement that ends in a trailing lambda's '}' needs no ';', like a block arm of a
 // match needs no ','.
-import std.io.console { println };
-import std.iter { over, fold, collectArray };
+import std.io { println };
 
 fn apply(f: fn(int) -> int, v: int): int {
     return f(v);
@@ -61,8 +60,8 @@ fn main(): int {
     println(f"{twice(n => n * 3, 2)}");
 
     // (6) chained over an iterator
-    let doubled = collectArray(over([1, 2, 3]).map { it * 2 });
-    println(f"{fold(over(doubled), 0, (acc, n) => acc + n)}");
+    let doubled = [1, 2, 3].iter().map { it * 2 }.toArray();
+    println(f"{doubled.iter().fold(0, (acc, n) => acc + n)}");
 
     // (7) a struct initializer is NOT a trailing lambda
     let p = P { x = 1, y = 2 };

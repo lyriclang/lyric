@@ -1,7 +1,7 @@
 // fizzbuzz.lyr — complexity: simple
 // Shows: for-in over an inclusive range, if/else-if chains, modulo and string interpolation.
 
-import std.io.console { println };
+import std.io { println };
 
 fn main(): int {
     for (n in 1..=100) {

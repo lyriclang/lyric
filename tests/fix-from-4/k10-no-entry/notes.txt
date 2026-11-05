@@ -1,0 +1,1 @@
+by hand[LYR-MIG0110] main.lyr:1:1: this file has no 'main': Lyric 4 ran it as a library of a host, and Lyric 5 asks a single file for its entry — make it a package with a library target, as 'lyric new --lib' does, or give it a 'main'

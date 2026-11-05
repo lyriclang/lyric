@@ -1,0 +1,9 @@
+// The file imports nothing.
+
+import std.os;
+
+/// The entry.
+fn main(): int {
+    let argv = os.args()[1..].iter().toArray();
+    return argv.length();
+}

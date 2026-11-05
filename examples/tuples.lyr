@@ -2,7 +2,7 @@
 //
 // The only way to the elements is destructuring; an access like 't.0' does not exist. A tuple is a
 // multiple return, and that is taken apart immediately.
-import std.io.console;
+import std.io as console;
 
 // The case tuples exist for: returning two values without inventing a type for them.
 fn divmod(a: int, b: int): (int, int) {

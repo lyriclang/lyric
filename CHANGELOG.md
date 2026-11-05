@@ -409,7 +409,10 @@ promise. This entry fills with the milestones.
   `try encode(v)`, `shuffle(r, xs)` → `r.shuffle(xs.asSlice())`. What compiles and behaves otherwise, a seeded generator's
   sequence, is said with `LYR-MIG0602`. Streams, processes and sockets too — `stream.createOrThrow(p)` → `try File.create(p)`, `process.startOrThrow(p, a)` →
   `try Command { … }.spawn()`, `net.connectOrThrow(h, p)` → `try TcpStream.connect(SocketAddr { … })`, `net.Listener` →
-  `TcpListener`; a read that now fills a buffer, `sendTo` and `receiveFrom` are said by hand. `std.time` gained `Instant.ofEpochMillis(n)`, the
+  `TcpListener`; a read that now fills a buffer, `sendTo` and `receiveFrom` are said by hand. So do the rest of the library's functions,
+  which a test now holds against the table: `padLeft(s, w)` → `s.padStart(w)`, `isNaN(x)` → `x.isNan()`, `formatHex(n)` →
+  `f"{n:x}"`, `readLine()` → `(try? stdin().readLine()) ?? null`; `joinPath` and `parentDir` become `join` and `parent`, and what
+  they do otherwise is said with `LYR-MIG0602`. `std.time` gained `Instant.ofEpochMillis(n)`, the
   inverse of `epochMillis()`, so a 4.6 call stays as it is.
 - **Every instance method is a value**: an interface's own, through its value or a type parameter, a generic type's on an
   instance, and `o?.m`, a `?fn(…)`. They gave `LYR-ICE0002`. A method only a call can bind is refused with `LYR-SEM0052`:

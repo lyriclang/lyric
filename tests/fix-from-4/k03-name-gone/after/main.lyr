@@ -1,0 +1,11 @@
+// What named the module has a form that does not, so no name is left to keep.
+import std.io;
+import std.io { stdin };
+
+fn main(): int {
+    let line = ((try? stdin().readLine()) ?? null);
+    if (line == null) {
+        return 1;
+    }
+    return 0;
+}

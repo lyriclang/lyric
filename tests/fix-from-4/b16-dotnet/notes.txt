@@ -1,0 +1,1 @@
+by hand[LYR-MIG0616] main.lyr:1:8: 'cbrt' binds a function of .NET, and Lyric 5 runs without it — use the function of std that does this, or bind a C library with 'extern "C"'

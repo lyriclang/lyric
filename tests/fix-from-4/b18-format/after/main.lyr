@@ -1,0 +1,9 @@
+import std.fmt as fmt;
+import std.io { println };
+
+fn main(): int {
+    let n = 255;
+    println(f"{n:x}" + f"{n:b}" + f"{n:o}");
+    println("ab".padStart(5) + "ab".padEnd(5));
+    return 0;
+}

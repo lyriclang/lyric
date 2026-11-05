@@ -1,0 +1,2 @@
+proposal[LYR-MIG0602] main.lyr:4:18: 'lines()' ended the lines where a read broke; these lines throw it on the walk — the function around the walk must catch it or say 'throws'
+proposal[LYR-MIG0602] main.lyr:13:13: 'isInteractive()' asked of input and output both; this asks of the input — where a prompt is at stake, ask of '.Stdout' too

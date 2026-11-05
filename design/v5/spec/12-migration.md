@@ -58,6 +58,7 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | K06 | nicht-`pub` = modulprivat | nicht-`pub` = `internal` (paketweit) — Sichtbarkeit wächst still | R | Hinweis je Modul |
 | K07 | `build.lyr` mit `executable("app", "src/main.lyr")`, `option`, `flag`, `Profile`, `packed`, `library` (guide 16) | `[[bin]]`, `[profile.*]` im Manifest; `packed` entfällt; Rest des Skripts bleibt (BS1) | R | — |
 | K08 | `stdlib-tests/`-Fremdkompilation | `tests/`-Root im Paket (V4) | H | — |
+| K10 | eine einzelne Datei ohne `main` (Bibliothek eines Hosts, guide 14) | ein Paket mit Bibliotheksziel (`lyric new --lib`, 11) | H | — |
 | **Syntax** (Grammar §1.4, §3–7) | | | | |
 | S01 | `params xs: int[]` (§3.1) | `xs: int...`; ein weitergereichtes Array bekommt an der Aufrufstelle `...` (`f(xs...)`, *Review 2026-10-05, A2*) | M | — |
 | S02 | `throws T` (ein Typ) / `throws` bar (§3.1, guide 10) | bleibt (`throws [A, B]` neu; Listenregel) | — | — |
@@ -70,6 +71,7 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | S09 | `Coroutine<T> throws E` als Typsuffix (§4) | bleibt | — | — |
 | S10 | `xs.length` (Array-**Feld**, guide 02) vs `s.length()` | `length()` überall (N8) | M | Typ |
 | S11 | `x` mit `Iterator<T>`/`Iterable<T>`, `Indexable<T>` als Typargument (guide 13) | `Iterator<Item = T>`, `Iterable<Item = T>`; Konformanz `:: Iterator { type Item = T; … }`; `Indexable<T>` → `Index<int> { type Output = T }` + `IndexSet<int>` | M/R | Methodenrümpfe |
+| S12 | `fn main(args: string[])` (guide 12) | `fn main()`, darin `let args = os.args()[1..].iter().toArray();`; `args()` nennt zuerst das Programm selbst, 4.6 ließ es aus | M | — |
 | **Interfaces / Werte** (guide 05, 07, 08) | | | | |
 | T01 | Felder ohne Modifikator, beschrieben (`b.x = 99`) | `var` an jedem geschriebenen Feld (02) | R | Schreibstellen |
 | T02 | `Equatable<Point>`, `Ordered<Version>`, `Hashable<K>` (guide 07/08) | `Equatable`, `Ordered`, `Hashable` (`Self`, T-Reihe) | M | — |
@@ -89,6 +91,10 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | T16 | `s.toChars()`, `s.utf8Encode()`, `utf8Decode(bytes): ?string` | `chars().toArray()`, `bytes()` (10 P5), `try? string.fromUtf8(bytes)` | M | — |
 | T17 | `?T` nicht schachtelbar; `Iterator<?T>` verboten | `??T` erlaubt — nichts zu tun | — | — |
 | T18 | `T[]` als `Map`-Schlüssel (war Lowering-Loch) | Übersetzungsfehler → Wrapper | H | — |
+| T19 | Methode ohne `pub`, die für einen `pub`-Typ ein `pub`-Interface beantwortet | `pub fn` (`LYR-SEM0167`) | M | Konformanz |
+| T20 | Methode einer Klasse schreibt `this` ohne `mut`, auch über einen Struct im Feld oder einen Aufruf auf `this` | `mut fn`; deklariert ein Interface sie ohne `mut`, ändern sich beide zusammen: von Hand | M/H | Schreibstellen |
+| T21 | Struct-Parameter wird beschrieben (war eine Kopie) | `var copy = v;` mit eigenem Namen, ein Parameter ist `let` und bindet nicht neu (`LYR-SEM0176`) | H | Schreibstellen |
+| T22 | Enum enthält sich selbst, auch über Structs | eine Klasse im Kreis (eigene oder `Box<T>`, `LYR-SEM0056`) | H | Typen |
 | **Fehler** (guide 10, 13) | | | | |
 | E01 | `xOrThrow(a)` (37 Zwillinge) | `x(a)` mit `try` | M | Bibliothekstabelle |
 | E02 | stille Form `x(a): ?T`/`bool` mit Grund (`file.text`, `writeText`, `json.parse`) | `try? x(a)` bzw. `try x(a)` (bool-Operationen werfen) | M | Bibliothekstabelle |
@@ -121,6 +127,11 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | B15 | `@Deprecated { message, until }` | bleibt (+ `replacement`) | — | — |
 | B16 | `extern "dotnet" fn … = "System.Math::Cbrt"` (guide 14) | entfällt — FFI über C (W4) | H | — |
 | B17 | `OnType`/`OnFunction`/`OnModule`/`WithArg` (guide 15) | bleiben (F1-Marker) | — | — |
+| B18 | `std.fmt`: `padLeft`, `padRight`, `formatHex`, `formatBinary`, `formatOctal`; `formatInt` & Co., `formatRadix`, `formatHexPadded`, `center`, `formatBytes`, `table` | `s.padStart(w)`, `s.padEnd(w)`, `f"{n:x}"`, `f"{n:b}"`, `f"{n:o}"`; von Hand: ein Format steht im f-String, seine Breite ist ein Literal; der Rest fehlt in Lyric 5 | M/H | — |
+| B19 | `std.math`: `log`, `logBase`, `isNaN`, `isInfinite`, `isFinite`, `toRadians`, `toDegrees`; `powInt`, `checkedAbs`, `divFloor`, `modFloor` | `ln`, `ln(a) / ln(b)`, `x.isNan()`, `x.isInfinite()`, `x.isFinite()`, `x * pi / 180.0`, `x * 180.0 / pi`; von Hand: `pow` und `abs` paniken, wo 4.6 `null` gab; `divFloor`/`modFloor` fehlen | M/H | — |
+| B20 | `std.io.console`: `readLine`, `readAll`, `lines`, `isInteractive`; `readChar`, `prompt` | `(try? stdin().readLine()) ?? null` (das `?? null` macht das doppelte `?` flach, sonst ist das Dateiende nie `null`), `(try? stdin().readToString()) ?? ""`, `stdin().lines()`, `isTerminal(.Stdin)` (fragt nur die Eingabe, gesagt); von Hand: `readChar`, `prompt` | M/R/H | — |
+| B21 | `joinPath`, `parentDir`; `bytes.indexOf`; `bytes.indexOfFrom`, `bytes.slice`, `StringBuilder.appendLine` | `join` (normalisiert, gesagt), `parent` (`.` statt `""`, gesagt); `b[..].find(v) ?? -1`; von Hand | R/M/H | — |
+| B22 | `std.core.coroutineEnded` | von Hand: das `null` von `next()` (`interrupt`, `pending` sagt N01) | H | — |
 
 ## R3 — Reihenfolge der Korpora: **entschieden** (2026-09-29)
 

@@ -1,0 +1,10 @@
+import std.io { println };
+import std.math { ln, pi };
+
+fn main(): int {
+    let x = 2.5;
+    println(x.isNan() || x.isInfinite() || !x.isFinite());
+    println(ln(x) + (ln(8.0) / ln(2.0)));
+    println((180.0 * pi / 180.0) + (1.0 * 180.0 / pi));
+    return 0;
+}
