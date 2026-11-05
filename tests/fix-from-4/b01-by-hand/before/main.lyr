@@ -1,0 +1,13 @@
+import std.option { map };
+import std.result { Result };
+
+fn parse(): Result<int, string> {
+    return Result.Ok(1);
+}
+
+fn main(): int {
+    let o: ?int = 1;
+    let p = map(o, (x) => x + 1);
+    let ok = parse().isOk();
+    return if (ok && p != null) 0 else 1;
+}

@@ -1400,7 +1400,10 @@ The plan is design 13's addendum "der Plan für M16" (#618; S1–S8).
 - **S5b**: the throwing twins and silent forms of `file`, `json`, `encoding`, `time`, `string` (E01–E03, `LYR-MIG0402`);
   those of `stream`, `net` and `process` go with their rules in S6.
 - **S5c**: the tasks (N01, N02; `LYR-MIG0501`, `0502`). S5 is done.
-- **Next**: S6, the library (B01–B13, the twins of `stream`, `net`, `process`, the table complete). Then S7, S8 closes.
+- **S6a**: text, iterators, collections, options (B01–B03, B08; `LYR-MIG0601`). An optional has no functions and a
+  `Result` has `of` and `get`, by the maintainer's decision of 2026-11-05: what used them is said by hand.
+- **Next**: S6b, time, encoding, JSON, random, OS (B04, B06, B07, B09–B11), S6c, `stream`, `net`, `process` (B05, B12, B13)
+  and the test that holds every public function of 4.6 against the table. Then S7, S8 closes.
 
 ### Block P — done (2026-11-04)
 

@@ -1,0 +1,2 @@
+by hand[LYR-MIG0601] main.lyr:10:13: 'map(o, (x) => x + 1)' has no form in Lyric 5 — Lyric 5 has no function on an optional: 'if (let v = o) f(v) else null'
+by hand[LYR-MIG0601] main.lyr:11:14: 'parse().isOk()' has no form in Lyric 5 — a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'r is .Ok(_)'

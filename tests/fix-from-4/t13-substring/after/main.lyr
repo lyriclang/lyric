@@ -1,5 +1,4 @@
 import std.io { println };
-import std.string as strings;
 
 fn at(): int {
     return 1;

@@ -1,0 +1,22 @@
+import std.collections { List, Map, Set, Deque, sortList, listContains, mapList, arrayOf, arrayFilled };
+import std.io.console { println };
+
+fn main(): int {
+    var ys = List<int>.empty();
+    ys.push(3);
+    ys.push(1);
+    ys.set(0, 5);
+    sortList(ys);
+    let twice = mapList(ys, (x) => x * 2);
+    println(f"{ys.get(0)} {listContains(ys, 5)} {twice.get(1)} {ys.first()!}");
+    var m = Map<string, int>.empty();
+    m.set("a", 1);
+    var t = Set<int>.empty();
+    t.add(4);
+    var d = Deque<int>.empty();
+    d.pushBack(2);
+    let a = arrayOf(2, (i) => i);
+    let b = arrayFilled(2, 9);
+    println(f"{m.get("a")!} {t.contains(4)} {d.toArray().length} {a.length} {b.length}");
+    return 0;
+}

@@ -8,6 +8,8 @@
 # array of strings and gives an iterator of views now, which the rule writes back to what 4.6 gave.
 # `throws`: 4.6's did not and this does, so E04 marks it. `statement`: only as a statement has it a form;
 # what it answered is gone, and a value is said by hand.
+# `hand`: no form; what to write instead is said, and the call stays. `moved`: the module whose import
+# names it now. A method's line names its receiver's type: `List.get`, a static one too: `List.empty`.
 
 [[free]]
 rule = "T11"
@@ -297,3 +299,589 @@ form = "Result.of(() => try {q}Hex.decode({0}))"
 rule = "E03"
 from = "std.string.parseIntOrErr"
 form = "Result.of(() => try int.parse({0}))"
+
+# the text, the iterators, the collections and what optionals and results were
+
+[[free]]
+rule = "B03"
+from = "std.string.fromInt"
+form = "f\"{{0}}\""
+
+[[free]]
+rule = "B03"
+from = "std.string.fromUint"
+form = "f\"{{0}}\""
+
+[[free]]
+rule = "B03"
+from = "std.string.fromFloat"
+form = "f\"{{0}}\""
+
+[[free]]
+rule = "B03"
+from = "std.string.fromBool"
+form = "f\"{{0}}\""
+
+[[free]]
+rule = "B03"
+from = "std.string.fromChar"
+form = "f\"{{0}}\""
+
+[[free]]
+rule = "B03"
+from = "std.string.concat"
+form = "({0} + {1})"
+
+[[free]]
+rule = "B03"
+from = "std.string.repeat"
+form = "{0}.repeat({1})"
+
+[[free]]
+rule = "B03"
+from = "std.string.fromChars"
+form = "string.fromChars({0}.iter())"
+
+[[free]]
+rule = "B03"
+from = "std.string.join"
+form = "{0}.join({1})"
+
+[[free]]
+rule = "E01"
+from = "std.string.utf8DecodeOrThrow"
+form = "string.fromUtf8({0})"
+
+[[free]]
+rule = "B03"
+from = "std.string.isDigit"
+form = "{0}.isDigit()"
+
+[[free]]
+rule = "B03"
+from = "std.string.isAlpha"
+form = "{0}.isAlpha()"
+
+[[free]]
+rule = "B03"
+from = "std.string.isAlphanumeric"
+form = "{0}.isAlphanumeric()"
+
+[[free]]
+rule = "B03"
+from = "std.string.isWhitespace"
+form = "{0}.isWhitespace()"
+
+[[free]]
+rule = "B03"
+from = "std.string.isUpper"
+form = "{0}.isUpper()"
+
+[[free]]
+rule = "B03"
+from = "std.string.isLower"
+form = "{0}.isLower()"
+
+[[free]]
+rule = "B03"
+from = "std.string.charToDigit"
+form = "{0}.toDigit(10)"
+
+[[free]]
+rule = "B03"
+from = "std.string.digitToChar"
+form = "char.fromDigit({0}, 10)"
+
+[[free]]
+rule = "B02"
+from = "std.string.parseInt"
+form = "(try? int.parse({0}))"
+
+[[free]]
+rule = "B02"
+from = "std.string.parseIntRadix"
+form = "(try? int.parse({0}, {1}))"
+
+[[free]]
+rule = "E03"
+from = "std.string.parseIntRadixOrErr"
+form = "Result.of(() => try int.parse({0}, {1}))"
+
+[[free]]
+rule = "B02"
+from = "std.string.parseBool"
+form = "(try? bool.parse({0}))"
+
+[[free]]
+rule = "B02"
+from = "std.string.parseFloat"
+form = "(try? float.parse({0}))"
+
+[[free]]
+rule = "B03"
+from = "std.string.StringBuilder"
+name = "StringBuilder"
+moved = "std.core"
+
+[[method]]
+rule = "B03"
+from = "StringBuilder.build"
+name = "toString"
+
+[[method]]
+rule = "T14"
+from = "string.trim"
+form = "{this}.trim().toString()"
+
+[[method]]
+rule = "T14"
+from = "string.trimStart"
+form = "{this}.trimStart().toString()"
+
+[[method]]
+rule = "T14"
+from = "string.trimEnd"
+form = "{this}.trimEnd().toString()"
+
+[[method]]
+rule = "B03"
+from = "string.replaceFirst"
+form = "{this}.replaceN({0}, {1}, 1)"
+
+[[method]]
+rule = "B03"
+from = "string.splitFirst"
+hand = "'splitOnce(sep)' answers a pair, or null where the text holds no separator"
+
+[[free]]
+rule = "B01"
+from = "std.iter.range"
+form = "({0}..{1})"
+
+[[free]]
+rule = "B01"
+from = "std.iter.rangeInclusive"
+form = "({0}..={1})"
+
+[[free]]
+rule = "B01"
+from = "std.iter.compact"
+form = "{0}.iter().mapNotNull((x) => x)"
+
+[[free]]
+rule = "B01"
+from = "std.iter.enumerate"
+form = "{0}.enumerate()"
+
+[[free]]
+rule = "B01"
+from = "std.iter.chunks"
+form = "{0}.chunks({1})"
+
+[[free]]
+rule = "B01"
+from = "std.iter.fold"
+form = "{0}.fold({1}, {2})"
+
+[[free]]
+rule = "B01"
+from = "std.iter.reduce"
+form = "{0}.reduce({1})"
+
+[[free]]
+rule = "B01"
+from = "std.iter.first"
+form = "{0}.first()"
+
+[[free]]
+rule = "B01"
+from = "std.iter.count"
+form = "{0}.count()"
+
+[[free]]
+rule = "B01"
+from = "std.iter.any"
+form = "{0}.any({1})"
+
+[[free]]
+rule = "B01"
+from = "std.iter.all"
+form = "{0}.all({1})"
+
+[[free]]
+rule = "B01"
+from = "std.iter.none"
+form = "{0}.none({1})"
+
+[[free]]
+rule = "B01"
+from = "std.iter.find"
+form = "{0}.firstWhere({1})"
+
+[[free]]
+rule = "B01"
+from = "std.iter.position"
+form = "{0}.find({1})"
+
+[[free]]
+rule = "B01"
+from = "std.iter.collectArray"
+form = "{0}.toArray()"
+
+[[free]]
+rule = "B01"
+from = "std.iter.minValue"
+form = "{0}.min()"
+
+[[free]]
+rule = "B01"
+from = "std.iter.maxValue"
+form = "{0}.max()"
+
+[[free]]
+rule = "B01"
+from = "std.collections.collect"
+form = "{0}.toList()"
+
+[[free]]
+rule = "B01"
+from = "std.collections.sortList"
+form = "{0}.asSlice().sort()"
+
+[[free]]
+rule = "B01"
+from = "std.collections.sortListByKey"
+form = "{0}.asSlice().sortByKey({1})"
+
+[[free]]
+rule = "B01"
+from = "std.collections.sortArray"
+form = "{0}.sort()"
+
+[[free]]
+rule = "B01"
+from = "std.collections.union"
+form = "{0}.union({1})"
+
+[[free]]
+rule = "B01"
+from = "std.collections.intersect"
+form = "{0}.intersect({1})"
+
+[[free]]
+rule = "B01"
+from = "std.collections.difference"
+form = "{0}.difference({1})"
+
+[[free]]
+rule = "B01"
+from = "std.collections.isSubset"
+form = "{0}.isSubset({1})"
+
+[[free]]
+rule = "B01"
+from = "std.collections.keys"
+form = "{0}.keys()"
+
+[[free]]
+rule = "B01"
+from = "std.collections.values"
+form = "{0}.values()"
+
+[[free]]
+rule = "B01"
+from = "std.collections.entries"
+form = "{0}.entries()"
+
+[[free]]
+rule = "B01"
+from = "std.collections.mapList"
+form = "{0}.iter().map({1}).toList()"
+
+[[free]]
+rule = "B01"
+from = "std.collections.maxBy"
+form = "{0}.iter().maxBy({1})"
+
+[[free]]
+rule = "B01"
+from = "std.collections.minBy"
+form = "{0}.iter().minBy({1})"
+
+[[free]]
+rule = "B01"
+from = "std.collections.slice"
+form = "{0}[{1}..{2}].iter().toArray()"
+
+[[free]]
+rule = "B01"
+from = "std.collections.listRemove"
+form = "{0}.remove({1})"
+
+[[free]]
+rule = "B01"
+from = "std.collections.groupBy"
+form = "{0}.iter().groupBy({1})"
+
+[[free]]
+rule = "B01"
+from = "std.collections.listContains"
+form = "{0}.contains({1})"
+
+[[free]]
+rule = "B01"
+from = "std.collections.listIndexOf"
+form = "{0}.asSlice().find({1})"
+
+[[free]]
+rule = "B01"
+from = "std.collections.arrayOf"
+name = "arrayOf"
+moved = "std.core"
+
+[[free]]
+rule = "B01"
+from = "std.collections.arrayFilled"
+name = "arrayOf"
+moved = "std.core"
+form = "arrayOf({0}, (_) => {1})"
+
+[[free]]
+rule = "B01"
+from = "std.collections.sortListBy"
+hand = "'xs.asSlice().sortBy(cmp)' takes a function that answers an 'Ordering', not a 'less'"
+
+[[method]]
+rule = "B08"
+from = "List.empty"
+name = "new"
+
+[[method]]
+rule = "B08"
+from = "Deque.empty"
+name = "new"
+
+[[method]]
+rule = "B08"
+from = "Map.empty"
+name = "new"
+
+[[method]]
+rule = "B08"
+from = "Set.empty"
+name = "new"
+
+[[method]]
+rule = "B08"
+from = "List.get"
+form = "{this}[{0}]"
+
+[[method]]
+rule = "B08"
+from = "List.set"
+form = "{this}[{0}] = {1}"
+
+[[method]]
+rule = "B08"
+from = "List.pushAllFrom"
+form = "{this}.pushAll({0}.toArray())"
+
+[[method]]
+rule = "B08"
+from = "List.slice"
+form = "{this}.asSlice()[{0}..{1}].iter().toList()"
+
+[[method]]
+rule = "B08"
+from = "List.filter"
+form = "{this}.iter().filter({0}).toList()"
+
+[[method]]
+rule = "B08"
+from = "List.forEach"
+form = "{this}.iter().forEach({0})"
+
+[[method]]
+rule = "B08"
+from = "List.toReversed"
+form = "List.of({this}.asSlice().reversed())"
+
+[[method]]
+rule = "B08"
+from = "List.first"
+form = "{this}.asSlice().first()"
+
+[[method]]
+rule = "B08"
+from = "List.last"
+form = "{this}.asSlice().last()"
+
+[[method]]
+rule = "B08"
+from = "List.reverse"
+form = "{this}.asSlice().reverse()"
+
+[[method]]
+rule = "B08"
+from = "Map.set"
+form = "{this}.insert({0}, {1})"
+
+[[method]]
+rule = "B08"
+from = "Map.fromEntries"
+form = "Map.from({0})"
+
+[[method]]
+rule = "B08"
+from = "Map.update"
+hand = "'update(k, f)' takes a function of the value and answers whether the key was there; 'getOr' and 'insert' say what a missing key does"
+
+[[method]]
+rule = "B08"
+from = "Set.add"
+name = "insert"
+
+[[method]]
+rule = "B08"
+from = "Set.addAll"
+hand = "insert each in a 'for', counting what 'insert' answers"
+
+[[method]]
+rule = "B08"
+from = "Set.toArray"
+form = "{this}.iter().toArray()"
+
+[[method]]
+rule = "B08"
+from = "Set.toList"
+form = "{this}.iter().toList()"
+
+[[method]]
+rule = "B08"
+from = "Deque.toArray"
+form = "{this}.iter().toArray()"
+
+[[method]]
+rule = "B08"
+from = "List.capacity"
+hand = "a collection says no capacity in Lyric 5"
+
+[[method]]
+rule = "B08"
+from = "Deque.capacity"
+hand = "a collection says no capacity in Lyric 5"
+
+[[method]]
+rule = "B08"
+from = "Map.capacity"
+hand = "a collection says no capacity in Lyric 5"
+
+[[method]]
+rule = "B08"
+from = "Deque.clear"
+hand = "pop until it is empty, or make a new one"
+
+[[free]]
+rule = "B01"
+from = "std.option.map"
+hand = "Lyric 5 has no function on an optional: 'if (let v = o) f(v) else null'"
+
+[[free]]
+rule = "B01"
+from = "std.option.andThen"
+hand = "Lyric 5 has no function on an optional: 'if (let v = o) f(v) else null'"
+
+[[free]]
+rule = "B01"
+from = "std.option.filter"
+hand = "Lyric 5 has no function on an optional: 'if (let v = o) (if (p(v)) v else null) else null'"
+
+[[free]]
+rule = "B01"
+from = "std.option.zip"
+hand = "Lyric 5 has no function on an optional: two 'if (let …)'"
+
+[[free]]
+rule = "B01"
+from = "std.option.contains"
+hand = "Lyric 5 has no function on an optional: 'o == value'"
+
+[[free]]
+rule = "B01"
+from = "std.option.toArray"
+hand = "Lyric 5 has no function on an optional: 'if (let v = o) [v] else []'"
+
+[[free]]
+rule = "B01"
+from = "std.option.iter"
+hand = "Lyric 5 has no function on an optional: 'if (let v = o) [v] else []', and its 'iter()'"
+
+[[free]]
+rule = "B01"
+from = "std.option.expect"
+hand = "Lyric 5 has no function on an optional: 'o ?? panic(message)'"
+
+[[free]]
+rule = "B01"
+from = "std.result.map"
+hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'match' on 'Ok' and 'Err'"
+
+[[free]]
+rule = "B01"
+from = "std.result.mapErr"
+hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'match' on 'Ok' and 'Err'"
+
+[[free]]
+rule = "B01"
+from = "std.result.andThen"
+hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'match', or 'try r.get()' in a 'Result.of'"
+
+[[free]]
+rule = "B01"
+from = "std.result.orElse"
+hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'match' on 'Ok' and 'Err'"
+
+[[free]]
+rule = "B01"
+from = "std.result.fromOptional"
+hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'o ?? throw error' in a 'Result.of'"
+
+[[free]]
+rule = "B01"
+from = "std.result.orThrow"
+form = "{0}.get()"
+
+[[method]]
+rule = "B01"
+from = "Result.isOk"
+hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'r is .Ok(_)'"
+
+[[method]]
+rule = "B01"
+from = "Result.isErr"
+hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'r is .Err(_)'"
+
+[[method]]
+rule = "B01"
+from = "Result.ok"
+hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'match'"
+
+[[method]]
+rule = "B01"
+from = "Result.err"
+hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'match'"
+
+[[method]]
+rule = "B01"
+from = "Result.unwrapOr"
+hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'match', or '(try? r.get()) ?? fallback'"
+
+[[method]]
+rule = "B01"
+from = "Result.unwrapOrElse"
+hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'match'"
+
+[[method]]
+rule = "B01"
+from = "Result.expect"
+hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'try! r.get()'"

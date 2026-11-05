@@ -181,6 +181,22 @@ internal sealed partial class Imports : IRule
                     context.Replace("K09", import.Span.File, group.Index, group.Index + group.Length, renamed);
                     continue;
                 }
+                if (import.Clause is ImportAlias { Alias: var alias } && path == "std.string" && !NamesAlias(module, alias))
+                {
+                    // it made a string's methods visible; the prelude passes them on now
+                    context.Replace("K05", import.Span.File, import.Span.Start, LineEnd(text, import.Span.End), "");
+                    continue;
+                }
+                if (import.Clause is ImportSelective moving)
+                {
+                    var moved = moving.Names.Select(n => LibraryTable.MovedTo(path, n) is { } m ? (Module: m, Name: LibraryTable.Of($"{path}.{n}")!.Name ?? n) : default)
+                        .Where(m => m.Module is not null).Distinct().GroupBy(m => m.Module!, StringComparer.Ordinal);
+                    foreach (var group in moved.OrderBy(g => g.Key, StringComparer.Ordinal))
+                    {
+                        var at = LineEnd(text, import.Span.End);
+                        context.Replace("K05", import.Span.File, at, at, $"import {group.Key} {{ {string.Join(", ", group.Select(m => m.Name))} }};\n");
+                    }
+                }
                 if (import.Clause is ImportSelective selective && (Prelude.TryGetValue(path, out var prelude) | Renamed.ContainsKey(path) | LibraryTable.HasModule(path)))
                 {
                     var renames = Hashing.NeedsHasher(context, module) ? Renamed.GetValueOrDefault(path) : null;
@@ -227,6 +243,22 @@ internal sealed partial class Imports : IRule
     }
 
     /// <summary>The end of the import's line, its line break included.</summary>
+    /// <summary>Whether what is left of a module names its alias of <c>std.string</c>: a type, or a
+    /// function the table has no form for. What has one no longer names the module.</summary>
+    private static bool NamesAlias(Module module, string alias)
+    {
+        foreach (var node in Tree.Below(module))
+            switch (node)
+            {
+                case NamedType { Path: var path } when path.Length > 1 && path[0] == alias:
+                    return true;
+                case MemberExpr { Target: IdentifierExpr { Name: var name }, Member: var member } when name == alias
+                    && LibraryTable.Of($"std.string.{member}") is not { Form: not null }:
+                    return true;
+            }
+        return false;
+    }
+
     private static int LineEnd(string text, int end)
     {
         if (end < text.Length && text[end] == '\r') end++;
