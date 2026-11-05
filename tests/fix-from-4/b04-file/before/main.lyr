@@ -1,0 +1,15 @@
+import std.io.console { println };
+import std.io.file { size, sizeOrThrow, modifiedMillis, isFile, isDirectory, entries, entriesOrThrow, tempDir };
+
+fn work(): int throws {
+    let names = entriesOrThrow("d");
+    println(tempDir());
+    return sizeOrThrow("x") + names.length;
+}
+
+fn main(): int {
+    let n = size("x");
+    let t = modifiedMillis("x");
+    let e = entries("d");
+    return if (isFile("x") || isDirectory("x") || n != null || t != null || e != null) 1 else 0;
+}

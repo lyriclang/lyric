@@ -1,0 +1,15 @@
+import std.encoding { hexEncode, base64Encode, base64Decode, base64DecodeOrThrow };
+import std.hash { crc32 };
+import std.random { secureRandom };
+
+fn work(s: string): uint8[] throws {
+    return base64DecodeOrThrow(s);
+}
+
+fn main(): int {
+    let b = secureRandom(4);
+    let h = hexEncode(b);
+    let d = base64Decode(base64Encode(b));
+    let c = crc32(b);
+    return if (h != "" && d != null && c >= 0) 0 else 1;
+}

@@ -1,0 +1,15 @@
+import std.io { println };
+import std.random { Random };
+
+fn main(): int {
+    let r = Random.seeded(42);
+    let s = 7;
+    let q = Random.seeded((s + 1) as uint64);
+    let xs = List<int>.of([1, 2, 3]);
+    r.shuffle(xs.asSlice());
+    let c = r.choice(xs.asSlice());
+    let n = r.nextInRange(1..7);
+    let g = r.nextNormal();
+    println(f"{n} {g}");
+    return if (c != null && q.nextBool()) 0 else 0;
+}

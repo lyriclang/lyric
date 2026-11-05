@@ -1,0 +1,1 @@
+proposal[LYR-MIG0602] main.lyr:13:13: 'a.iso()' wrote exactly milliseconds, '.000Z'; 'show' writes RFC 3339 with what there is, nanoseconds or none — where another program reads the text, check that it reads this

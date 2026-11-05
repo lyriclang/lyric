@@ -1,0 +1,15 @@
+import std.io { println };
+import std.fs { metadata, readDir, tempDir };
+
+fn work(): int throws {
+    let names = try readDir("d").map((entry) => entry.name).toArray();
+    println(try tempDir());
+    return try metadata("x").size + names.length();
+}
+
+fn main(): int {
+    let n = (try? metadata("x"))?.size;
+    let t = (try? metadata("x"))?.modified?.epochMillis();
+    let e = (try? readDir("d").map((entry) => entry.name).toArray());
+    return if (((try? metadata("x"))?.isFile ?? false) || ((try? metadata("x"))?.isDir ?? false) || n != null || t != null || e != null) 1 else 0;
+}

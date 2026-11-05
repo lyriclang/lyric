@@ -1,0 +1,26 @@
+import std.io.console { println };
+import std.collections { Map };
+import std.json { JsonValue, parse, serialize, serializePretty };
+
+fn show(v: JsonValue): string {
+    return match (v) {
+        JsonValue.Str(s) => s,
+        JsonValue.Arr(a) => "array",
+        JsonValue.Obj(o) => "object",
+        _ => "other",
+    };
+}
+
+fn work(d: JsonValue): void throws {
+    println(serialize(d));
+    println(serializePretty(JsonValue.Str("x"), 2));
+}
+
+fn main(): int {
+    if (let d = parse("{}")) {
+        let inner = d.field("a")?.field("b");
+        println(show(JsonValue.Obj(Map<string, JsonValue>.empty())));
+        return if (inner == null) 0 else 1;
+    }
+    return 1;
+}

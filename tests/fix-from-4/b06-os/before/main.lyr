@@ -1,0 +1,17 @@
+import std.io.console { println };
+import std.os { nowMillis, sleep, currentDir, envOr, hostName, platform, setEnv };
+
+fn work(): string throws {
+    sleep(10);
+    return currentDir();
+}
+
+fn main(): int {
+    let t = nowMillis();
+    let home = envOr("HOME", "/");
+    let host = hostName();
+    let name = platform();
+    setEnv("A", "b");
+    println(home + name);
+    return if (t > 0 && host != null) 0 else 1;
+}

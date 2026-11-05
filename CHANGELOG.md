@@ -404,7 +404,10 @@ promise. This entry fills with the milestones.
   `fromInt(n)` → `f"{n}"`, `parseInt(s)` → `(try? int.parse(s))`, `isDigit(c)` → `c.isDigit()`, `fold(over(xs), 0, f)` →
   `xs.iter().fold(0, f)`, `range(a, b)` → `(a..b)`, `sortList(xs)` → `xs.asSlice().sort()`, `List<int>.empty()` →
   `.new()`, `xs.get(i)` → `xs[i]`, `m.set(k, v)` → `m.insert(k, v)`; what `std.option` and a `Result`'s methods did is
-  said by hand. The rest of the library follows.
+  said by hand; time, encoding, JSON, random numbers and the system — `nowMillis()` → `Instant.now().epochMillis()`,
+  `d.plus(e)` → `(d + e)`, `hexEncode(b)` → `Hex.encode(b)`, `doc.field("n")` → `doc["n"]`, `serialize(v)` →
+  `try encode(v)`, `shuffle(r, xs)` → `r.shuffle(xs.asSlice())`. What compiles and behaves otherwise, a seeded generator's
+  sequence, is said with `LYR-MIG0602`. The rest of the library follows.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
 
 ---

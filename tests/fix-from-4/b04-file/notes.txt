@@ -1,0 +1,2 @@
+proposal[LYR-MIG0602] main.lyr:5:17: 'entriesOrThrow("d")' gave the names sorted; 'readDir' gives them in the system's order — where the order matters, sort them: 'asSlice().sort()'
+proposal[LYR-MIG0602] main.lyr:13:13: 'entries("d")' gave the names sorted; 'readDir' gives them in the system's order — where the order matters, sort them: 'asSlice().sort()'

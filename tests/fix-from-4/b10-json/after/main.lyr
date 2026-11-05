@@ -1,0 +1,25 @@
+import std.io { println };
+import std.json { JsonValue, parse, encode, JsonOptions };
+
+fn show(v: JsonValue): string {
+    return match (v) {
+        JsonValue.String(s) => s,
+        JsonValue.Array(a) => "array",
+        JsonValue.Object(o) => "object",
+        _ => "other",
+    };
+}
+
+fn work(d: JsonValue): void throws {
+    println(try encode(d));
+    println(try encode(JsonValue.String("x"), JsonOptions { pretty = true, indent = 2 }));
+}
+
+fn main(): int {
+    if (let d = (try? parse("{}"))) {
+        let inner = d["a"]?.index("b");
+        println(show(JsonValue.Object(Map<string, JsonValue>.new())));
+        return if (inner == null) 0 else 1;
+    }
+    return 1;
+}

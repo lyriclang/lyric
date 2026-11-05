@@ -1,0 +1,3 @@
+proposal[LYR-MIG0602] main.lyr:6:13: 'Random.seeded(42)' gives another sequence in Lyric 5, the generator being ChaCha8 — a test that holds a seed's numbers takes the new ones
+proposal[LYR-MIG0602] main.lyr:8:13: 'Random.seeded(s + 1)' gives another sequence in Lyric 5, the generator being ChaCha8 — a test that holds a seed's numbers takes the new ones
+proposal[LYR-MIG0602] main.lyr:12:13: 'r.nextIntRange(1, 7)' gave 'lo' for an empty range; 'nextInRange' panics on one — where 'hi' can be 'lo' or less, test it first

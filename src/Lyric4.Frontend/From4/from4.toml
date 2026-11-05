@@ -10,6 +10,9 @@
 # what it answered is gone, and a value is said by hand.
 # `hand`: no form; what to write instead is said, and the call stays. `moved`: the module whose import
 # names it now. A method's line names its receiver's type: `List.get`, a static one too: `List.empty`.
+# `imports`: what a form names that the call did not, `std.time.Instant`. `{0~uint64}`: an argument cast to
+# a type, which a literal takes by itself. `review`, `advice`: what changed, said for a proposal.
+# `optional`: the form through `?.`; a form without one is said by hand there.
 
 [[free]]
 rule = "T11"
@@ -168,12 +171,6 @@ rule = "E01"
 from = "std.encoding.hexDecodeOrThrow"
 name = "Hex"
 form = "{q}Hex.decode({0})"
-
-[[free]]
-rule = "E01"
-from = "std.time.fromIsoOrThrow"
-name = "Instant"
-form = "{q}Instant.parse({0})"
 
 [[free]]
 rule = "E02"
@@ -885,3 +882,302 @@ hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'match'"
 rule = "B01"
 from = "Result.expect"
 hand = "a 'Result' is an enum with 'of' and 'get' in Lyric 5: 'try! r.get()'"
+
+[[free]]
+rule = "B04"
+from = "std.io.file.size"
+name = "metadata"
+form = "(try? {q}metadata({0}))?.size"
+
+[[free]]
+rule = "B04"
+from = "std.io.file.sizeOrThrow"
+name = "metadata"
+form = "{q}metadata({0}).size"
+
+[[free]]
+rule = "B04"
+from = "std.io.file.modifiedMillis"
+name = "metadata"
+form = "(try? {q}metadata({0}))?.modified?.epochMillis()"
+
+[[free]]
+rule = "B04"
+from = "std.io.file.isFile"
+name = "metadata"
+form = "((try? {q}metadata({0}))?.isFile ?? false)"
+
+[[free]]
+rule = "B04"
+from = "std.io.file.isDirectory"
+name = "metadata"
+form = "((try? {q}metadata({0}))?.isDir ?? false)"
+
+[[free]]
+rule = "B04"
+from = "std.io.file.entries"
+name = "readDir"
+form = "(try? {q}readDir({0}).map((entry) => entry.name).toArray())"
+review = "gave the names sorted; 'readDir' gives them in the system's order"
+advice = "where the order matters, sort them: 'asSlice().sort()'"
+
+[[free]]
+rule = "B04"
+from = "std.io.file.entriesOrThrow"
+name = "readDir"
+form = "{q}readDir({0}).map((entry) => entry.name).toArray()"
+review = "gave the names sorted; 'readDir' gives them in the system's order"
+advice = "where the order matters, sort them: 'asSlice().sort()'"
+
+[[free]]
+rule = "B04"
+from = "std.io.file.tempDir"
+name = "tempDir"
+throws = true
+
+[[free]]
+rule = "B04"
+from = "std.io.file.appendBytes"
+hand = "Lyric 5 has no 'appendBytes': 'File.openWith(path, OpenOptions { append = true, create = true })', then 'write' and 'close'"
+
+[[free]]
+rule = "B04"
+from = "std.io.file.appendBytesOrThrow"
+hand = "Lyric 5 has no 'appendBytes': 'File.openWith(path, OpenOptions { append = true, create = true })', then 'write' and 'close'"
+
+[[free]]
+rule = "B06"
+from = "std.os.nowMillis"
+form = "Instant.now().epochMillis()"
+imports = ["std.time.Instant"]
+
+[[free]]
+rule = "B06"
+from = "std.os.nowNanos"
+hand = "to measure a time, 'let start = Monotonic.now();' and 'start.elapsed()' from std.time; a clock's raw reading is not given"
+
+[[free]]
+rule = "B06"
+from = "std.os.sleep"
+form = "sleep(Duration.ofMillis({0}))"
+imports = ["std.task.sleep", "std.time.Duration"]
+throws = true
+
+[[free]]
+rule = "B06"
+from = "std.os.platform"
+name = "platform"
+form = "f\"{{q}platform()}\""
+
+[[free]]
+rule = "B06"
+from = "std.os.currentDir"
+name = "cwd"
+throws = true
+
+[[free]]
+rule = "B06"
+from = "std.os.setEnv"
+name = "setEnv"
+form = "{q}setEnv({0}, {1})"
+statement = true
+
+[[free]]
+rule = "B06"
+from = "std.os.hostName"
+name = "hostname"
+form = "(try? {q}hostname())"
+
+[[free]]
+rule = "B06"
+from = "std.os.userName"
+hand = "Lyric 5 has no 'userName': 'env(\"USER\") ?? env(\"USERNAME\")'"
+
+[[free]]
+rule = "B06"
+from = "std.os.envOr"
+name = "env"
+form = "({q}env({0}) ?? {1})"
+
+[[method]]
+rule = "B07"
+from = "Duration.ofSeconds"
+name = "ofSecs"
+
+[[method]]
+rule = "B07"
+from = "Duration.totalMillis"
+name = "millis"
+
+[[method]]
+rule = "B07"
+from = "Duration.totalSeconds"
+name = "secs"
+
+[[method]]
+rule = "B07"
+from = "Duration.plus"
+form = "({this} + {0})"
+
+[[method]]
+rule = "B07"
+from = "Duration.minus"
+form = "({this} - {0})"
+
+[[method]]
+rule = "B07"
+from = "Instant.plus"
+form = "({this} + {0})"
+
+[[method]]
+rule = "B07"
+from = "Instant.iso"
+form = "{this}.show()"
+review = "wrote exactly milliseconds, '.000Z'; 'show' writes RFC 3339 with what there is, nanoseconds or none"
+advice = "where another program reads the text, check that it reads this"
+
+[[method]]
+rule = "B07"
+from = "Instant.fromIso"
+form = "(try? {q}parse({0}))"
+
+[[method]]
+rule = "B07"
+from = "Instant.fromIsoOrThrow"
+form = "{q}parse({0})"
+
+[[method]]
+rule = "B07"
+from = "Instant.ofEpochMillis"
+hand = "Lyric 5 has no 'ofEpochMillis': 'try Instant.parse(\"1970-01-01T00:00:00Z\") + Duration.ofMillis(n)'"
+
+[[method]]
+rule = "B07"
+from = "Duration.hash"
+hand = "'hash' writes into a 'Hasher' in Lyric 5 and gives nothing: 'hash(h)'"
+
+[[method]]
+rule = "B07"
+from = "Instant.hash"
+hand = "'hash' writes into a 'Hasher' in Lyric 5 and gives nothing: 'hash(h)'"
+
+[[free]]
+rule = "B09"
+from = "std.encoding.hexEncode"
+name = "Hex"
+form = "{q}Hex.encode({0})"
+
+[[free]]
+rule = "B09"
+from = "std.encoding.base64Encode"
+name = "Base64"
+form = "{q}Base64.encode({0})"
+
+[[free]]
+rule = "B09"
+from = "std.encoding.base64Decode"
+name = "Base64"
+form = "(try? {q}Base64.decode({0}))"
+
+[[free]]
+rule = "B09"
+from = "std.encoding.base64DecodeOrThrow"
+name = "Base64"
+form = "{q}Base64.decode({0})"
+
+[[free]]
+rule = "B09"
+from = "std.random.secureRandom"
+form = "randomBytes({0})"
+imports = ["std.crypto.randomBytes"]
+
+[[free]]
+rule = "B09"
+from = "std.hash.crc32"
+name = "crc32"
+form = "({q}crc32({0}) as int)"
+
+[[free]]
+rule = "B09"
+from = "std.hash.sha256"
+hand = "std.crypto's 'sha256' gives a 'uint8[32]'; for a 'uint8[]', 'var h = Sha256.new(); h.update(bytes); h.finish()'"
+
+[[free]]
+rule = "B09"
+from = "std.hash.sha1"
+hand = "std.crypto: 'var h = Sha1.new(); h.update(bytes); h.finish()'"
+
+[[free]]
+rule = "B09"
+from = "std.hash.md5"
+hand = "std.crypto: 'var h = Md5.new(); h.update(bytes); h.finish()'"
+
+[[free]]
+rule = "B09"
+from = "std.hash.sha256Hex"
+hand = "std.crypto and std.encoding: 'var h = Sha256.new(); h.update(text.bytes()); Hex.encode(h.finish())'"
+
+[[free]]
+rule = "B09"
+from = "std.hash.sha1Hex"
+hand = "std.crypto and std.encoding: 'var h = Sha1.new(); h.update(text.bytes()); Hex.encode(h.finish())'"
+
+[[free]]
+rule = "B09"
+from = "std.hash.md5Hex"
+hand = "std.crypto and std.encoding: 'var h = Md5.new(); h.update(text.bytes()); Hex.encode(h.finish())'"
+
+[[free]]
+rule = "B09"
+from = "std.hash.hashAll"
+hand = "write each value into a 'Hasher': 'DefaultHasher.new()' from std.hash"
+
+[[method]]
+rule = "B10"
+from = "JsonValue.field"
+form = "{this}[{0}]"
+optional = "{this}?.index({0})"
+
+[[free]]
+rule = "B10"
+from = "std.json.serialize"
+name = "encode"
+form = "{q}encode({0})"
+throws = true
+
+[[free]]
+rule = "B10"
+from = "std.json.serializePretty"
+name = "encode"
+form = "{q}encode({0}, JsonOptions { pretty = true, indent = {1} })"
+imports = ["std.json.JsonOptions"]
+throws = true
+
+[[method]]
+rule = "B11"
+from = "Random.seeded"
+form = "{q}seeded({0~uint64})"
+review = "gives another sequence in Lyric 5, the generator being ChaCha8"
+advice = "a test that holds a seed's numbers takes the new ones"
+
+[[method]]
+rule = "B11"
+from = "Random.nextIntRange"
+form = "{this}.nextInRange({0}..{1})"
+review = "gave 'lo' for an empty range; 'nextInRange' panics on one"
+advice = "where 'hi' can be 'lo' or less, test it first"
+
+[[method]]
+rule = "B11"
+from = "Random.nextGaussian"
+name = "nextNormal"
+
+[[free]]
+rule = "B11"
+from = "std.random.shuffle"
+form = "{0}.shuffle({1}.asSlice())"
+
+[[free]]
+rule = "B11"
+from = "std.random.choice"
+form = "{0}.choice({1}.asSlice())"
