@@ -535,7 +535,10 @@ said by hand; time, encoding, JSON, random numbers and the system — <code>nowM
 <code>try encode(v)</code>, <code>shuffle(r, xs)</code> → <code>r.shuffle(xs.asSlice())</code>. What compiles and behaves otherwise, a seeded generator's
 sequence, is said with <code>LYR-MIG0602</code>. Streams, processes and sockets too — <code>stream.createOrThrow(p)</code> → <code>try File.create(p)</code>, <code>process.startOrThrow(p, a)</code> →
 <code>try Command { … }.spawn()</code>, <code>net.connectOrThrow(h, p)</code> → <code>try TcpStream.connect(SocketAddr { … })</code>, <code>net.Listener</code> →
-<code>TcpListener</code>; a read that now fills a buffer, <code>sendTo</code> and <code>receiveFrom</code> are said by hand. <code>std.time</code> gained <code>Instant.ofEpochMillis(n)</code>, the
+<code>TcpListener</code>; a read that now fills a buffer, <code>sendTo</code> and <code>receiveFrom</code> are said by hand. So do the rest of the library's functions,
+which a test now holds against the table: <code>padLeft(s, w)</code> → <code>s.padStart(w)</code>, <code>isNaN(x)</code> → <code>x.isNan()</code>, <code>formatHex(n)</code> →
+<code>f&quot;{n:x}&quot;</code>, <code>readLine()</code> → <code>(try? stdin().readLine()) ?? null</code>; <code>joinPath</code> and <code>parentDir</code> become <code>join</code> and <code>parent</code>, and what
+they do otherwise is said with <code>LYR-MIG0602</code>. <code>std.time</code> gained <code>Instant.ofEpochMillis(n)</code>, the
 inverse of <code>epochMillis()</code>, so a 4.6 call stays as it is.</p>
 </li>
 <li><p><strong>The language server answers a held hover after the diagnostics</strong> it waited for, not before them.</p>
