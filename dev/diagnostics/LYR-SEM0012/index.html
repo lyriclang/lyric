@@ -248,8 +248,8 @@
 <p class="meta">error · <a href="../../spec/05-interfaces/">spec 05-interfaces</a></p>
 <p>A member access <code>x.name</code> names no field, method or element of the value's type, or reads a member that is a method without calling it (<code>length</code> instead of <code>length()</code>). A tuple position past its last element is reported here too.</p>
 <h2 id="explanation">Explanation</h2>
-<p>A member comes from the type's declaration, from its conformances, or from an <code>extend</code> block in scope. Built-in members such as an array's <code>length()</code> are methods and are called.</p>
-<p>Correct the name, call the method, or bring the block that adds the member into scope.</p>
+<p>A member comes from the type's declaration, from its conformances, or from an <code>extend</code> block in scope. A block of methods is in scope where its module is imported, whatever the import names: <code>import std.io;</code> brings <code>writeAll</code> to everything that is a <code>Writer</code>. Built-in members such as an array's <code>length()</code> are methods and are called.</p>
+<p>Correct the name, call the method, or import the module of the block that adds the member; the error names that module where the program already holds it. A module nothing in the program imports is not read, so its blocks cannot be named.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">fn</span> main(): <span class="ty">void</span> {
     <span class="kw">let</span> xs = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>];

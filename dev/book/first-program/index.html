@@ -245,6 +245,9 @@ imported by name:</p>
 10 1024</code></pre>
 <p><code>find</code> gives an index wherever it stands — the byte of a text, the place in an array or of an
 iterator's value —, or <code>null</code> where there is none; <code>firstWhere</code> gives the value itself.</p>
+<p>A method that an <code>extend</code> block adds is there wherever the block's module is imported, whatever the
+import names. <code>std.io</code> adds <code>writeAll</code> to everything that is a <code>Writer</code>, a <code>File</code> among them, so a
+file that only calls it writes <code>import std.io;</code>. Without the import, the error names the module.</p>
 <h2 id="reading-input">Reading input</h2>
 <p>The last step reads the lines from the standard input instead of an array. <code>stdin().lines()</code> gives
 them one by one until the input ends; reading can fail, so the loop is marked <code>try</code> too:</p>

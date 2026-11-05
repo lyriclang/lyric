@@ -248,8 +248,9 @@
 <p class="meta">warning · <a href="../../spec/04-modules/">spec 04-modules</a> · lint <code>unused-import</code>, group <code>unused</code>, warn unless said</p>
 <p>A name an import binds is never referred to in the file.</p>
 <h2 id="explanation">Explanation</h2>
-<p>An unused import makes the file look as if it depended on a module it does not need. A module import counts as used when an extension method of that module is called in the file.</p>
-<p>Remove the import, or the name from the import list.</p>
+<p>An unused import makes the file look as if it depended on a module it does not need. A module import counts as used when an extension method of that module, or of a module it passes on with <code>pub import</code>, is called in the file.</p>
+<p>Remove the import, or the name from the import list. An import brings its module's <code>extend</code> blocks along with its names, so where no name of <code>import std.io { Writer };</code> is used but the file calls <code>writeAll</code>, a method those blocks add, the warning says to keep the module alone: <code>import std.io;</code>. Removing the import there would take the method away (<code>LYR-SEM0012</code>). The warning says to take the import out where another import or the prelude brings the same blocks.</p>
+<p>A constraint a type satisfies through a conformance names nothing of the module that gives it. Where the module declares neither the type nor the interface, and no other import brings the module, <code>lyric fix</code> leaves the import alone and the warning says what depends on it.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
 

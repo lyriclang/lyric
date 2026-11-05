@@ -210,13 +210,17 @@ among them —, and exits 1 where an error stays, else 0. A second <code>fix</co
 <li><code>fix</code> takes <code>-C</code>, <code>--offline</code>, the lint options of §5 rule 4 — a lint set to <code>allow</code> says nothing and
 so suggests nothing — and <code>--json</code> (§4). <strong><code>--dry-run</code></strong> makes one pass and writes nothing: it prints
 the changes as a unified diff on the standard output.</li>
-<li>The safe changes: <code>unused-import</code> takes the import out, or the one name out of its list;
+<li>The safe changes: <code>unused-import</code> takes the import out, or the one name out of its list, or
+leaves the module alone where the file calls what its blocks add (<a href="../../spec/04-modules/">04 §4</a> rule 3);
 <code>unused-var</code> writes <code>let</code> for <code>var</code>; <code>useless-try</code> takes a plain <code>try</code> out (<code>try?</code> and <code>try!</code> change the
 value's type, and a <code>catch</code> is code); <code>needless-return</code> takes the <code>return;</code> out; <code>self-assignment</code>
 writes <code>x++</code> for <code>x = x++</code>; <code>deprecated</code> writes the <code>@Deprecated</code>'s <code>replacement</code> where it is a name;
 a call that writes fewer type arguments than the function has gets a <code>_</code> for each one left out
 (<code>LYR-SEM0026</code>), the call the inference would have made.
-A change that needs a reader: <code>naming</code>'s new name, written where the name is declared (its uses are an
+A change that needs a reader: <code>unused-import</code>'s removal where the import alone holds in the program a
+module that gives a conformance of a type and an interface it declares neither of, since a constraint
+that conformance satisfies names nothing of the module;
+<code>naming</code>'s new name, written where the name is declared (its uses are an
 editor's rename); <code>self-assignment</code>'s removal of <code>x = x</code>, which may stand for an assignment meant
 otherwise; an unknown name's closest known one (<code>did you mean</code>).</li>
 <li><em>(Informative.)</em> <strong><code>lyric fix --from-4 [&lt;file.lyr&gt;]</code></strong> migrates a Lyric 4 program — the <code>lyric.json</code> of the

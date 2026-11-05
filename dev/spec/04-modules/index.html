@@ -91,7 +91,7 @@ come with <code>comptime</code>.)</em></li>
 (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V1</a>). A package gathers modules under one name
 (<a href="../../spec/15-project/">15 §1</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/04-modules/</code> — a rule about a package as a package case, a
-directory (<a href="https://github.com/lyriclang/lyric-spec/blob/908cd200625cc74cae70a934f41c46f6d6787600/conformance/README.md">the format</a>); what only the command line shows, in the
+directory (<a href="https://github.com/lyriclang/lyric-spec/blob/0290910a1b8e3aebaa64bc0b8a771303e321337a/conformance/README.md">the format</a>); what only the command line shows, in the
 toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>PackageTests</code>).</p>
 <ol>
 <li>A <strong>package</strong> is a directory with a manifest, <code>lyric.toml</code>; its modules are the <code>.lyr</code> files
@@ -224,7 +224,13 @@ import is its module's own (§3 rule 4). A package's root module (§2 rule 1a) i
 library passes on what its modules declare: <code>pub import geo.shapes { rect };</code> in <code>src/lib.lyr</code>
 makes <code>import geo { rect }</code> of it.</li>
 <li>An import a module never uses is <strong>warned</strong>, in every form (<code>LYR-SEM0072</code>) (I5): a qualified
-import is used when its module is named, or one of its extension methods called. A <code>pub import</code> is used by being passed on.</li>
+import is used when its module is named, or a method of a block it brings (§3 rule 9a) called.
+A <code>pub import</code> is used by being passed on. A selective import is used by its names; one of which
+no name is used is warned even where it brings a block the file calls. The warning's change
+leaves the program compiling: where a method the file calls reaches it through this import
+alone — no other import that stays, not the prelude — the change keeps the module
+(<code>import std.io;</code>), and elsewhere takes the import out. Of two imports that bring the same
+blocks, one stays.</li>
 <li>The <strong>prelude</strong>, the module <code>std.prelude</code>, is named in every module without an import (I8;
 <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 B2</a>): <code>panic</code>, <code>assert</code>, <code>unreachable</code>, <code>todo</code>, <code>same</code>, <code>sequence</code>; <code>Error</code>, <code>Exception</code>, <code>Result</code>, <code>Box</code>,
 <code>Ordering</code>, <code>Range</code>, <code>RangeInclusive</code>, <code>RangeFrom</code>, <code>RangeTo</code>, <code>RangeFull</code>; <code>Equatable</code>,
@@ -256,8 +262,9 @@ as a change that needs a reader (<a href="../../spec/16-diagnostics/">16 §6</a>
 (<code>LYR-SEM0012</code>), where the local hides a module the file imports whole or a type of the
 prelude that has the member, says that the name is the local here and what it hides — hiding is
 legal and silent until then (rule 5 warns of a declaration or an import, never of a local); a
-method a block adds to the type in a module this one cannot see — not imported, or kept to its
-module — names it, its module and why.</li>
+method a block adds to the type — a block on the type, on a shape, or a blanket block whose
+constraints the type satisfies — in a module this one cannot see — not imported, or kept to its
+module — names it, its module and why. A module the program does not hold has no blocks to name.</li>
 </ol>
 <h2 id="5-a-types-members-by-their-bare-names">5. A type's members by their bare names</h2>
 <p>What a bare name means between the braces of a type
