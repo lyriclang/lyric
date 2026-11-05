@@ -1718,6 +1718,20 @@ example = '''
 by hand[LYR-MIG0318] main.lyr:3:12: 'int[]' is no key in Lyric 5: an array is not 'Hashable' — wrap the array in a struct that conforms to 'Hashable', or key by a value made of its elements
 '''
 
+[LYR-MIG0402]
+title = "an operation that answered whether it worked"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a silent operation of Lyric 4 answered `false` when it failed, `file.remove(p)`; in Lyric 5 it throws and answers nothing, and its answer is used here."
+explanation = '''
+Lyric 4's silent forms answered: `null` for what gives a value, `false` for what does not. Lyric 5 has the throwing form alone. Where the answer was a value, the migration writes `try?`: `file.text(p)` is `(try? fs.readText(p))`. Where it was `false`, a statement is written `try fs.remove(p);`, and the enclosing function has to catch it or say `throws`.
+
+Where the answer is used, in an `if` or a `let`, the call stays as written and the note says so: call it in a `try` block, and do in its `catch` what the `false` did.
+'''
+example = '''
+by hand[LYR-MIG0402] main.lyr:4:9: 'file.remove("/nothing")' answered whether it worked; in Lyric 5 it throws, and it answers nothing — call it in a 'try' block, and do in its 'catch' what the 'false' did
+'''
+
 [LYR-MIG0408]
 title = "a try around all of main"
 severity = "hint"

@@ -1,0 +1,12 @@
+import std.encoding { hexDecodeOrErr };
+import std.io.file as file;
+import std.json as json;
+import std.string as strings;
+
+fn main(): int {
+    let t = file.textOrErr("/nothing");
+    let j = json.parseOrErr("1");
+    let h = hexDecodeOrErr("00");
+    let n = strings.parseIntOrErr("1");
+    return 0;
+}

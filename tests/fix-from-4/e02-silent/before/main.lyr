@@ -1,0 +1,19 @@
+import std.encoding as encoding;
+import std.io.console { println };
+import std.io.file as file;
+import std.json as json;
+
+fn save(): void throws {
+    file.writeText("y", "z");
+    file.createDirAll("d");
+}
+
+fn main(): int {
+    let t = file.text("/nothing");
+    let b = file.bytes("/nothing");
+    let l = file.lines("/nothing");
+    let j = json.parse("{");
+    let h = encoding.hexDecode("z");
+    println(f"{t == null} {b == null} {l == null} {j == null} {h == null}");
+    return 0;
+}

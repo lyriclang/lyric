@@ -1,0 +1,1 @@
+by hand[LYR-MIG0402] main.lyr:4:9: 'file.remove("/nothing")' answered whether it worked; in Lyric 5 it throws, and it answers nothing — call it in a 'try' block, and do in its 'catch' what the 'false' did

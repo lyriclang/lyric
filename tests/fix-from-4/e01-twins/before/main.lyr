@@ -1,0 +1,19 @@
+import std.encoding { hexDecodeOrThrow };
+import std.io.console { println };
+import std.io.file as file;
+import std.json as json;
+
+fn work(): string throws {
+    let t = file.textOrThrow("x");
+    file.writeTextOrThrow("y", t);
+    file.moveOrThrow("y", "z");
+    let lines = file.linesOrThrow("x");
+    let d = json.parseOrThrow("1");
+    let h = hexDecodeOrThrow("00");
+    println(f"{lines.length} {h.length}");
+    return t;
+}
+
+fn main(): int {
+    return 0;
+}
