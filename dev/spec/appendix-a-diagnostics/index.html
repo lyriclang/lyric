@@ -2518,6 +2518,20 @@ code is no longer reported, and its number is not given again.</p>
 <td>a close that a using says</td>
 <td>A note of <code>lyric fix --from-4</code>: <code>defer stream.close(f)</code> closes by hand what a <code>using</code> binding closes in Lyric 5.</td>
 </tr>
+<tr>
+<td>LYR-MIG0501</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a task without a form</td>
+<td>A note of <code>lyric fix --from-4</code>: a use of Lyric 4's <code>std.task</code> that the migration cannot write: a wait for a descriptor or an interrupt, a <code>spawn</code> apart from its <code>run()</code>, a coroutine held in a value, <code>interrupt()</code>, <code>pending()</code>, or the module named by an alias.</td>
+</tr>
+<tr>
+<td>LYR-MIG0502</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>tasks became a scope</td>
+<td>A note of <code>lyric fix --from-4</code>: the <code>spawn</code>s of a block and its <code>run()</code> are a <code>TaskScope</code>, whose <code>close()</code> waits for the tasks as <code>run()</code> did.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a7-ct--compile-time-evaluation">A.7 CT — Compile-time evaluation</h2>

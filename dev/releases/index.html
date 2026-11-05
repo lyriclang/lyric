@@ -524,8 +524,9 @@ said; the first library rules, from a table (<code>from4.toml</code>) — <code>
 <code>Exception { text = &quot;…&quot; }</code> → <code>Exception(&quot;…&quot;)</code>, a <code>try</code> around all of <code>main</code> and a <code>defer</code> that closes said; the
 throwing twins and silent forms of <code>file</code>, <code>json</code>, <code>encoding</code> and <code>time</code> — <code>file.textOrThrow(p)</code> →
 <code>try file.readText(p)</code>, <code>file.text(p)</code> → <code>(try? file.readText(p))</code>, <code>file.remove(p);</code> → <code>try file.remove(p);</code>,
-<code>json.parseOrErr(s)</code> → <code>Result.of(() =&gt; try json.parse(s))</code>. The rules for coroutines and the rest of the library
-follow.</p>
+<code>json.parseOrErr(s)</code> → <code>Result.of(() =&gt; try json.parse(s))</code>; the tasks — <code>yield Wait.Now</code> → <code>try yieldNow()</code>,
+<code>yield Wait.Sleep(ms)</code> → <code>try sleep(Duration.ofMillis(ms))</code>, <code>Coroutine&lt;Wait&gt;</code> → <code>void throws Cancelled</code>, and the
+<code>spawn</code>s and <code>run()</code> of a block a <code>TaskScope</code>, which waits as <code>run()</code> did. The rest of the library follows.</p>
 </li>
 <li><p><strong>The language server answers a held hover after the diagnostics</strong> it waited for, not before them.</p>
 </li>
