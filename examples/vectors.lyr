@@ -2,7 +2,7 @@
 //
 // The point is what does NOT happen: 'b = a' copies, so 'b.x = 99' never changes 'a.x'. That is the
 // whole difference between a struct and a class.
-import std.io.console;
+import std.io as console;
 
 pub struct Vector2 {
     var x: int,
@@ -34,12 +34,11 @@ pub struct Segment {
     to: Vector2,
 }
 
-// The parameter is a copy, and a 'let': to change it, it is bound to a 'var' first. What
-// happens here stays here.
+// The parameter is a 'let', so the change happens on a copy, and it stays here.
 fn shrink(v: Vector2): int {
-    var w = v;
-    w.scale(0);
-    return w.sum();
+    var copy = v;
+    copy.scale(0);
+    return copy.sum();
 }
 
 fn main(): int {

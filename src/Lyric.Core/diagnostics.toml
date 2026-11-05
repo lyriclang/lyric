@@ -1512,6 +1512,20 @@ example = '''
 by hand[LYR-MIG0108] lyric.json:1:1: the tests under 'tests' are compiled apart in Lyric 4; Lyric 5 runs a package's tests/ with lyric test — move them to tests/ and make each test an @Test function
 '''
 
+[LYR-MIG0110]
+title = "a file without an entry"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a single file has no `main`. Lyric 4 ran it as a library of a host; Lyric 5 asks a single file for its entry."
+explanation = '''
+Lyric 4 compiled such a file to bytecode, and a host loaded it and called its functions. Lyric 5 builds a single file as a program, and refuses one without `main` (`LYR-SEM0021`).
+
+A library is a package in Lyric 5: `lyric new --lib` lays one out, and `lyric build --lib` makes a static library and its header for a host in C. Or give the file a `main`.
+'''
+example = '''
+by hand[LYR-MIG0110] main.lyr:1:1: this file has no 'main': Lyric 4 ran it as a library of a host, and Lyric 5 asks a single file for its entry — make it a package with a library target, as 'lyric new --lib' does, or give it a 'main'
+'''
+
 [LYR-MIG0205]
 title = "an opaque type became a struct"
 severity = "hint"
@@ -1718,6 +1732,48 @@ example = '''
 by hand[LYR-MIG0318] main.lyr:3:12: 'int[]' is no key in Lyric 5: an array is not 'Hashable' — wrap the array in a struct that conforms to 'Hashable', or key by a value made of its elements
 '''
 
+[LYR-MIG0320]
+title = "a method that writes under an interface"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a method of a class writes the object's state, and the interface it answers declares it without `mut`."
+explanation = '''
+In Lyric 4 a method of a class wrote its fields without saying so, whatever the interface declared. In Lyric 5 a method that writes `this` is a `mut fn` (`LYR-SEM0019`), and a conformance repeats what the interface says (`LYR-SEM0042`), so neither side can change alone.
+
+Declare it `mut fn` in the interface and in every type that answers it. A struct that answers it then needs a `var` to call it on. Where the interface is another library's, the state has to move: into another object that the method reaches through a field.
+'''
+example = '''
+by hand[LYR-MIG0320] main.lyr:8:8: 'hit' writes the object's state, and the interface 'Damageable' declares it without 'mut'; Lyric 5 has a method that writes declared 'mut fn', and a conformance repeats what the interface says — declare it 'mut fn' in 'Damageable' and in every type that answers it
+'''
+
+[LYR-MIG0321]
+title = "a written parameter"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a function writes a struct it took as a parameter. It was a copy in Lyric 4; in Lyric 5 a parameter is a `let`."
+explanation = '''
+A struct parameter of Lyric 4 was a copy the function could change, and its caller saw nothing of it. A parameter of Lyric 5 is a `let` (`LYR-SEM0019`), and the same block cannot bind its name anew (`LYR-SEM0176`).
+
+Copy it into a `var` of another name and write that: `var copy = v;`. The behaviour stays what it was, the caller's value untouched. The note stands at the first write of each parameter; the uses after it are for the same change.
+'''
+example = '''
+by hand[LYR-MIG0321] main.lyr:10:5: the parameter 'v' is written; it was a copy in Lyric 4, and in Lyric 5 a parameter is a 'let' — copy it into a 'var' of another name, 'var copy = v;', and write that
+'''
+
+[LYR-MIG0322]
+title = "an enum that holds itself"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: an enum holds itself, directly or through a struct. Lyric 4 kept payloads by reference; an enum of Lyric 5 is a value and would have no size."
+explanation = '''
+Lyric 5 refuses the type (`LYR-SEM0056`). A class in the cycle ends it, because a class is a reference.
+
+One of the program's own keeps the matches readable, since a pattern can name its fields: `Neg(Unary)` with `class Unary { x: Expr }` and the pattern `.Neg(Unary { x = .Lit(0) })`. `Box<T>` of `std.core` needs no declaration, and its matches take the value out with `.value`. Either way the constructors and the patterns change, which is why this is by hand.
+'''
+example = '''
+by hand[LYR-MIG0322] main.lyr:1:1: the enum 'Expr' holds itself; an enum is a value in Lyric 5 and would have no size — put the recursive part behind a class: one of the program's own, whose fields a pattern can name, or 'Box<T>'
+'''
+
 [LYR-MIG0402]
 title = "an operation that answered whether it worked"
 severity = "hint"
@@ -1808,6 +1864,20 @@ The call was written anew, and it does what the old one did but for one thing, w
 '''
 example = '''
 proposal[LYR-MIG0602] main.lyr:5:13: 'Random.seeded(42)' gives another sequence in Lyric 5, the generator being ChaCha8 — a test that holds a seed's numbers takes the new ones
+'''
+
+[LYR-MIG0616]
+title = "a function bound to .NET"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: an `extern \"dotnet\"` binds a function of .NET, which Lyric 5 runs without."
+explanation = '''
+Lyric 4 ran on .NET and bound its static methods. Lyric 5 is native, and C is its one foreign border (`LYR-SEM0099`).
+
+Use the function of std that does the same, as `std.math` for `Math.Cbrt` and `std.os` for `Environment`, or bind a C library with `extern "C"`.
+'''
+example = '''
+by hand[LYR-MIG0616] main.lyr:1:8: 'cbrt' binds a function of .NET, and Lyric 5 runs without it — use the function of std that does this, or bind a C library with 'extern "C"'
 '''
 
 [LYR-PAR0001]

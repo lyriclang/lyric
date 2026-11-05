@@ -11,9 +11,7 @@
 // The double parenthesis in '((a, b)) => …' is deliberate: the OUTER pair is the parameter
 // list, so '(a, b) => …' keeps its two parameters. Rust writes '|(a, b)|', Python cannot do it
 // at all.
-import std.io.console { println };
-import std.collections { Map, entries };
-import std.iter { over, enumerate };
+import std.io { println };
 
 fn foldPairs(ps: (int, int)[], seed: int, f: fn(int, (int, int)) -> int): int {
     var acc = seed;
@@ -24,22 +22,22 @@ fn foldPairs(ps: (int, int)[], seed: int, f: fn(int, (int, int)) -> int): int {
 }
 
 fn main(): int {
-    let m = Map<string, int>.empty();
-    m.set("a", 1);
-    m.set("b", 2);
+    let m = Map<string, int>.new();
+    m.insert("a", 1);
+    m.insert("b", 2);
 
     var total = 0;
-    for ((k, v) in entries(m)) {
+    for ((k, v) in m.entries()) {
         println(k + "=" + f"{v}");
         total += v;
     }
 
     // '_' skips an element and takes its unused-name warning with it
-    for ((_, v) in entries(m)) {
+    for ((_, v) in m.entries()) {
         total += v;
     }
 
-    for ((i, name) in enumerate(over(["x", "y"]))) {
+    for ((i, name) in ["x", "y"].iter().enumerate()) {
         println(f"{i}: {name}");
     }
 

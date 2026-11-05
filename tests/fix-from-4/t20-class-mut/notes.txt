@@ -1,0 +1,4 @@
+proposal[LYR-MIG0301] main.lyr:2:5: the field 'v' is written (line 32); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value
+proposal[LYR-MIG0301] main.lyr:6:5: the field 'x' is written (line 24); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value
+proposal[LYR-MIG0301] main.lyr:10:5: the field 'n' is written (line 15); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value
+proposal[LYR-MIG0301] main.lyr:12:5: the field 'at' is written (line 24); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value

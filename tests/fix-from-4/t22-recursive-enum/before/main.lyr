@@ -1,0 +1,27 @@
+enum Expr {
+    Lit(int),
+    Neg(Expr),
+}
+
+struct Pair {
+    left: Tree,
+    right: Tree,
+}
+
+enum Tree {
+    Leaf,
+    Node(Pair),
+}
+
+class Holder {
+    fine: Fine,
+}
+
+enum Fine {
+    End,
+    More(Holder),
+}
+
+fn main(): int {
+    return 0;
+}

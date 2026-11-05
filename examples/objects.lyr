@@ -2,7 +2,7 @@
 // Shows: class as a reference type, field access, methods and a `static` factory. Without
 // interfaces and exceptions; `bank.lyr` is the same subject fully built out.
 
-import std.io.console { println };
+import std.io { println };
 
 class Counter {
     var value: int,

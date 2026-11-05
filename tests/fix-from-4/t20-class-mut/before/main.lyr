@@ -1,0 +1,48 @@
+class Other {
+    v: int,
+}
+
+struct Pair {
+    x: int,
+}
+
+class Counter {
+    n: int,
+    held: Other,
+    at: Pair,
+
+    fn advance() {
+        this.n += 1;
+    }
+
+    fn twice() {
+        this.advance();
+        this.advance();
+    }
+
+    fn reach() {
+        this.at.x = 3;
+    }
+
+    fn get(): int {
+        return this.n;
+    }
+
+    fn another() {
+        this.held.v = 2;
+    }
+
+    fn given(o: Other) {
+        o.v = 1;
+    }
+}
+
+fn bump(c: Counter) {
+    c.twice();
+}
+
+fn main(): int {
+    let c = Counter { n = 0, held = Other { v = 0 }, at = Pair { x = 0 } };
+    bump(c);
+    return c.get();
+}

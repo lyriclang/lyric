@@ -1,0 +1,8 @@
+lyric 1.0 (constants)
+origin sum: 0
+goblin lvl 1: 10 hp
+goblin lvl 2: 20 hp
+goblin lvl 3: 30 hp
+goblin lvl 4: 40 hp
+total: 100
+base: 40

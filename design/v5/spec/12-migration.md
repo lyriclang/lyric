@@ -58,6 +58,7 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | K06 | nicht-`pub` = modulprivat | nicht-`pub` = `internal` (paketweit) — Sichtbarkeit wächst still | R | Hinweis je Modul |
 | K07 | `build.lyr` mit `executable("app", "src/main.lyr")`, `option`, `flag`, `Profile`, `packed`, `library` (guide 16) | `[[bin]]`, `[profile.*]` im Manifest; `packed` entfällt; Rest des Skripts bleibt (BS1) | R | — |
 | K08 | `stdlib-tests/`-Fremdkompilation | `tests/`-Root im Paket (V4) | H | — |
+| K10 | eine einzelne Datei ohne `main` (Bibliothek eines Hosts, guide 14) | ein Paket mit Bibliotheksziel (`lyric new --lib`, 11) | H | — |
 | **Syntax** (Grammar §1.4, §3–7) | | | | |
 | S01 | `params xs: int[]` (§3.1) | `xs: int...`; ein weitergereichtes Array bekommt an der Aufrufstelle `...` (`f(xs...)`, *Review 2026-10-05, A2*) | M | — |
 | S02 | `throws T` (ein Typ) / `throws` bar (§3.1, guide 10) | bleibt (`throws [A, B]` neu; Listenregel) | — | — |
@@ -70,6 +71,7 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | S09 | `Coroutine<T> throws E` als Typsuffix (§4) | bleibt | — | — |
 | S10 | `xs.length` (Array-**Feld**, guide 02) vs `s.length()` | `length()` überall (N8) | M | Typ |
 | S11 | `x` mit `Iterator<T>`/`Iterable<T>`, `Indexable<T>` als Typargument (guide 13) | `Iterator<Item = T>`, `Iterable<Item = T>`; Konformanz `:: Iterator { type Item = T; … }`; `Indexable<T>` → `Index<int> { type Output = T }` + `IndexSet<int>` | M/R | Methodenrümpfe |
+| S12 | `fn main(args: string[])` (guide 12) | `fn main()`, darin `let args = os.args()[1..].iter().toArray();`; `args()` nennt zuerst das Programm selbst, 4.6 ließ es aus | M | — |
 | **Interfaces / Werte** (guide 05, 07, 08) | | | | |
 | T01 | Felder ohne Modifikator, beschrieben (`b.x = 99`) | `var` an jedem geschriebenen Feld (02) | R | Schreibstellen |
 | T02 | `Equatable<Point>`, `Ordered<Version>`, `Hashable<K>` (guide 07/08) | `Equatable`, `Ordered`, `Hashable` (`Self`, T-Reihe) | M | — |
@@ -89,6 +91,10 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | T16 | `s.toChars()`, `s.utf8Encode()`, `utf8Decode(bytes): ?string` | `chars().toArray()`, `bytes()` (10 P5), `try? string.fromUtf8(bytes)` | M | — |
 | T17 | `?T` nicht schachtelbar; `Iterator<?T>` verboten | `??T` erlaubt — nichts zu tun | — | — |
 | T18 | `T[]` als `Map`-Schlüssel (war Lowering-Loch) | Übersetzungsfehler → Wrapper | H | — |
+| T19 | Methode ohne `pub`, die für einen `pub`-Typ ein `pub`-Interface beantwortet | `pub fn` (`LYR-SEM0167`) | M | Konformanz |
+| T20 | Methode einer Klasse schreibt `this` ohne `mut`, auch über einen Struct im Feld oder einen Aufruf auf `this` | `mut fn`; deklariert ein Interface sie ohne `mut`, ändern sich beide zusammen: von Hand | M/H | Schreibstellen |
+| T21 | Struct-Parameter wird beschrieben (war eine Kopie) | `var copy = v;` mit eigenem Namen, ein Parameter ist `let` und bindet nicht neu (`LYR-SEM0176`) | H | Schreibstellen |
+| T22 | Enum enthält sich selbst, auch über Structs | eine Klasse im Kreis (eigene oder `Box<T>`, `LYR-SEM0056`) | H | Typen |
 | **Fehler** (guide 10, 13) | | | | |
 | E01 | `xOrThrow(a)` (37 Zwillinge) | `x(a)` mit `try` | M | Bibliothekstabelle |
 | E02 | stille Form `x(a): ?T`/`bool` mit Grund (`file.text`, `writeText`, `json.parse`) | `try? x(a)` bzw. `try x(a)` (bool-Operationen werfen) | M | Bibliothekstabelle |

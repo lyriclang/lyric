@@ -1,0 +1,55 @@
+// Patterns where a NAME used to stand: in a for-loop head and in a lambda parameter.
+//
+//   for ((k, v) in entries(m)) { … }        instead of 'let (k, v) = kv;' as the first line
+//   (acc, (a, b)) => acc + a * b            instead of the same line inside the lambda
+//
+// The pattern has to hold for every element — a loop head and a parameter have no path for a
+// miss — so only irrefutable patterns are allowed: names, '_', nested tuples and struct field
+// patterns. A pattern that could fail is LYR-SEM0098, and the way out it names is 'let … else'
+// in the body.
+//
+// The double parenthesis in '((a, b)) => …' is deliberate: the OUTER pair is the parameter
+// list, so '(a, b) => …' keeps its two parameters. Rust writes '|(a, b)|', Python cannot do it
+// at all.
+import std.io.console { println };
+import std.collections { Map, entries };
+import std.iter { over, enumerate };
+
+fn foldPairs(ps: (int, int)[], seed: int, f: fn(int, (int, int)) -> int): int {
+    var acc = seed;
+    for (p in ps) {
+        acc = f(acc, p);
+    }
+    return acc;
+}
+
+fn main(): int {
+    let m = Map<string, int>.empty();
+    m.set("a", 1);
+    m.set("b", 2);
+
+    var total = 0;
+    for ((k, v) in entries(m)) {
+        println(k + "=" + f"{v}");
+        total += v;
+    }
+
+    // '_' skips an element and takes its unused-name warning with it
+    for ((_, v) in entries(m)) {
+        total += v;
+    }
+
+    for ((i, name) in enumerate(over(["x", "y"]))) {
+        println(f"{i}: {name}");
+    }
+
+    let sum = foldPairs([(1, 10), (2, 20)], 0, (acc, (a, b)) => acc + a * b);
+    println(f"total {total} sum {sum}");
+    return 0;
+}
+// Output (the map's order is its own):
+// b=2
+// a=1
+// 0: x
+// 1: y
+// total 6 sum 50

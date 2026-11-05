@@ -308,7 +308,7 @@ public sealed class NameSpanTests
     public static TheoryData<string> RealSources()
     {
         var data = new TheoryData<string>();
-        foreach (var directory in new[] { "stdlib", "examples" })
+        foreach (var directory in new[] { "stdlib", Path.Combine("tests", "corpus-4x") })
             foreach (var file in Directory.EnumerateFiles(
                 Path.Combine(RepoRoot(), directory), "*.lyr", SearchOption.AllDirectories))
             {

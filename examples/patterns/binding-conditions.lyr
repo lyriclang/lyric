@@ -9,7 +9,7 @@
 //                name is bound on every path.
 // A '?T' matched by a plain name binds 'T' — the binding is the proof (§7.4). An enum payload
 // binds as in a match arm, a struct pattern takes a struct apart without an else at all.
-import std.io.console { println };
+import std.io { println };
 import std.collections { Deque };
 
 class Profile {
@@ -100,7 +100,7 @@ fn main(): int {
 
     println(describe(Shape.Rect { w = 2, h = 3 }) + " / " + describe(Shape.Empty));
 
-    let q = Deque<int>.empty();
+    let q = Deque<int>.new();
     q.pushBack(1);
     q.pushBack(2);
     q.pushBack(3);

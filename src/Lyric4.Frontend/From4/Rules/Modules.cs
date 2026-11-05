@@ -223,12 +223,21 @@ internal sealed partial class Imports : IRule
                 if (Modules.TryGetValue(path, out var to) && PathOfImport().Match(text, import.Span.Start) is { Success: true } written)
                 {
                     var group = written.Groups[1];
-                    context.Replace(path == "std.io.console" ? "K03" : "K04", import.Span.File, group.Index, group.Index + group.Length, to);
+                    // the module's name in the program stays what it was, 'console.println' keeps reading as written
+                    var keeps = import.Clause is null && import.Path[^1] != to[(to.LastIndexOf('.') + 1)..] && NamesModule(module, import.Path[^1], path);
+                    context.Replace(path == "std.io.console" ? "K03" : "K04", import.Span.File, group.Index, group.Index + group.Length,
+                        keeps ? $"{to} as {import.Path[^1]}" : to);
                 }
             }
+            if (EntryArguments.Of(module) is not null
+                && !module.Declarations.OfType<ImportDecl>().Any(d => string.Join('.', d.Path) == "std.os" && d.Clause is not ImportSelective))
+                needed["std.os"] = ["*"];
+            var lines = needed.OrderBy(n => n.Key, StringComparer.Ordinal)
+                .Select(n => n.Value is ["*"] ? $"import {n.Key};\n" : $"import {n.Key} {{ {string.Join(", ", n.Value)} }};\n").ToList();
             if (module.Declarations.OfType<ImportDecl>().LastOrDefault() is { } last)
-                foreach (var (path, names) in needed.OrderBy(n => n.Key, StringComparer.Ordinal))
-                    Insert(LineEnd(text, last.Span.End), names is ["*"] ? $"import {path};\n" : $"import {path} {{ {string.Join(", ", names)} }};\n");
+                foreach (var line in lines) Insert(LineEnd(text, last.Span.End), line);
+            else if (lines.Count > 0 && module.Declarations.FirstOrDefault() is { } first)
+                Insert(AboveDocComment(text, first.Span.Start), string.Concat(lines) + "\n");
             foreach (var (at, line) in inserts) context.Replace("K05", module.Span.File, at, at, line);
         }
     }
@@ -253,23 +262,40 @@ internal sealed partial class Imports : IRule
         return names;
     }
 
-    /// <summary>The end of the import's line, its line break included.</summary>
-    /// <summary>Whether what is left of a module names its alias of <c>std.string</c>: a type, or a
-    /// function the table has no form for. What has one no longer names the module.</summary>
-    private static bool NamesAlias(Module module, string alias)
+    /// <summary>Whether what is left of a module names its alias of <c>std.string</c>.</summary>
+    private static bool NamesAlias(Module module, string alias) => NamesModule(module, alias, "std.string");
+
+    /// <summary>Whether what is left of a module names a 4.x module by <paramref name="name"/>: a type,
+    /// or a function the table has no form for. What has one no longer names the module, unless its
+    /// form says <c>{q}</c>, which keeps what was written.</summary>
+    private static bool NamesModule(Module module, string name, string path)
     {
         foreach (var node in Tree.Below(module))
             switch (node)
             {
-                case NamedType { Path: var path } when path.Length > 1 && path[0] == alias:
+                case NamedType { Path: var named } when named.Length > 1 && named[0] == name:
                     return true;
-                case MemberExpr { Target: IdentifierExpr { Name: var name }, Member: var member } when name == alias
-                    && LibraryTable.Of($"std.string.{member}") is not { Form: not null }:
+                case MemberExpr { Target: IdentifierExpr { Name: var target }, Member: var member } when target == name
+                    && (LibraryTable.Of($"{path}.{member}") is not { Form: { } form } || form.Contains("{q}", StringComparison.Ordinal)):
                     return true;
             }
         return false;
     }
 
+    /// <summary>The start of a declaration's line, above the doc comment that belongs to it.</summary>
+    private static int AboveDocComment(string text, int at)
+    {
+        var start = text.LastIndexOf('\n', Math.Max(0, at - 1)) + 1;
+        while (start > 0)
+        {
+            var above = text.LastIndexOf('\n', Math.Max(0, start - 2)) + 1;
+            if (!text.AsSpan(above, start - above).TrimStart().StartsWith("///")) break;
+            start = above;
+        }
+        return start;
+    }
+
+    /// <summary>The end of the import's line, its line break included.</summary>
     private static int LineEnd(string text, int end)
     {
         if (end < text.Length && text[end] == '\r') end++;

@@ -1,0 +1,2 @@
+by hand[LYR-MIG0322] main.lyr:1:1: the enum 'Expr' holds itself; an enum is a value in Lyric 5 and would have no size — put the recursive part behind a class: one of the program's own, whose fields a pattern can name, or 'Box<T>'
+by hand[LYR-MIG0322] main.lyr:11:1: the enum 'Tree' holds itself; an enum is a value in Lyric 5 and would have no size — put the recursive part behind a class: one of the program's own, whose fields a pattern can name, or 'Box<T>'
