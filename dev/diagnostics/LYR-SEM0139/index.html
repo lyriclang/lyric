@@ -248,7 +248,7 @@
 <p class="meta">warning · <a href="../../spec/06-errors/">spec 06-errors</a> · lint <code>useless-try</code>, group <code>style</code>, warn unless said</p>
 <p>A 'try' mark, a 'try?' or 'try!', a 'try' block or a marked loop covers no call that can throw, or marks what an enclosing or earlier mark covers already.</p>
 <h2 id="explanation">Explanation</h2>
-<p>A mark says that a call may fail here. Where nothing under it can throw — or a <code>try?</code> inside takes every error first — the mark is wrong, and a <code>try</code> block's <code>catch</code> clauses can never run. A second mark under the first adds nothing.</p>
+<p>A mark says that a call may fail here. Where nothing under it can throw — or a <code>try?</code> inside takes every error first — the mark is wrong, and a <code>try</code> block's <code>catch</code> clauses can never run. A second mark under the first adds nothing. Over a call the compiler refused there is no such warning: what it throws is known once the error is fixed.</p>
 <p>Remove the mark; if a call was expected to throw, check that the right function is called.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">fn</span> safe(): <span class="ty">int</span> { <span class="kw">return</span> <span class="num">1</span>; }
