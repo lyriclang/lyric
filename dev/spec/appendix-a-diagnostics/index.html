@@ -2497,6 +2497,20 @@ code is no longer reported, and its number is not given again.</p>
 <td>an array as a key</td>
 <td>A note of <code>lyric fix --from-4</code>: an array is the key of a <code>Map</code> or the element of a <code>Set</code>, which Lyric 4's checker passed and Lyric 5 refuses.</td>
 </tr>
+<tr>
+<td>LYR-MIG0408</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a try around all of main</td>
+<td>A note of <code>lyric fix --from-4</code>: a <code>try</code> holds all of <code>main</code>, which could not throw in Lyric 4; in Lyric 5 <code>main</code> may.</td>
+</tr>
+<tr>
+<td>LYR-MIG0409</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a close that a using says</td>
+<td>A note of <code>lyric fix --from-4</code>: <code>defer stream.close(f)</code> closes by hand what a <code>using</code> binding closes in Lyric 5.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a7-ct--compile-time-evaluation">A.7 CT — Compile-time evaluation</h2>
