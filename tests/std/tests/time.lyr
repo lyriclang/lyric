@@ -92,6 +92,19 @@ fn whatIsNoDurationIsSaidWhy(): void {
 }
 
 @Test
+fn anInstantComesFromItsEpochMilliseconds(): void {
+    assertEq(Instant.ofEpochMillis(0), try! Instant.parse("1970-01-01T00:00:00Z"));
+    assertEq(Instant.ofEpochMillis(1500).epochMillis(), 1500);
+    assertEq(Instant.ofEpochMillis(-1).epochMillis(), -1);
+    assertEq(Instant.ofEpochMillis(-1).epochSecs(), -1);
+    assertEq(Instant.ofEpochMillis(9223372036854).epochMillis(), 9223372036854);
+    // epochMillis rounds down: what is finer than a millisecond does not come back.
+    let fine = Instant.ofEpochMillis(1500) + Duration.ofNanos(999);
+    assertEq(fine.epochMillis(), 1500);
+    assertTrue(Instant.ofEpochMillis(fine.epochMillis()) < fine);
+}
+
+@Test
 fn anInstantIsAMomentOnTheWallClock(): void {
     let now = Instant.now();
     // 2025-01-01T00:00:00Z

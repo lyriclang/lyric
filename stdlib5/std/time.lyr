@@ -320,6 +320,17 @@ pub struct Instant :: [Equatable, Ordered, TotalOrder, Hashable, Add<Duration>, 
         return Instant { ns = lyr_clock_realtime_ns() };
     }
 
+    /// Returns the moment `n` milliseconds after the epoch, before it for a negative `n`: the
+    /// inverse of `epochMillis`, which rounds down, so what is finer than a millisecond does not
+    /// come back.
+    ///
+    /// # Panics
+    ///
+    /// Panics where an instant cannot hold the moment, outside the years 1677 to 2262.
+    pub static fn ofEpochMillis(n: int): Instant {
+        return Instant { ns = n * 1000000 };
+    }
+
     /// Returns the whole seconds since the epoch, rounded down (a moment before 1970 gives a
     /// negative count).
     pub fn epochSecs(): int {
