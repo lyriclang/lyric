@@ -1,0 +1,12 @@
+import std.io.console { println };
+import std.string as text;
+
+fn main(): int {
+    let s = "a,b,a";
+    println(s.contains("a"));
+    println(s.count("a"));
+    println(s.replace("a", "x"));
+    println(s.startsWith("a"));
+    println(s.endsWith("a"));
+    return 0;
+}

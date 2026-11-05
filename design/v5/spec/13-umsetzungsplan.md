@@ -2125,6 +2125,23 @@ Formen der Bibliothek (E01–E03, in der Tabelle), **S5c** die Koroutinen (N01, 
   Adresse, die Argumente liefen nicht mehr in ihrer Reihenfolge), `receiveFrom` (ein Tupel statt `Packet`), `process.close`.
 - **`wait` gibt weiter eine Zahl**: `c.wait().code() ?? -1`. Ein getötetes Kind hat in Lyric 5 keinen Code, das sagt `LYR-MIG0602`.
 
+**S6d, beim Bauen entschieden** (2026-11-05):
+
+- **Der Test** liest die Quellen der 4.6-Bibliothek mit dem 4.6-Parser und die Oberfläche von Lyric 5 aus `lyric api --std`. Für jede
+  `pub`-Funktion gilt: eine Zeile der Tabelle, `[[elsewhere]]` (Sache einer anderen Regel) oder derselbe Name in Lyric 5, sonst ist er rot.
+  Ein zweiter Test fragt gegen eine leere Oberfläche und verlangt, dass Namen auftauchen: der erste sagt sonst nichts, wenn er nichts sieht.
+- **Er vergleicht nur Namen.** Eine Funktion, die ihren Namen behielt und ihre Bedeutung änderte, besteht ihn. Das ist die Grenze dieses
+  Tests; solche Fälle fangen nur Fälle mit Lauf (S7).
+- **Was er fand, stand nicht in 12 R2**: `std.fmt`, der Rest von `std.math` und `std.io.console`, `joinPath`, `parentDir`, `bytes`. Ein
+  4.6-Programm damit bekam von `fix` kein Wort und dann ein nacktes `SEM0012`. 12 R2 hat dafür jetzt B18–B22.
+- **Formen, die kompiliert hätten und falsch gewesen wären**: `(try? stdin().readLine())` ist am Dateiende nicht `null`, das `?` schachtelt
+  sich, und `while (line != null)` endete nie; die Form sagt `?? null`. `parent("a")` gibt `.`, wo `parentDir` `""` gab, und `join`
+  normalisiert: beides sagt `LYR-MIG0602`.
+- **`lastIndexOf` und `indexOfFrom` eines Strings** gehören T15 (`rfind`, `findFrom`), `task.interrupt` und `pending` gehören N01; eine
+  Hand-Notiz daneben hätte die Regel überdeckt oder doppelt und schlechter gesagt, was sie sagt (`task.cancel()` ist kein Interrupt). Die Messung mit einem Regex über die Quellen hatte gut 140 offene Namen; die echte Oberfläche ließ davon rund 45 übrig.
+- **Die Nachricht von 2e05043f ist falsch**: lyric#661 ist S6c, sein Commit trägt Titel und Text von lyric#659. Die Skripte schrieben die
+  Texte erst nach der Schranke; `shipnext` verweigert jetzt einen Titel, den `main` schon trägt. `main` bleibt ungeschrieben.
+
 ## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
 
 **Anlass** (Maintainer, 2026-10-29): ein Bau mit einer eingebundenen C-Bibliothek (raylib, sieben Quellen) sagte

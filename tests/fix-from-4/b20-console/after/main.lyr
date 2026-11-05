@@ -1,0 +1,16 @@
+import std.io { println, stdin };
+import std.term { isTerminal };
+
+fn work(): void throws {
+    for (line in try stdin().lines()) {
+        println(line);
+    }
+}
+
+fn main(): int {
+    let l = ((try? stdin().readLine()) ?? null);
+    println(l == null);
+    println(((try? stdin().readToString()) ?? ""));
+    println(isTerminal(.Stdin));
+    return 0;
+}

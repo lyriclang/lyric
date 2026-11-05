@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Lyric4.AST;
 using Lyric4.Core;
+using Lyric4.Parsing;
 using Lyric4.Resolver;
 using Lyric4.Sema;
 
@@ -11,7 +12,7 @@ namespace Lyric4.From4.Rules;
 internal sealed record LibraryEntry(string Rule, string From, string? Name, string? Form, bool Iterator, bool Lambda, bool Throws, bool Statement, string? Hand, string? Moved, IReadOnlyList<string> Imports, string? Review, string? Advice, string? Optional, bool Walk);
 
 /// <summary>The table of <c>from4.toml</c>, embedded in this assembly: 4.6's library by function.</summary>
-internal static class LibraryTable
+internal static partial class LibraryTable
 {
     private static readonly Lazy<Dictionary<string, LibraryEntry>> Entries = new(Read);
 
@@ -57,6 +58,72 @@ internal static class LibraryTable
                 || text.Contains($"fn {name}<", StringComparison.Ordinal) || text.Contains($"class {name} ", StringComparison.Ordinal)
                 || text.Contains($"struct {name} ", StringComparison.Ordinal) || text.Contains($"type {name} ", StringComparison.Ordinal));
         })];
+
+    private static readonly Lazy<HashSet<string>> Elsewhere = new(() =>
+    {
+        using var stream = typeof(LibraryTable).Assembly.GetManifestResourceStream("from4.toml")!;
+        using var reader = new StreamReader(stream);
+        var table = Lyric.Core.Toml.Parse(reader.ReadToEnd());
+        if (!table.TryGet("elsewhere", out var list)) return [];
+        return [.. ((Lyric.Core.TomlArray)list).Cast<Lyric.Core.TomlTable>().Select(row => row.TryGet("from", out var from) ? (string)from : "")];
+    });
+
+    /// <summary>The public functions of 4.6's library that nothing speaks for: no line of the table, no other
+    /// rule, and no function of that name in the surface of Lyric 5, given as its lines. It compares names: a
+    /// function that kept its name and changed its meaning stands here as the same. A line of
+    /// <c>elsewhere</c> that names nothing of 4.6 is a fault too.</summary>
+    public static IReadOnlyList<string> Gaps(IEnumerable<KeyValuePair<string, string>> stdlib, IEnumerable<string> surface)
+    {
+        var five = surface.Select(line => FiveName().Match(line)).Where(m => m.Success).Select(m => m.Groups[1].Value).ToHashSet(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var gaps = new List<string>();
+        foreach (var (relative, text) in stdlib)
+        {
+            var sources = new SourceManager();
+            var parsed = ParsedModule.Parse(sources, sources.AddVirtual(relative, text), new DiagnosticEngine(sources));
+            var module = Path.ChangeExtension(relative, null).Replace('\\', '/').Replace('/', '.');
+            void Method(string owner, FunctionDecl method, TypeNode[] interfaces)
+            {
+                if (!method.IsPublic) return;
+                var key = $"{owner}.{method.Name}";
+                seen.Add(key);
+                // what an iterator has from its interface, whatever it is called
+                if (method.Name == "next" && interfaces.OfType<NamedType>().Any(i => i.Path[^1] == "Iterator")) return;
+                if (Spoken(key)) return;
+                var owners = owner == "string" ? new[] { "string", "StringView" } : [owner];
+                if (!five.Any(name => owners.Any(o => name.EndsWith($".{o}.{method.Name}", StringComparison.Ordinal)))) gaps.Add(key);
+            }
+            foreach (var declaration in parsed.Ast.Declarations)
+                switch (declaration)
+                {
+                    case FunctionDecl { IsPublic: true } function:
+                        var key = $"{module}.{function.Name}";
+                        seen.Add(key);
+                        if (!Spoken(key) && !five.Contains($"{Imports.Target(module)}.{function.Name}")) gaps.Add(key);
+                        break;
+                    case StructDecl s:
+                        foreach (var member in s.Members.OfType<FunctionDecl>()) Method(s.Name, member, s.Interfaces);
+                        break;
+                    case ClassDecl c:
+                        foreach (var member in c.Members.OfType<FunctionDecl>()) Method(c.Name, member, c.Interfaces);
+                        break;
+                    case EnumDecl e:
+                        foreach (var member in e.Methods) Method(e.Name, member, e.Interfaces);
+                        break;
+                    case ExtendDecl { Target: NamedType target } x:
+                        foreach (var member in x.Methods) Method(target.Path[^1], member, x.Interfaces);
+                        break;
+                }
+        }
+        gaps.AddRange(Elsewhere.Value.Where(key => !seen.Contains(key)).Select(key => $"elsewhere names nothing of 4.6: {key}"));
+        gaps.Sort(StringComparer.Ordinal);
+        return gaps;
+    }
+
+    private static bool Spoken(string key) => Of(key) is not null || Elsewhere.Value.Contains(key);
+
+    [GeneratedRegex(@"\bfn ([^\s<(]+)")]
+    private static partial Regex FiveName();
 
     /// <summary>Whether the table holds a function of a module: its imports change.</summary>
     public static bool HasModule(string module) => Entries.Value.Keys.Any(key => key.StartsWith(module + ".", StringComparison.Ordinal));

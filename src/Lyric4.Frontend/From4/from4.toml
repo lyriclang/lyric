@@ -15,6 +15,8 @@
 # `optional`: the form through `?.`; a form without one is said by hand there.
 # `std.io.*` in `imports`: a method the form calls comes with the module, whichever way it is imported.
 # `walk`: as what a loop walks it is marked `try`, its `next()` throwing.
+# `[[elsewhere]]`: a function of 4.6's library the table has no line for and a test may not ask about: another
+# rule's business.
 # A type of 4.6's library has its line as a function does: `name` is what it is written as, `hand` says what
 # stands for it.
 
@@ -1485,3 +1487,326 @@ name = "TcpStream"
 rule = "B13"
 from = "std.io.net.Packet"
 hand = "a datagram fills a buffer and comes with its sender, no 'Packet': 'let buf = [0u8] * max; let (got, from) = try socket.recvFrom(buf[..]);'"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.padLeft"
+form = "{0}.padStart({1})"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.padRight"
+form = "{0}.padEnd({1})"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.formatHex"
+form = "f\"{{0}:x}\""
+
+[[free]]
+rule = "B18"
+from = "std.fmt.formatBinary"
+form = "f\"{{0}:b}\""
+
+[[free]]
+rule = "B18"
+from = "std.fmt.formatOctal"
+form = "f\"{{0}:o}\""
+
+[[free]]
+rule = "B18"
+from = "std.fmt.formatInt"
+hand = "a format stands in an f-string in Lyric 5, written there: f\"{v:>8}\"; a format held in a variable has no form"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.formatUint"
+hand = "a format stands in an f-string in Lyric 5, written there: f\"{v:>8}\"; a format held in a variable has no form"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.formatFloat"
+hand = "a format stands in an f-string in Lyric 5, written there: f\"{v:>8}\"; a format held in a variable has no form"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.formatBool"
+hand = "a format stands in an f-string in Lyric 5, written there: f\"{v:>8}\"; a format held in a variable has no form"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.formatChar"
+hand = "a format stands in an f-string in Lyric 5, written there: f\"{v:>8}\"; a format held in a variable has no form"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.formatString"
+hand = "a format stands in an f-string in Lyric 5, written there: f\"{v:>8}\"; a format held in a variable has no form"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.formatRadix"
+hand = "only three bases have a format: f\"{v:b}\", f\"{v:o}\", f\"{v:x}\"; another is written by hand"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.formatHexPadded"
+hand = "a format's width is a literal: f\"{v:08x}\"; a width in a variable pads the text: f\"{v:x}\".padStart(w, '0')"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.center"
+hand = "Lyric 5 has 'padStart' and 'padEnd', no centring: compute the two widths"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.formatBytes"
+hand = "Lyric 5 has no such function: write it where it is needed"
+
+[[free]]
+rule = "B18"
+from = "std.fmt.table"
+hand = "Lyric 5 has no such function: write it where it is needed"
+
+[[free]]
+rule = "B19"
+from = "std.math.log"
+name = "ln"
+lambda = true
+
+[[free]]
+rule = "B19"
+from = "std.math.logBase"
+name = "ln"
+form = "({q}ln({0}) / {q}ln({1}))"
+
+[[free]]
+rule = "B19"
+from = "std.math.isNaN"
+form = "{0}.isNan()"
+
+[[free]]
+rule = "B19"
+from = "std.math.isInfinite"
+form = "{0}.isInfinite()"
+
+[[free]]
+rule = "B19"
+from = "std.math.isFinite"
+form = "{0}.isFinite()"
+
+[[free]]
+rule = "B19"
+from = "std.math.toRadians"
+form = "({0} * pi / 180.0)"
+imports = ["std.math.pi"]
+
+[[free]]
+rule = "B19"
+from = "std.math.toDegrees"
+form = "({0} * 180.0 / pi)"
+imports = ["std.math.pi"]
+
+[[free]]
+rule = "B19"
+from = "std.math.powInt"
+hand = "'base.pow(n as uint)' panics where it overflows, and 'powInt' answered null; a negative exponent has no form"
+
+[[free]]
+rule = "B19"
+from = "std.math.checkedAbs"
+hand = "'abs' panics for the smallest int, and 'checkedAbs' answered null: ask first where that can come"
+
+[[free]]
+rule = "B19"
+from = "std.math.divFloor"
+hand = "Lyric 5 has no such function: 'let q = a / b; if (a % b != 0 && (a < 0) != (b < 0)) q - 1 else q'"
+
+[[free]]
+rule = "B19"
+from = "std.math.modFloor"
+hand = "Lyric 5 has no such function: 'let r = a % b; if (r != 0 && (r < 0) != (b < 0)) r + b else r'"
+
+[[free]]
+rule = "B20"
+from = "std.io.console.readLine"
+form = "((try? stdin().readLine()) ?? null)"
+imports = ["std.io.stdin"]
+
+[[free]]
+rule = "B20"
+from = "std.io.console.readAll"
+form = "((try? stdin().readToString()) ?? \"\")"
+imports = ["std.io.stdin"]
+
+[[free]]
+rule = "B20"
+from = "std.io.console.lines"
+form = "stdin().lines()"
+imports = ["std.io.stdin"]
+walk = true
+review = "ended the lines where a read broke; these lines throw it on the walk"
+advice = "the function around the walk must catch it or say 'throws'"
+
+[[free]]
+rule = "B20"
+from = "std.io.console.isInteractive"
+form = "isTerminal(.Stdin)"
+imports = ["std.term.isTerminal"]
+review = "asked of input and output both; this asks of the input"
+advice = "where a prompt is at stake, ask of '.Stdout' too"
+
+[[free]]
+rule = "B20"
+from = "std.io.console.readChar"
+hand = "Lyric 5 reads no single character from the console: read the line, 'stdin().readLine()', and take it apart"
+
+[[free]]
+rule = "B20"
+from = "std.io.console.prompt"
+hand = "print the text, then read: 'print(text); (try? stdin().readLine()) ?? null'"
+
+[[free]]
+rule = "B21"
+from = "std.io.path.joinPath"
+name = "join"
+form = "{q}join({0}, {1})"
+review = "put its parts together as they were; 'join' normalizes, and 'a/../b' is 'b'"
+advice = "where the text itself matters, look at what it gives"
+
+[[free]]
+rule = "B21"
+from = "std.io.path.parentDir"
+name = "parent"
+form = "{q}parent({0})"
+review = "gave '' where no directory precedes; 'parent' gives '.'"
+advice = "where the code asks for the empty text, ask for '.'"
+
+[[free]]
+rule = "B21"
+from = "std.bytes.indexOf"
+form = "({0}[..].find({1}) ?? -1)"
+
+[[free]]
+rule = "B21"
+from = "std.bytes.indexOfFrom"
+hand = "search the rest and add what was skipped: 'bytes[start..].find(value)' answers from 'start', and null where 'indexOfFrom' gave -1"
+
+[[free]]
+rule = "B21"
+from = "std.bytes.slice"
+hand = "a range gives a view: 'bytes[start..start + count]'; 'slice' gave a copy"
+
+[[method]]
+rule = "B21"
+from = "StringBuilder.appendLine"
+hand = "'sb.appendStr(value); sb.appendChar('\\n');'"
+
+[[free]]
+rule = "B22"
+from = "std.core.coroutineEnded"
+hand = "Lyric 5 has no such function: a coroutine's end is the 'null' of its 'next()'"
+
+[[elsewhere]]
+rule = "K07"
+from = "std.build.addExecutable"
+
+[[elsewhere]]
+rule = "K07"
+from = "std.build.executable"
+
+[[elsewhere]]
+rule = "K07"
+from = "std.build.finish"
+
+[[elsewhere]]
+rule = "K07"
+from = "std.build.flag"
+
+[[elsewhere]]
+rule = "K07"
+from = "std.build.library"
+
+[[elsewhere]]
+rule = "K07"
+from = "std.build.option"
+
+[[elsewhere]]
+rule = "K07"
+from = "std.build.packed"
+
+[[elsewhere]]
+rule = "K07"
+from = "Artifact.outputPath"
+
+[[elsewhere]]
+rule = "K07"
+from = "Artifact.use"
+
+[[elsewhere]]
+rule = "K07"
+from = "Profile.debug"
+
+[[elsewhere]]
+rule = "K07"
+from = "Profile.named"
+
+[[elsewhere]]
+rule = "K07"
+from = "Profile.release"
+
+[[elsewhere]]
+rule = "K07"
+from = "Profile.selected"
+
+[[elsewhere]]
+rule = "T04"
+from = "Duration.compare"
+
+[[elsewhere]]
+rule = "T04"
+from = "Duration.equals"
+
+[[elsewhere]]
+rule = "T04"
+from = "Instant.compare"
+
+[[elsewhere]]
+rule = "T04"
+from = "Instant.equals"
+
+[[elsewhere]]
+rule = "T05"
+from = "std.core.combineHash"
+
+[[elsewhere]]
+rule = "T05"
+from = "std.hash.hashCombine"
+
+[[elsewhere]]
+rule = "T12"
+from = "string.length"
+
+[[elsewhere]]
+rule = "T15"
+from = "string.indexOf"
+
+[[elsewhere]]
+rule = "T15"
+from = "string.indexOfFrom"
+
+[[elsewhere]]
+rule = "T15"
+from = "string.lastIndexOf"
+
+[[elsewhere]]
+rule = "N01"
+from = "std.task.run"
+
+[[elsewhere]]
+rule = "N01"
+from = "std.task.interrupt"
+
+[[elsewhere]]
+rule = "N01"
+from = "std.task.pending"

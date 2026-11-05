@@ -1,0 +1,11 @@
+import std.bytes { indexOf };
+import std.io.console { println };
+import std.io.path { joinPath, parentDir };
+
+fn main(): int {
+    println(joinPath("a", "b"));
+    println(parentDir("a/b"));
+    let b: uint8[] = [1u8, 2u8];
+    println(indexOf(b, 2u8));
+    return 0;
+}

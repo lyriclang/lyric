@@ -167,6 +167,10 @@ public static class Migrator
     /// <summary>The lines of <c>from4.toml</c> that name no function of 4.6's library.</summary>
     public static IReadOnlyList<string> TableFaults() => Lyric4.From4.Rules.LibraryTable.Faults(From4.StdlibFile);
 
+    /// <summary>The public functions of 4.6's library that nothing speaks for, against the surface of Lyric 5
+    /// as its lines.</summary>
+    public static IReadOnlyList<string> TableGaps(IEnumerable<string> surface) => Lyric4.From4.Rules.LibraryTable.Gaps(From4.StdlibFiles, surface);
+
     /// <exception cref="InvalidOperationException">The program does not check with 4.6.</exception>
     public static Migration Run(Model model, string? lyricJson = null)
     {
