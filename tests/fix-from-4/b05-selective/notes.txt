@@ -1,0 +1,1 @@
+proposal[LYR-MIG0602] main.lyr:8:18: 'lineReader(f)' gave a 'LineReader', whose 'failed()' told a broken read from the end; these lines throw it on the walk — the function around the walk must catch it or say 'throws'

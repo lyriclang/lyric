@@ -1,0 +1,4 @@
+proposal[LYR-MIG0602] main.lyr:8:13: 'net.listenOrThrow("127.0.0.1", 0)' takes the first address its name gives: 'localhost' may be '::1' — where it must be version 4, write the address: '127.0.0.1'
+proposal[LYR-MIG0602] main.lyr:10:13: 'net.connectOrThrow("127.0.0.1", port)' takes the first address its name gives: 'localhost' may be '::1' — where it must be version 4, write the address: '127.0.0.1'
+proposal[LYR-MIG0602] main.lyr:16:13: 'net.bindOrThrow("127.0.0.1", 0)' takes the first address its name gives: 'localhost' may be '::1' — where it must be version 4, write the address: '127.0.0.1'
+proposal[LYR-MIG0602] main.lyr:22:13: 'net.listen("127.0.0.1", 0)' takes the first address its name gives: 'localhost' may be '::1' — where it must be version 4, write the address: '127.0.0.1'

@@ -8,7 +8,7 @@ using Lyric4.Sema;
 namespace Lyric4.From4.Rules;
 
 /// <summary>A line of <c>from4.toml</c>: a function of 4.6's library and its form in Lyric 5.</summary>
-internal sealed record LibraryEntry(string Rule, string From, string? Name, string? Form, bool Iterator, bool Lambda, bool Throws, bool Statement, string? Hand, string? Moved, IReadOnlyList<string> Imports, string? Review, string? Advice, string? Optional);
+internal sealed record LibraryEntry(string Rule, string From, string? Name, string? Form, bool Iterator, bool Lambda, bool Throws, bool Statement, string? Hand, string? Moved, IReadOnlyList<string> Imports, string? Review, string? Advice, string? Optional, bool Walk);
 
 /// <summary>The table of <c>from4.toml</c>, embedded in this assembly: 4.6's library by function.</summary>
 internal static class LibraryTable
@@ -33,7 +33,7 @@ internal static class LibraryTable
                 entries.Add(from, new LibraryEntry(Text("rule")!, from, Text("name"), Text("form"),
                     Flag("iterator"), Flag("lambda"), Flag("throws"), Flag("statement"), Text("hand"), Text("moved"),
                     row.TryGet("imports", out var imports) ? [.. ((Lyric.Core.TomlArray)imports).Cast<string>()] : [],
-                    Text("review"), Text("advice"), Text("optional")));
+                    Text("review"), Text("advice"), Text("optional"), Flag("walk")));
             }
         }
         return entries;
@@ -52,9 +52,10 @@ internal static class LibraryTable
             // a method's line names its type, which stands in some file of the library
             var files = key.StartsWith("std.", StringComparison.Ordinal) || module == "std.string"
                 ? new[] { $"{module.Replace('.', '/')}.lyr" }
-                : ["std/collections.lyr", "std/result.lyr", "std/string.lyr", "std/time.lyr", "std/json.lyr", "std/random.lyr"];
+                : ["std/collections.lyr", "std/result.lyr", "std/string.lyr", "std/time.lyr", "std/json.lyr", "std/random.lyr", "std/io/stream.lyr"];
             return !files.Select(stdlibFile).OfType<string>().Any(text => text.Contains($"fn {name}(", StringComparison.Ordinal)
-                || text.Contains($"fn {name}<", StringComparison.Ordinal) || text.Contains($"class {name} ", StringComparison.Ordinal));
+                || text.Contains($"fn {name}<", StringComparison.Ordinal) || text.Contains($"class {name} ", StringComparison.Ordinal)
+                || text.Contains($"struct {name} ", StringComparison.Ordinal) || text.Contains($"type {name} ", StringComparison.Ordinal));
         })];
 
     /// <summary>Whether the table holds a function of a module: its imports change.</summary>
@@ -95,6 +96,15 @@ internal static class LibraryTable
         return std < 0 ? null : $"{Path.ChangeExtension(file[(std + 1)..], null).Replace('/', '.')}.{function.Name}";
     }
 
+    /// <summary>The type a written type stands for, as a key of the table: <c>std.io.net.Listener</c>.</summary>
+    public static string? KeyOfType(RuleContext context, NamedType named)
+    {
+        if (Tree.Target(context, named) is not TypeSymbol { Declaration: { } declaration } symbol || !Tree.InStdlib(context, symbol)) return null;
+        var file = context.Model.Sources.GetPath(declaration.Span.File).Replace('\\', '/');
+        var std = file.LastIndexOf("/std/", StringComparison.Ordinal);
+        return std < 0 ? null : $"{Path.ChangeExtension(file[(std + 1)..], null).Replace('/', '.')}.{symbol.Name}";
+    }
+
     /// <summary>What a module's calls of the table need imported beyond what it imports, by module:
     /// a form that names what 4.6's call did not, <c>Instant.now()</c> for <c>nowMillis()</c>.</summary>
     public static Dictionary<string, List<string>> Needed(RuleContext context, Module module)
@@ -107,14 +117,19 @@ internal static class LibraryTable
             {
                 var dot = import.LastIndexOf('.');
                 var (path, name) = (import[..dot], import[(dot + 1)..]);
-                var imported = module.Declarations.OfType<ImportDecl>().Any(d => string.Join('.', d.Path) == path
-                    && d.Clause is ImportSelective selective && selective.Names.Contains(name));
+                // a module's methods come with any import of it
+                var imported = module.Declarations.OfType<ImportDecl>().Any(d => Imports.Target(string.Join('.', d.Path)) == path
+                    && (name == "*" || (d.Clause is ImportSelective selective && selective.Names.Contains(name))));
                 if (imported) continue;
                 if (!needed.TryGetValue(path, out var names)) needed[path] = names = [];
                 if (!names.Contains(name)) names.Add(name);
             }
         }
-        foreach (var names in needed.Values) names.Sort(StringComparer.Ordinal);
+        foreach (var names in needed.Values)
+        {
+            if (names.Count > 1) names.Remove("*");
+            names.Sort(StringComparer.Ordinal);
+        }
         return needed;
     }
 }
@@ -190,6 +205,15 @@ internal sealed partial class Library : IRule
                         $"'{Conformances.Text(text, name)}' is written as a method in Lyric 5, and no function stands for it",
                         $"pass a lambda that calls it: (it) => {entry.Form!.Replace("{q}", "").Replace("{0}", "it")}");
             }
+            foreach (var named in nodes.OfType<NamedType>())
+            {
+                if (LibraryTable.KeyOfType(context, named) is not { } key || LibraryTable.Of(key) is not { } entry) continue;
+                if (entry.Hand is { } hand)
+                    context.Note(entry.Rule, "LYR-MIG0601", NoteKind.Hand, named.Span,
+                        $"'{Conformances.Text(text, named)}' has no form in Lyric 5", hand);
+                else if (entry.Name is { } to)
+                    context.Replace(entry.Rule, named.Span.File, named.Span.End - named.Path[^1].Length, named.Span.End, to);
+            }
         }
     }
 
@@ -214,6 +238,7 @@ internal sealed partial class Library : IRule
         form = form.Replace("{q}", qualifier);
         var position = call.Span.Start;
         var pending = new StringBuilder();
+        if (isSource && entry.Walk) pending.Append("try ");
         var at = 0;
         foreach (Match match in Placeholder().Matches(form))
         {

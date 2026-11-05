@@ -1,0 +1,22 @@
+import std.io.stream as stream;
+
+fn keep(f: stream.File): stream.File {
+    return f;
+}
+
+fn work(path: string): void throws {
+    let f = stream.createOrThrow(path);
+    stream.writeOrThrow(f, [104u8, 10u8]);
+    stream.close(f);
+    let a = stream.openAppendOrThrow(path);
+    stream.writeOrThrow(keep(a), [33u8, 10u8]);
+    stream.close(a);
+    let r = stream.openOrThrow(path);
+    stream.close(r);
+}
+
+fn main(): int {
+    let f = stream.open("definitely-missing");
+    let g = stream.openAppend("/definitely/missing/at/all");
+    return if (f == null && g == null) 0 else 1;
+}

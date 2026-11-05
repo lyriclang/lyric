@@ -1,0 +1,24 @@
+import std.fs as stream;
+import std.fs { OpenOptions };
+import std.io;
+
+fn keep(f: stream.File): stream.File {
+    return f;
+}
+
+fn work(path: string): void throws {
+    let f = try stream.File.create(path);
+    try f.writeAll([104u8, 10u8]);
+    try f.close();
+    let a = try stream.File.openWith(path, OpenOptions { append = true, create = true });
+    try keep(a).writeAll([33u8, 10u8]);
+    try a.close();
+    let r = try stream.File.open(path);
+    try r.close();
+}
+
+fn main(): int {
+    let f = (try? stream.File.open("definitely-missing"));
+    let g = (try? stream.File.openWith("/definitely/missing/at/all", OpenOptions { append = true, create = true }));
+    return if (f == null && g == null) 0 else 1;
+}

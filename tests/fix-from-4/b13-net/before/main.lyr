@@ -1,0 +1,24 @@
+import std.io.net as net;
+
+fn server(l: net.Listener): net.Socket throws {
+    return net.acceptOrThrow(l);
+}
+
+fn work(): int throws {
+    let l = net.listenOrThrow("127.0.0.1", 0);
+    let port = net.localPort(l);
+    let s = net.connectOrThrow("127.0.0.1", port);
+    net.writeOrThrow(s, [1u8]);
+    let t = server(l);
+    net.close(s);
+    net.close(t);
+    net.closeListener(l);
+    let u = net.bindOrThrow("127.0.0.1", 0);
+    net.close(u);
+    return port;
+}
+
+fn main(): int {
+    let l = net.listen("127.0.0.1", 0);
+    return if (l != null) 0 else 1;
+}
