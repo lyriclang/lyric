@@ -6115,14 +6115,14 @@ internal sealed class FunctionLowerer
     /// monomorphization request, the same substitution of the return type. It stands separately only
     /// because the receiver is parameter 0, and there is none here.</para>
     /// </summary>
-    private TempId? LowerGenericStaticCall(MemberExpr member, GenericInstance owner, CallExpr expr)
+    private TempId? LowerGenericStaticCall(Expr callee, string name, GenericInstance owner, CallExpr expr)
     {
-        if (_types.RefOf(member) is not FunctionSymbol method)
-            throw NotSupported($"call to '{member.Member}' on " +
+        if (_types.RefOf(callee) is not FunctionSymbol method)
+            throw NotSupported($"call to '{name}' on " +
                                $"'{TypeFacts.Display(owner)}'", expr.Span);
 
         if (method.Declaration is not FunctionDecl declaration)
-            throw NotSupported($"call to '{member.Member}' (no declaration)", expr.Span);
+            throw NotSupported($"call to '{name}' (no declaration)", expr.Span);
 
         // A static of a generic 'extend' block: 'Box<int>.default()' from
         // 'extend<T :: [Default]> Box<T>'. The block's parameters are bound by the named instance
@@ -6145,7 +6145,7 @@ internal sealed class FunctionLowerer
                     map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal));
             var blockTarget = _instances.RequestExtension(method, declaration, block, map, owner, expr.Span, ownArguments);
             var byName = map.ToDictionary(kv => kv.Key.Name, kv => kv.Value, StringComparer.Ordinal);
-            var blockArgs = MaterializeArguments(declaration, ArgumentsOf(expr), member.Member, expr.Span, byName);
+            var blockArgs = MaterializeArguments(declaration, ArgumentsOf(expr), name, expr.Span, byName);
             var blockReturns = TypeOfExpr(expr);
             if (IsVoid(blockReturns))
             {
@@ -6171,7 +6171,7 @@ internal sealed class FunctionLowerer
                 symbols[owner.Definition.Generics[i]] = owner.Arguments[i];
             for (var i = 0; i < Math.Min(method.Generics.Length, methodArguments.Length); i++)
                 symbols[method.Generics[i]] = methodArguments[i];
-            return LowerInline(expr, declaration, method.IsStatic ? null : LowerExpr(member.Target), owner.Definition,
+            return LowerInline(expr, declaration, method.IsStatic ? null : LowerExpr(((MemberExpr)callee).Target), owner.Definition,
                 symbols, InstanceSubstitution(owner, method, methodArguments));
         }
 
@@ -6185,7 +6185,7 @@ internal sealed class FunctionLowerer
         // 'Box<?int>.of(3)' writes its parameter 'T', which is a '?int' here, and the 3 has to
         // be wrapped. A STATIC call needs it just as much — the receiver is absent, the type
         // arguments are not.
-        var args = MaterializeArguments(declaration, ArgumentsOf(expr), member.Member, expr.Span,
+        var args = MaterializeArguments(declaration, ArgumentsOf(expr), name, expr.Span,
             InstanceSubstitution(owner, method, methodArguments));
 
         var returns = method.Generics.Length > 0
@@ -7633,6 +7633,10 @@ internal sealed class FunctionLowerer
             case ImplicitMemberExpr implied when _types.RefOf(implied) is EnumVariantSymbol:
                 return LowerVariantCall(implied.Name, expr.Arguments, expr, expr.Span);
 
+            // '.of(f)': a static of the instance the position asked for, as 'Result<int, E>.of(f)' is.
+            case ImplicitMemberExpr implied when _types.ImplicitInstanceOf(implied) is { } impliedInstance:
+                return LowerGenericStaticCall(implied, implied.Name, SubstituteType(impliedInstance) as GenericInstance ?? impliedInstance, expr);
+
             // '.origin()': a static member reached the same way.
             case ImplicitMemberExpr implied:
                 calleeName = implied.Name;
@@ -7652,7 +7656,7 @@ internal sealed class FunctionLowerer
                 // 'fn make<T>()' the call 'List<T>.empty()' names the CALLER's T, and which type
                 // that is only the enclosing instantiation knows. Unsubstituted it reached the
                 // type table as a bare parameter and threw.
-                return LowerGenericStaticCall(member,
+                return LowerGenericStaticCall(member, member.Member,
                     SubstituteType(owner) as GenericInstance ?? owner, expr);
 
             // The receiver is an interface value: which implementation runs is settled only at runtime.
