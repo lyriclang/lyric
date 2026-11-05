@@ -1,0 +1,16 @@
+import std.process as process;
+import std.io;
+
+fn work(): int throws {
+    let c = try process.Command { program = "cat", args = ["-"], stdin = .Piped, stdout = .Piped, stderr = .Piped }.spawn();
+    try c.stdin!.writeAll([104u8]);
+    try c.stdin!.close();
+    let code = try (c.wait().code() ?? -1);
+    try c.kill();
+    return code;
+}
+
+fn main(): int {
+    let c = (try? process.Command { program = "definitely-no-such-program", args = [], stdin = .Piped, stdout = .Piped, stderr = .Piped }.spawn());
+    return if (c == null) 0 else 1;
+}

@@ -13,6 +13,10 @@
 # `imports`: what a form names that the call did not, `std.time.Instant`. `{0~uint64}`: an argument cast to
 # a type, which a literal takes by itself. `review`, `advice`: what changed, said for a proposal.
 # `optional`: the form through `?.`; a form without one is said by hand there.
+# `std.io.*` in `imports`: a method the form calls comes with the module, whichever way it is imported.
+# `walk`: as what a loop walks it is marked `try`, its `next()` throwing.
+# A type of 4.6's library has its line as a function does: `name` is what it is written as, `hand` says what
+# stands for it.
 
 [[free]]
 rule = "T11"
@@ -1176,3 +1180,308 @@ form = "{0}.shuffle({1}.asSlice())"
 rule = "B11"
 from = "std.random.choice"
 form = "{0}.choice({1}.asSlice())"
+
+[[free]]
+rule = "E02"
+from = "std.io.stream.open"
+name = "File"
+form = "(try? {q}File.open({0}))"
+
+[[free]]
+rule = "E01"
+from = "std.io.stream.openOrThrow"
+name = "File"
+form = "{q}File.open({0})"
+
+[[free]]
+rule = "E02"
+from = "std.io.stream.create"
+name = "File"
+form = "(try? {q}File.create({0}))"
+
+[[free]]
+rule = "E01"
+from = "std.io.stream.createOrThrow"
+name = "File"
+form = "{q}File.create({0})"
+
+[[free]]
+rule = "E02"
+from = "std.io.stream.openAppend"
+name = "File"
+form = "(try? {q}File.openWith({0}, OpenOptions { append = true, create = true }))"
+imports = ["std.fs.OpenOptions"]
+
+[[free]]
+rule = "E01"
+from = "std.io.stream.openAppendOrThrow"
+name = "File"
+form = "{q}File.openWith({0}, OpenOptions { append = true, create = true })"
+imports = ["std.fs.OpenOptions"]
+
+[[free]]
+rule = "B05"
+from = "std.io.stream.readSome"
+hand = "a read fills a buffer and answers how much, 0 at the end: 'let buf = [0u8] * n; let got = try f.read(into: buf[..]);'"
+
+[[free]]
+rule = "B05"
+from = "std.io.stream.readSomeOrThrow"
+hand = "a read fills a buffer and answers how much, 0 at the end: 'let buf = [0u8] * n; let got = try f.read(into: buf[..]);'"
+
+[[free]]
+rule = "B05"
+from = "std.io.stream.write"
+form = "{0}.writeAll({1})"
+imports = ["std.io.*"]
+statement = true
+throws = true
+
+[[free]]
+rule = "E01"
+from = "std.io.stream.writeOrThrow"
+form = "{0}.writeAll({1})"
+imports = ["std.io.*"]
+
+[[free]]
+rule = "B05"
+from = "std.io.stream.close"
+form = "{0}.close()"
+throws = true
+
+[[free]]
+rule = "B05"
+from = "std.io.stream.lineReader"
+form = "TextReader.new({0}).lines()"
+imports = ["std.io.TextReader"]
+review = "gave a 'LineReader', whose 'failed()' told a broken read from the end; these lines throw it on the walk"
+advice = "the function around the walk must catch it or say 'throws'"
+walk = true
+
+[[free]]
+rule = "B05"
+from = "std.io.stream.LineReader"
+hand = "what walks a file's lines is 'TextLinesIter<File>' in Lyric 5; its 'next()' throws"
+
+[[method]]
+rule = "B05"
+from = "LineReader.next"
+form = "{this}.next()"
+throws = true
+
+[[method]]
+rule = "B05"
+from = "LineReader.failed"
+hand = "the walk throws what broke in Lyric 5, and nothing is left to ask"
+
+[[free]]
+rule = "E02"
+from = "std.process.start"
+name = "Command"
+form = "(try? {q}Command { program = {0}, args = {1}, stdin = .Piped, stdout = .Piped, stderr = .Piped }.spawn())"
+
+[[free]]
+rule = "E01"
+from = "std.process.startOrThrow"
+name = "Command"
+form = "{q}Command { program = {0}, args = {1}, stdin = .Piped, stdout = .Piped, stderr = .Piped }.spawn()"
+
+[[free]]
+rule = "B12"
+from = "std.process.readSomeOut"
+hand = "a read fills a buffer and answers how much, 0 at the end: 'let buf = [0u8] * n; let got = try child.stdout!.read(into: buf[..]);'"
+
+[[free]]
+rule = "B12"
+from = "std.process.readSomeOutOrThrow"
+hand = "a read fills a buffer and answers how much, 0 at the end: 'let buf = [0u8] * n; let got = try child.stdout!.read(into: buf[..]);'"
+
+[[free]]
+rule = "B12"
+from = "std.process.readSomeErr"
+hand = "a read fills a buffer and answers how much, 0 at the end: 'let buf = [0u8] * n; let got = try child.stderr!.read(into: buf[..]);'"
+
+[[free]]
+rule = "B12"
+from = "std.process.readSomeErrOrThrow"
+hand = "a read fills a buffer and answers how much, 0 at the end: 'let buf = [0u8] * n; let got = try child.stderr!.read(into: buf[..]);'"
+
+[[free]]
+rule = "B12"
+from = "std.process.write"
+form = "{0}.stdin!.writeAll({1})"
+imports = ["std.io.*"]
+statement = true
+throws = true
+
+[[free]]
+rule = "E01"
+from = "std.process.writeOrThrow"
+form = "{0}.stdin!.writeAll({1})"
+imports = ["std.io.*"]
+
+[[free]]
+rule = "B12"
+from = "std.process.closeStdin"
+form = "{0}.stdin!.close()"
+throws = true
+
+[[free]]
+rule = "B12"
+from = "std.process.wait"
+form = "({0}.wait().code() ?? -1)"
+throws = true
+review = "gave the kill's code for a child that was killed; in Lyric 5 such a child has no code, and -1 stands for it here"
+advice = "where it matters, ask what 'wait()' gives: 'success()', 'code()', 'signal()'"
+
+[[free]]
+rule = "B12"
+from = "std.process.kill"
+form = "{0}.kill()"
+throws = true
+
+[[free]]
+rule = "B12"
+from = "std.process.close"
+hand = "a child has no 'close' in Lyric 5: close the pipes it has, 'child.stdout!.close()'; as in 4.6 that does not stop it"
+
+[[free]]
+rule = "E02"
+from = "std.io.net.listen"
+name = "TcpListener"
+form = "(try? {q}TcpListener.bind(SocketAddr { ip = resolve({0})[0], port = {1~uint16} }))"
+imports = ["std.net.SocketAddr", "std.net.resolve"]
+review = "takes the first address its name gives: 'localhost' may be '::1'"
+advice = "where it must be version 4, write the address: '127.0.0.1'"
+
+[[free]]
+rule = "E01"
+from = "std.io.net.listenOrThrow"
+name = "TcpListener"
+form = "{q}TcpListener.bind(SocketAddr { ip = resolve({0})[0], port = {1~uint16} })"
+imports = ["std.net.SocketAddr", "std.net.resolve"]
+review = "takes the first address its name gives: 'localhost' may be '::1'"
+advice = "where it must be version 4, write the address: '127.0.0.1'"
+
+[[free]]
+rule = "B13"
+from = "std.io.net.localPort"
+form = "({0}.localAddr().port as int)"
+throws = true
+
+[[free]]
+rule = "E02"
+from = "std.io.net.accept"
+form = "(try? {0}.accept())"
+
+[[free]]
+rule = "E01"
+from = "std.io.net.acceptOrThrow"
+form = "{0}.accept()"
+
+[[free]]
+rule = "E02"
+from = "std.io.net.connect"
+name = "TcpStream"
+form = "(try? {q}TcpStream.connect(SocketAddr { ip = resolve({0})[0], port = {1~uint16} }))"
+imports = ["std.net.SocketAddr", "std.net.resolve"]
+review = "takes the first address its name gives: 'localhost' may be '::1'"
+advice = "where it must be version 4, write the address: '127.0.0.1'"
+
+[[free]]
+rule = "E01"
+from = "std.io.net.connectOrThrow"
+name = "TcpStream"
+form = "{q}TcpStream.connect(SocketAddr { ip = resolve({0})[0], port = {1~uint16} })"
+imports = ["std.net.SocketAddr", "std.net.resolve"]
+review = "takes the first address its name gives: 'localhost' may be '::1'"
+advice = "where it must be version 4, write the address: '127.0.0.1'"
+
+[[free]]
+rule = "B13"
+from = "std.io.net.readSome"
+hand = "a read fills a buffer and answers how much, 0 at the end: 'let buf = [0u8] * n; let got = try socket.read(into: buf[..]);'"
+
+[[free]]
+rule = "B13"
+from = "std.io.net.readSomeOrThrow"
+hand = "a read fills a buffer and answers how much, 0 at the end: 'let buf = [0u8] * n; let got = try socket.read(into: buf[..]);'"
+
+[[free]]
+rule = "B13"
+from = "std.io.net.write"
+form = "{0}.writeAll({1})"
+imports = ["std.io.*"]
+statement = true
+throws = true
+
+[[free]]
+rule = "E01"
+from = "std.io.net.writeOrThrow"
+form = "{0}.writeAll({1})"
+imports = ["std.io.*"]
+
+[[free]]
+rule = "B13"
+from = "std.io.net.close"
+form = "{0}.close()"
+throws = true
+
+[[free]]
+rule = "B13"
+from = "std.io.net.closeListener"
+form = "{0}.close()"
+throws = true
+
+[[free]]
+rule = "E02"
+from = "std.io.net.bind"
+name = "UdpSocket"
+form = "(try? {q}UdpSocket.bind(SocketAddr { ip = resolve({0})[0], port = {1~uint16} }))"
+imports = ["std.net.SocketAddr", "std.net.resolve"]
+review = "takes the first address its name gives: 'localhost' may be '::1'"
+advice = "where it must be version 4, write the address: '127.0.0.1'"
+
+[[free]]
+rule = "E01"
+from = "std.io.net.bindOrThrow"
+name = "UdpSocket"
+form = "{q}UdpSocket.bind(SocketAddr { ip = resolve({0})[0], port = {1~uint16} })"
+imports = ["std.net.SocketAddr", "std.net.resolve"]
+review = "takes the first address its name gives: 'localhost' may be '::1'"
+advice = "where it must be version 4, write the address: '127.0.0.1'"
+
+[[free]]
+rule = "B13"
+from = "std.io.net.sendTo"
+hand = "the bytes come first and the address is one value: 'socket.sendTo(bytes, SocketAddr { ip = resolve(host)[0], port = port as uint16 })', which answers how many went"
+
+[[free]]
+rule = "B13"
+from = "std.io.net.sendToOrThrow"
+hand = "the bytes come first and the address is one value: 'socket.sendTo(bytes, SocketAddr { ip = resolve(host)[0], port = port as uint16 })', which answers how many went"
+
+[[free]]
+rule = "B13"
+from = "std.io.net.receiveFrom"
+hand = "a datagram fills a buffer and comes with its sender, no 'Packet': 'let buf = [0u8] * max; let (got, from) = try socket.recvFrom(buf[..]);'"
+
+[[free]]
+rule = "B13"
+from = "std.io.net.receiveFromOrThrow"
+hand = "a datagram fills a buffer and comes with its sender, no 'Packet': 'let buf = [0u8] * max; let (got, from) = try socket.recvFrom(buf[..]);'"
+
+[[free]]
+rule = "B13"
+from = "std.io.net.Listener"
+name = "TcpListener"
+
+[[free]]
+rule = "B13"
+from = "std.io.net.Socket"
+name = "TcpStream"
+
+[[free]]
+rule = "B13"
+from = "std.io.net.Packet"
+hand = "a datagram fills a buffer and comes with its sender, no 'Packet': 'let buf = [0u8] * max; let (got, from) = try socket.recvFrom(buf[..]);'"

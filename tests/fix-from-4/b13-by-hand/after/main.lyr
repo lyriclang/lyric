@@ -1,0 +1,39 @@
+import std.net as net;
+import std.fs as stream;
+import std.process as process;
+import std.io;
+import std.net { SocketAddr, resolve };
+
+fn packet(u: net.UdpSocket): ?net.Packet {
+    return net.receiveFrom(u, 16);
+}
+
+fn lines(r: stream.LineReader): bool {
+    return r.failed();
+}
+
+fn main(): int {
+    let f = (try? stream.File.open("x"));
+    if (let open = f) {
+        let some = stream.readSome(open, 16);
+        let ok = stream.write(open, [1u8]);
+        return if (some != null && ok) 0 else 1;
+    }
+    let c = (try? process.Command { program = "x", args = [], stdin = .Piped, stdout = .Piped, stderr = .Piped }.spawn());
+    if (let child = c) {
+        let out = process.readSomeOut(child, 16);
+        process.close(child);
+        return if (out != null) 0 else 1;
+    }
+    let s = (try? net.TcpStream.connect(SocketAddr { ip = resolve("127.0.0.1")[0], port = 1 }));
+    if (let socket = s) {
+        let got = net.readSome(socket, 16);
+        return if (got != null) 0 else 1;
+    }
+    let u = (try? net.UdpSocket.bind(SocketAddr { ip = resolve("127.0.0.1")[0], port = 0 }));
+    if (let udp = u) {
+        let sent = net.sendTo(udp, "127.0.0.1", 1, [1u8]);
+        return if (sent) 0 else 1;
+    }
+    return 0;
+}

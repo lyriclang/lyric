@@ -1,0 +1,1 @@
+proposal[LYR-MIG0602] main.lyr:7:16: 'process.wait(c)' gave the kill's code for a child that was killed; in Lyric 5 such a child has no code, and -1 stands for it here — where it matters, ask what 'wait()' gives: 'success()', 'code()', 'signal()'

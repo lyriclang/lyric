@@ -126,7 +126,7 @@ internal sealed partial class Imports : IRule
     {
         ["std.io.console"] = "std.io",
         ["std.io.file"] = "std.fs",
-        ["std.io.stream"] = "std.io",
+        ["std.io.stream"] = "std.fs",
         ["std.io.net"] = "std.net",
         ["std.io.path"] = "std.path",
         ["std.io.error"] = "std.io",
@@ -161,6 +161,9 @@ internal sealed partial class Imports : IRule
         ["std.core"] = new(StringComparer.Ordinal) { ["combineHash"] = "Hasher" },
         ["std.hash"] = new(StringComparer.Ordinal) { ["hashCombine"] = "Hasher" },
     };
+
+    /// <summary>The module a 4.x module is in Lyric 5.</summary>
+    public static string Target(string path) => Modules.GetValueOrDefault(path, path);
 
     [GeneratedRegex(@"\Gimport\s+([A-Za-z_][A-Za-z0-9_]*(?:\s*\.\s*[A-Za-z_][A-Za-z0-9_]*)*)")]
     private static partial Regex PathOfImport();
@@ -199,7 +202,7 @@ internal sealed partial class Imports : IRule
                         Insert(LineEnd(text, import.Span.End), $"import {group.Key} {{ {string.Join(", ", group.Select(m => m.Name))} }};\n");
                     }
                 }
-                if (import.Clause is ImportSelective selective && (Prelude.TryGetValue(path, out var prelude) | Renamed.ContainsKey(path) | LibraryTable.HasModule(path)))
+                if (import.Clause is ImportSelective selective && (Prelude.TryGetValue(path, out var prelude) | Renamed.ContainsKey(path) | LibraryTable.HasModule(path) | needed.ContainsKey(Target(path))))
                 {
                     var renames = Hashing.NeedsHasher(context, module) ? Renamed.GetValueOrDefault(path) : null;
                     var kept = selective.Names.Where(name => prelude is null || !prelude.Contains(name))
@@ -208,7 +211,7 @@ internal sealed partial class Imports : IRule
                         .Distinct(StringComparer.Ordinal)
                         .ToList();
                     // what a form needs from a module joins the line that imports from it
-                    if (needed.Remove(path, out var joining)) kept.AddRange(joining.Where(name => !kept.Contains(name)));
+                    if (needed.Remove(Target(path), out var joining)) kept.AddRange(joining.Where(name => !kept.Contains(name)));
                     if (kept.Count == 0)
                     {
                         context.Replace("K05", import.Span.File, import.Span.Start, LineEnd(text, import.Span.End), "");
@@ -225,7 +228,7 @@ internal sealed partial class Imports : IRule
             }
             if (module.Declarations.OfType<ImportDecl>().LastOrDefault() is { } last)
                 foreach (var (path, names) in needed.OrderBy(n => n.Key, StringComparer.Ordinal))
-                    Insert(LineEnd(text, last.Span.End), $"import {path} {{ {string.Join(", ", names)} }};\n");
+                    Insert(LineEnd(text, last.Span.End), names is ["*"] ? $"import {path};\n" : $"import {path} {{ {string.Join(", ", names)} }};\n");
             foreach (var (at, line) in inserts) context.Replace("K05", module.Span.File, at, at, line);
         }
     }

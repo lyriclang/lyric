@@ -2108,6 +2108,23 @@ Formen der Bibliothek (E01–E03, in der Tabelle), **S5c** die Koroutinen (N01, 
 - **Eine neu werfende Funktion wie `sleep`, `cwd`, `encode`** bekommt ihr `try`; dass die umgebende Funktion dann `throws`
   sagen oder fangen muss, zeigt Lyric 5 selbst, wie in S5b entschieden. `main` ohne `throws` bleibt also ein Compilerfehler.
 
+**S6c, beim Bauen entschieden** (2026-11-05):
+
+- **Neu geschnitten**: der Test über jede `pub`-Funktion von 4.6 wird **S6d**. Eine grobe Messung lässt gut 140 Namen offen, die weder
+  in der Tabelle stehen noch denselben Namen in Lyric 5 tragen. Vieles davon ist Fehlalarm der Messung oder Sache anderer
+  Regeln, aber das zu trennen ist eigene Arbeit.
+- **`std.io.stream` wird `std.fs`, nicht `std.io`** (K04): dort liegt `File`, und `stream.File` muss weiter etwas nennen.
+- **Eine Methode kommt mit ihrem Modul**: `writeAll` steht in einem Erweiterungsblock von `std.io`, und ohne einen Import des Moduls
+  sagt der Compiler `SEM0012`. Die Proben hatten es verdeckt, weil `println` schon aus `std.io` kam; erst die Fälle zeigten es. Die Tabelle
+  sagt dafür `std.io.*`, und `import std.io;` kommt nur, wo noch kein Import des Moduls steht.
+- **Typen haben eine Zeile wie Funktionen**: `net.Listener` wird `TcpListener`, `net.Socket` wird `TcpStream`, `Packet` und
+  `LineReader` sagt der Migrator von Hand.
+- **Hostnamen bleiben möglich**: Lyric 5 verbindet zu Adressen, 4.6 zu Namen. Die Form geht über `resolve(h)[0]` und nicht über
+  `SocketAddr.parse`, das an `localhost` scheitern würde. Sie nimmt die erste Adresse, und `localhost` gibt hier `::1`: das sagt `LYR-MIG0602`.
+- **Von Hand bleibt, was keine Form hat**: jedes `readSome` (ein Puffer statt eines Rückgabewerts), `sendTo` (die Bytes kämen vor die
+  Adresse, die Argumente liefen nicht mehr in ihrer Reihenfolge), `receiveFrom` (ein Tupel statt `Packet`), `process.close`.
+- **`wait` gibt weiter eine Zahl**: `c.wait().code() ?? -1`. Ein getötetes Kind hat in Lyric 5 keinen Code, das sagt `LYR-MIG0602`.
+
 ## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
 
 **Anlass** (Maintainer, 2026-10-29): ein Bau mit einer eingebundenen C-Bibliothek (raylib, sieben Quellen) sagte

@@ -1,0 +1,26 @@
+import std.net as net;
+import std.io;
+import std.net { SocketAddr, resolve };
+
+fn server(l: net.TcpListener): net.TcpStream throws {
+    return try l.accept();
+}
+
+fn work(): int throws {
+    let l = try net.TcpListener.bind(SocketAddr { ip = resolve("127.0.0.1")[0], port = 0 });
+    let port = try (l.localAddr().port as int);
+    let s = try net.TcpStream.connect(SocketAddr { ip = resolve("127.0.0.1")[0], port = port as uint16 });
+    try s.writeAll([1u8]);
+    let t = try server(l);
+    try s.close();
+    try t.close();
+    try l.close();
+    let u = try net.UdpSocket.bind(SocketAddr { ip = resolve("127.0.0.1")[0], port = 0 });
+    try u.close();
+    return port;
+}
+
+fn main(): int {
+    let l = (try? net.TcpListener.bind(SocketAddr { ip = resolve("127.0.0.1")[0], port = 0 }));
+    return if (l != null) 0 else 1;
+}

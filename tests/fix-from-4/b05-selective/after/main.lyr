@@ -1,0 +1,16 @@
+import std.fs { File };
+import std.io { println, TextReader };
+
+fn work(): File throws {
+    let f = try File.create("x");
+    try f.writeAll([1u8]);
+    try f.close();
+    for (line in try TextReader.new(f).lines()) {
+        println(line);
+    }
+    return f;
+}
+
+fn main(): int {
+    return 0;
+}

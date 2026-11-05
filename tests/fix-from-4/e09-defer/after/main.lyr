@@ -1,9 +1,9 @@
-import std.io as stream;
+import std.fs as stream;
 
 fn main(): int {
     try {
-        let f = stream.openOrThrow("x");
-        defer stream.close(f);
+        let f = stream.File.open("x");
+        defer f.close();
     } catch (e) {
         return 1;
     }
