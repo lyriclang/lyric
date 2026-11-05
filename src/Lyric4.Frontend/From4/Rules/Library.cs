@@ -7,7 +7,7 @@ using Lyric4.Sema;
 namespace Lyric4.From4.Rules;
 
 /// <summary>A line of <c>from4.toml</c>: a function of 4.6's library and its form in Lyric 5.</summary>
-internal sealed record LibraryEntry(string Rule, string From, string? Name, string? Form, bool Iterator);
+internal sealed record LibraryEntry(string Rule, string From, string? Name, string? Form, bool Iterator, bool Lambda, bool Throws, bool Statement);
 
 /// <summary>The table of <c>from4.toml</c>, embedded in this assembly: 4.6's library by function.</summary>
 internal static class LibraryTable
@@ -28,14 +28,27 @@ internal static class LibraryTable
             {
                 string? Text(string key) => row.TryGet(key, out var value) ? (string)value : null;
                 var from = Text("from")!;
+                bool Flag(string key) => row.TryGet(key, out var value) && (bool)value;
                 entries.Add(from, new LibraryEntry(Text("rule")!, from, Text("name"), Text("form"),
-                    row.TryGet("iterator", out var iterator) && (bool)iterator));
+                    Flag("iterator"), Flag("lambda"), Flag("throws"), Flag("statement")));
             }
         }
         return entries;
     }
 
     public static LibraryEntry? Of(string key) => Entries.Value.GetValueOrDefault(key);
+
+    /// <summary>The table's lines that name no function of 4.6's library: a line with a typing error
+    /// would do nothing, silently.</summary>
+    public static IReadOnlyList<string> Faults(Func<string, string?> stdlibFile) =>
+        [.. Entries.Value.Keys.Where(key =>
+        {
+            var dot = key.LastIndexOf('.');
+            var module = key.StartsWith("string.", StringComparison.Ordinal) ? "std.string" : key[..dot];
+            var name = key[(dot + 1)..];
+            return stdlibFile($"{module.Replace('.', '/')}.lyr") is not { } text
+                || !(text.Contains($"fn {name}(", StringComparison.Ordinal) || text.Contains($"fn {name}<", StringComparison.Ordinal));
+        })];
 
     /// <summary>Whether the table holds a function of a module: its imports change.</summary>
     public static bool HasModule(string module) => Entries.Value.Keys.Any(key => key.StartsWith(module + ".", StringComparison.Ordinal));
@@ -78,24 +91,31 @@ internal sealed partial class Library : IRule
             var nodes = Tree.Below(module).ToList();
             var sources = nodes.OfType<ForInStmt>().Select(f => f.Iterable).ToHashSet<Expr>(ReferenceEqualityComparer.Instance);
             var callees = nodes.OfType<CallExpr>().Select(c => c.Callee).ToHashSet<Expr>(ReferenceEqualityComparer.Instance);
+            var statements = nodes.OfType<ExprStmt>().Select(s => s.Expr).ToHashSet<Expr>(ReferenceEqualityComparer.Instance);
             foreach (var call in nodes.OfType<CallExpr>())
-                if (LibraryTable.KeyOf(context, call.Callee) is { } key && LibraryTable.Of(key) is { Form: { } form } entry)
-                    Write(context, text, call, entry, form, sources.Contains(call));
+            {
+                if (LibraryTable.KeyOf(context, call.Callee) is not { } key || LibraryTable.Of(key) is not { Form: { } form } entry) continue;
+                if (entry.Statement && !statements.Contains(call))
+                    context.Note(entry.Rule, "LYR-MIG0402", NoteKind.Hand, call.Span,
+                        $"'{Conformances.Text(text, call)}' answered whether it worked; in Lyric 5 it throws, and it answers nothing",
+                        "call it in a 'try' block, and do in its 'catch' what the 'false' did");
+                else Write(context, text, call, entry, form, sources.Contains(call));
+            }
             foreach (var name in nodes.OfType<Expr>().Where(n => n is IdentifierExpr or MemberExpr))
             {
                 if (LibraryTable.KeyOf(context, name) is not { } key || LibraryTable.Of(key) is not { } entry) continue;
-                if (entry.Name is { } to)
+                if (entry is { Name: { } to, Form: null })
                 {
                     var written = name is MemberExpr member ? member.Member : ((IdentifierExpr)name).Name;
-                    if (callees.Contains(name))
-                        context.Replace(entry.Rule, name.Span.File, name.Span.End - written.Length, name.Span.End, to);
-                    else
+                    if (entry.Lambda && !callees.Contains(name))
                         context.Replace(entry.Rule, name.Span, Lambda(context, name, to));
+                    else
+                        context.Replace(entry.Rule, name.Span.File, name.Span.End - written.Length, name.Span.End, to);
                 }
                 else if (!callees.Contains(name))
                     context.Note(entry.Rule, "LYR-MIG0311", NoteKind.Hand, name.Span,
                         $"'{Conformances.Text(text, name)}' is written as a method in Lyric 5, and no function stands for it",
-                        $"pass a lambda that calls it: (it) => {entry.Form!.Replace("{0}", "it")}");
+                        $"pass a lambda that calls it: (it) => {entry.Form!.Replace("{q}", "").Replace("{0}", "it")}");
             }
         }
     }
@@ -115,6 +135,9 @@ internal sealed partial class Library : IRule
     /// stays open to other rules.</summary>
     private static void Write(RuleContext context, string text, CallExpr call, LibraryEntry entry, string form, bool isSource)
     {
+        // the module the call named stays named
+        var qualifier = call.Callee is MemberExpr { Target: var module } ? Conformances.Text(text, module) + "." : "";
+        form = form.Replace("{q}", qualifier);
         var position = call.Span.Start;
         var pending = new StringBuilder();
         var at = 0;

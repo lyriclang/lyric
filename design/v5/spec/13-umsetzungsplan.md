@@ -2038,6 +2038,20 @@ Formen der Bibliothek (E01–E03, in der Tabelle), **S5c** die Koroutinen (N01, 
   Deklaration in keiner Datei steht — jedes `:: [Throwable]` brach den Migrator ab. Der Fall `e05-throwable` fand es; die
   Frage steht jetzt an einer Stelle (`Tree.InStdlib`).
 
+**S5b, beim Bauen entschieden** (2026-11-05):
+
+- **Geschnitten nach der Form**: E01–E03 von `file`, `json`, `encoding`, `time` und `string` hier, wo ein Name oder eine
+  kurze Form genügt. Die Zwillinge von `stream`, `net` und `process` gehen mit B05, B12, B13 in S6: dort ändert sich
+  die ganze Form (Puffer übergeben, `TcpListener`, `Command`), ein Zwilling lässt sich davon nicht trennen.
+- **Die Tabelle wächst um `{q}`** (das genannte Modul: `file.` bleibt `file.`), **`throws`** (4.6s warf nicht, diese
+  wirft, E04 setzt die Markierung, so bleibt es eine Markierung je Ausdruck und keine im `try`-Block) und **`statement`**
+  (nur als Anweisung hat sie eine Form).
+- **E02 an Bool-Operationen**: eine Anweisung wird `try x(a);`, und die Funktion muss es fangen oder `throws` sagen —
+  das zeigt Lyric 5 selbst. Eine genutzte Antwort (`if (file.remove(p))`) hat keine Form: sie bleibt stehen, von Hand
+  (`LYR-MIG0402`). Verworfen: `(try? x(a)) != null` — ein `void` hat kein `?`.
+- **Ein Test hält die Tabelle an 4.6**: jede Zeile muss eine Funktion der Bibliothek nennen, sonst täte ein Tippfehler
+  still nichts. Dass jede `pub`-Funktion in der Tabelle steht, prüft erst S6.
+
 ## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
 
 **Anlass** (Maintainer, 2026-10-29): ein Bau mit einer eingebundenen C-Bibliothek (raylib, sieben Quellen) sagte

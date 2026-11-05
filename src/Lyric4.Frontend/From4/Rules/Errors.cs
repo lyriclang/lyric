@@ -17,8 +17,14 @@ internal sealed class TryMarks : IRule
 
     public void Apply(RuleContext context)
     {
-        foreach (var module in context.Modules) Visit(context, module, covered: false);
+        foreach (var module in context.Modules)
+        {
+            _statements = Tree.Below(module).OfType<ExprStmt>().Select(s => s.Expr).ToHashSet<Expr>(ReferenceEqualityComparer.Instance);
+            Visit(context, module, covered: false);
+        }
     }
+
+    private HashSet<Expr> _statements = [];
 
     private void Visit(RuleContext context, Node node, bool covered)
     {
@@ -57,7 +63,7 @@ internal sealed class TryMarks : IRule
         parent is IfExpr choice ? ReferenceEquals(child, choice.Then) || ReferenceEquals(child, choice.Else) : parent is MatchArm;
 
     /// <summary>The smallest part of an expression that holds all its calls that throw.</summary>
-    private static Node? Cover(RuleContext context, Node node)
+    private Node? Cover(RuleContext context, Node node)
     {
         if (node is LambdaExpr or Stmt) return null;
         var parts = AstChildren.Of(node)
@@ -70,10 +76,13 @@ internal sealed class TryMarks : IRule
         return parts.Count == 1 ? node is UnaryExpr ? node : parts[0] : null;
     }
 
-    private static bool Throws(RuleContext context, Node node) => node switch
+    private bool Throws(RuleContext context, Node node) => node switch
     {
         CallExpr call => context.Model.Types.ThrownByPull(call) is not null
-            || Tree.Target(context, call.Callee) is FunctionSymbol { Declaration: FunctionDecl { Throws: not null } },
+            || Tree.Target(context, call.Callee) is FunctionSymbol { Declaration: FunctionDecl { Throws: not null } }
+            // silent in 4.6, and written to throw (E02); as a value it is left as it stands, and said
+            || (LibraryTable.KeyOf(context, call.Callee) is { } key && LibraryTable.Of(key) is { Throws: true } entry
+                && (!entry.Statement || _statements.Contains(call))),
         ResumeExpr resume => context.Model.Types.ThrownByPull(resume) is not null,
         _ => false,
     };

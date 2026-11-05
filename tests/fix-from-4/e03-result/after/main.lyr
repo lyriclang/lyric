@@ -1,0 +1,12 @@
+import std.encoding { Hex };
+import std.fs as file;
+import std.json as json;
+import std.string as strings;
+
+fn main(): int {
+    let t = Result.of(() => try file.readText("/nothing"));
+    let j = Result.of(() => try json.parse("1"));
+    let h = Result.of(() => try Hex.decode("00"));
+    let n = Result.of(() => try int.parse("1"));
+    return 0;
+}

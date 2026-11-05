@@ -16,6 +16,10 @@ public class FixFrom4Tests
 {
     private static readonly string Cases = Path.Combine(RuntimeLayout.FindRoot(AppContext.BaseDirectory), "tests", "fix-from-4");
 
+    /// <summary>A line of the table with a typing error would do nothing, silently.</summary>
+    [Fact]
+    public void Every_line_of_the_table_names_a_function_of_4_6s_library() => Assert.Empty(Migrator.TableFaults());
+
     public static TheoryData<string> Names() => [.. Directory.EnumerateDirectories(Cases)
         .Select(Path.GetFileName).OfType<string>()
         .Where(name => name != "examples-4.6")

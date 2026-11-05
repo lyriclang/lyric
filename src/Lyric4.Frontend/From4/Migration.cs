@@ -162,6 +162,9 @@ public static class Migrator
         new Rules.DeferredClose(),
     ];
 
+    /// <summary>The lines of <c>from4.toml</c> that name no function of 4.6's library.</summary>
+    public static IReadOnlyList<string> TableFaults() => Lyric4.From4.Rules.LibraryTable.Faults(From4.StdlibFile);
+
     /// <exception cref="InvalidOperationException">The program does not check with 4.6.</exception>
     public static Migration Run(Model model, string? lyricJson = null)
     {

@@ -2,38 +2,47 @@
 #
 # `name`: the same call under another name, in the import too. `form`: the call written anew — `{this}`
 # the receiver, `{0}` an argument, in their order and each once, so what stands in them stays as it is
-# written and other rules may change it; `{0!}` a copy of an argument's text. A function with a form
-# leaves the imports. `iterator`: it gave an array of strings and gives an iterator of views now, which
-# the rule writes back to what 4.6 gave.
+# written and other rules may change it; `{0!}` a copy of an argument's text; `{q}` the module the call
+# named, `file.`. With a form, `name` is what the import names instead; without one the function leaves
+# the imports. `lambda`: as a value it needs one, the new function being generic. `iterator`: it gave an
+# array of strings and gives an iterator of views now, which the rule writes back to what 4.6 gave.
+# `throws`: 4.6's did not and this does, so E04 marks it. `statement`: only as a statement has it a form;
+# what it answered is gone, and a value is said by hand.
 
 [[free]]
 rule = "T11"
 from = "std.math.absInt"
+lambda = true
 name = "abs"
 
 [[free]]
 rule = "T11"
 from = "std.math.minInt"
+lambda = true
 name = "min"
 
 [[free]]
 rule = "T11"
 from = "std.math.maxInt"
+lambda = true
 name = "max"
 
 [[free]]
 rule = "T11"
 from = "std.math.clampInt"
+lambda = true
 name = "clamp"
 
 [[free]]
 rule = "T11"
 from = "std.math.signInt"
+lambda = true
 name = "signum"
 
 [[free]]
 rule = "T11"
 from = "std.math.sign"
+lambda = true
 name = "signum"
 
 # what sum and sumFloat took an array through
@@ -83,3 +92,208 @@ form = "{this}.bytes()"
 rule = "T16"
 from = "std.string.utf8Decode"
 form = "(try? string.fromUtf8({0}))"
+
+# the throwing twins, the silent forms and those with a Result; of stream, net and process with their rules
+
+[[free]]
+rule = "E01"
+from = "std.io.file.textOrThrow"
+name = "readText"
+
+[[free]]
+rule = "E01"
+from = "std.io.file.bytesOrThrow"
+name = "readBytes"
+
+[[free]]
+rule = "E01"
+from = "std.io.file.writeTextOrThrow"
+name = "writeText"
+
+[[free]]
+rule = "E01"
+from = "std.io.file.appendTextOrThrow"
+name = "appendText"
+
+[[free]]
+rule = "E01"
+from = "std.io.file.writeBytesOrThrow"
+name = "writeBytes"
+
+[[free]]
+rule = "E01"
+from = "std.io.file.removeOrThrow"
+name = "remove"
+
+[[free]]
+rule = "E01"
+from = "std.io.file.copyOrThrow"
+name = "copy"
+
+[[free]]
+rule = "E01"
+from = "std.io.file.moveOrThrow"
+name = "rename"
+
+[[free]]
+rule = "E01"
+from = "std.io.file.createDirOrThrow"
+name = "createDir"
+
+[[free]]
+rule = "E01"
+from = "std.io.file.createDirAllOrThrow"
+name = "createDirAll"
+
+[[free]]
+rule = "E01"
+from = "std.io.file.removeDirOrThrow"
+name = "removeDir"
+
+[[free]]
+rule = "E01"
+from = "std.io.file.linesOrThrow"
+name = "lines"
+form = "{q}lines({0}).toArray()"
+
+[[free]]
+rule = "E01"
+from = "std.json.parseOrThrow"
+name = "parse"
+
+[[free]]
+rule = "E01"
+from = "std.encoding.hexDecodeOrThrow"
+name = "Hex"
+form = "{q}Hex.decode({0})"
+
+[[free]]
+rule = "E01"
+from = "std.time.fromIsoOrThrow"
+name = "Instant"
+form = "{q}Instant.parse({0})"
+
+[[free]]
+rule = "E02"
+from = "std.io.file.text"
+name = "readText"
+form = "(try? {q}readText({0}))"
+
+[[free]]
+rule = "E02"
+from = "std.io.file.bytes"
+name = "readBytes"
+form = "(try? {q}readBytes({0}))"
+
+[[free]]
+rule = "E02"
+from = "std.io.file.lines"
+name = "lines"
+form = "(try? {q}lines({0}).toArray())"
+
+[[free]]
+rule = "E02"
+from = "std.json.parse"
+name = "parse"
+form = "(try? {q}parse({0}))"
+
+[[free]]
+rule = "E02"
+from = "std.encoding.hexDecode"
+name = "Hex"
+form = "(try? {q}Hex.decode({0}))"
+
+[[free]]
+rule = "E02"
+from = "std.io.file.writeText"
+name = "writeText"
+form = "{q}writeText({0}, {1})"
+statement = true
+throws = true
+
+[[free]]
+rule = "E02"
+from = "std.io.file.appendText"
+name = "appendText"
+form = "{q}appendText({0}, {1})"
+statement = true
+throws = true
+
+[[free]]
+rule = "E02"
+from = "std.io.file.writeBytes"
+name = "writeBytes"
+form = "{q}writeBytes({0}, {1})"
+statement = true
+throws = true
+
+[[free]]
+rule = "E02"
+from = "std.io.file.remove"
+name = "remove"
+form = "{q}remove({0})"
+statement = true
+throws = true
+
+[[free]]
+rule = "E02"
+from = "std.io.file.copy"
+name = "copy"
+form = "{q}copy({0}, {1})"
+statement = true
+throws = true
+
+[[free]]
+rule = "E02"
+from = "std.io.file.move"
+name = "rename"
+form = "{q}rename({0}, {1})"
+statement = true
+throws = true
+
+[[free]]
+rule = "E02"
+from = "std.io.file.createDir"
+name = "createDir"
+form = "{q}createDir({0})"
+statement = true
+throws = true
+
+[[free]]
+rule = "E02"
+from = "std.io.file.createDirAll"
+name = "createDirAll"
+form = "{q}createDirAll({0})"
+statement = true
+throws = true
+
+[[free]]
+rule = "E02"
+from = "std.io.file.removeDir"
+name = "removeDir"
+form = "{q}removeDir({0})"
+statement = true
+throws = true
+
+[[free]]
+rule = "E03"
+from = "std.io.file.textOrErr"
+name = "readText"
+form = "Result.of(() => try {q}readText({0}))"
+
+[[free]]
+rule = "E03"
+from = "std.json.parseOrErr"
+name = "parse"
+form = "Result.of(() => try {q}parse({0}))"
+
+[[free]]
+rule = "E03"
+from = "std.encoding.hexDecodeOrErr"
+name = "Hex"
+form = "Result.of(() => try {q}Hex.decode({0}))"
+
+[[free]]
+rule = "E03"
+from = "std.string.parseIntOrErr"
+form = "Result.of(() => try int.parse({0}))"

@@ -395,8 +395,11 @@ promise. This entry fills with the milestones.
   `substring(a, a + n).toString()`, `split` and `splitLines` written back to the array of strings they gave,
   `indexOf(n) >= 0` → `contains(n)`, `toChars`, `utf8Encode`, `utf8Decode`; the errors — a call that throws gets one
   `try` for its expression (`try h(g())`, `p(try g())`), none inside a `try` block, `Throwable` → `Error`,
-  `Exception { text = "…" }` → `Exception("…")`, a `try` around all of `main` and a `defer` that closes said. The
-  rules for the library's throwing twins, coroutines and the rest of the library follow.
+  `Exception { text = "…" }` → `Exception("…")`, a `try` around all of `main` and a `defer` that closes said; the
+  throwing twins and silent forms of `file`, `json`, `encoding` and `time` — `file.textOrThrow(p)` →
+  `try file.readText(p)`, `file.text(p)` → `(try? file.readText(p))`, `file.remove(p);` → `try file.remove(p);`,
+  `json.parseOrErr(s)` → `Result.of(() => try json.parse(s))`. The rules for coroutines and the rest of the library
+  follow.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
 
 ---

@@ -106,6 +106,11 @@ public static class From4
     internal static bool IsStdlib(string path) =>
         Path.GetFullPath(path).StartsWith(StdlibRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal);
 
+    /// <summary>A file of 4.6's standard library, by its path under the library's root; <c>null</c>
+    /// where it has none.</summary>
+    internal static string? StdlibFile(string relative) =>
+        Stdlib.Value.GetValueOrDefault(Path.Combine(StdlibRoot, relative.Replace('/', Path.DirectorySeparatorChar)));
+
     /// <summary>4.6's standard library from the resources, by the path the loader asks under
     /// <see cref="StdlibRoot"/>.</summary>
     private static IReadOnlyDictionary<string, string> ReadStdlib()
