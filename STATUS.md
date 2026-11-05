@@ -1404,7 +1404,9 @@ The plan is design 13's addendum "der Plan für M16" (#618; S1–S8).
   `Result` has `of` and `get`, by the maintainer's decision of 2026-11-05: what used them is said by hand.
 - **S6b**: time, encoding, JSON, random, OS, the rest of `file` (B04, B06, B07, B09–B11; `LYR-MIG0602`). `Instant.ofEpochMillis`
   added on the maintainer's word, the inverse of `epochMillis()`; a 4.6 call stays as it is.
-- **Next**: S6c, `stream`, `net`, `process` (B05, B12, B13)
+- **S6c**: `stream`, `process`, `net` (B05, B12, B13); `std.io.stream` becomes `std.fs`, where `File` lives; a type of 4.6's
+  library has its line in the table now.
+- **Next**: S6d, the test that holds every public function of 4.6 against the table, and what it finds
   and the test that holds every public function of 4.6 against the table. Then S7, S8 closes.
 
 ### Block P — done (2026-11-04)

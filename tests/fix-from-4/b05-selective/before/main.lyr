@@ -1,0 +1,16 @@
+import std.io.stream { File, close, createOrThrow, lineReader, write };
+import std.io.console { println };
+
+fn work(): File throws {
+    let f = createOrThrow("x");
+    write(f, [1u8]);
+    close(f);
+    for (line in lineReader(f)) {
+        println(line);
+    }
+    return f;
+}
+
+fn main(): int {
+    return 0;
+}

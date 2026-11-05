@@ -1,0 +1,15 @@
+import std.process as process;
+
+fn work(): int throws {
+    let c = process.startOrThrow("cat", ["-"]);
+    process.writeOrThrow(c, [104u8]);
+    process.closeStdin(c);
+    let code = process.wait(c);
+    process.kill(c);
+    return code;
+}
+
+fn main(): int {
+    let c = process.start("definitely-no-such-program", []);
+    return if (c == null) 0 else 1;
+}

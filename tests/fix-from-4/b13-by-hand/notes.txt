@@ -1,0 +1,12 @@
+by hand[LYR-MIG0601] main.lyr:5:31: 'net.Packet' has no form in Lyric 5 — a datagram fills a buffer and comes with its sender, no 'Packet': 'let buf = [0u8] * max; let (got, from) = try socket.recvFrom(buf[..]);'
+by hand[LYR-MIG0601] main.lyr:6:12: 'net.receiveFrom(u, 16)' has no form in Lyric 5 — a datagram fills a buffer and comes with its sender, no 'Packet': 'let buf = [0u8] * max; let (got, from) = try socket.recvFrom(buf[..]);'
+by hand[LYR-MIG0601] main.lyr:9:13: 'stream.LineReader' has no form in Lyric 5 — what walks a file's lines is 'TextLinesIter<File>' in Lyric 5; its 'next()' throws
+by hand[LYR-MIG0601] main.lyr:10:12: 'r.failed()' has no form in Lyric 5 — the walk throws what broke in Lyric 5, and nothing is left to ask
+by hand[LYR-MIG0601] main.lyr:16:20: 'stream.readSome(open, 16)' has no form in Lyric 5 — a read fills a buffer and answers how much, 0 at the end: 'let buf = [0u8] * n; let got = try f.read(into: buf[..]);'
+by hand[LYR-MIG0402] main.lyr:17:18: 'stream.write(open, [1u8])' answered whether it worked; in Lyric 5 it throws, and it answers nothing — call it in a 'try' block, and do in its 'catch' what the 'false' did
+by hand[LYR-MIG0601] main.lyr:22:19: 'process.readSomeOut(child, 16)' has no form in Lyric 5 — a read fills a buffer and answers how much, 0 at the end: 'let buf = [0u8] * n; let got = try child.stdout!.read(into: buf[..]);'
+by hand[LYR-MIG0601] main.lyr:23:9: 'process.close(child)' has no form in Lyric 5 — a child has no 'close' in Lyric 5: close the pipes it has, 'child.stdout!.close()'; as in 4.6 that does not stop it
+proposal[LYR-MIG0602] main.lyr:26:13: 'net.connect("127.0.0.1", 1)' takes the first address its name gives: 'localhost' may be '::1' — where it must be version 4, write the address: '127.0.0.1'
+by hand[LYR-MIG0601] main.lyr:28:19: 'net.readSome(socket, 16)' has no form in Lyric 5 — a read fills a buffer and answers how much, 0 at the end: 'let buf = [0u8] * n; let got = try socket.read(into: buf[..]);'
+proposal[LYR-MIG0602] main.lyr:31:13: 'net.bind("127.0.0.1", 0)' takes the first address its name gives: 'localhost' may be '::1' — where it must be version 4, write the address: '127.0.0.1'
+by hand[LYR-MIG0601] main.lyr:33:20: 'net.sendTo(udp, "127.0.0.1", 1, [1u8])' has no form in Lyric 5 — the bytes come first and the address is one value: 'socket.sendTo(bytes, SocketAddr { ip = resolve(host)[0], port = port as uint16 })', which answers how many went
