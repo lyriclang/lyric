@@ -2400,6 +2400,13 @@ code is no longer reported, and its number is not given again.</p>
 <td>A note of <code>lyric fix --from-4</code>: the <code>lyric.json</code> names a <code>testRoot</code>, whose files Lyric 4 compiled apart from the program. Lyric 5 runs a package's <code>tests/</code> with <code>lyric test</code>; each test is an <code>@Test</code> function.</td>
 </tr>
 <tr>
+<td>LYR-MIG0110</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a file without an entry</td>
+<td>A note of <code>lyric fix --from-4</code>: a single file has no <code>main</code>. Lyric 4 ran it as a library of a host; Lyric 5 asks a single file for its entry.</td>
+</tr>
+<tr>
 <td>LYR-MIG0205</td>
 <td>H</td>
 <td><a href="../../spec/14-cli/">14-cli</a></td>
@@ -2498,6 +2505,27 @@ code is no longer reported, and its number is not given again.</p>
 <td>A note of <code>lyric fix --from-4</code>: an array is the key of a <code>Map</code> or the element of a <code>Set</code>, which Lyric 4's checker passed and Lyric 5 refuses.</td>
 </tr>
 <tr>
+<td>LYR-MIG0320</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a method that writes under an interface</td>
+<td>A note of <code>lyric fix --from-4</code>: a method of a class writes the object's state, and the interface it answers declares it without <code>mut</code>.</td>
+</tr>
+<tr>
+<td>LYR-MIG0321</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a written parameter</td>
+<td>A note of <code>lyric fix --from-4</code>: a function writes a struct it took as a parameter. It was a copy in Lyric 4; in Lyric 5 a parameter is a <code>let</code>.</td>
+</tr>
+<tr>
+<td>LYR-MIG0322</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>an enum that holds itself</td>
+<td>A note of <code>lyric fix --from-4</code>: an enum holds itself, directly or through a struct. Lyric 4 kept payloads by reference; an enum of Lyric 5 is a value and would have no size.</td>
+</tr>
+<tr>
 <td>LYR-MIG0402</td>
 <td>H</td>
 <td><a href="../../spec/14-cli/">14-cli</a></td>
@@ -2545,6 +2573,13 @@ code is no longer reported, and its number is not given again.</p>
 <td><a href="../../spec/14-cli/">14-cli</a></td>
 <td>a library function that behaves otherwise</td>
 <td>A note of <code>lyric fix --from-4</code>: a function of Lyric 4's library has a form in Lyric 5 that compiles and behaves otherwise somewhere.</td>
+</tr>
+<tr>
+<td>LYR-MIG0616</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>a function bound to .NET</td>
+<td>A note of <code>lyric fix --from-4</code>: an <code>extern &quot;dotnet&quot;</code> binds a function of .NET, which Lyric 5 runs without.</td>
 </tr>
 </tbody>
 </table>
