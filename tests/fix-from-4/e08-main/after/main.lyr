@@ -1,0 +1,15 @@
+import std.io { println };
+
+fn work(): void throws Exception {
+    println("work");
+}
+
+fn main(): int {
+    try {
+        work();
+    } catch (e: Exception) {
+        println(e.text);
+        return 1;
+    }
+    return 0;
+}

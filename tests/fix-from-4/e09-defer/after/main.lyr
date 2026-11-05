@@ -1,0 +1,11 @@
+import std.io as stream;
+
+fn main(): int {
+    try {
+        let f = stream.openOrThrow("x");
+        defer stream.close(f);
+    } catch (e) {
+        return 1;
+    }
+    return 0;
+}

@@ -1,0 +1,1 @@
+proposal[LYR-MIG0408] main.lyr:39:5: a 'try' around all of 'main' caught what 'main' could not throw in Lyric 4; in Lyric 5 'main' may throw — where the 'catch' only reports, declare 'throws' on 'main' and take the 'try' away

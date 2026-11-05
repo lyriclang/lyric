@@ -1718,6 +1718,32 @@ example = '''
 by hand[LYR-MIG0318] main.lyr:3:12: 'int[]' is no key in Lyric 5: an array is not 'Hashable' — wrap the array in a struct that conforms to 'Hashable', or key by a value made of its elements
 '''
 
+[LYR-MIG0408]
+title = "a try around all of main"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a `try` holds all of `main`, which could not throw in Lyric 4; in Lyric 5 `main` may."
+explanation = '''
+Lyric 4's `main` could not declare `throws`, so a program caught what was left around all of it. In Lyric 5 `main` may throw: the error is reported with its causes, and the exit code is 1.
+
+The migration leaves the `try`: what its `catch` does may be meant. Where it only reports, declare `throws` on `main` and take the `try` away.
+'''
+example = '''
+proposal[LYR-MIG0408] main.lyr:9:5: a 'try' around all of 'main' caught what 'main' could not throw in Lyric 4; in Lyric 5 'main' may throw — where the 'catch' only reports, declare 'throws' on 'main' and take the 'try' away
+'''
+
+[LYR-MIG0409]
+title = "a close that a using says"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: `defer stream.close(f)` closes by hand what a `using` binding closes in Lyric 5."
+explanation = '''
+Lyric 5's `using let f = …` closes what it holds when the block ends, on every way out, for anything that is `Closeable`. The migration leaves the `defer` and says where one would do: write `using let f = …` and take the `defer` away.
+'''
+example = '''
+proposal[LYR-MIG0409] main.lyr:6:9: 'defer' closes 'f' by hand; Lyric 5 closes what a 'using' binding holds — write 'using let f = …' and take the 'defer' away
+'''
+
 [LYR-PAR0001]
 title = "a token after one whole expression, pattern or statement"
 severity = "error"

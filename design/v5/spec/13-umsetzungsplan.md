@@ -2021,6 +2021,23 @@ S4c die Aufrufe der 4.6-Bibliothek.
 - **Offen für S6**: `import std.string as strings;` machte in 4.6 die Methoden sichtbar und bleibt stehen; ohne
   weitere Nutzung ist er in Lyric 5 nur noch `LYR-SEM0072`. Er fällt mit den `strings.…`-Regeln von S6.
 
+**S5, geschnitten** (2026-11-05): **S5a** die Sprache (E04–E06, E08, E09), **S5b** die werfenden Zwillinge und stillen
+Formen der Bibliothek (E01–E03, in der Tabelle), **S5c** die Koroutinen (N01, N02).
+
+**S5a, beim Bauen entschieden** (2026-11-05):
+
+- **E04, eine Markierung je Ausdruck**: gemessen deckt ein `try` den ganzen Ausdruck und was rechts davon steht, ein
+  zweites ist `LYR-SEM0139`. Also genau eines, am Anfang des kleinsten Teils, der alle werfenden Aufrufe hält:
+  `try h(g())`, `p(try g())`, `1 + try g()`, `try g() + h(1)`, `try f"{g()} {h(1)}"`, `try -g()` (ein Präfix bindet enger).
+  Die Zweige von `if` und `match` sind eigene Ausdrücke; ein `try`-Block deckt, was in ihm steht, sein Lambda nicht.
+- **E06**: 4.6s `Exception` hat nur `text`; `inner` gibt es erst in Lyric 5. Die Zeile in 12 R2 beschreibt Lyric 5.
+- **E07 fällt weg**: `lastErrorKind`/`lastErrorDetail` gibt es in 4.6 nicht mehr (gesucht in 4.6s `stdlib/`).
+- **E08 und E09 schreiben nichts**: was ein `catch` um `main` tut, kann gewollt sein; `using` zöge eine Bindung um.
+  Beide sind Vorschläge (`LYR-MIG0408`, `0409`).
+- **Ein Absturz aus S4a**: die Frage „steht das in 4.6s Bibliothek?“ stolperte über den eingebauten `Throwable`, dessen
+  Deklaration in keiner Datei steht — jedes `:: [Throwable]` brach den Migrator ab. Der Fall `e05-throwable` fand es; die
+  Frage steht jetzt an einer Stelle (`Tree.InStdlib`).
+
 ## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
 
 **Anlass** (Maintainer, 2026-10-29): ein Bau mit einer eingebundenen C-Bibliothek (raylib, sieben Quellen) sagte

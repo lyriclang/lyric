@@ -41,8 +41,7 @@ internal static class Conformances
 
     /// <summary>Which interface of 4.6's own library a written type names, by its name — not a namesake.</summary>
     public static string? Std(RuleContext context, NamedType named) =>
-        Tree.Target(context, named) is TypeSymbol { Kind: TypeSymbolKind.Interface, Declaration: { } declaration }
-        && From4.IsStdlib(context.Model.Sources.GetPath(declaration.Span.File))
+        Tree.Target(context, named) is TypeSymbol { Kind: TypeSymbolKind.Interface } symbol && Tree.InStdlib(context, symbol)
             ? named.Path[^1]
             : null;
 
@@ -429,8 +428,8 @@ internal sealed class Hashing : IRule
     }
 
     private static bool IsCombine(RuleContext context, Node node) =>
-        node is CallExpr call && Tree.Target(context, call.Callee) is FunctionSymbol { Name: "combineHash" or "hashCombine", Declaration: { } declaration }
-        && From4.IsStdlib(context.Model.Sources.GetPath(declaration.Span.File));
+        node is CallExpr call && Tree.Target(context, call.Callee) is FunctionSymbol { Name: "combineHash" or "hashCombine" } symbol
+        && Tree.InStdlib(context, symbol);
 
     private static bool HasStdCoreImport(Module module) =>
         module.Declarations.OfType<ImportDecl>().Any(i => i.Clause is ImportSelective s && string.Join('.', i.Path) is "std.core" or "std.hash"
