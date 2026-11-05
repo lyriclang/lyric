@@ -6159,7 +6159,7 @@ severity = "error"
 area = "03-types"
 summary = "A name that is not a value — a type, a module, an interface — stands where a value is wanted, or a generic function or method, or a block's member with a parameter only a call binds, is named as a function value."
 explanation = '''
-A type is built (`T { … }`, `T.new(…)`) and a module is reached through (`m.f()`); neither is a value itself. A function value is monomorphic, so a generic function becomes one only with its type arguments written or by a call. A method named through its object or its type is no value either where only a call can bind a parameter: its own, `c.convert`, or its block's, `m.into`. The type the position expects binds neither.
+A type is built (`T { … }`, `T.new(…)`) and a module is reached through (`m.f()`); neither is a value itself. A function value is monomorphic, so a generic function becomes one only with its type arguments written or by a call. A method named through its object or its type is no value either where only a call can bind a parameter: its own, `c.convert`, also with its type arguments written, `c.convert<int>`, or its block's, `m.into`. The type the position expects binds neither.
 
 Build a value of the type, call the function, write the type arguments (`ident<int>`), or write a lambda that calls the method (`() => m.into()`).
 '''
@@ -7245,11 +7245,11 @@ fn main(): void {
 title = "a shared function name used as a value without a type to choose by"
 severity = "error"
 area = "08-expressions"
-summary = "The bare name of several functions stands where a value is wanted, and no expected function type picks exactly one of them."
+summary = "The name of several functions, bare or through an object, a type or a module, stands where a value is wanted, and no expected function type picks exactly one of them."
 explanation = '''
 A call chooses among functions of one name by its arguments; a function value has none, so the type it is wanted as has to choose. Without one, or when none or several of the functions fit it, the name stays ambiguous.
 
-Give the binding or parameter a function type (`let g: fn(int) -> int = step;`), or wrap the call in a lambda.
+Give the binding or parameter a function type (`let g: fn(int) -> int = step;`, `let h: fn(int, int) -> int = v.step;`), or wrap the call in a lambda.
 '''
 wrong = '''
 fn step(n: int): int { return n; }

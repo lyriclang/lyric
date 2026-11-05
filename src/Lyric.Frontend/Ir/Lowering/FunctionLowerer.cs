@@ -5320,8 +5320,6 @@ internal sealed class FunctionLowerer
     /// </summary>
     private TempId LowerMethodValue(MemberExpr expr, FunctionSymbol method)
     {
-        if (_types.MethodValueOf(expr) is { } bound)
-            return LowerBoundMethod(expr, bound.Lambda, bound.Receiver, null);
         if (TypeOfExpr(expr) is not IrFunctionType signature)
             throw NotSupported($"'{method.Name}' as a value", expr.Span);
         // A static of a generic type's instance, 'Pair<int>.of': the instance's function, as its
@@ -5422,6 +5420,8 @@ internal sealed class FunctionLowerer
             return LowerVariantCall(expr.Member, [], expr, expr.Span);
 
         // 'obj.method' and 'Type.staticFn' as VALUES.
+        if (!expr.IsOptional && _types.MethodValueOf(expr) is { } bound)
+            return LowerBoundMethod(expr, bound.Lambda, bound.Receiver, null);
         if (_types.RefOf(expr) is FunctionSymbol method && !expr.IsOptional)
             return LowerMethodValue(expr, method);
 
