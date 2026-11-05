@@ -5633,6 +5633,8 @@ internal sealed class FunctionLowerer
     /// free function. An instance method is a BOUND closure: its environment holds
     /// the receiver — the object shared, a struct copied — and its code is a function
     /// built here that takes the receiver out of the environment and calls the method with it.
+    /// A generic block's member, a blanket block's among them, has no function of its own: the
+    /// receiver names its instance, as it does for a call through it.
     /// </summary>
     private TempId LowerMethodValue(MemberExpr expr, FunctionSymbol method)
     {
@@ -5651,6 +5653,13 @@ internal sealed class FunctionLowerer
             _b.Emit(new MakeClosure(instanceValue, made, null, signature, expr.Span));
             return instanceValue;
         }
+        if (method.Declaration is FunctionDecl { IsStatic: false, Body: not null } blockMember
+            && _typeTable.BlockOf(method) is { Generics.Length: > 0 } block)
+        {
+            var reached = SubstituteType(_types.TypeOf(expr.Target));
+            return LowerBoundMethod(expr, method, signature, reached, _instances.RequestExtension(
+                method, blockMember, block, BlockParametersOn(block, reached, method.Name, expr.Span), reached, expr.Span));
+        }
         if (!TryResolveFunction(method, out var target))
             throw NotSupported($"reference to '{method.Name}' as a value", expr.Span);
 
@@ -5667,6 +5676,14 @@ internal sealed class FunctionLowerer
         var receiverType = SubstituteType(_types.TypeOf(expr.Target));
         if (receiverType is GenericInstance)
             throw NotSupported($"a method of a generic instance ('{method.Name}') as a value — wrap it in a lambda", expr.Span);
+        return LowerBoundMethod(expr, method, signature, receiverType, target);
+    }
+
+    /// <summary>The closure over the receiver of <paramref name="expr"/> that calls
+    /// <paramref name="target"/> with it.</summary>
+    private TempId LowerBoundMethod(MemberExpr expr, FunctionSymbol method, IrFunctionType signature,
+        LyrType receiverType, FunctionId target)
+    {
         var receiver = LowerType(receiverType, expr.Target.Span);
         var envType = _typeTable.EnvironmentFor(_name, [receiver], ["this"]);
         var env = _slots.NewTemp(envType);
@@ -6448,6 +6465,18 @@ internal sealed class FunctionLowerer
         return false;
     }
 
+    /// <summary>A generic block's parameters as the receiver binds them.</summary>
+    private Dictionary<GenericParamSymbol, LyrType> BlockParametersOn(ExtensionBlock block, LyrType receiver, string member, Span span)
+    {
+        var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
+        if (block.TargetType is not { } pattern || !TypeFacts.Match(pattern, receiver, map))
+            throw NotSupported($"'{member}': '{TypeFacts.Display(receiver)}' does not match the block's target", span);
+        // A parameter only a fixation names is the receiver's answer (05 §13 rule 2).
+        if (!TypeChecker.ApplyFixations(block, map))
+            throw NotSupported($"'{member}': '{TypeFacts.Display(receiver)}' does not fit a fixation of the block", span);
+        return map;
+    }
+
     /// <summary>A block member on an instance receiver: a generic block's method is
     /// requested for the receiver, a plain block's lowered as every extension is; the call is
     /// direct either way.</summary>
@@ -6466,12 +6495,7 @@ internal sealed class FunctionLowerer
         }
         else
         {
-            var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
-            if (block.TargetType is not { } pattern || !TypeFacts.Match(pattern, receiver, map))
-                throw NotSupported($"'{TypeFacts.Display(receiver)}' does not match the block's target", expr.Span);
-            // A parameter only a fixation names is the receiver's answer (05 §13 rule 2).
-            if (!TypeChecker.ApplyFixations(block, map))
-                throw NotSupported($"'{TypeFacts.Display(receiver)}' does not fit a fixation of the block", expr.Span);
+            var map = BlockParametersOn(block, receiver, member.Member, expr.Span);
             // A generic method's own parameters, bound by the call beside the block's
             // bound by the receiver: 'mapped<U>' in 'extend<I :: [Iterator]> I'.
             var own = symbol.Generics.Length > 0 ? SubstitutedTypeArguments(expr) : [];
