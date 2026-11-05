@@ -12,5 +12,6 @@ fn main(): int {
     let t = b.since(a).totalMillis() + d.totalSeconds();
     println(a.iso());
     let p = Instant.fromIso("1970-01-01T00:00:00.000Z");
-    return if (t > 0 && p != null) 0 else 1;
+    let e = Instant.ofEpochMillis(1500);
+    return if (t > 0 && p != null && e.epochMillis() == 1500) 0 else 1;
 }

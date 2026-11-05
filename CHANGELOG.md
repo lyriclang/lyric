@@ -407,7 +407,8 @@ promise. This entry fills with the milestones.
   said by hand; time, encoding, JSON, random numbers and the system — `nowMillis()` → `Instant.now().epochMillis()`,
   `d.plus(e)` → `(d + e)`, `hexEncode(b)` → `Hex.encode(b)`, `doc.field("n")` → `doc["n"]`, `serialize(v)` →
   `try encode(v)`, `shuffle(r, xs)` → `r.shuffle(xs.asSlice())`. What compiles and behaves otherwise, a seeded generator's
-  sequence, is said with `LYR-MIG0602`. The rest of the library follows.
+  sequence, is said with `LYR-MIG0602`. The rest of the library follows. `std.time` gained `Instant.ofEpochMillis(n)`, the
+  inverse of `epochMillis()`, so a 4.6 call stays as it is.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
 
 ---

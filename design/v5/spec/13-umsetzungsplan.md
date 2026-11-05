@@ -2094,9 +2094,10 @@ Formen der Bibliothek (E01–E03, in der Tabelle), **S5c** die Koroutinen (N01, 
   steht in 10 Q1 gar nicht; `Hex.encode(sha256(s.asBytes()))` scheitert doppelt (`string` hat `bytes()`, und von einem
   temporären `uint8[32]` geht keine Ansicht, SEM0115); `nowNanos` hat keine Form, `Monotonic` gibt nur `elapsed()`. Das sagt
   der Migrator von Hand, 12 R2 ist korrigiert.
-- **Offen für den Maintainer**: `Instant.ofEpochMillis` ergänzen? `epochMillis()` hat keine Umkehrung, ein Zeitstempel aus
-  einer Datei geht nur über `Instant.parse("1970-01-01T00:00:00Z") + Duration.ofMillis(n)`. Bis dahin von Hand; nach der
-  Entscheidung ist es eine Zeile der Tabelle.
+- **`Instant.ofEpochMillis` ergänzt** (Maintainer, 2026-11-05; 10 Q1): `epochMillis()` hatte keine Umkehrung, ein Zeitstempel
+  aus einer Datei ging nur über `Instant.parse("1970-01-01T00:00:00Z") + Duration.ofMillis(n)`. Ein Wert außerhalb des Bereichs
+  panikt wie die Arithmetik von `Duration`, eine werfende Form wäre ein zweiter Mechanismus. Der 4.6-Aufruf bleibt, wie er ist;
+  die Notiz fällt weg. `ofEpochSecs` kommt nicht mit: 4.6 hatte es nicht, und gefragt war es nicht.
 - **Die Tabelle lernt**: `imports` (was eine Form nennt, das der Aufruf nicht nannte; es tritt zur Zeile desselben Moduls),
   `{0~uint64}` (ein Cast, den ein Literal nicht braucht), `review`/`advice` (`LYR-MIG0602`: kompiliert und verhält sich an
   einer Stelle anders), `optional` (die Form durch `?.`: `x?.field("n")` wird `x?.index("n")`, `?[` gibt es nicht; ohne

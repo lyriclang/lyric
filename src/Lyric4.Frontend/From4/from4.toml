@@ -1048,11 +1048,6 @@ form = "{q}parse({0})"
 
 [[method]]
 rule = "B07"
-from = "Instant.ofEpochMillis"
-hand = "Lyric 5 has no 'ofEpochMillis': 'try Instant.parse(\"1970-01-01T00:00:00Z\") + Duration.ofMillis(n)'"
-
-[[method]]
-rule = "B07"
 from = "Duration.hash"
 hand = "'hash' writes into a 'Hasher' in Lyric 5 and gives nothing: 'hash(h)'"
 
