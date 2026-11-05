@@ -16,7 +16,8 @@ namespace Lyric.Sema;
 /// same cover;</item>
 /// <item>a <c>try</c> no error reaches is warned about (<c>LYR-SEM0139</c>): nothing under it
 /// throws, or a <c>try</c> inside takes all of it — and so is a mark over what another
-/// <c>try</c> marks already.</item>
+/// <c>try</c> marks already. An expression the checker refused may throw anything once it is
+/// fixed, so a <c>try</c> over one is not warned about: its error says the one thing there is.</item>
 /// </list>
 ///
 /// <para>A mark to the right of an operator, <c>a() + try b() + c()</c>, covers by POSITION: from
@@ -47,6 +48,9 @@ internal sealed class ExceptionAnalyzer
     /// can declare at all, and the <c>try</c>s open in it, innermost last.</summary>
     private sealed class Context(LyrType[] declared, string name, bool canDeclare)
     {
+        /// <summary>The context this one stands in: a lambda's is the function around it.</summary>
+        public Context? Outer { get; set; }
+
         public LyrType[] Declared { get; } = declared;
         public string Name { get; } = name;
         public bool CanDeclare { get; } = canDeclare;
@@ -181,6 +185,7 @@ internal sealed class ExceptionAnalyzer
     private void InContext(Context context, Action walk)
     {
         var saved = _context;
+        context.Outer = saved;
         _context = context;
         try
         {
@@ -315,11 +320,13 @@ internal sealed class ExceptionAnalyzer
 
     private void AnalyzeExpr(Expr expr)
     {
+        if (_types.IsRefused(expr)) Unknown(expr.Span.Start);
         switch (expr)
         {
             case CallExpr call:
                 AnalyzeCallee(call.Callee);
                 foreach (var a in call.Arguments) AnalyzeExpr(a);
+                if (ClauseLostATypeOf(call.Callee)) Unknown(call.Span.Start);
 
                 // A pull — 'c.next()' — is the throw site of a coroutine, never the call that
                 // built it (#73); the checker marked it, knowing the receiver's type.
@@ -495,8 +502,13 @@ internal sealed class ExceptionAnalyzer
     /// type it may throw covered by a clause around it or by the context's set.</summary>
     private void Site(LyrType[] thrown, Span at, string what, bool needsMark = true)
     {
-        if (thrown.Length == 0 || thrown.Any(t => t.IsError)) return;
+        if (thrown.Length == 0) return;
         var position = at.Start;
+        if (thrown.Any(t => t.IsError))
+        {
+            Unknown(position);
+            return;
+        }
         foreach (var (mark, frame) in _context.Rightward)
             if (Covers(mark, position)) frame.Reached = true;
         if (needsMark && !Marked(position))
@@ -531,6 +543,32 @@ internal sealed class ExceptionAnalyzer
                       + (_context.Declared.Length == 0 ? "does not throw" : $"throws only {SetText(_context.Declared)}")
                       + " — catch it inside, or give the lambda a type that throws it"
                     : $"{what} throws '{TypeFacts.Display(t)}', and {_context.Name} cannot throw — catch it there");
+        }
+    }
+
+    /// <summary>Does the called function's clause name a type that did not resolve? The set it
+    /// keeps leaves such a type out, so the call looks as if it threw less than it was written to.</summary>
+    private bool ClauseLostATypeOf(Expr callee)
+    {
+        var target = _types.RefOf(callee);
+        if (target is ImportBindingSymbol binding) target = binding.Target;
+        return target is FunctionSymbol { Declaration: FunctionDecl { Throws.Types: var named } fn }
+            && named.Length > _types.DeclaredThrows(fn).Length;
+    }
+
+    /// <summary>What stands at <paramref name="position"/> was refused, so what it throws is not
+    /// known: every <c>try</c> over it may be reached. Through the contexts around this one too — a
+    /// lambda's body can decide what the call it is handed to throws. Nothing is covered or kept:
+    /// no type is known to cover. Only once an error is out: a compile-time body or a macro's
+    /// argument carries the error type in a program that is fine, and such a program keeps its warnings.</summary>
+    private void Unknown(int position)
+    {
+        if (!_de.HasErrors) return;
+        for (var context = _context; context is not null; context = context.Outer)
+        {
+            foreach (var frame in context.Frames) frame.Reached = true;
+            foreach (var (mark, frame) in context.Rightward)
+                if (Covers(mark, position)) frame.Reached = true;
         }
     }
 

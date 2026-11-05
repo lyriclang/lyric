@@ -8552,7 +8552,7 @@ level = "warn"
 area = "06-errors"
 summary = "A 'try' mark, a 'try?' or 'try!', a 'try' block or a marked loop covers no call that can throw, or marks what an enclosing or earlier mark covers already."
 explanation = '''
-A mark says that a call may fail here. Where nothing under it can throw — or a `try?` inside takes every error first — the mark is wrong, and a `try` block's `catch` clauses can never run. A second mark under the first adds nothing.
+A mark says that a call may fail here. Where nothing under it can throw — or a `try?` inside takes every error first — the mark is wrong, and a `try` block's `catch` clauses can never run. A second mark under the first adds nothing. Over a call the compiler refused there is no such warning: what it throws is known once the error is fixed.
 
 Remove the mark; if a call was expected to throw, check that the right function is called.
 '''

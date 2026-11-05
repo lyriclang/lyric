@@ -76,6 +76,10 @@ public sealed class TypeResult
     public IEnumerable<KeyValuePair<Expr, LyrType>> AllTypes => _types;
     public LyrType TypeOf(Expr expr) => _types.TryGetValue(expr, out var t) ? t : LyrType.Error;
 
+    /// <summary>Did the checker give this expression the error type? Unlike <see cref="TypeOf"/>,
+    /// not for a node it gives no type of its own, such as the range in <c>xs[1..]</c>.</summary>
+    public bool IsRefused(Expr expr) => _types.TryGetValue(expr, out var t) && t.IsError;
+
     /// <summary>Every type an expression of the program has: what a value of an interface can hold.</summary>
     public IEnumerable<LyrType> ExpressionTypes => _types.Values;
 
