@@ -296,6 +296,10 @@ fn main(): void {
 `find` gives an index wherever it stands — the byte of a text, the place in an array or of an
 iterator's value —, or `null` where there is none; `firstWhere` gives the value itself.
 
+A method that an `extend` block adds is there wherever the block's module is imported, whatever the
+import names. `std.io` adds `writeAll` to everything that is a `Writer`, a `File` among them, so a
+file that only calls it writes `import std.io;`. Without the import, the error names the module.
+
 ## Reading input
 
 The last step reads the lines from the standard input instead of an array. `stdin().lines()` gives

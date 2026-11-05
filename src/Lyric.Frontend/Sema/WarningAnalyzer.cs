@@ -695,6 +695,9 @@ internal sealed partial class WarningAnalyzer
 
             var ast = _comp.AstOf(module);
             var inFile = _usedByFile.GetValueOrDefault(ast.Span.File);
+            // The imports told to go, in source order: of two that bring one module's blocks, the
+            // first may go only while the second stays, and the second then has to.
+            var going = new HashSet<ImportDecl>(ReferenceEqualityComparer.Instance);
 
             foreach (var decl in ast.Declarations)
             {
@@ -705,16 +708,22 @@ internal sealed partial class WarningAnalyzer
                     {
                         var unused = Enumerable.Range(0, selective.Names.Length)
                             .Where(i => IsUnusedImport(module, selective.BoundName(i), inFile)).ToHashSet();
-                        // The import brings its module's blocks into sight as well (05 §6): where
-                        // the file calls one, the module stays, its names go.
-                        var keepsBlocks = unused.Count == selective.Names.Length && BringsBlocksUsed(import, inFile);
-                        var whole = unused.Count == selective.Names.Length
-                            ? keepsBlocks ? ModuleAlone(import) : WholeImport(import)
-                            : null;
+                        var noneUsed = unused.Count == selective.Names.Length;
+                        // The import brings its module's blocks into sight as well: where the file
+                        // calls one, the module stays, its names go.
+                        var called = noneUsed ? BlockMethodOnlyItBrings(module, import, inFile, going) : null;
+                        var gives = noneUsed && called is null && GivesConformanceOnlyItBrings(module, import, going);
+                        if (noneUsed && called is null) going.Add(import);
+                        var whole = !noneUsed ? null
+                            : called is not null ? ModuleAlone(import)
+                            : gives ? WholeImport(import) is { } delete ? delete with { Applicability = Applicability.NeedsReview } : null
+                            : WholeImport(import);
+                        var help = called is not null ? $"keep the module alone — it brings '{called}', which the file calls"
+                            : gives ? "take it out, unless the program needs a conformance the module gives"
+                            : "take it out";
                         for (var i = 0; i < selective.Names.Length; i++)
                             WarnIfUnusedImport(module, selective.BoundName(i), selective.NameSpans[i], inFile,
-                                unused.Count == selective.Names.Length ? whole : NameOutOf(selective, i),
-                                keepsBlocks ? "keep the module alone — the file calls what its blocks add" : "take it out");
+                                noneUsed ? whole : NameOutOf(selective, i), noneUsed ? help : "take it out");
                         break;
                     }
                     case ImportAlias alias:
@@ -731,11 +740,48 @@ internal sealed partial class WarningAnalyzer
     private Replacement? WholeImport(ImportDecl import) =>
         _comp.Lyric5Modules ? SourceEdits.DeleteStatement(_comp.Sources, import.Span) : null;
 
-    /// <summary>Does the file call a member a block of the imported module adds — <c>x.toBytesBE()</c>
-    /// through <c>import std.encoding { Hex };</c>?</summary>
-    private bool BringsBlocksUsed(ImportDecl import, HashSet<Symbol>? usedInFile) =>
-        usedInFile is not null && _comp.FindModule(import.Path) is { } brought
-        && usedInFile.Any(used => ExtensionOwners.TryGetValue(used, out var owner) && ReferenceEquals(owner, brought));
+    /// <summary>The first by name of the members the file calls that would be gone with this import
+    /// — <c>x.toBytesBE()</c> through <c>import std.encoding { Hex };</c> —, a block of the imported
+    /// module's or of one it passes on, which nothing else here brings: not another import that
+    /// stays, not the prelude.</summary>
+    private string? BlockMethodOnlyItBrings(ModuleSymbol module, ImportDecl import, HashSet<Symbol>? usedInFile,
+        HashSet<ImportDecl> going)
+    {
+        if (usedInFile is null || _comp.FindModule(import.Path) is not { } brought) return null;
+        var without = new HashSet<ImportDecl>(going, ReferenceEqualityComparer.Instance) { import };
+        return usedInFile
+            .Where(used => _comp.Extensions.BlockOf(used) is { } block && LeavesWithItsModule(block)
+                && _comp.Brings(brought, block.Module) && !_comp.Sees(module, block.Module, without))
+            .Select(used => used.Name).Order(StringComparer.Ordinal).FirstOrDefault();
+    }
+
+    /// <summary>Whether the imported module gives a conformance that may stand on this import alone:
+    /// no use of it can be told from the file, as a constraint it satisfies names nothing of it.</summary>
+    private bool GivesConformanceOnlyItBrings(ModuleSymbol module, ImportDecl import, HashSet<ImportDecl> going)
+    {
+        if (_comp.FindModule(import.Path) is not { } brought) return false;
+        var without = new HashSet<ImportDecl>(going, ReferenceEqualityComparer.Instance) { import };
+        return !_comp.Sees(module, brought, without) && _comp.Extensions.Blocks
+            .Any(block => ReferenceEquals(block.Module, brought) && IsOrphanConformance(block));
+    }
+
+    /// <summary>Whether a block's members can be lost with an import of its module: a block of
+    /// methods reaches only where its module is seen. A conformance block reaches everywhere its
+    /// module is in the program, and that its module is in the program follows from any use unless
+    /// the block is an orphan.</summary>
+    private static bool LeavesWithItsModule(ExtensionBlock block) =>
+        block.Decl.Interfaces.Length == 0 || IsOrphanConformance(block);
+
+    /// <summary>A conformance of a type another module declares to an interface another module
+    /// declares: nothing that names the type or the interface loads the block's module.</summary>
+    private static bool IsOrphanConformance(ExtensionBlock block)
+    {
+        bool DeclaredHere(string name) =>
+            block.Module.Members.LookupLocal(name) is not (null or ImportBindingSymbol);
+        return block.Decl.Interfaces.Length > 0
+            && !(block.Target is { } target && DeclaredHere(target.Name))
+            && !block.Decl.Interfaces.Any(i => i is NamedType { Path.Length: 1 } named && DeclaredHere(named.Path[0]));
+    }
 
     /// <summary>The import as a module import, <c>import std.encoding;</c>: its names out, its blocks
     /// in sight.</summary>
@@ -793,8 +839,7 @@ internal sealed partial class WarningAnalyzer
         // the module has to appear in the source for that.
         if (target is ModuleSymbol targetModule && usedInFile is not null)
             foreach (var used in usedInFile)
-                if (ExtensionOwners.TryGetValue(used, out var owner)
-                    && ReferenceEquals(owner, targetModule))
+                if (ExtensionOwners.TryGetValue(used, out var owner) && _comp.Brings(targetModule, owner))
                     return false;
 
         // And when it brings conformances: 'import std.iter;' brings the blocks that make every

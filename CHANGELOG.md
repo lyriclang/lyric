@@ -412,6 +412,12 @@ promise. This entry fills with the milestones.
   `TcpListener`; a read that now fills a buffer, `sendTo` and `receiveFrom` are said by hand. `std.time` gained `Instant.ofEpochMillis(n)`, the
   inverse of `epochMillis()`, so a 4.6 call stays as it is.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
+- **`unused-import` no longer tells you to break the program**, and `lyric fix` no longer does it: it keeps the
+  module where a method the file calls comes through a `pub import` of it, takes out an import when another one or
+  the prelude brings the same blocks, and asks a reader before removing the one import that holds a conformance of
+  another module's type and interface. A module import counts as used by the blocks it passes on.
+- **`'File' has no member 'writeAll'` names the module to import** where a blanket block, or a block on a built-in
+  shape, adds the member in a module of the program this one does not import.
 
 ---
 
