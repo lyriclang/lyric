@@ -1,0 +1,14 @@
+import std.io.console { println };
+import std.string { fromInt, fromFloat, isDigit, join, parseInt, parseFloat, charToDigit, digitToChar, concat, repeat };
+import std.string as strings;
+
+fn main(): int {
+    let n = 7;
+    println("n = " + fromInt(n + 1));
+    println(f"{isDigit('3')} {join(["a", "b"], ",")} {parseInt("x") == null} {parseFloat("1.5") != null}");
+    println(concat("a", "b") + repeat("x", 2) + strings.fromBool(true));
+    println(f"{charToDigit('7')!} {digitToChar(3)!} {"  a ".trim()} {"aXa".replaceFirst("a", "b")}");
+    let m = "abcabc".lastIndexOf("b") >= 0;
+    println(f"{m}");
+    return 0;
+}

@@ -1,0 +1,15 @@
+import std.io { println };
+
+fn main(): int {
+    let xs = [3, 1, 2];
+    let total = xs.iter().fold(0, (a, x) => a + x);
+    let arr = (0..3).toArray();
+    let inc = (1..=2).toArray();
+    println(f"{total} {arr.length()} {inc.length()} {xs.iter().any((x) => x > 2)}");
+    println(f"{xs.iter().firstWhere((x) => x < 3)!} {xs.iter().find((x) => x < 3)!} {xs.iter().min()!}");
+    for (pair in xs.iter().enumerate()) {
+        let (i, x) = pair;
+        println(f"{i} {x}");
+    }
+    return 0;
+}

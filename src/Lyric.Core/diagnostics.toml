@@ -1786,6 +1786,18 @@ example = '''
 proposal[LYR-MIG0502] main.lyr:16:5: the tasks and 'run()' are a 'TaskScope': 'close()' waits for them as 'run()' did, and the first that fails cancels the others — where a task should outlive its block, 'spawnDetached' is one nobody waits for, and the program ends with 'main'
 '''
 
+[LYR-MIG0601]
+title = "a library function without a form"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a function of Lyric 4's library has no form in Lyric 5, by decision: an optional has no functions, a `Result` has `of` and `get`."
+explanation = '''
+Some of Lyric 4's library has no counterpart in Lyric 5, on purpose. An optional is taken apart with `if (let v = o)` and `??`, not with `map(o, f)`. A `Result` is an enum with two bridges, `Result.of` and `try r.get()`, and is matched as any enum is. The call stays as written, and the note says what to write instead.
+'''
+example = '''
+by hand[LYR-MIG0601] main.lyr:5:13: 'map(o, f)' has no form in Lyric 5 — Lyric 5 has no function on an optional: 'if (let v = o) f(v) else null'
+'''
+
 [LYR-PAR0001]
 title = "a token after one whole expression, pattern or statement"
 severity = "error"

@@ -1,0 +1,16 @@
+import std.io.console { println };
+import std.iter { over, range, rangeInclusive, fold, collectArray, enumerate, any, find, position, minValue };
+
+fn main(): int {
+    let xs = [3, 1, 2];
+    let total = fold(over(xs), 0, (a, x) => a + x);
+    let arr = collectArray(range(0, 3));
+    let inc = collectArray(rangeInclusive(1, 2));
+    println(f"{total} {arr.length} {inc.length} {any(over(xs), (x) => x > 2)}");
+    println(f"{find(over(xs), (x) => x < 3)!} {position(over(xs), (x) => x < 3)!} {minValue(over(xs))!}");
+    for (pair in enumerate(over(xs))) {
+        let (i, x) = pair;
+        println(f"{i} {x}");
+    }
+    return 0;
+}

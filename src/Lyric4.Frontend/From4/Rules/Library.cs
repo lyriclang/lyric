@@ -7,7 +7,7 @@ using Lyric4.Sema;
 namespace Lyric4.From4.Rules;
 
 /// <summary>A line of <c>from4.toml</c>: a function of 4.6's library and its form in Lyric 5.</summary>
-internal sealed record LibraryEntry(string Rule, string From, string? Name, string? Form, bool Iterator, bool Lambda, bool Throws, bool Statement);
+internal sealed record LibraryEntry(string Rule, string From, string? Name, string? Form, bool Iterator, bool Lambda, bool Throws, bool Statement, string? Hand, string? Moved);
 
 /// <summary>The table of <c>from4.toml</c>, embedded in this assembly: 4.6's library by function.</summary>
 internal static class LibraryTable
@@ -30,7 +30,7 @@ internal static class LibraryTable
                 var from = Text("from")!;
                 bool Flag(string key) => row.TryGet(key, out var value) && (bool)value;
                 entries.Add(from, new LibraryEntry(Text("rule")!, from, Text("name"), Text("form"),
-                    Flag("iterator"), Flag("lambda"), Flag("throws"), Flag("statement")));
+                    Flag("iterator"), Flag("lambda"), Flag("throws"), Flag("statement"), Text("hand"), Text("moved")));
             }
         }
         return entries;
@@ -46,8 +46,12 @@ internal static class LibraryTable
             var dot = key.LastIndexOf('.');
             var module = key.StartsWith("string.", StringComparison.Ordinal) ? "std.string" : key[..dot];
             var name = key[(dot + 1)..];
-            return stdlibFile($"{module.Replace('.', '/')}.lyr") is not { } text
-                || !(text.Contains($"fn {name}(", StringComparison.Ordinal) || text.Contains($"fn {name}<", StringComparison.Ordinal));
+            // a method's line names its type, which stands in some file of the library
+            var files = key.StartsWith("std.", StringComparison.Ordinal) || module == "std.string"
+                ? new[] { $"{module.Replace('.', '/')}.lyr" }
+                : ["std/collections.lyr", "std/result.lyr", "std/string.lyr"];
+            return !files.Select(stdlibFile).OfType<string>().Any(text => text.Contains($"fn {name}(", StringComparison.Ordinal)
+                || text.Contains($"fn {name}<", StringComparison.Ordinal) || text.Contains($"class {name} ", StringComparison.Ordinal));
         })];
 
     /// <summary>Whether the table holds a function of a module: its imports change.</summary>
@@ -56,7 +60,10 @@ internal static class LibraryTable
     /// <summary>What an import of a name from a module names in Lyric 5: the name itself, the new
     /// one, or <c>null</c> where the call no longer needs an import.</summary>
     public static string? ImportName(string module, string name) =>
-        Of($"{module}.{name}") is { } entry ? entry.Name : name;
+        Of($"{module}.{name}") is { } entry ? entry.Moved is null && entry.Hand is null ? entry.Name : entry.Hand is null ? null : name : name;
+
+    /// <summary>The module an imported name lives in now, where it left the one it came from.</summary>
+    public static string? MovedTo(string module, string name) => Of($"{module}.{name}")?.Moved;
 
     /// <summary>The function a callee or a name stands for, as a key of the table: <c>std.math.absInt</c>
     /// for a free one, <c>string.toChars</c> for a method of a string.</summary>
@@ -64,8 +71,19 @@ internal static class LibraryTable
     {
         if (Tree.Target(context, callee) is not FunctionSymbol function || !Tree.InStdlib(context, function)) return null;
         var path = context.Model.Sources.GetPath(function.Declaration!.Span.File);
-        if (callee is MemberExpr member && context.Model.Types.TypeOf(member.Target) is PrimitiveType { Kind: PrimitiveKind.String })
-            return $"string.{function.Name}";
+        if (callee is MemberExpr member && Tree.Target(context, member.Target) is not ModuleSymbol)
+        {
+            var type = context.Model.Types.TypeOf(member.Target) switch
+            {
+                PrimitiveType { Kind: PrimitiveKind.String } => "string",
+                NamedRef { Symbol.Name: var named } => named,
+                GenericInstance { Definition.Name: var named } => named,
+                // a static one: the type as written, 'List<int>.empty'
+                _ when function.IsStatic => context.Model.Sources.GetText(member.Span.File)[member.Target.Span.Start..member.Target.Span.End].Split('<')[0].Split('.')[^1],
+                _ => null,
+            };
+            if (type is not null) return $"{type}.{function.Name}";
+        }
         var file = path.Replace('\\', '/');
         var std = file.LastIndexOf("/std/", StringComparison.Ordinal);
         return std < 0 ? null : $"{Path.ChangeExtension(file[(std + 1)..], null).Replace('/', '.')}.{function.Name}";
@@ -94,7 +112,14 @@ internal sealed partial class Library : IRule
             var statements = nodes.OfType<ExprStmt>().Select(s => s.Expr).ToHashSet<Expr>(ReferenceEqualityComparer.Instance);
             foreach (var call in nodes.OfType<CallExpr>())
             {
-                if (LibraryTable.KeyOf(context, call.Callee) is not { } key || LibraryTable.Of(key) is not { Form: { } form } entry) continue;
+                if (LibraryTable.KeyOf(context, call.Callee) is not { } key || LibraryTable.Of(key) is not { } entry) continue;
+                if (entry.Hand is { } hand)
+                {
+                    context.Note(entry.Rule, "LYR-MIG0601", NoteKind.Hand, call.Span,
+                        $"'{Conformances.Text(text, call)}' has no form in Lyric 5", hand);
+                    continue;
+                }
+                if (entry.Form is not { } form) continue;
                 if (entry.Statement && !statements.Contains(call))
                     context.Note(entry.Rule, "LYR-MIG0402", NoteKind.Hand, call.Span,
                         $"'{Conformances.Text(text, call)}' answered whether it worked; in Lyric 5 it throws, and it answers nothing",
@@ -104,6 +129,7 @@ internal sealed partial class Library : IRule
             foreach (var name in nodes.OfType<Expr>().Where(n => n is IdentifierExpr or MemberExpr))
             {
                 if (LibraryTable.KeyOf(context, name) is not { } key || LibraryTable.Of(key) is not { } entry) continue;
+                if (entry.Hand is not null) continue;
                 if (entry is { Name: { } to, Form: null })
                 {
                     var written = name is MemberExpr member ? member.Member : ((IdentifierExpr)name).Name;
@@ -233,21 +259,23 @@ internal sealed class StringIndexOf : IRule
             var tested = new HashSet<CallExpr>(ReferenceEqualityComparer.Instance);
             foreach (var binary in nodes.OfType<BinaryExpr>())
             {
-                if (!StringCalls.Is(context, binary.Left, "indexOf", out var call, out var member)
-                    || Found(binary.Operator, binary.Right) is not { } found) continue;
+                if (!(StringCalls.Is(context, binary.Left, "indexOf", out var call, out var member) && member.Member == "indexOf")
+                    && !StringCalls.Is(context, binary.Left, "lastIndexOf", out call, out member)) continue;
+                if (Found(binary.Operator, binary.Right) is not { } found) continue;
                 tested.Add(call);
                 if (!found) context.Replace(Id, binary.Span.File, binary.Span.Start, binary.Span.Start, "!");
-                context.Replace(Id, member.Span.File, member.Span.End - "indexOf".Length, member.Span.End, "contains");
+                context.Replace(Id, member.Span.File, member.Span.End - member.Member.Length, member.Span.End, "contains");
                 context.Replace(Id, binary.Span.File, call.Span.End, binary.Span.End, "");
             }
             foreach (var node in nodes)
-            {
-                if (!StringCalls.Is(context, node, "indexOf", out var call, out var member) || tested.Contains(call)) continue;
-                context.Replace(Id, member.Span.File, member.Span.End - "indexOf".Length, member.Span.End, "find");
-                context.Note(Id, "LYR-MIG0315", NoteKind.Review, call.Span,
-                    $"'{Conformances.Text(text, call)}' gave a character's index or -1; 'find' gives a byte's index or 'null'",
-                    "take the 'null' with '??' or 'if', and 'charIndex(byte)' gives the character's index");
-            }
+                foreach (var (from, to) in new[] { ("indexOf", "find"), ("lastIndexOf", "rfind"), ("indexOfFrom", "findFrom") })
+                {
+                    if (!StringCalls.Is(context, node, from, out var call, out var member) || tested.Contains(call)) continue;
+                    context.Replace(Id, member.Span.File, member.Span.End - from.Length, member.Span.End, to);
+                    context.Note(Id, "LYR-MIG0315", NoteKind.Review, call.Span,
+                        $"'{Conformances.Text(text, call)}' gave a character's index or -1; '{to}' gives a byte's index or 'null'",
+                        "take the 'null' with '??' or 'if', and 'charIndex(byte)' gives the character's index");
+                }
         }
     }
 

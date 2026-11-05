@@ -1,0 +1,23 @@
+import std.collections { Deque };
+import std.core { arrayOf };
+import std.io { println };
+
+fn main(): int {
+    var ys = List<int>.new();
+    ys.push(3);
+    ys.push(1);
+    ys[0] = 5;
+    ys.asSlice().sort();
+    let twice = ys.iter().map((x) => x * 2).toList();
+    println(f"{ys[0]} {ys.contains(5)} {twice[1]} {ys.asSlice().first()!}");
+    var m = Map<string, int>.new();
+    m.insert("a", 1);
+    var t = Set<int>.new();
+    t.insert(4);
+    var d = Deque<int>.new();
+    d.pushBack(2);
+    let a = arrayOf(2, (i) => i);
+    let b = arrayOf(2, (_) => 9);
+    println(f"{m.get("a")!} {t.contains(4)} {d.iter().toArray().length()} {a.length()} {b.length()}");
+    return 0;
+}

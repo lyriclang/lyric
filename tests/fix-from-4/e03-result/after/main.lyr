@@ -1,7 +1,6 @@
 import std.encoding { Hex };
 import std.fs as file;
 import std.json as json;
-import std.string as strings;
 
 fn main(): int {
     let t = Result.of(() => try file.readText("/nothing"));

@@ -1,5 +1,4 @@
 import std.io { println };
-import std.string as strings;
 
 fn count(parts: string[]): int {
     return parts.length();

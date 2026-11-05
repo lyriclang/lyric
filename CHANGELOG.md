@@ -400,7 +400,11 @@ promise. This entry fills with the milestones.
   `try file.readText(p)`, `file.text(p)` → `(try? file.readText(p))`, `file.remove(p);` → `try file.remove(p);`,
   `json.parseOrErr(s)` → `Result.of(() => try json.parse(s))`; the tasks — `yield Wait.Now` → `try yieldNow()`,
   `yield Wait.Sleep(ms)` → `try sleep(Duration.ofMillis(ms))`, `Coroutine<Wait>` → `void throws Cancelled`, and the
-  `spawn`s and `run()` of a block a `TaskScope`, which waits as `run()` did. The rest of the library follows.
+  `spawn`s and `run()` of a block a `TaskScope`, which waits as `run()` did; the text, iterators and collections —
+  `fromInt(n)` → `f"{n}"`, `parseInt(s)` → `(try? int.parse(s))`, `isDigit(c)` → `c.isDigit()`, `fold(over(xs), 0, f)` →
+  `xs.iter().fold(0, f)`, `range(a, b)` → `(a..b)`, `sortList(xs)` → `xs.asSlice().sort()`, `List<int>.empty()` →
+  `.new()`, `xs.get(i)` → `xs[i]`, `m.set(k, v)` → `m.insert(k, v)`; what `std.option` and a `Result`'s methods did is
+  said by hand. The rest of the library follows.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
 
 ---

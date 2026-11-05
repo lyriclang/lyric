@@ -2069,6 +2069,25 @@ Formen der Bibliothek (E01–E03, in der Tabelle), **S5c** die Koroutinen (N01, 
   dass ein Hänger von 20 ms die Reihenfolge drehte, und 10 s waren für einen vollen Runner zu knapp. Jetzt 200 ms gegen
   10 ms und 25 s, was die Aussage des Tests hält: lange vor der 30-s-Task.
 
+**S6, geschnitten** (2026-11-05): 4.6 hat rund 430 öffentliche Funktionen. **S6a** Text, Iteratoren, Sammlungen, Option;
+**S6b** Zeit, Kodierung, JSON, Zufall, OS, der Rest von `file`; **S6c** `stream`, `net`, `process` und der Test über alle
+`pub`-Funktionen.
+
+**S6a, beim Bauen entschieden** (2026-11-05):
+
+- **Jede Form gegen den Compiler geprüft, bevor sie in die Tabelle kam** (rund 150 Probezeilen). Das fand, was 12 R2
+  versprach und es nicht gibt: `n.toString()`, `opt.map(f)`, `xs.sort()` auf einer `List`, `List.from(iter)` ohne Typargument.
+- **Vom Maintainer entschieden**: `?T` bekommt keine Methoden, `std.option` wird von Hand gesagt (`LYR-MIG0601`) — `if (let v = o)`
+  und `??` sind der eine Weg. Zahl zu Text ist `f"{n}"`. `Result` bleibt bei `of` und `get` (05 E1), seine Methoden von Hand.
+  12 R2 ist entsprechend korrigiert.
+- **Die Tabelle kennt jetzt Methoden fremder Empfänger** (`List.get`, `Map.set`, statisch `List.empty`), `hand` für eine
+  Funktion ohne Form, `moved` für einen Namen, der das Modul wechselt (`arrayOf` und `StringBuilder` nach `std.core`).
+- **`import std.string as strings;` fällt**, wenn nichts mehr den Alias nennt: er machte in 4.6 die Methoden sichtbar, in
+  Lyric 5 reicht das Prelude sie weiter. Das schließt den offenen Punkt aus S4c.
+- **Gefunden beim Prüfen**: `fn h(): Result<int, X> { return Result.of(…); }` ist ein interner Fehler des Compilers
+  (`LYR-ICE0002`), sobald ein Zieltyp da ist; `let r = Result.of(…)` geht. Das ist genau das dokumentierte Idiom. Eine
+  eigene Aufgabe, außerhalb von M16.
+
 ## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
 
 **Anlass** (Maintainer, 2026-10-29): ein Bau mit einer eingebundenen C-Bibliothek (raylib, sieben Quellen) sagte

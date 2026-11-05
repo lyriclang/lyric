@@ -1,0 +1,12 @@
+import std.io { println };
+
+fn main(): int {
+    let n = 7;
+    println("n = " + f"{n + 1}");
+    println(f"{'3'.isDigit()} {["a", "b"].join(",")} {(try? int.parse("x")) == null} {(try? float.parse("1.5")) != null}");
+    println(("a" + "b") + "x".repeat(2) + f"{true}");
+    println(f"{'7'.toDigit(10)!} {char.fromDigit(3, 10)!} {"  a ".trim().toString()} {"aXa".replaceN("a", "b", 1)}");
+    let m = "abcabc".contains("b");
+    println(f"{m}");
+    return 0;
+}
