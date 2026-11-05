@@ -1,0 +1,6 @@
+by hand[LYR-MIG0601] main.lyr:7:13: 'nowNanos()' has no form in Lyric 5 — to measure a time, 'let start = Monotonic.now();' and 'start.elapsed()' from std.time; a clock's raw reading is not given
+by hand[LYR-MIG0601] main.lyr:8:13: 'userName()' has no form in Lyric 5 — Lyric 5 has no 'userName': 'env("USER") ?? env("USERNAME")'
+by hand[LYR-MIG0601] main.lyr:9:13: 'sha256Hex("x")' has no form in Lyric 5 — std.crypto and std.encoding: 'var h = Sha256.new(); h.update(text.bytes()); Hex.encode(h.finish())'
+by hand[LYR-MIG0601] main.lyr:10:13: 'Instant.ofEpochMillis(0)' has no form in Lyric 5 — Lyric 5 has no 'ofEpochMillis': 'try Instant.parse("1970-01-01T00:00:00Z") + Duration.ofMillis(n)'
+by hand[LYR-MIG0304] main.lyr:11:13: 'compare' returns '?Ordering' in Lyric 5, not an int — compare the values with '<', '==' or '>', or match the 'Ordering'
+by hand[LYR-MIG0601] main.lyr:12:14: 'appendBytes("x", [1u8])' has no form in Lyric 5 — Lyric 5 has no 'appendBytes': 'File.openWith(path, OpenOptions { append = true, create = true })', then 'write' and 'close'

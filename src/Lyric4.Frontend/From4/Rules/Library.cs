@@ -1,13 +1,14 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Lyric4.AST;
+using Lyric4.Core;
 using Lyric4.Resolver;
 using Lyric4.Sema;
 
 namespace Lyric4.From4.Rules;
 
 /// <summary>A line of <c>from4.toml</c>: a function of 4.6's library and its form in Lyric 5.</summary>
-internal sealed record LibraryEntry(string Rule, string From, string? Name, string? Form, bool Iterator, bool Lambda, bool Throws, bool Statement, string? Hand, string? Moved);
+internal sealed record LibraryEntry(string Rule, string From, string? Name, string? Form, bool Iterator, bool Lambda, bool Throws, bool Statement, string? Hand, string? Moved, IReadOnlyList<string> Imports, string? Review, string? Advice, string? Optional);
 
 /// <summary>The table of <c>from4.toml</c>, embedded in this assembly: 4.6's library by function.</summary>
 internal static class LibraryTable
@@ -30,7 +31,9 @@ internal static class LibraryTable
                 var from = Text("from")!;
                 bool Flag(string key) => row.TryGet(key, out var value) && (bool)value;
                 entries.Add(from, new LibraryEntry(Text("rule")!, from, Text("name"), Text("form"),
-                    Flag("iterator"), Flag("lambda"), Flag("throws"), Flag("statement"), Text("hand"), Text("moved")));
+                    Flag("iterator"), Flag("lambda"), Flag("throws"), Flag("statement"), Text("hand"), Text("moved"),
+                    row.TryGet("imports", out var imports) ? [.. ((Lyric.Core.TomlArray)imports).Cast<string>()] : [],
+                    Text("review"), Text("advice"), Text("optional")));
             }
         }
         return entries;
@@ -49,7 +52,7 @@ internal static class LibraryTable
             // a method's line names its type, which stands in some file of the library
             var files = key.StartsWith("std.", StringComparison.Ordinal) || module == "std.string"
                 ? new[] { $"{module.Replace('.', '/')}.lyr" }
-                : ["std/collections.lyr", "std/result.lyr", "std/string.lyr"];
+                : ["std/collections.lyr", "std/result.lyr", "std/string.lyr", "std/time.lyr", "std/json.lyr", "std/random.lyr"];
             return !files.Select(stdlibFile).OfType<string>().Any(text => text.Contains($"fn {name}(", StringComparison.Ordinal)
                 || text.Contains($"fn {name}<", StringComparison.Ordinal) || text.Contains($"class {name} ", StringComparison.Ordinal));
         })];
@@ -78,6 +81,9 @@ internal static class LibraryTable
                 PrimitiveType { Kind: PrimitiveKind.String } => "string",
                 NamedRef { Symbol.Name: var named } => named,
                 GenericInstance { Definition.Name: var named } => named,
+                // through '?.': the type behind the optional
+                Optional { Inner: NamedRef { Symbol.Name: var named } } when member.IsOptional => named,
+                Optional { Inner: GenericInstance { Definition.Name: var named } } when member.IsOptional => named,
                 // a static one: the type as written, 'List<int>.empty'
                 _ when function.IsStatic => context.Model.Sources.GetText(member.Span.File)[member.Target.Span.Start..member.Target.Span.End].Split('<')[0].Split('.')[^1],
                 _ => null,
@@ -87,6 +93,29 @@ internal static class LibraryTable
         var file = path.Replace('\\', '/');
         var std = file.LastIndexOf("/std/", StringComparison.Ordinal);
         return std < 0 ? null : $"{Path.ChangeExtension(file[(std + 1)..], null).Replace('/', '.')}.{function.Name}";
+    }
+
+    /// <summary>What a module's calls of the table need imported beyond what it imports, by module:
+    /// a form that names what 4.6's call did not, <c>Instant.now()</c> for <c>nowMillis()</c>.</summary>
+    public static Dictionary<string, List<string>> Needed(RuleContext context, Module module)
+    {
+        var needed = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var call in Tree.Below(module).OfType<CallExpr>())
+        {
+            if (KeyOf(context, call.Callee) is not { } key || Of(key) is not { Hand: null } entry) continue;
+            foreach (var import in entry.Imports)
+            {
+                var dot = import.LastIndexOf('.');
+                var (path, name) = (import[..dot], import[(dot + 1)..]);
+                var imported = module.Declarations.OfType<ImportDecl>().Any(d => string.Join('.', d.Path) == path
+                    && d.Clause is ImportSelective selective && selective.Names.Contains(name));
+                if (imported) continue;
+                if (!needed.TryGetValue(path, out var names)) needed[path] = names = [];
+                if (!names.Contains(name)) names.Add(name);
+            }
+        }
+        foreach (var names in needed.Values) names.Sort(StringComparer.Ordinal);
+        return needed;
     }
 }
 
@@ -98,7 +127,7 @@ internal sealed partial class Library : IRule
 {
     public string Id => "T11";
 
-    [GeneratedRegex(@"\{(this|\d+)(!?)\}")]
+    [GeneratedRegex(@"\{(this|\d+)(!|~[a-z0-9]+)?\}")]
     private static partial Regex Placeholder();
 
     public void Apply(RuleContext context)
@@ -110,6 +139,7 @@ internal sealed partial class Library : IRule
             var sources = nodes.OfType<ForInStmt>().Select(f => f.Iterable).ToHashSet<Expr>(ReferenceEqualityComparer.Instance);
             var callees = nodes.OfType<CallExpr>().Select(c => c.Callee).ToHashSet<Expr>(ReferenceEqualityComparer.Instance);
             var statements = nodes.OfType<ExprStmt>().Select(s => s.Expr).ToHashSet<Expr>(ReferenceEqualityComparer.Instance);
+            var inserts = new SortedDictionary<int, (string Rule, FileId File, string Text)>();
             foreach (var call in nodes.OfType<CallExpr>())
             {
                 if (LibraryTable.KeyOf(context, call.Callee) is not { } key || LibraryTable.Of(key) is not { } entry) continue;
@@ -120,12 +150,29 @@ internal sealed partial class Library : IRule
                     continue;
                 }
                 if (entry.Form is not { } form) continue;
+                if (call.Callee is MemberExpr { IsOptional: true } && entry.Optional is null)
+                {
+                    context.Note(entry.Rule, "LYR-MIG0601", NoteKind.Hand, call.Span,
+                        $"'{Conformances.Text(text, call)}' has no form through '?.' in Lyric 5",
+                        $"take the optional apart first, with 'if (let v = o)', and write the call on 'v': {entry.Form.Replace("{this}", "v")}");
+                    continue;
+                }
                 if (entry.Statement && !statements.Contains(call))
                     context.Note(entry.Rule, "LYR-MIG0402", NoteKind.Hand, call.Span,
-                        $"'{Conformances.Text(text, call)}' answered whether it worked; in Lyric 5 it throws, and it answers nothing",
-                        "call it in a 'try' block, and do in its 'catch' what the 'false' did");
-                else Write(context, text, call, entry, form, sources.Contains(call));
+                        entry.Throws
+                            ? $"'{Conformances.Text(text, call)}' answered whether it worked; in Lyric 5 it throws, and it answers nothing"
+                            : $"'{Conformances.Text(text, call)}' answered whether it worked; in Lyric 5 it answers nothing",
+                        entry.Throws ? "call it in a 'try' block, and do in its 'catch' what the 'false' did" : "call it as a statement");
+                else
+                {
+                    if (call.Callee is MemberExpr { IsOptional: true }) form = entry.Optional!;
+                    Write(context, text, call, entry, form, sources.Contains(call), inserts);
+                    if (entry.Review is { } review)
+                        context.Note(entry.Rule, "LYR-MIG0602", NoteKind.Review, call.Span, $"'{Conformances.Text(text, call)}' {review}", entry.Advice);
+                }
             }
+            // several forms open at one place, '(a + b) - c': one edit
+            foreach (var (at, insert) in inserts) context.Replace(insert.Rule, insert.File, at, at, insert.Text);
             foreach (var name in nodes.OfType<Expr>().Where(n => n is IdentifierExpr or MemberExpr))
             {
                 if (LibraryTable.KeyOf(context, name) is not { } key || LibraryTable.Of(key) is not { } entry) continue;
@@ -159,7 +206,8 @@ internal sealed partial class Library : IRule
 
     /// <summary>A call in its form: an edit for each stretch between what stays, so that an argument
     /// stays open to other rules.</summary>
-    private static void Write(RuleContext context, string text, CallExpr call, LibraryEntry entry, string form, bool isSource)
+    private static void Write(RuleContext context, string text, CallExpr call, LibraryEntry entry, string form, bool isSource,
+        SortedDictionary<int, (string Rule, FileId File, string Text)> inserts)
     {
         // the module the call named stays named
         var qualifier = call.Callee is MemberExpr { Target: var module } ? Conformances.Text(text, module) + "." : "";
@@ -183,22 +231,62 @@ internal sealed partial class Library : IRule
                 pending.Append(Conformances.Text(text, what));
                 continue;
             }
+            // a type a literal takes by itself, and anything else is cast to
+            var cast = match.Groups[2].Value.StartsWith('~') && what is not IntLiteralExpr ? match.Groups[2].Value[1..] : null;
             // a postfix binds to all of it only where it is written so
-            var parens = at < form.Length && form[at] == '.' && !Tree.TakesPostfix(what);
+            var parens = ((at < form.Length && form[at] == '.') || cast is not null) && !Tree.TakesPostfix(what);
             if (parens) pending.Append('(');
-            Stretch(context, text, entry, call, position, what.Span.Start, pending);
+            Stretch(context, text, entry, call, position, what.Span.Start, pending, inserts);
             position = what.Span.End;
             if (parens) pending.Append(')');
+            if (cast is not null) pending.Append(" as ").Append(cast);
         }
         pending.Append(form, at, form.Length - at);
         if (entry.Iterator) pending.Append(isSource ? ".map((part) => part.toString())" : ".map((part) => part.toString()).toArray()");
-        Stretch(context, text, entry, call, position, call.Span.End, pending);
+        Stretch(context, text, entry, call, position, call.Span.End, pending, inserts);
     }
 
-    private static void Stretch(RuleContext context, string text, LibraryEntry entry, CallExpr call, int start, int end, StringBuilder written)
+    private static void Stretch(RuleContext context, string text, LibraryEntry entry, CallExpr call, int start, int end, StringBuilder written,
+        SortedDictionary<int, (string Rule, FileId File, string Text)> inserts)
     {
-        if (text[start..end] != written.ToString()) context.Replace(entry.Rule, call.Span.File, start, end, written.ToString());
+        if (start == end && written.Length > 0)
+            inserts[start] = (entry.Rule, call.Span.File, (inserts.TryGetValue(start, out var open) ? open.Text : "") + written);
+        else if (text[start..end] != written.ToString()) context.Replace(entry.Rule, call.Span.File, start, end, written.ToString());
         written.Clear();
+    }
+}
+
+/// <summary>B10: three variants of <c>JsonValue</c> have their whole names in Lyric 5, in an
+/// expression and in a pattern.</summary>
+internal sealed class JsonVariants : IRule
+{
+    public string Id => "B10";
+
+    private static readonly Dictionary<string, string> Names = new(StringComparer.Ordinal)
+    {
+        ["Str"] = "String",
+        ["Arr"] = "Array",
+        ["Obj"] = "Object",
+    };
+
+    public void Apply(RuleContext context)
+    {
+        foreach (var module in context.Modules)
+        {
+            var text = context.TextOf(module);
+            foreach (var node in Tree.Below(module))
+            {
+                var (symbol, name, end) = node switch
+                {
+                    VariantPattern pattern => (context.Model.Types.RefOf(pattern), pattern.Path[^1], text.IndexOf(pattern.Path[^1], pattern.Span.Start, StringComparison.Ordinal) + pattern.Path[^1].Length),
+                    MemberExpr member => (Tree.Target(context, member), member.Member, member.Span.End),
+                    _ => (null, "", 0),
+                };
+                if (symbol is not EnumVariantSymbol || !Tree.InStdlib(context, symbol) || !Names.TryGetValue(name, out var to)) continue;
+                if (!context.Model.Sources.GetPath(symbol.Declaration!.Span.File).Replace('\\', '/').EndsWith("/std/json.lyr", StringComparison.Ordinal)) continue;
+                context.Replace(Id, node.Span.File, end - name.Length, end, to);
+            }
+        }
     }
 }
 

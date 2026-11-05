@@ -1798,6 +1798,18 @@ example = '''
 by hand[LYR-MIG0601] main.lyr:5:13: 'map(o, f)' has no form in Lyric 5 — Lyric 5 has no function on an optional: 'if (let v = o) f(v) else null'
 '''
 
+[LYR-MIG0602]
+title = "a library function that behaves otherwise"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a function of Lyric 4's library has a form in Lyric 5 that compiles and behaves otherwise somewhere."
+explanation = '''
+The call was written anew, and it does what the old one did but for one thing, which the note names: a seeded generator gives another sequence, a directory's names come in the system's order, an instant's text is no longer exactly to the millisecond. Whether that matters depends on the program.
+'''
+example = '''
+proposal[LYR-MIG0602] main.lyr:5:13: 'Random.seeded(42)' gives another sequence in Lyric 5, the generator being ChaCha8 — a test that holds a seed's numbers takes the new ones
+'''
+
 [LYR-PAR0001]
 title = "a token after one whole expression, pattern or statement"
 severity = "error"

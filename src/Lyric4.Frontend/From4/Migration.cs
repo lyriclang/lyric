@@ -153,6 +153,7 @@ public static class Migrator
         new Rules.FloatLiterals(),
         new Rules.ArrayKeys(),
         new Rules.Library(),
+        new Rules.JsonVariants(),
         new Rules.StringLength(),
         new Rules.StringIndexOf(),
         new Rules.TryMarks(),

@@ -1,0 +1,19 @@
+import std.io { println };
+import std.os { cwd, env, hostname, platform, setEnv };
+import std.task { sleep };
+import std.time { Duration, Instant };
+
+fn work(): string throws {
+    try sleep(Duration.ofMillis(10));
+    return try cwd();
+}
+
+fn main(): int {
+    let t = Instant.now().epochMillis();
+    let home = (env("HOME") ?? "/");
+    let host = (try? hostname());
+    let name = f"{platform()}";
+    setEnv("A", "b");
+    println(home + name);
+    return if (t > 0 && host != null) 0 else 1;
+}

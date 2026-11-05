@@ -171,6 +171,9 @@ internal sealed partial class Imports : IRule
         foreach (var module in context.Modules)
         {
             var text = context.TextOf(module);
+            var needed = LibraryTable.Needed(context, module);
+            var inserts = new SortedDictionary<int, string>();
+            void Insert(int at, string line) => inserts[at] = inserts.GetValueOrDefault(at, "") + line;
             foreach (var import in module.Declarations.OfType<ImportDecl>())
             {
                 var path = string.Join('.', import.Path);
@@ -193,8 +196,7 @@ internal sealed partial class Imports : IRule
                         .Where(m => m.Module is not null).Distinct().GroupBy(m => m.Module!, StringComparer.Ordinal);
                     foreach (var group in moved.OrderBy(g => g.Key, StringComparer.Ordinal))
                     {
-                        var at = LineEnd(text, import.Span.End);
-                        context.Replace("K05", import.Span.File, at, at, $"import {group.Key} {{ {string.Join(", ", group.Select(m => m.Name))} }};\n");
+                        Insert(LineEnd(text, import.Span.End), $"import {group.Key} {{ {string.Join(", ", group.Select(m => m.Name))} }};\n");
                     }
                 }
                 if (import.Clause is ImportSelective selective && (Prelude.TryGetValue(path, out var prelude) | Renamed.ContainsKey(path) | LibraryTable.HasModule(path)))
@@ -205,6 +207,8 @@ internal sealed partial class Imports : IRule
                         .OfType<string>()
                         .Distinct(StringComparer.Ordinal)
                         .ToList();
+                    // what a form needs from a module joins the line that imports from it
+                    if (needed.Remove(path, out var joining)) kept.AddRange(joining.Where(name => !kept.Contains(name)));
                     if (kept.Count == 0)
                     {
                         context.Replace("K05", import.Span.File, import.Span.Start, LineEnd(text, import.Span.End), "");
@@ -219,6 +223,10 @@ internal sealed partial class Imports : IRule
                     context.Replace(path == "std.io.console" ? "K03" : "K04", import.Span.File, group.Index, group.Index + group.Length, to);
                 }
             }
+            if (module.Declarations.OfType<ImportDecl>().LastOrDefault() is { } last)
+                foreach (var (path, names) in needed.OrderBy(n => n.Key, StringComparer.Ordinal))
+                    Insert(LineEnd(text, last.Span.End), $"import {path} {{ {string.Join(", ", names)} }};\n");
+            foreach (var (at, line) in inserts) context.Replace("K05", module.Span.File, at, at, line);
         }
     }
 

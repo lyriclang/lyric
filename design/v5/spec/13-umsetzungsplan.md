@@ -2088,6 +2088,25 @@ Formen der Bibliothek (E01–E03, in der Tabelle), **S5c** die Koroutinen (N01, 
   (`LYR-ICE0002`), sobald ein Zieltyp da ist; `let r = Result.of(…)` geht. Das ist genau das dokumentierte Idiom. Eine
   eigene Aufgabe, außerhalb von M16.
 
+**S6b, beim Bauen entschieden** (2026-11-05):
+
+- **Wieder gegen den Compiler geprüft, wieder Versprechen aus 12 R2, die nicht halten**: `Instant.ofEpochMillis` „bleibt“ und
+  steht in 10 Q1 gar nicht; `Hex.encode(sha256(s.asBytes()))` scheitert doppelt (`string` hat `bytes()`, und von einem
+  temporären `uint8[32]` geht keine Ansicht, SEM0115); `nowNanos` hat keine Form, `Monotonic` gibt nur `elapsed()`. Das sagt
+  der Migrator von Hand, 12 R2 ist korrigiert.
+- **Offen für den Maintainer**: `Instant.ofEpochMillis` ergänzen? `epochMillis()` hat keine Umkehrung, ein Zeitstempel aus
+  einer Datei geht nur über `Instant.parse("1970-01-01T00:00:00Z") + Duration.ofMillis(n)`. Bis dahin von Hand; nach der
+  Entscheidung ist es eine Zeile der Tabelle.
+- **Die Tabelle lernt**: `imports` (was eine Form nennt, das der Aufruf nicht nannte; es tritt zur Zeile desselben Moduls),
+  `{0~uint64}` (ein Cast, den ein Literal nicht braucht), `review`/`advice` (`LYR-MIG0602`: kompiliert und verhält sich an
+  einer Stelle anders), `optional` (die Form durch `?.`: `x?.field("n")` wird `x?.index("n")`, `?[` gibt es nicht; ohne
+  sie von Hand).
+- **Mehrere Einfügungen an einer Stelle waren ein stiller Fehler**: `a.plus(b).minus(c)` öffnet zwei Klammern an derselben
+  Stelle, identische Bearbeitungen fielen zu einer zusammen, und das Ergebnis wäre unbalanciert gewesen; zwei verschiedene
+  Importzeilen an einer Stelle hätten die Migration abgebrochen. Library und Imports fassen sie jetzt zu einer zusammen.
+- **Eine neu werfende Funktion wie `sleep`, `cwd`, `encode`** bekommt ihr `try`; dass die umgebende Funktion dann `throws`
+  sagen oder fangen muss, zeigt Lyric 5 selbst, wie in S5b entschieden. `main` ohne `throws` bleibt also ein Compilerfehler.
+
 ## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
 
 **Anlass** (Maintainer, 2026-10-29): ein Bau mit einer eingebundenen C-Bibliothek (raylib, sieben Quellen) sagte

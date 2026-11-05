@@ -1,0 +1,16 @@
+import std.io.console { println };
+import std.collections { List };
+import std.random { Random, shuffle, choice };
+
+fn main(): int {
+    let r = Random.seeded(42);
+    let s = 7;
+    let q = Random.seeded(s + 1);
+    let xs = List<int>.of([1, 2, 3]);
+    shuffle(r, xs);
+    let c = choice(r, xs);
+    let n = r.nextIntRange(1, 7);
+    let g = r.nextGaussian();
+    println(f"{n} {g}");
+    return if (c != null && q.nextBool()) 0 else 0;
+}

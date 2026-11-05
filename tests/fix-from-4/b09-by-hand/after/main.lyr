@@ -1,0 +1,14 @@
+import std.fs { appendBytes };
+import std.hash { sha256Hex };
+import std.os { nowNanos, userName };
+import std.time { Instant };
+
+fn main(): int {
+    let t = nowNanos();
+    let u = userName();
+    let h = sha256Hex("x");
+    let a = Instant.ofEpochMillis(0);
+    let c = a.compare(a);
+    let ok = appendBytes("x", [1u8]);
+    return if (t > 0 && u != null && h != "" && c == 0 && ok) 0 else 1;
+}

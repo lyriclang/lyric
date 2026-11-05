@@ -1,0 +1,16 @@
+import std.io.console { println };
+import std.time { Duration, Instant };
+
+fn work(): Instant throws {
+    return Instant.fromIsoOrThrow("1970-01-01T00:00:00.000Z");
+}
+
+fn main(): int {
+    let d = Duration.ofSeconds(2).plus(Duration.ofMinutes(1)).minus(Duration.ofMillis(5));
+    let a = Instant.now();
+    let b = a.plus(d);
+    let t = b.since(a).totalMillis() + d.totalSeconds();
+    println(a.iso());
+    let p = Instant.fromIso("1970-01-01T00:00:00.000Z");
+    return if (t > 0 && p != null) 0 else 1;
+}
