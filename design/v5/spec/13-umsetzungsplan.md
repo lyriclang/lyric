@@ -2052,6 +2052,23 @@ Formen der Bibliothek (E01–E03, in der Tabelle), **S5c** die Koroutinen (N01, 
 - **Ein Test hält die Tabelle an 4.6**: jede Zeile muss eine Funktion der Bibliothek nennen, sonst täte ein Tippfehler
   still nichts. Dass jede `pub`-Funktion in der Tabelle steht, prüft erst S6.
 
+**S5c, beim Bauen entschieden** (2026-11-05):
+
+- **`run()` entfällt nicht einfach**, anders als die Zeile N02 in 12 R2: 4.6s `run()` wartete auf alle Tasks, in Lyric 5
+  endet das Programm mit `main`, und eine losgelöste Task stirbt mit ihm. Eine stille Änderung des Verhaltens. Darum
+  werden die `spawn`s von einfachen Aufrufen und das `run()` eines Blocks ein `TaskScope`: `tasks.spawn(() => try w())`,
+  `try tasks.close();` (gemessen: dieselbe Reihenfolge). Der Unterschied wird gesagt (`LYR-MIG0502`): die erste Task, die
+  scheitert, bricht die anderen ab. Die Funktion wirft dafür `Error`.
+- **Warten steckt an**: `yield Wait.Now` darf in einer Hilfsfunktion stehen (4.6 hatte stackful Koroutinen, keine Signatur
+  sagte es). `try yieldNow()` wirft `Cancelled`, also bekommt sie `throws Cancelled`, und ebenso jeder Aufrufer bis zum
+  Fixpunkt; E04 markiert die Aufrufe. Was ein `spawn` nimmt, läuft in der Task und ist dort markiert.
+- **Von Hand** (`LYR-MIG0501`): `Wait.Readable`/`Writable`/`Interrupt`, `spawn` fern von seinem `run()`, eine Koroutine in
+  einem Wert, `interrupt()`, `pending()`, und `std.task` unter einem Alias — ein Programm damit wird gar nicht
+  umgeschrieben, denn die Regeln lesen die Namen.
+- **Nebenbei**: `Tasks_take_turns_sleep_and_end_with_main` machte main und einen PR rot: 30 ms gegen 10 ms lagen so dicht,
+  dass ein Hänger von 20 ms die Reihenfolge drehte, und 10 s waren für einen vollen Runner zu knapp. Jetzt 200 ms gegen
+  10 ms und 25 s, was die Aussage des Tests hält: lange vor der 30-s-Task.
+
 ## Nachtrag 2026-10-29 — Statuszeilen beim Bau (P9s Tür geöffnet)
 
 **Anlass** (Maintainer, 2026-10-29): ein Bau mit einer eingebundenen C-Bibliothek (raylib, sieben Quellen) sagte

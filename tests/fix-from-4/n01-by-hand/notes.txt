@@ -1,0 +1,4 @@
+by hand[LYR-MIG0501] main.lyr:4:5: a task that waits for a descriptor or an interrupt has no form here: I/O parks by itself in Lyric 5 — read or write without the 'yield'; 'os.signals(Signal.Interrupt)' gives a channel for an interrupt
+by hand[LYR-MIG0501] main.lyr:8:5: 'spawn' of Lyric 4 has no form here: it stands apart from its 'run()', or takes a coroutine held in a value — start the tasks in a 'TaskScope', whose 'close()' waits for them, or with 'spawnDetached'
+by hand[LYR-MIG0501] main.lyr:13:5: 'interrupt' of Lyric 4 has no form here: a task waits for a signal on a channel in Lyric 5 — 'os.signals(Signal.Interrupt)' gives the channel
+by hand[LYR-MIG0501] main.lyr:14:5: 'run' of Lyric 4 has no form here: no 'spawn' of plain calls stands before it in its block — start the tasks in a 'TaskScope', whose 'close()' waits for them, or with 'spawnDetached'

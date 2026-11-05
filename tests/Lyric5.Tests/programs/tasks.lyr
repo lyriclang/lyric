@@ -6,7 +6,7 @@
 //   zero z main                 a sleep of zero lets the ready tasks run first
 //   chain 1 other 2 end         a generator in main sleeps between its yields: main's task parks
 //   done                        and a task still asleep never runs again: the program ends with main
-// Exit 0, after 280 ms of sleeping in main and long before the last task's 30 s.
+// Exit 0, after 450 ms of sleeping in main and long before the last task's 30 s.
 import std.io { println };
 import std.task { sleep, yieldNow, spawnDetached, Cancelled };
 import std.time { Duration };
@@ -24,7 +24,7 @@ fn flush(title: string): void {
 
 fn numbers(): Coroutine<int> {
     yield 1;
-    try sleep(Duration.ofMillis(30));
+    try sleep(Duration.ofMillis(200));
     yield 2;
 }
 

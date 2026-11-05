@@ -1,0 +1,16 @@
+import std.task { Cancelled, Wait, interrupt, run, spawn };
+
+fn watcher(): void throws Cancelled {
+    yield Wait.Interrupt;
+}
+
+fn start(): void {
+    spawn(watcher());
+}
+
+fn main(): int {
+    start();
+    interrupt();
+    run();
+    return 0;
+}

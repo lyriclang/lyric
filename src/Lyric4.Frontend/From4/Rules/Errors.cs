@@ -82,7 +82,9 @@ internal sealed class TryMarks : IRule
             || Tree.Target(context, call.Callee) is FunctionSymbol { Declaration: FunctionDecl { Throws: not null } }
             // silent in 4.6, and written to throw (E02); as a value it is left as it stands, and said
             || (LibraryTable.KeyOf(context, call.Callee) is { } key && LibraryTable.Of(key) is { Throws: true } entry
-                && (!entry.Statement || _statements.Contains(call))),
+                && (!entry.Statement || _statements.Contains(call)))
+            // a function that waits throws now, and what it calls in a task is marked there (N01)
+            || TaskFacts.Of(context).Throws(context, call),
         ResumeExpr resume => context.Model.Types.ThrownByPull(resume) is not null,
         _ => false,
     };

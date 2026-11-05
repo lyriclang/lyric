@@ -160,6 +160,7 @@ public static class Migrator
         new Rules.Exceptions(),
         new Rules.ThrowingMain(),
         new Rules.DeferredClose(),
+        new Rules.Tasks(),
     ];
 
     /// <summary>The lines of <c>from4.toml</c> that name no function of 4.6's library.</summary>

@@ -1758,6 +1758,34 @@ example = '''
 proposal[LYR-MIG0409] main.lyr:6:9: 'defer' closes 'f' by hand; Lyric 5 closes what a 'using' binding holds — write 'using let f = …' and take the 'defer' away
 '''
 
+[LYR-MIG0501]
+title = "a task without a form"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: a use of Lyric 4's `std.task` that the migration cannot write: a wait for a descriptor or an interrupt, a `spawn` apart from its `run()`, a coroutine held in a value, `interrupt()`, `pending()`, or the module named by an alias."
+explanation = '''
+Lyric 5's tasks wait by calling, not by yielding what they wait for. The migration writes `yield Wait.Now` and `yield Wait.Sleep(ms)`, and the `spawn`s of plain calls with the `run()` that follows them in their block. The rest is left as written.
+
+I/O parks by itself in Lyric 5, so a wait for a descriptor goes away with the read or the write it preceded. `os.signals(Signal.Interrupt)` gives a channel for an interrupt. Start tasks in a `TaskScope`, whose `close()` waits for them, or with `spawnDetached`, which nobody waits for; `spawn` returns a handle to keep.
+'''
+example = '''
+by hand[LYR-MIG0501] main.lyr:8:5: 'spawn' of Lyric 4 has no form here: it stands apart from its 'run()', or takes a coroutine held in a value — start the tasks in a 'TaskScope', whose 'close()' waits for them, or with 'spawnDetached'
+'''
+
+[LYR-MIG0502]
+title = "tasks became a scope"
+severity = "hint"
+area = "14-cli"
+summary = "A note of `lyric fix --from-4`: the `spawn`s of a block and its `run()` are a `TaskScope`, whose `close()` waits for the tasks as `run()` did."
+explanation = '''
+Lyric 4's `run()` drove every task to its end. In Lyric 5 a program ends with `main`, and a task nobody waits for ends with it, so dropping `run()` would change what the program does. The migration writes a `TaskScope`: `tasks.spawn(() => try worker())` for each `spawn`, `try tasks.close();` for the `run()`.
+
+What differs: the first task that fails cancels the others, and `close()` throws its error, so the function now throws `Error`. Where a task should outlive its block, `spawnDetached` starts one nobody waits for.
+'''
+example = '''
+proposal[LYR-MIG0502] main.lyr:16:5: the tasks and 'run()' are a 'TaskScope': 'close()' waits for them as 'run()' did, and the first that fails cancels the others — where a task should outlive its block, 'spawnDetached' is one nobody waits for, and the program ends with 'main'
+'''
+
 [LYR-PAR0001]
 title = "a token after one whole expression, pattern or statement"
 severity = "error"
