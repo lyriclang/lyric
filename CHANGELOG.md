@@ -398,8 +398,9 @@ promise. This entry fills with the milestones.
   `Exception { text = "…" }` → `Exception("…")`, a `try` around all of `main` and a `defer` that closes said; the
   throwing twins and silent forms of `file`, `json`, `encoding` and `time` — `file.textOrThrow(p)` →
   `try file.readText(p)`, `file.text(p)` → `(try? file.readText(p))`, `file.remove(p);` → `try file.remove(p);`,
-  `json.parseOrErr(s)` → `Result.of(() => try json.parse(s))`. The rules for coroutines and the rest of the library
-  follow.
+  `json.parseOrErr(s)` → `Result.of(() => try json.parse(s))`; the tasks — `yield Wait.Now` → `try yieldNow()`,
+  `yield Wait.Sleep(ms)` → `try sleep(Duration.ofMillis(ms))`, `Coroutine<Wait>` → `void throws Cancelled`, and the
+  `spawn`s and `run()` of a block a `TaskScope`, which waits as `run()` did. The rest of the library follows.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
 
 ---

@@ -1,0 +1,22 @@
+import std.io { println };
+import std.task { Cancelled, TaskScope, sleep, yieldNow };
+import std.time { Duration };
+
+fn breathe(): void throws Cancelled {
+    try yieldNow();
+}
+
+fn worker(name: string, ms: int): void throws Cancelled {
+    println(name + " starts");
+    try breathe();
+    try sleep(Duration.ofMillis(ms));
+    println(name + " finishes");
+}
+
+fn main(): int throws Error {
+    let tasks = TaskScope.new();
+    tasks.spawn(() => try worker("a", 20));
+    tasks.spawn(() => try worker("b", 1));
+    try tasks.close();
+    return 0;
+}

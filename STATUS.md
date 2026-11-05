@@ -1399,7 +1399,8 @@ The plan is design 13's addendum "der Plan für M16" (#618; S1–S8).
 - **S5a**: the errors of the language (E04–E06, E08, E09; `LYR-MIG0408`, `0409`; E07 is void: 4.6 has no such ritual).
 - **S5b**: the throwing twins and silent forms of `file`, `json`, `encoding`, `time`, `string` (E01–E03, `LYR-MIG0402`);
   those of `stream`, `net` and `process` go with their rules in S6.
-- **Next**: S5c, the coroutines (N01–N02). Then S6–S7, S8 closes.
+- **S5c**: the tasks (N01, N02; `LYR-MIG0501`, `0502`). S5 is done.
+- **Next**: S6, the library (B01–B13, the twins of `stream`, `net`, `process`, the table complete). Then S7, S8 closes.
 
 ### Block P — done (2026-11-04)
 

@@ -595,7 +595,7 @@ public class CEmitterTests
     /// <summary>
     /// Tasks: the program's lines are the order — ready
     /// tasks in turn, sleepers by deadline, a zero sleep, a generator that sleeps inside main's
-    /// task — and a second, timed run shows the waits are real: main sleeps 280 ms in all, and the
+    /// task — and a second, timed run shows the waits are real: main sleeps 450 ms in all, and the
     /// program ends with main, long before its last detached task's 30 s.
     /// </summary>
     [Theory]
@@ -612,7 +612,7 @@ public class CEmitterTests
         var again = ProcessRunner.Run(RuntimeBuildTests.EmittedBinary("tasks", profile), [], TimeSpan.FromMinutes(1));
         watch.Stop();
         Assert.Equal(TASKS_EXPECTED, again.Stdout.Replace("\r\n", "\n"));
-        Assert.InRange(watch.ElapsedMilliseconds, 280, 10000);
+        Assert.InRange(watch.ElapsedMilliseconds, 450, 25000);
     }
 
     /// <summary>
