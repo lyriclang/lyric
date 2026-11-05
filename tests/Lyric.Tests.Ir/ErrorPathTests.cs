@@ -447,7 +447,7 @@ public class ErrorPathTests
             class C { fn m(): int throws Boom { return 1; } }
             fn main(): int throws Boom { let c = C { }; let f = c.m; return try f(); }
             """);
-        var bound = module.Functions.Single(fn => fn.Name.Contains("<bound:m", StringComparison.Ordinal));
+        var bound = module.Functions.Single(fn => fn.Name.Contains("<lambda", StringComparison.Ordinal));
         Assert.True(bound.Throws);
         Assert.Contains(Terminators(bound), t => t is Propagate);
     }

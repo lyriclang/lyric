@@ -5033,9 +5033,21 @@ internal sealed class FunctionLowerer
 
         // The 'optget' cannot panic: the branch stands behind the 'optissome', so the proof is made. The
         // same division of labour as in flow narrowing.
-        var (type, field, fieldType) = ResolveFieldOn(target.Inner, expr);
-        var value = _slots.NewTemp(fieldType);
-        _b.Emit(new LoadField(value, unwrapped, type, field, fieldType, expr.Span));
+        TempId value;
+        IrType fieldType;
+        if (_types.MethodValueOf(expr) is { } bound)
+        {
+            // 'o?.m', a method named: the closure over the value there is
+            value = LowerBoundMethod(expr, bound.Lambda, bound.Receiver, unwrapped);
+            fieldType = result.Inner;
+        }
+        else
+        {
+            var (type, field, loaded) = ResolveFieldOn(target.Inner, expr);
+            fieldType = loaded;
+            value = _slots.NewTemp(fieldType);
+            _b.Emit(new LoadField(value, unwrapped, type, field, fieldType, expr.Span));
+        }
 
         // When the FIELD itself is optional ('w: ?int'), its value is already the result type: the sema
         // collapsed '??int' to '?int'. Wrapping a second time would create a level the language does not
@@ -5630,16 +5642,12 @@ internal sealed class FunctionLowerer
 
     /// <summary>
     /// A method as a value. A static one is a function value without an environment, like a
-    /// free function. An instance method is a BOUND closure: its environment holds
-    /// the receiver — the object shared, a struct copied — and its code is a function
-    /// built here that takes the receiver out of the environment and calls the method with it.
-    /// A generic block's member, a blanket block's among them, has no function of its own: the
-    /// receiver names its instance, as it does for a call through it.
+    /// free function; an instance method the lambda the sema wrote for it.
     /// </summary>
     private TempId LowerMethodValue(MemberExpr expr, FunctionSymbol method)
     {
-        if (method.Declaration is FunctionDecl { Generics.Length: > 0 })
-            throw NotSupported($"a generic method ('{method.Name}') as a value — wrap it in a lambda", expr.Span);
+        if (_types.MethodValueOf(expr) is { } bound)
+            return LowerBoundMethod(expr, bound.Lambda, bound.Receiver, null);
         if (TypeOfExpr(expr) is not IrFunctionType signature)
             throw NotSupported($"'{method.Name}' as a value", expr.Span);
         // A static of a generic type's instance, 'Pair<int>.of': the instance's function, as its
@@ -5653,91 +5661,25 @@ internal sealed class FunctionLowerer
             _b.Emit(new MakeClosure(instanceValue, made, null, signature, expr.Span));
             return instanceValue;
         }
-        if (method.Declaration is FunctionDecl { IsStatic: false, Body: not null } blockMember
-            && _typeTable.BlockOf(method) is { Generics.Length: > 0 } block)
-        {
-            var reached = SubstituteType(_types.TypeOf(expr.Target));
-            return LowerBoundMethod(expr, method, signature, reached, _instances.RequestExtension(
-                method, blockMember, block, BlockParametersOn(block, reached, method.Name, expr.Span), reached, expr.Span));
-        }
         if (!TryResolveFunction(method, out var target))
             throw NotSupported($"reference to '{method.Name}' as a value", expr.Span);
 
-        // A function of a module, named through the module ('util.twice'), has no receiver
-        // either: its target names a module, not a value.
-        if (method.Declaration is FunctionDecl { IsStatic: true }
-            || _types.TypeOf(expr.Target) is NonValueType { Symbol: ModuleSymbol })
-        {
-            var direct = _slots.NewTemp(signature);
-            _b.Emit(new MakeClosure(direct, target, null, signature, expr.Span));
-            return direct;
-        }
-
-        var receiverType = SubstituteType(_types.TypeOf(expr.Target));
-        if (receiverType is GenericInstance)
-            throw NotSupported($"a method of a generic instance ('{method.Name}') as a value — wrap it in a lambda", expr.Span);
-        return LowerBoundMethod(expr, method, signature, receiverType, target);
+        var direct = _slots.NewTemp(signature);
+        _b.Emit(new MakeClosure(direct, target, null, signature, expr.Span));
+        return direct;
     }
 
-    /// <summary>The closure over the receiver of <paramref name="expr"/> that calls
-    /// <paramref name="target"/> with it.</summary>
-    private TempId LowerBoundMethod(MemberExpr expr, FunctionSymbol method, IrFunctionType signature,
-        LyrType receiverType, FunctionId target)
+    /// <summary>The closure of a method value: the receiver in the local the lambda captures, read
+    /// when the value is made — the object shared, a struct copied.
+    /// <paramref name="receiver"/> is what <c>?.</c> has already unwrapped, else the target.</summary>
+    private TempId LowerBoundMethod(MemberExpr expr, LambdaExpr lambda, LocalSymbol holder, TempId? receiver)
     {
-        var receiver = LowerType(receiverType, expr.Target.Span);
-        var envType = _typeTable.EnvironmentFor(_name, [receiver], ["this"]);
-        var env = _slots.NewTemp(envType);
-        _b.Emit(new NewObject(env, envType.Type, envType, expr.Span));
-        _b.Emit(new StoreField(env, envType.Type, new FieldId(0), LowerExprAs(expr.Target, receiver), expr.Span));
-
-        var name = _lambdas.BuiltName(_name, "bound:" + method.Name);
-        var throws = _types.TypeOf(expr) is FnType bound && ThrownHere(bound.Throws).Length > 0;
-        var code = _lambdas.RegisterBuilt(_ => BuildBoundMethod(name, envType, receiver, signature, target, throws));
-        var dest = _slots.NewTemp(signature);
-        _b.Emit(new MakeClosure(dest, code, env, signature, expr.Span));
-        return dest;
-    }
-
-    /// <summary>The code of a bound method value: environment first, then the parameters; the
-    /// receiver is read from the environment and the method called with it. A method that throws
-    /// passes its error on through the closure's slot.</summary>
-    private static IrFunction BuildBoundMethod(string name, IrRefType envType, IrType receiver,
-        IrFunctionType signature, FunctionId target, bool throws)
-    {
-        var locals = new List<IrLocal> { new(new LocalId(0), "<env>", envType) };
-        for (var i = 0; i < signature.Parameters.Length; i++)
-            locals.Add(new IrLocal(new LocalId(i + 1), $"p{i}", signature.Parameters[i]));
-        var temps = new List<IrTemp>();
-        TempId Temp(IrType type) { var t = new TempId(temps.Count); temps.Add(new IrTemp(t, type)); return t; }
-
-        var blocks = new List<IrBlock>();
-        var b = new BlockBuilder(blocks);
-        var env = Temp(envType);
-        b.Emit(new LoadLocal(env, new LocalId(0), envType, default));
-        var self = Temp(receiver);
-        b.Emit(new LoadField(self, env, envType.Type, new FieldId(0), receiver, default));
-        var args = new TempId[signature.Parameters.Length + 1];
-        args[0] = self;
-        for (var i = 0; i < signature.Parameters.Length; i++)
-        {
-            args[i + 1] = Temp(signature.Parameters[i]);
-            b.Emit(new LoadLocal(args[i + 1], new LocalId(i + 1), signature.Parameters[i], default));
-        }
-        var isVoid = signature.Return is IrScalarType { Kind: IrScalar.Void };
-        TempId? result = isVoid ? null : Temp(signature.Return);
-        b.Emit(new Call(result, target, args, default));
-        if (throws)
-        {
-            var fail = b.NewBlock();
-            var next = b.NewBlock();
-            b.Seal(new ErrorBranch(fail, next, default));
-            b.SwitchTo(fail);
-            b.Seal(new Propagate(default));
-            b.SwitchTo(next);
-        }
-        b.Seal(new Return(result, default));
-
-        return new IrFunction(name, signature.Return, locals.Count, locals, temps, blocks) { Entry = new BlockId(0), Throws = throws };
+        var type = LowerValueType(holder.Type, expr.Span);
+        var value = receiver ?? LowerExprAs(expr.Target, type);
+        if (type is IrStructType structType && !_fresh.Contains(value))
+            value = CopyStructValue(value, structType, expr.Span);
+        _b.Emit(new StoreLocal(_slots.DeclareFor(holder, type), value, expr.Span));
+        return LowerLambda(lambda);
     }
 
     /// <summary>The members of std.core's infos, in the order their constants are built here

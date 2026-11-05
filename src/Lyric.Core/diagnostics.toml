@@ -6099,11 +6099,11 @@ fn main(): void {
 title = "a type, module or generic function used as a value"
 severity = "error"
 area = "03-types"
-summary = "A name that is not a value — a type, a module, an interface — stands where a value is wanted, or the bare name of a generic function is used as a function value."
+summary = "A name that is not a value — a type, a module, an interface — stands where a value is wanted, or a generic function or method, or a block's member with a parameter only a call binds, is named as a function value."
 explanation = '''
-A type is built (`T { … }`, `T.new(…)`) and a module is reached through (`m.f()`); neither is a value itself. A function value is monomorphic, so a generic function becomes one only with its type arguments written or by a call.
+A type is built (`T { … }`, `T.new(…)`) and a module is reached through (`m.f()`); neither is a value itself. A function value is monomorphic, so a generic function becomes one only with its type arguments written or by a call. A method named through its object or its type is no value either where only a call can bind a parameter: its own, `c.convert`, or its block's, `m.into`. The type the position expects binds neither.
 
-Build a value of the type, call the function, or write the type arguments (`ident<int>`).
+Build a value of the type, call the function, write the type arguments (`ident<int>`), or write a lambda that calls the method (`() => m.into()`).
 '''
 wrong = '''
 fn ident<T>(x: T): T { return x; }

@@ -411,6 +411,9 @@ promise. This entry fills with the milestones.
   `try Command { … }.spawn()`, `net.connectOrThrow(h, p)` → `try TcpStream.connect(SocketAddr { … })`, `net.Listener` →
   `TcpListener`; a read that now fills a buffer, `sendTo` and `receiveFrom` are said by hand. `std.time` gained `Instant.ofEpochMillis(n)`, the
   inverse of `epochMillis()`, so a 4.6 call stays as it is.
+- **Every instance method is a value**: an interface's own, through its value or a type parameter, a generic type's on an
+  instance, and `o?.m`, a `?fn(…)`. They gave `LYR-ICE0002`. A method only a call can bind is refused with `LYR-SEM0052`:
+  a generic one, `c.convert`, and a block's with a parameter a call binds, `m.into`; a lambda that calls it is the value.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
 - **`unused-import` no longer tells you to break the program**, and `lyric fix` no longer does it: it keeps the
   module where a method the file calls comes through a `pub import` of it, takes out an import when another one or
