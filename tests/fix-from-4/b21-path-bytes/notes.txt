@@ -1,0 +1,2 @@
+proposal[LYR-MIG0602] main.lyr:6:13: 'joinPath("a", "b")' put its parts together as they were; 'join' normalizes, and 'a/../b' is 'b' — where the text itself matters, look at what it gives
+proposal[LYR-MIG0602] main.lyr:7:13: 'parentDir("a/b")' gave '' where no directory precedes; 'parent' gives '.' — where the code asks for the empty text, ask for '.'

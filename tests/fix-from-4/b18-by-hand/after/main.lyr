@@ -1,0 +1,25 @@
+import std.encoding { indexOfFrom, slice };
+import std.fmt { center, formatBytes, formatHexPadded, formatInt, formatRadix, table };
+import std.io { prompt, readChar };
+import std.math { checkedAbs, divFloor, modFloor, powInt };
+import std.core { StringBuilder };
+import std.task { interrupt, pending };
+
+fn main(): int {
+    let n = 255;
+    let a = formatInt(n, "x") + formatRadix(n, 3) + formatHexPadded(n, 8) + center("a", 3) + formatBytes(n);
+    let t = table([["a"]], ",");
+    let p = prompt("x");
+    let c = readChar();
+    let d = checkedAbs(n);
+    let e = divFloor(n, 2) + modFloor(n, 2);
+    let f = powInt(n, 2);
+    let b: uint8[] = [1u8];
+    let g = indexOfFrom(b, 1u8, 0);
+    let h = slice(b, 0, 1);
+    var s = StringBuilder.new();
+    s.appendLine("x");
+    interrupt();
+    let k = pending();
+    return 0;
+}

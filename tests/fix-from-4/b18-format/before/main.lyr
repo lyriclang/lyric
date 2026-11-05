@@ -1,0 +1,9 @@
+import std.fmt as fmt;
+import std.io.console { println };
+
+fn main(): int {
+    let n = 255;
+    println(fmt.formatHex(n) + fmt.formatBinary(n) + fmt.formatOctal(n));
+    println(fmt.padLeft("ab", 5) + fmt.padRight("ab", 5));
+    return 0;
+}

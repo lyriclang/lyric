@@ -111,6 +111,10 @@ public static class From4
     internal static string? StdlibFile(string relative) =>
         Stdlib.Value.GetValueOrDefault(Path.Combine(StdlibRoot, relative.Replace('/', Path.DirectorySeparatorChar)));
 
+    /// <summary>4.6's standard library, each file by its path under the library's root.</summary>
+    internal static IEnumerable<KeyValuePair<string, string>> StdlibFiles =>
+        Stdlib.Value.Select(file => KeyValuePair.Create(Path.GetRelativePath(StdlibRoot, file.Key), file.Value));
+
     /// <summary>4.6's standard library from the resources, by the path the loader asks under
     /// <see cref="StdlibRoot"/>.</summary>
     private static IReadOnlyDictionary<string, string> ReadStdlib()

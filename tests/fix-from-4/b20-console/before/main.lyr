@@ -1,0 +1,15 @@
+import std.io.console { isInteractive, lines, println, readAll, readLine };
+
+fn work(): void throws {
+    for (line in lines()) {
+        println(line);
+    }
+}
+
+fn main(): int {
+    let l = readLine();
+    println(l == null);
+    println(readAll());
+    println(isInteractive());
+    return 0;
+}

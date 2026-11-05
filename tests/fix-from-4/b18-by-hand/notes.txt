@@ -1,0 +1,17 @@
+by hand[LYR-MIG0601] main.lyr:10:13: 'formatInt(n, "x")' has no form in Lyric 5 — a format stands in an f-string in Lyric 5, written there: f"{v:>8}"; a format held in a variable has no form
+by hand[LYR-MIG0601] main.lyr:10:33: 'formatRadix(n, 3)' has no form in Lyric 5 — only three bases have a format: f"{v:b}", f"{v:o}", f"{v:x}"; another is written by hand
+by hand[LYR-MIG0601] main.lyr:10:53: 'formatHexPadded(n, 8)' has no form in Lyric 5 — a format's width is a literal: f"{v:08x}"; a width in a variable pads the text: f"{v:x}".padStart(w, '0')
+by hand[LYR-MIG0601] main.lyr:10:77: 'center("a", 3)' has no form in Lyric 5 — Lyric 5 has 'padStart' and 'padEnd', no centring: compute the two widths
+by hand[LYR-MIG0601] main.lyr:10:94: 'formatBytes(n)' has no form in Lyric 5 — Lyric 5 has no such function: write it where it is needed
+by hand[LYR-MIG0601] main.lyr:11:13: 'table([["a"]], ",")' has no form in Lyric 5 — Lyric 5 has no such function: write it where it is needed
+by hand[LYR-MIG0601] main.lyr:12:13: 'prompt("x")' has no form in Lyric 5 — print the text, then read: 'print(text); (try? stdin().readLine()) ?? null'
+by hand[LYR-MIG0601] main.lyr:13:13: 'readChar()' has no form in Lyric 5 — Lyric 5 reads no single character from the console: read the line, 'stdin().readLine()', and take it apart
+by hand[LYR-MIG0601] main.lyr:14:13: 'checkedAbs(n)' has no form in Lyric 5 — 'abs' panics for the smallest int, and 'checkedAbs' answered null: ask first where that can come
+by hand[LYR-MIG0601] main.lyr:15:13: 'divFloor(n, 2)' has no form in Lyric 5 — Lyric 5 has no such function: 'let q = a / b; if (a % b != 0 && (a < 0) != (b < 0)) q - 1 else q'
+by hand[LYR-MIG0601] main.lyr:15:30: 'modFloor(n, 2)' has no form in Lyric 5 — Lyric 5 has no such function: 'let r = a % b; if (r != 0 && (r < 0) != (b < 0)) r + b else r'
+by hand[LYR-MIG0601] main.lyr:16:13: 'powInt(n, 2)' has no form in Lyric 5 — 'base.pow(n as uint)' panics where it overflows, and 'powInt' answered null; a negative exponent has no form
+by hand[LYR-MIG0601] main.lyr:18:13: 'indexOfFrom(b, 1u8, 0)' has no form in Lyric 5 — search the rest and add what was skipped: 'bytes[start..].find(value)' answers from 'start', and null where 'indexOfFrom' gave -1
+by hand[LYR-MIG0601] main.lyr:19:13: 'slice(b, 0, 1)' has no form in Lyric 5 — a range gives a view: 'bytes[start..start + count]'; 'slice' gave a copy
+by hand[LYR-MIG0601] main.lyr:21:5: 's.appendLine("x")' has no form in Lyric 5 — 'sb.appendStr(value); sb.appendChar('\n');'
+by hand[LYR-MIG0501] main.lyr:22:5: 'interrupt' of Lyric 4 has no form here: a task waits for a signal on a channel in Lyric 5 — 'os.signals(Signal.Interrupt)' gives the channel
+by hand[LYR-MIG0501] main.lyr:23:13: 'pending' of Lyric 4 has no form here: nothing counts the tasks in Lyric 5 — keep the handles 'spawn' returns

@@ -121,6 +121,11 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | B15 | `@Deprecated { message, until }` | bleibt (+ `replacement`) | — | — |
 | B16 | `extern "dotnet" fn … = "System.Math::Cbrt"` (guide 14) | entfällt — FFI über C (W4) | H | — |
 | B17 | `OnType`/`OnFunction`/`OnModule`/`WithArg` (guide 15) | bleiben (F1-Marker) | — | — |
+| B18 | `std.fmt`: `padLeft`, `padRight`, `formatHex`, `formatBinary`, `formatOctal`; `formatInt` & Co., `formatRadix`, `formatHexPadded`, `center`, `formatBytes`, `table` | `s.padStart(w)`, `s.padEnd(w)`, `f"{n:x}"`, `f"{n:b}"`, `f"{n:o}"`; von Hand: ein Format steht im f-String, seine Breite ist ein Literal; der Rest fehlt in Lyric 5 | M/H | — |
+| B19 | `std.math`: `log`, `logBase`, `isNaN`, `isInfinite`, `isFinite`, `toRadians`, `toDegrees`; `powInt`, `checkedAbs`, `divFloor`, `modFloor` | `ln`, `ln(a) / ln(b)`, `x.isNan()`, `x.isInfinite()`, `x.isFinite()`, `x * pi / 180.0`, `x * 180.0 / pi`; von Hand: `pow` und `abs` paniken, wo 4.6 `null` gab; `divFloor`/`modFloor` fehlen | M/H | — |
+| B20 | `std.io.console`: `readLine`, `readAll`, `lines`, `isInteractive`; `readChar`, `prompt` | `(try? stdin().readLine()) ?? null` (das `?? null` macht das doppelte `?` flach, sonst ist das Dateiende nie `null`), `(try? stdin().readToString()) ?? ""`, `stdin().lines()`, `isTerminal(.Stdin)` (fragt nur die Eingabe, gesagt); von Hand: `readChar`, `prompt` | M/R/H | — |
+| B21 | `joinPath`, `parentDir`; `bytes.indexOf`; `bytes.indexOfFrom`, `bytes.slice`, `StringBuilder.appendLine` | `join` (normalisiert, gesagt), `parent` (`.` statt `""`, gesagt); `b[..].find(v) ?? -1`; von Hand | R/M/H | — |
+| B22 | `std.core.coroutineEnded` | von Hand: das `null` von `next()` (`interrupt`, `pending` sagt N01) | H | — |
 
 ## R3 — Reihenfolge der Korpora: **entschieden** (2026-09-29)
 
