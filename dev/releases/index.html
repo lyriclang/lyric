@@ -526,7 +526,11 @@ throwing twins and silent forms of <code>file</code>, <code>json</code>, <code>e
 <code>try file.readText(p)</code>, <code>file.text(p)</code> → <code>(try? file.readText(p))</code>, <code>file.remove(p);</code> → <code>try file.remove(p);</code>,
 <code>json.parseOrErr(s)</code> → <code>Result.of(() =&gt; try json.parse(s))</code>; the tasks — <code>yield Wait.Now</code> → <code>try yieldNow()</code>,
 <code>yield Wait.Sleep(ms)</code> → <code>try sleep(Duration.ofMillis(ms))</code>, <code>Coroutine&lt;Wait&gt;</code> → <code>void throws Cancelled</code>, and the
-<code>spawn</code>s and <code>run()</code> of a block a <code>TaskScope</code>, which waits as <code>run()</code> did. The rest of the library follows.</p>
+<code>spawn</code>s and <code>run()</code> of a block a <code>TaskScope</code>, which waits as <code>run()</code> did; the text, iterators and collections —
+<code>fromInt(n)</code> → <code>f&quot;{n}&quot;</code>, <code>parseInt(s)</code> → <code>(try? int.parse(s))</code>, <code>isDigit(c)</code> → <code>c.isDigit()</code>, <code>fold(over(xs), 0, f)</code> →
+<code>xs.iter().fold(0, f)</code>, <code>range(a, b)</code> → <code>(a..b)</code>, <code>sortList(xs)</code> → <code>xs.asSlice().sort()</code>, <code>List&lt;int&gt;.empty()</code> →
+<code>.new()</code>, <code>xs.get(i)</code> → <code>xs[i]</code>, <code>m.set(k, v)</code> → <code>m.insert(k, v)</code>; what <code>std.option</code> and a <code>Result</code>'s methods did is
+said by hand. The rest of the library follows.</p>
 </li>
 <li><p><strong>The language server answers a held hover after the diagnostics</strong> it waited for, not before them.</p>
 </li>
