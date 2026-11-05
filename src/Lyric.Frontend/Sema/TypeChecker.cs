@@ -346,7 +346,7 @@ public sealed class TypeChecker
             // could have said it, and the partial result is still handed back: the caller stops on
             // HasErrors, and a null here would only move the crash.
             _de.Report("LYR-SEM0105", Severity.Error, deep.At,
-                $"this nests deeper than the checker walks ({MaxNesting} levels) — the language "
+                $"this nests deeper than the checker walks ({MaxNesting} levels, or fewer where its stack is smaller) — the language "
                 + "sets no limit, this implementation does, and the alternative was taking the "
                 + "process down");
             _result.NestingExceeded = true;
@@ -3597,6 +3597,8 @@ public sealed class TypeChecker
 
     private void CheckStmt(Stmt stmt, SymbolTable scope)
     {
+        // Statements inside statements do not count toward the bound; they end where the stack ends.
+        if (!StackGuard.HasRoom()) throw new NestingTooDeep(stmt.Span);
         switch (stmt)
         {
             case Block b: CheckBlock(b, scope); break;
@@ -4901,7 +4903,7 @@ public sealed class TypeChecker
     {
         // A compound assignment's target, met again as its operator's left side (CheckAssign).
         if (ReferenceEquals(expr, _typedTarget)) return _result.TypeOf(expr) ?? LyrType.Error;
-        if (++_depth > MaxNesting) return Deeper(expr.Span);
+        if (++_depth > MaxNesting || !StackGuard.HasRoom()) return Deeper(expr.Span);
         try { return CheckExprInner(expr, scope, expected); }
         finally { _depth--; }
     }
@@ -8529,6 +8531,8 @@ public sealed class TypeChecker
     /// without effect otherwise.</param>
     private LyrType CheckMember(MemberExpr mem, SymbolTable scope, LyrType? expected = null)
     {
+        // A chain of members goes through CheckTarget, past the bound; it ends where the stack ends.
+        if (!StackGuard.HasRoom()) throw new NestingTooDeep(mem.Span);
         // CheckTarget rather than CheckExpr: a type or module name is allowed here.
         var targetType = _typedReceiver.Contains(mem) ? _result.TypeOf(mem.Target) : CheckTarget(mem.Target, scope);
 
@@ -15463,7 +15467,7 @@ public sealed class TypeChecker
 
     private LyrType ResolveType(TypeNode node, SymbolTable scope)
     {
-        if (++_depth > MaxNesting) return Deeper(node.Span);
+        if (++_depth > MaxNesting || !StackGuard.HasRoom()) return Deeper(node.Span);
         try { return ResolveTypeInner(node, scope); }
         finally { _depth--; }
     }

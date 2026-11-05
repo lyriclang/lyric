@@ -157,6 +157,12 @@ public sealed partial class Parser
     /// the floor the specification requires and roughly half the shallowest measured failure, which
     /// leaves room for a host with less stack than a console process, such as a language server's
     /// thread pool. The first attempt was 512, ABOVE the ceiling, and changed nothing at all.</para>
+    ///
+    /// <para>The number alone does not hold: a level costs what the build makes of it, about 8 KiB
+    /// in a Debug build, so a thread of 1.5 MiB (Windows' default) was spent at level 178 and the
+    /// process died below its own bound. So each level also asks the runtime for stack, and an
+    /// answer of no is this bound reached early. The number stays for what it gives: one limit on
+    /// every host that has the stack for it.</para>
     /// </summary>
     internal const int MaxNesting = 192;
 
@@ -175,9 +181,19 @@ public sealed partial class Parser
         public Span At { get; } = at;
     }
 
+    /// <summary>
+    /// For the recursions the bound does not count — a chain of prefix operators, statements
+    /// inside statements, patterns inside patterns —: they end where the stack ends. Counting them
+    /// would refuse programs that compile today, a long <c>else if</c> chain first of all.
+    /// </summary>
+    private void NeedStack()
+    {
+        if (!StackGuard.HasRoom()) throw new NestingTooDeep(_buffer.Current.Span);
+    }
+
     private Expr ParseExpr(int minBp)
     {
-        if (++_depth > MaxNesting) { _depth--; throw new NestingTooDeep(_buffer.Current.Span); }
+        if (++_depth > MaxNesting || !StackGuard.HasRoom()) { _depth--; throw new NestingTooDeep(_buffer.Current.Span); }
         if (minBp != 0)
         {
             try { return ParseExprInner(minBp); }
@@ -321,6 +337,7 @@ public sealed partial class Parser
 
     private Expr ParsePrefix(bool atStart = false)
     {
+        NeedStack();
         var op = _buffer.Current.TokenKind;
         // 'try e': the mark covers EVERYTHING to its right — 'try a +
         // b' is 'try (a + b)'. It may also stand to the right of an operator (
@@ -1866,7 +1883,7 @@ public sealed partial class Parser
     /// coroutine type, which is what that clause has always meant.</param>
     private TypeNode ParseType(bool allowThrows = true)
     {
-        if (++_depth > MaxNesting) { _depth--; throw new NestingTooDeep(_buffer.Current.Span); }
+        if (++_depth > MaxNesting || !StackGuard.HasRoom()) { _depth--; throw new NestingTooDeep(_buffer.Current.Span); }
         try { return ParseTypeInner(allowThrows); }
         finally { _depth--; }
     }

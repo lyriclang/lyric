@@ -421,6 +421,9 @@ promise. This entry fills with the milestones.
   another module's type and interface. A module import counts as used by the blocks it passes on.
 - **`'File' has no member 'writeAll'` names the module to import** where a blanket block, or a block on a built-in
   shape, adds the member in a module of the program this one does not import.
+- **Nesting no longer takes the compiler down, on any thread:** `LYR-PAR0045` and `LYR-SEM0105` also answer when the
+  stack runs out before their 192 levels. That covers what the bound never counted — `!!!!…`, blocks and `if`s inside
+  each other, a long `else if` chain, patterns inside patterns, `a.b.c…` —, which ended in `Stack overflow` in every build.
 
 ---
 

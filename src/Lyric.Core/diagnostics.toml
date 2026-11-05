@@ -2731,9 +2731,9 @@ fn main(): void {
 title = "nesting deeper than the parser carries"
 severity = "error"
 area = "02-grammar"
-summary = "Expressions or types in a file nest deeper than this implementation parses — 192 levels of parentheses, brackets, operands or type arguments. Reported once, and the file is then read as holding no declaration."
+summary = "Expressions or types in a file nest deeper than this implementation parses — 192 levels of parentheses, brackets, operands or type arguments, or fewer where its stack runs out first. Reported once, and the file is then read as holding no declaration."
 explanation = '''
-The language sets no limit on nesting; the parser recurses, and a thread's stack does not grow without end. Rather than crash, the parse stops at a fixed depth and says so. No written program comes near it; a generated one can.
+The language sets no limit on nesting; the parser recurses, and a thread's stack does not grow without end. Rather than crash, the parse stops at a fixed depth, or sooner on a thread with little stack, and says so. Prefix operators, statements inside statements and patterns inside patterns have no fixed depth, only the stack. No written program comes near it; a generated one can.
 
 Split the expression: give inner parts names with `let`, or build the value in steps.
 '''
@@ -7624,9 +7624,9 @@ fn main(): void {
 title = "an expression or type nested deeper than the checker walks"
 severity = "error"
 area = "16-diagnostics"
-summary = "An expression or a type is nested deeper than the type checker's fixed bound (192 levels) — for example a chain of a few hundred binary operators, which the parser reads in a loop and the checker walks recursively."
+summary = "An expression or a type is nested deeper than the type checker's fixed bound (192 levels), or than its stack allows — for example a chain of a few hundred binary operators, which the parser reads in a loop and the checker walks recursively."
 explanation = '''
-The language sets no limit on nesting; this implementation does. The type checker walks expressions and types recursively, and instead of overflowing its stack on a pathologically deep tree it stops at 192 levels and reports this once. A long chain such as `1 + 1 + … + 1` counts one level per operator, since `a + b + c` is `(a + b) + c`.
+The language sets no limit on nesting; this implementation does. The type checker walks expressions and types recursively, and instead of overflowing its stack on a pathologically deep tree it stops at 192 levels, or sooner on a thread with little stack, and reports this once. A long chain such as `1 + 1 + … + 1` counts one level per operator, since `a + b + c` is `(a + b) + c`.
 
 Split the expression: bind parts to names, sum an array, or build the value in a loop. Generated code is the usual source; have the generator emit intermediate bindings.
 '''
