@@ -1,0 +1,24 @@
+import std.io.console { println };
+
+class NotFound :: [Throwable] {
+    fn message(): string {
+        return "not found";
+    }
+}
+
+fn lookup(): int throws NotFound {
+    throw NotFound { };
+}
+
+fn any(): int throws Throwable {
+    return lookup();
+}
+
+fn main(): int {
+    try {
+        println(f"{any()}");
+    } catch (e: Throwable) {
+        println(e.message());
+    }
+    return 0;
+}

@@ -1,0 +1,46 @@
+import std.core { Exception };
+import std.io.console { println };
+
+fn g(): int throws Exception {
+    return 2;
+}
+
+fn h(x: int): int throws Exception {
+    return x + 1;
+}
+
+fn p(x: int): int {
+    return x;
+}
+
+struct S {
+    fn foo(): S throws Exception {
+        return this;
+    }
+    fn bar(): int {
+        return 5;
+    }
+}
+
+fn all(c: bool): int throws Exception {
+    let a = h(g());
+    let b = p(g());
+    let d = 1 + g();
+    let e = g() + h(1);
+    let f = S { }.foo().bar();
+    let i = if (c) g() else 1;
+    let j = -g();
+    println(f"{g()} {h(1)}");
+    g();
+    return a + b + d + e + f + i + j;
+}
+
+fn main(): int {
+    try {
+        println(f"{all(true)}");
+        p(g());
+    } catch (e: Exception) {
+        println("caught");
+    }
+    return 0;
+}

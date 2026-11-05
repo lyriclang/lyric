@@ -49,9 +49,8 @@ internal static class LibraryTable
     /// for a free one, <c>string.toChars</c> for a method of a string.</summary>
     public static string? KeyOf(RuleContext context, Expr callee)
     {
-        if (Tree.Target(context, callee) is not FunctionSymbol { Declaration: { } declaration } function) return null;
-        var path = context.Model.Sources.GetPath(declaration.Span.File);
-        if (!From4.IsStdlib(path)) return null;
+        if (Tree.Target(context, callee) is not FunctionSymbol function || !Tree.InStdlib(context, function)) return null;
+        var path = context.Model.Sources.GetPath(function.Declaration!.Span.File);
         if (callee is MemberExpr member && context.Model.Types.TypeOf(member.Target) is PrimitiveType { Kind: PrimitiveKind.String })
             return $"string.{function.Name}";
         var file = path.Replace('\\', '/');

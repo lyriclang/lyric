@@ -1,0 +1,2 @@
+proposal[LYR-MIG0408] main.lyr:4:5: a 'try' around all of 'main' caught what 'main' could not throw in Lyric 4; in Lyric 5 'main' may throw — where the 'catch' only reports, declare 'throws' on 'main' and take the 'try' away
+proposal[LYR-MIG0409] main.lyr:6:9: 'defer' closes 'f' by hand; Lyric 5 closes what a 'using' binding holds — write 'using let f = …' and take the 'defer' away

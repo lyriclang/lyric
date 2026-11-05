@@ -118,8 +118,7 @@ internal sealed class ArrayKeys : IRule
             var text = context.TextOf(module);
             foreach (var named in Tree.Below(module).OfType<NamedType>())
                 if (named is { Path: [.., "Map" or "Set"], TypeArguments: [ArrayType key, ..] }
-                    && Tree.Target(context, named) is TypeSymbol { Declaration: { } declaration }
-                    && From4.IsStdlib(context.Model.Sources.GetPath(declaration.Span.File)))
+                    && Tree.Target(context, named) is TypeSymbol symbol && Tree.InStdlib(context, symbol))
                     context.Note(Id, "LYR-MIG0318", NoteKind.Hand, named.Span,
                         $"'{text[key.Span.Start..key.Span.End]}' is no key in Lyric 5: an array is not 'Hashable'",
                         "wrap the array in a struct that conforms to 'Hashable', or key by a value made of its elements");

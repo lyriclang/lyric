@@ -1,0 +1,23 @@
+import std.core { Exception };
+import std.io.console { println };
+
+fn a(): void throws Exception {
+    throw Exception { text = "first" };
+}
+
+fn b(): void throws Exception {
+    try {
+        a();
+    } catch (e: Exception) {
+        throw Exception { text = "second" };
+    }
+}
+
+fn main(): int {
+    try {
+        b();
+    } catch (e: Exception) {
+        println(e.text);
+    }
+    return 0;
+}

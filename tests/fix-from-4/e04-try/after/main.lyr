@@ -1,0 +1,45 @@
+import std.io { println };
+
+fn g(): int throws Exception {
+    return 2;
+}
+
+fn h(x: int): int throws Exception {
+    return x + 1;
+}
+
+fn p(x: int): int {
+    return x;
+}
+
+struct S {
+    fn foo(): S throws Exception {
+        return this;
+    }
+    fn bar(): int {
+        return 5;
+    }
+}
+
+fn all(c: bool): int throws Exception {
+    let a = try h(g());
+    let b = p(try g());
+    let d = 1 + try g();
+    let e = try g() + h(1);
+    let f = try S { }.foo().bar();
+    let i = if (c) try g() else 1;
+    let j = try -g();
+    println(try f"{g()} {h(1)}");
+    try g();
+    return a + b + d + e + f + i + j;
+}
+
+fn main(): int {
+    try {
+        println(f"{all(true)}");
+        p(g());
+    } catch (e: Exception) {
+        println("caught");
+    }
+    return 0;
+}

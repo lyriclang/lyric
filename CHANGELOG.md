@@ -393,8 +393,10 @@ promise. This entry fills with the milestones.
   said; the first library rules, from a table (`from4.toml`) — `absInt` … `signInt`, `sign` → `abs` … `signum`,
   `sum(over(xs))` → `xs.iter().sum()`, a string's `length()` → `charCount()`, `substring(a, n)` →
   `substring(a, a + n).toString()`, `split` and `splitLines` written back to the array of strings they gave,
-  `indexOf(n) >= 0` → `contains(n)`, `toChars`, `utf8Encode`, `utf8Decode`. The rules for errors and the rest of
-  the library follow.
+  `indexOf(n) >= 0` → `contains(n)`, `toChars`, `utf8Encode`, `utf8Decode`; the errors — a call that throws gets one
+  `try` for its expression (`try h(g())`, `p(try g())`), none inside a `try` block, `Throwable` → `Error`,
+  `Exception { text = "…" }` → `Exception("…")`, a `try` around all of `main` and a `defer` that closes said. The
+  rules for the library's throwing twins, coroutines and the rest of the library follow.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
 
 ---

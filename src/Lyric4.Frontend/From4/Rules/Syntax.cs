@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Lyric4.AST;
+using Lyric4.Core;
 using Lyric4.Resolver;
 using Lyric4.Sema;
 
@@ -30,6 +31,11 @@ internal static class Tree
         var symbol = context.Model.Types.RefOf(node) ?? context.Model.Binding.Resolve(node);
         return symbol is ImportBindingSymbol import ? import.Target : symbol;
     }
+
+    /// <summary>Whether a symbol is declared in 4.6's own library. A built-in, <c>Throwable</c>, has
+    /// a declaration that stands in no file.</summary>
+    public static bool InStdlib(RuleContext context, Symbol? symbol) =>
+        symbol?.Declaration is { Span.File: var file } && file != FileId.None && From4.IsStdlib(context.Model.Sources.GetPath(file));
 
     /// <summary>The indentation of the line <paramref name="at"/> stands on.</summary>
     public static string IndentAt(string text, int at)
@@ -426,8 +432,8 @@ internal sealed class GenericInterfaces : IRule
     /// <summary>Which of the three a written type names — one of 4.6's own library, not a namesake.</summary>
     private static string? Which(RuleContext context, NamedType named) =>
         named.Path[^1] is "Iterator" or "Iterable" or "Indexable"
-        && Tree.Target(context, named) is TypeSymbol { Kind: TypeSymbolKind.Interface, Declaration: { } declaration }
-        && From4.IsStdlib(context.Model.Sources.GetPath(declaration.Span.File))
+        && Tree.Target(context, named) is TypeSymbol { Kind: TypeSymbolKind.Interface } symbol
+        && Tree.InStdlib(context, symbol)
             ? named.Path[^1]
             : null;
 

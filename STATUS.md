@@ -1396,7 +1396,8 @@ The plan is design 13's addendum "der Plan für M16" (#618; S1–S8).
 - **S4** (#649 + spec#408, #650 + spec#409, and T11–T16 with `from4.toml`): the interfaces (T01–T05,
   `LYR-MIG0301`–`0305`), the numbers (T08–T10, T18, `LYR-MIG0309`, `0318`), the first of the library
   (`LYR-MIG0311`–`0313`, `0315`).
-- **Next**: S5, the errors and coroutines (E01–E09, N01–N02). Then S6–S7, S8 closes.
+- **S5a**: the errors of the language (E04–E06, E08, E09; `LYR-MIG0408`, `0409`; E07 is void: 4.6 has no such ritual).
+- **Next**: S5b, the throwing twins (E01–E03), S5c, the coroutines (N01–N02). Then S6–S7, S8 closes.
 
 ### Block P — done (2026-11-04)
 
