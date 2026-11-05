@@ -148,6 +148,12 @@ public sealed class TypeResult
     /// its member bound them — <c>U</c> of <c>m.into()</c> by the type the position expects. The
     /// lowering adds them to what the receiver binds.</summary>
     private readonly Dictionary<Node, IReadOnlyDictionary<GenericParamSymbol, LyrType>> _openBlockArguments = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<ImplicitMemberExpr, GenericInstance> _implicitInstances = new(ReferenceEqualityComparer.Instance);
+
+    public void SetImplicitInstance(ImplicitMemberExpr member, GenericInstance instance) => _implicitInstances[member] = instance;
+
+    /// <summary>The instance whose static an implicit member names: <c>.of(f)</c> at an expected <c>Result&lt;int, E&gt;</c>.</summary>
+    public GenericInstance? ImplicitInstanceOf(ImplicitMemberExpr member) => _implicitInstances.GetValueOrDefault(member);
 
     public void SetOpenBlockArguments(Node call, IReadOnlyDictionary<GenericParamSymbol, LyrType> bound) => _openBlockArguments[call] = bound;
 

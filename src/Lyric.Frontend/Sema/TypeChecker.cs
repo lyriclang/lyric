@@ -5924,6 +5924,8 @@ public sealed class TypeChecker
 
         var (type, symbol) = MemberOfType(target.def, im.Name, im.Span, target.instance);
         if (symbol is not null) _result.BindRef(im, symbol);
+        // '.of(f)': no receiver to write the instance onto, and the lowering needs it to name the static.
+        if (symbol is FunctionSymbol && target.instance is { } asked) _result.SetImplicitInstance(im, asked);
         return type;
     }
 
@@ -8556,16 +8558,23 @@ public sealed class TypeChecker
         {
             case NonValueType { Symbol: TypeSymbol ts } named:
             {
-                var namedInstance = named.Instance ?? ExpectedInstance(expected, ts);
-                // A generic type named without its arguments and CALLED through: the call binds them, so the member is typed in the parameters
-                // still open and the receiver is remembered for it.
-                if (namedInstance is null && ts.Generics.Length > 0 && _calleePosition.Contains(mem)
+                // A generic type named without its arguments and CALLED through: the call binds them, the
+                // type the position expects first, so the member is typed in the parameters still open and
+                // the receiver is remembered for it. An enum takes this way as a struct does: the call
+                // writes the instance onto the receiver, where the lowering reads it.
+                if (named.Instance is null && ts.Generics.Length > 0 && _calleePosition.Contains(mem)
                     && OpenMember(ts, mem.Member, mem.Span) is { } openMember)
                 {
                     _openReceivers[mem] = (openMember.Params, openMember.Receiver, ts.Name);
                     return BindMember(mem, (openMember.Type, openMember.Symbol));
                 }
-                return BindMember(mem, MemberOfType(ts, mem.Member, mem.Span, namedInstance));
+                var namedInstance = named.Instance ?? ExpectedInstance(expected, ts);
+                var namedMember = MemberOfType(ts, mem.Member, mem.Span, namedInstance);
+                // A constant of the instance the position asks for ('let z: Opt<int> = Opt.zero;'):
+                // there is one per instance, and the lowering finds it through the receiver.
+                if (named.Instance is null && namedInstance is not null && namedMember.Item2 is GlobalSymbol)
+                    _result.SetType(mem.Target, new NonValueType(ts, "type", namedInstance));
+                return BindMember(mem, namedMember);
             }
 
             case NonValueType { Symbol: ModuleSymbol mod }:
