@@ -641,9 +641,11 @@ without a unit or a unit unknown, <code>Invalid</code>, a span beyond the range,
 taken as Go takes it, <code>fraction × (unit ÷ 10^digits)</code> in floating point, so what Go reads this
 reads. A duration's text parses back to it.</li>
 <li><strong><code>Instant</code></strong> is a moment on the wall clock, nanoseconds since <code>1970-01-01T00:00:00Z</code>, POSIX
-time without leap seconds: <code>Instant.now()</code>, <code>epochSecs()</code> and <code>epochMillis()</code> rounded down,
-<code>instant + duration</code>, <code>later.since(earlier): Duration</code>. Instants compare and order as the
-moments they are. The system may set its wall clock back. <strong><code>Monotonic</code></strong> is a moment on the
+time without leap seconds: <code>Instant.now()</code>, <code>Instant.ofEpochMillis(n)</code>, <code>epochSecs()</code> and
+<code>epochMillis()</code> rounded down, <code>instant + duration</code>, <code>later.since(earlier): Duration</code>. Instants compare and order as the
+moments they are. <code>ofEpochMillis</code> is the inverse of <code>epochMillis</code> for a whole millisecond, a
+negative <code>n</code> before the epoch; an <code>n</code> whose moment an instant cannot hold panics with an overflow.
+The system may set its wall clock back. <strong><code>Monotonic</code></strong> is a moment on the
 clock that only moves forward, from an unspecified start: <code>Monotonic.now()</code>,
 <code>elapsed(): Duration</code>.</li>
 <li><strong>The calendar</strong> is the proleptic Gregorian one, every year an <code>int</code> holds. <code>Date.of(year, month, day)</code> and <code>Time.of(hour, minute, second, nano = 0)</code> throw <code>TimeError</code> for what is no

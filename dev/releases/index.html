@@ -533,7 +533,8 @@ throwing twins and silent forms of <code>file</code>, <code>json</code>, <code>e
 said by hand; time, encoding, JSON, random numbers and the system — <code>nowMillis()</code> → <code>Instant.now().epochMillis()</code>,
 <code>d.plus(e)</code> → <code>(d + e)</code>, <code>hexEncode(b)</code> → <code>Hex.encode(b)</code>, <code>doc.field(&quot;n&quot;)</code> → <code>doc[&quot;n&quot;]</code>, <code>serialize(v)</code> →
 <code>try encode(v)</code>, <code>shuffle(r, xs)</code> → <code>r.shuffle(xs.asSlice())</code>. What compiles and behaves otherwise, a seeded generator's
-sequence, is said with <code>LYR-MIG0602</code>. The rest of the library follows.</p>
+sequence, is said with <code>LYR-MIG0602</code>. The rest of the library follows. <code>std.time</code> gained <code>Instant.ofEpochMillis(n)</code>, the
+inverse of <code>epochMillis()</code>, so a 4.6 call stays as it is.</p>
 </li>
 <li><p><strong>The language server answers a held hover after the diagnostics</strong> it waited for, not before them.</p>
 </li>

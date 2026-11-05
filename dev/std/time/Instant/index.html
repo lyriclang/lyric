@@ -46,6 +46,14 @@ Its text is RFC 3339 in UTC, <code>2026-10-08T12:34:56.5Z</code>, the fraction w
 <p>Returns the current moment on the system's wall clock, which the system may set back; to
 measure how long something took, use <code>Monotonic</code>.</p>
 </section>
+<section class="member" id="method.ofEpochMillis">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">static</span> <span class="kw">fn</span> ofEpochMillis(n: <span class="ty">int</span>): <span class="ty">Instant</span></code></pre>
+<p>Returns the moment <code>n</code> milliseconds after the epoch, before it for a negative <code>n</code>: the
+inverse of <code>epochMillis</code>, which rounds down, so what is finer than a millisecond does not
+come back.</p>
+<h4 id="panics">Panics</h4>
+<p>Panics where an instant cannot hold the moment, outside the years 1677 to 2262.</p>
+</section>
 <section class="member" id="method.epochSecs">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> epochSecs(): <span class="ty">int</span></code></pre>
 <p>Returns the whole seconds since the epoch, rounded down (a moment before 1970 gives a
@@ -85,6 +93,7 @@ negative count).</p>
 <ul>
 <li class="level-2"><a href="#methods">Methods</a></li>
 <li class="level-3"><a href="#method.now">now</a></li>
+<li class="level-3"><a href="#method.ofEpochMillis">ofEpochMillis</a></li>
 <li class="level-3"><a href="#method.epochSecs">epochSecs</a></li>
 <li class="level-3"><a href="#method.epochMillis">epochMillis</a></li>
 <li class="level-3"><a href="#method.add">add</a></li>
