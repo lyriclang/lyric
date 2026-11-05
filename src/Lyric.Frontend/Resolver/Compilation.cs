@@ -231,7 +231,8 @@ public sealed class Compilation
     }
 
     /// <summary>Does module <paramref name="from"/> see declarations from <paramref name="to"/>?
-    /// The same module, or an import of <paramref name="to"/>.</summary>
+    /// The same module, or an import of <paramref name="to"/> other than those in
+    /// <paramref name="without"/> — the answer the module would get with them taken out.</summary>
     /// <summary>
     /// Whether a block reaches the code of <paramref name="from"/> (spec 04 rule
     /// 10): a conformance block — <c>extend T :: [I] { … }</c>, the
@@ -249,7 +250,7 @@ public sealed class Compilation
     public bool Reaches(ModuleSymbol? from, ExtensionMethod method) =>
         method.InConformanceBlock || from is null || Sees(from, method.Module);
 
-    public bool Sees(ModuleSymbol from, ModuleSymbol to)
+    public bool Sees(ModuleSymbol from, ModuleSymbol to, IReadOnlySet<ImportDecl>? without = null)
     {
         if (ReferenceEquals(from, to)) return true;
 
@@ -265,10 +266,15 @@ public sealed class Compilation
         // std.core is, so a block on a collection the prelude names reaches whoever names it.
         if (PreludeSources().Contains(to)) return true;
         foreach (var decl in AstOf(from).Declarations)
-            if (decl is ImportDecl imp && FindModule(imp.Path) is { } t && PassesOn(t, to, new HashSet<ModuleSymbol>(ReferenceEqualityComparer.Instance)))
+            if (decl is ImportDecl imp && without?.Contains(imp) != true && FindModule(imp.Path) is { } t && Brings(t, to))
                 return true;
         return false;
     }
+
+    /// <summary>Whether an import of <paramref name="imported"/> brings the blocks of
+    /// <paramref name="to"/> into sight.</summary>
+    public bool Brings(ModuleSymbol imported, ModuleSymbol to) =>
+        PassesOn(imported, to, new HashSet<ModuleSymbol>(ReferenceEqualityComparer.Instance));
 
     /// <summary>Whether importing <paramref name="imported"/> brings <paramref name="to"/>'s extensions
     /// along: it is the module, or it passes it on with a <c>pub import</c> — a chain of them, as a

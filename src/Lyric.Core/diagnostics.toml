@@ -5129,9 +5129,9 @@ severity = "error"
 area = "05-interfaces"
 summary = "A member access `x.name` names no field, method or element of the value's type, or reads a member that is a method without calling it (`length` instead of `length()`). A tuple position past its last element is reported here too."
 explanation = '''
-A member comes from the type's declaration, from its conformances, or from an `extend` block in scope. Built-in members such as an array's `length()` are methods and are called.
+A member comes from the type's declaration, from its conformances, or from an `extend` block in scope. A block of methods is in scope where its module is imported, whatever the import names: `import std.io;` brings `writeAll` to everything that is a `Writer`. Built-in members such as an array's `length()` are methods and are called.
 
-Correct the name, call the method, or bring the block that adds the member into scope.
+Correct the name, call the method, or import the module of the block that adds the member; the error names that module where the program already holds it. A module nothing in the program imports is not read, so its blocks cannot be named.
 '''
 wrong = '''
 fn main(): void {
@@ -6664,9 +6664,11 @@ level = "warn"
 area = "04-modules"
 summary = "A name an import binds is never referred to in the file."
 explanation = '''
-An unused import makes the file look as if it depended on a module it does not need. A module import counts as used when an extension method of that module is called in the file.
+An unused import makes the file look as if it depended on a module it does not need. A module import counts as used when an extension method of that module, or of a module it passes on with `pub import`, is called in the file.
 
-Remove the import, or the name from the import list.
+Remove the import, or the name from the import list. An import brings its module's `extend` blocks along with its names, so where no name of `import std.io { Writer };` is used but the file calls `writeAll`, a method those blocks add, the warning says to keep the module alone: `import std.io;`. Removing the import there would take the method away (`LYR-SEM0012`). The warning says to take the import out where another import or the prelude brings the same blocks.
+
+A constraint a type satisfies through a conformance names nothing of the module that gives it. Where the module declares neither the type nor the interface, and no other import brings the module, `lyric fix` leaves the import alone and the warning says what depends on it.
 '''
 wrong = '''
 import std.io { println };

@@ -8673,7 +8673,9 @@ public sealed class TypeChecker
             return BindMember(mem, blanket);
         if (targetType.IsError) return LyrType.Error;
         return Report(mem.Span, "LYR-SEM0012", $"'{TypeFacts.Display(targetType)}' has no member '{mem.Member}'",
-            _comp.Lyric5Modules && TypeFacts.SymbolOf(targetType) is { } owner ? HiddenCandidate(owner, mem.Member) : null);
+            !_comp.Lyric5Modules ? null
+            : (TypeFacts.SymbolOf(targetType) is { } owner ? HiddenCandidate(owner, mem.Member) : null)
+                ?? HiddenBlockMember(baseType, mem.Member));
     }
 
     /// <summary>The clause binding this member is asked of, in its clause and not in a lambda there
@@ -10387,6 +10389,27 @@ public sealed class TypeChecker
         return null;
     }
 
+    /// <summary>The module to import for a member a block with no type of its own — a blanket block,
+    /// a block on a built-in shape — adds to this receiver, and which an import here would make
+    /// available. Asked of the modules in the program: one nothing imports was never read.</summary>
+    private DiagnosticNote? HiddenBlockMember(LyrType receiver, string member)
+    {
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (!block.IsBlanketTarget && !IsShapeBlock(block)) continue;
+            if (_comp.Reaches(_currentModule, block)) continue;
+            if (block.MethodScope.LookupLocal(member) is not FunctionSymbol found || !MayName(found)) continue;
+            using (_de.Mute())
+                if (BlockSubstitution(block, receiver, open: true) is null
+                    && !(receiver is ArrayOf whole && BlockSubstitution(block, new SliceOf(whole.Element), open: true) is not null))
+                    continue;
+            var name = block.Module.FullName;
+            return new DiagnosticNote($"'{member}' is added by a block in module '{name}', which this module does not import — write 'import {name};'")
+                { Kind = NoteKind.Help };
+        }
+        return null;
+    }
+
     /// <summary>An overload that takes the call's count and that this module may not call — a
     /// member its type keeps to itself, one a block adds in a module not imported here, a private
     /// overload beside an imported function: said beside the counts the call could choose from.</summary>
@@ -10524,7 +10547,7 @@ public sealed class TypeChecker
         // A blanket block's member, asked last: the receiver binds its parameter.
         var receiver = _memberReceiver is GenericInstance own && ReferenceEquals(own.Definition, ts) ? own : SelfType(ts);
         if (BlanketMember(receiver, member, span) is { } blanket) return blanket;
-        var hidden = _comp.Lyric5Modules ? HiddenCandidate(ts, member) : null;
+        var hidden = _comp.Lyric5Modules ? HiddenCandidate(ts, member) ?? HiddenBlockMember(receiver, member) : null;
         var near = NameSuggestion.Note(member, MemberFacts
             .OfInstance(_comp, _binding, ts, _currentModule)
             .Select(candidate => candidate.Symbol.Name));
