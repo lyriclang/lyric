@@ -2498,6 +2498,13 @@ code is no longer reported, and its number is not given again.</p>
 <td>A note of <code>lyric fix --from-4</code>: an array is the key of a <code>Map</code> or the element of a <code>Set</code>, which Lyric 4's checker passed and Lyric 5 refuses.</td>
 </tr>
 <tr>
+<td>LYR-MIG0402</td>
+<td>H</td>
+<td><a href="../../spec/14-cli/">14-cli</a></td>
+<td>an operation that answered whether it worked</td>
+<td>A note of <code>lyric fix --from-4</code>: a silent operation of Lyric 4 answered <code>false</code> when it failed, <code>file.remove(p)</code>; in Lyric 5 it throws and answers nothing, and its answer is used here.</td>
+</tr>
+<tr>
 <td>LYR-MIG0408</td>
 <td>H</td>
 <td><a href="../../spec/14-cli/">14-cli</a></td>

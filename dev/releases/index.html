@@ -521,8 +521,11 @@ said; the first library rules, from a table (<code>from4.toml</code>) — <code>
 <code>substring(a, a + n).toString()</code>, <code>split</code> and <code>splitLines</code> written back to the array of strings they gave,
 <code>indexOf(n) &gt;= 0</code> → <code>contains(n)</code>, <code>toChars</code>, <code>utf8Encode</code>, <code>utf8Decode</code>; the errors — a call that throws gets one
 <code>try</code> for its expression (<code>try h(g())</code>, <code>p(try g())</code>), none inside a <code>try</code> block, <code>Throwable</code> → <code>Error</code>,
-<code>Exception { text = &quot;…&quot; }</code> → <code>Exception(&quot;…&quot;)</code>, a <code>try</code> around all of <code>main</code> and a <code>defer</code> that closes said. The
-rules for the library's throwing twins, coroutines and the rest of the library follow.</p>
+<code>Exception { text = &quot;…&quot; }</code> → <code>Exception(&quot;…&quot;)</code>, a <code>try</code> around all of <code>main</code> and a <code>defer</code> that closes said; the
+throwing twins and silent forms of <code>file</code>, <code>json</code>, <code>encoding</code> and <code>time</code> — <code>file.textOrThrow(p)</code> →
+<code>try file.readText(p)</code>, <code>file.text(p)</code> → <code>(try? file.readText(p))</code>, <code>file.remove(p);</code> → <code>try file.remove(p);</code>,
+<code>json.parseOrErr(s)</code> → <code>Result.of(() =&gt; try json.parse(s))</code>. The rules for coroutines and the rest of the library
+follow.</p>
 </li>
 <li><p><strong>The language server answers a held hover after the diagnostics</strong> it waited for, not before them.</p>
 </li>
