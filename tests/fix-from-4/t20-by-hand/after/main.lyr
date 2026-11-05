@@ -1,0 +1,15 @@
+interface Damageable {
+    fn hit();
+}
+
+class Wall :: [Damageable] {
+    var hp: int,
+
+    fn hit() {
+        this.hp -= 1;
+    }
+}
+
+fn main(): int {
+    return 0;
+}

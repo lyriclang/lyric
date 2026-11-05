@@ -1,0 +1,51 @@
+pub interface Shape {
+    fn area(): int;
+}
+
+interface Hidden {
+    fn secret(): int;
+}
+
+pub class Square :: [Shape, Hidden] {
+    side: int,
+
+    fn area(): int {
+        return this.side * this.side;
+    }
+
+    fn secret(): int {
+        return 1;
+    }
+
+    fn other(): int {
+        return 2;
+    }
+}
+
+pub struct Dot :: [Shape] {
+    x: int,
+
+    pub fn area(): int {
+        return 0;
+    }
+}
+
+pub enum Unit :: [Shape] {
+    One;
+
+    fn area(): int {
+        return 1;
+    }
+}
+
+class Inner :: [Shape] {
+    x: int,
+
+    fn area(): int {
+        return 2;
+    }
+}
+
+fn main(): int {
+    return Square { side = 2 }.area();
+}

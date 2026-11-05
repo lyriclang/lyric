@@ -1,0 +1,5 @@
+extern "dotnet" fn cbrt(x: float): float = "System.Math::Cbrt";
+
+fn main(): int {
+    return 0;
+}

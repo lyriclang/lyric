@@ -1,0 +1,27 @@
+struct V {
+    var x: int,
+
+    mut fn set(n: int) {
+        this.x = n;
+    }
+}
+
+fn called(v: V): int {
+    v.set(1);
+    v.set(2);
+    return v.x;
+}
+
+fn assigned(w: V): int {
+    w.x = 3;
+    return w.x;
+}
+
+fn read(u: V): int {
+    return u.x;
+}
+
+fn main(): int {
+    let a = V { x = 0 };
+    return called(a) + assigned(a) + read(a);
+}

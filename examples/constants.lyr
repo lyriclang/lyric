@@ -3,7 +3,7 @@
 // A module 'let' and a 'static let' are the SAME mechanism. Both are filled once before the program
 // starts by a synthetic '<globals>' function; the only difference is where the name is visible. An
 // initializer may therefore do everything a body may do: compute, call, allocate objects.
-import std.io.console;
+import std.io as console;
 
 let VERSION = "1.0";
 
@@ -16,8 +16,8 @@ let LEVELS = 4;
 let BASE = LEVELS * 10;
 
 pub struct Vector2 {
-    var x: int,
-    var y: int,
+    x: int,
+    y: int,
 
     // A type-bound constant that is an object. This case is why the globals section references an
     // init FUNCTION rather than holding values: 'Vector2 { … }' is an expression, not a literal.

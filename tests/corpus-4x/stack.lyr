@@ -1,0 +1,56 @@
+// stack.lyr — complexity: medium to advanced
+// Shows: a generic class and a generic interface, interface conformance via `::`, mut methods, a
+// nullable return, composition over std.collections.List, and a while loop.
+
+import std.io.console { println };
+import std.collections { List };
+
+pub interface Container<T> {
+    mut fn add(item: T);
+    fn count(): int;
+}
+
+// A stack is a list with fewer possibilities. It inherits nothing — the language has no
+// inheritance — but OWNS a list and exposes only what a stack may do: push, pop, peek.
+pub class Stack<T> :: [Container<T>] {
+    items: List<T>,
+
+    mut fn add(item: T) {
+        this.items.push(item);
+    }
+
+    mut fn pop(): ?T {
+        return this.items.pop();
+    }
+
+    fn peek(): ?T {
+        if (this.items.length() == 0) {
+            return null;
+        }
+        return this.items.get(this.items.length() - 1);
+    }
+
+    fn count(): int {
+        return this.items.length();
+    }
+}
+
+fn newStack<T>(): Stack<T> {
+    return Stack<T> { items = List<T>.empty() };
+}
+
+fn main(): int {
+    var stack = newStack<int>();
+    stack.add(1);
+    stack.add(2);
+    stack.add(3);
+
+    println(f"Groesse: {stack.count()}");
+    println(f"Spitze:  {stack.peek() ?? 0}");
+
+    while (stack.count() > 0) {
+        let top = stack.pop() ?? 0;
+        println(f"pop -> {top}");
+    }
+    return 0;
+}

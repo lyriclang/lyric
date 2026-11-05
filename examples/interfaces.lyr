@@ -2,7 +2,7 @@
 //
 // 'hit' knows only 'Damageable' and not whether a Player or a Wall stands in front of it. Which
 // 'takeDamage' runs is decided at run time; this is the only dynamic dispatch in the language.
-import std.io.console;
+import std.io as console;
 
 pub interface Damageable {
     mut fn takeDamage(amount: int);
@@ -22,14 +22,14 @@ pub class Player :: [Damageable] {
         return Player { hp = hp };
     }
 
-    mut fn takeDamage(amount: int) {
+    pub mut fn takeDamage(amount: int) {
         this.hp -= amount;
         if (this.hp < 0) {
             this.hp = 0;
         }
     }
 
-    fn getHp(): int {
+    pub fn getHp(): int {
         return this.hp;
     }
 }
@@ -42,19 +42,19 @@ pub class Wall :: [Damageable] {
     }
 
     // A Wall absorbs half of it.
-    mut fn takeDamage(amount: int) {
+    pub mut fn takeDamage(amount: int) {
         this.hp -= amount / 2;
         if (this.hp < 0) {
             this.hp = 0;
         }
     }
 
-    fn getHp(): int {
+    pub fn getHp(): int {
         return this.hp;
     }
 
     // Overrides the default: a Wall counts as destroyed only below 10 hp.
-    fn isAlive(): bool {
+    pub fn isAlive(): bool {
         return this.hp > 10;
     }
 }

@@ -3,7 +3,7 @@
 // A closure captures the VARIABLE, not its value. 'counter' returns a function that keeps counting
 // its 'n' up although the creating call has long returned, and two closures over the same 'n' see
 // the same one.
-import std.io.console;
+import std.io as console;
 
 // A captured 'let' is copied: it never changes, so the difference is not observable and the copy
 // saves the cell.

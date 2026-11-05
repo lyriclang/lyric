@@ -99,8 +99,8 @@ tests = ["StdTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Fo
 cases = []
 
 [[rule]]
-paths = ["examples/"]
-tests = ["ExampleTests", "SiteTests", "FormatterProofTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Formatting.Lyric5ProofTests"]
+paths = ["examples/", "tests/fix-from-4-acceptance/"]
+tests = ["FixFrom4AcceptanceTests", "ExampleTests", "SiteTests", "FormatterProofTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Formatting.Lyric5ProofTests"]
 cases = []
 
 [[rule]]

@@ -14,7 +14,7 @@
 // A rest with a NAME ('[first, ..rest]') is refused for now: the elements it covers would have
 // to be copied into an array of their own, and this compiler version cannot build one of a
 // length it learns at runtime. Bind the positions you need and take the tail with 'slice'.
-import std.io.console { println };
+import std.io { println };
 
 enum Token {
     Word(string),

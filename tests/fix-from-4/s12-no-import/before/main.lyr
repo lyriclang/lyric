@@ -1,0 +1,6 @@
+// The file imports nothing.
+
+/// The entry.
+fn main(argv: string[]): int {
+    return argv.length;
+}

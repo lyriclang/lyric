@@ -1,13 +1,15 @@
-// The second entry form: 'fn main(args: string[])'.
+// The program's arguments: 'std.os' has them, its own name first, which '[1..]' leaves out.
 //
 // Everything after the first '--' belongs to the program:
 //
 //     lyric run examples/greet.lyr -- World Lyric
 //
-// A parameterless 'main' ignores passed arguments rather than failing.
-import std.io.console;
+// A 'main' that does not ask for them ignores them.
+import std.io as console;
+import std.os;
 
-fn main(args: string[]): int {
+fn main(): int {
+    let args = os.args()[1..].iter().toArray();
     if (args.length() == 0) {
         console.println("hallo, niemand");
         return 0;

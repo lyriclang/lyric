@@ -1,0 +1,2 @@
+proposal[LYR-MIG0301] main.lyr:6:5: the field 'hp' is written (line 9); Lyric 5 writes a field only where it is declared 'var' — where only the value's construction should set it, leave out the 'var' and build a new value
+by hand[LYR-MIG0320] main.lyr:8:8: 'hit' writes the object's state, and the interface 'Damageable' declares it without 'mut'; Lyric 5 has a method that writes declared 'mut fn', and a conformance repeats what the interface says — declare it 'mut fn' in 'Damageable' and in every type that answers it

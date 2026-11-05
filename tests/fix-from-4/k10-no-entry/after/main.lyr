@@ -1,0 +1,4 @@
+// A library of a host.
+pub fn onUpdate(frame: int): int {
+    return frame + 1;
+}

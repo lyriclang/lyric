@@ -134,8 +134,8 @@ public class LoweringTests
     [Fact]
     public void Gate_program_lowers_end_to_end()
     {
-        // examples/arith.lyr is deliberately stdlib-free, so it compiles from the core alone.
-        var path = Path.Combine(RepoRoot(), "examples", "arith.lyr");
+        // tests/corpus-4x/arith.lyr is deliberately stdlib-free, so it compiles from the core alone.
+        var path = Path.Combine(RepoRoot(), "tests", "corpus-4x", "arith.lyr");
         Assert.True(File.Exists(path), $"missing gate program: {path}");
 
         var module = Lower(File.ReadAllText(path, Encoding.UTF8));

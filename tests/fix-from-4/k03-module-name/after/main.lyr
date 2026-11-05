@@ -1,0 +1,7 @@
+// The module's name stays what the program calls it.
+import std.io as console;
+
+fn main(): int {
+    console.println("hello");
+    return 0;
+}

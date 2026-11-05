@@ -1,5 +1,5 @@
 // arith.lyr — complexity: simple
-// Deliberately WITHOUT the standard library, so it compiles to bytecode from the core alone.
+// Deliberately WITHOUT the standard library, so it compiles from the core alone.
 //
 // Shows what the lowering produces for scalar expressions, locals, module-internal calls and
 // control flow. Observable through `lyric lower examples/arith.lyr`.

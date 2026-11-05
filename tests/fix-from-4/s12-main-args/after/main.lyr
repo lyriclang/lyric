@@ -1,0 +1,10 @@
+import std.io { println };
+import std.os;
+
+fn main(): int {
+    let args = os.args()[1..].iter().toArray();
+    for (a in args) {
+        println(a);
+    }
+    return args.length();
+}

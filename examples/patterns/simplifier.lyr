@@ -1,73 +1,71 @@
-// Nested patterns: an expression simplifier.
+// Nested variant patterns: an expression simplifier in one match.
 //
-// An enum is a value and cannot hold itself, so the tree stands behind 'Box<Expr>'. A pattern
-// stops at a box — it is a reference — and the match goes on over what the boxes hold: a tuple
-// of two expressions, where '(Lit(0), x)' and '(Lit(a), Lit(b))' reach into both at once.
-// Or-patterns bind too: '(Lit(0), x) | (x, Lit(0))' names the surviving side from either
-// alternative and stores it into ONE local.
-import std.core { Box };
-import std.io.console { println };
+// An enum is a value, so a recursive one reaches itself through a class: 'Unary' and 'Binary' end
+// the cycle. A pattern names a class's fields as it names a variant's payload, which keeps
+// '.Neg(Unary { x = .Neg(Unary { x }) })' one pattern however deep it goes. Or-patterns bind too:
+// the two alternatives of an addition with a zero name the surviving side, and store it into ONE
+// local.
+import std.io { println };
+
+class Unary {
+    x: Expr,
+}
+
+class Binary {
+    l: Expr,
+    r: Expr,
+}
 
 enum Expr {
     Lit(int),
-    Neg(Box<Expr>),
-    Add(Box<Expr>, Box<Expr>),
-    Mul(Box<Expr>, Box<Expr>),
+    Neg(Unary),
+    Add(Binary),
+    Mul(Binary),
 }
 
-fn lit(n: int): Expr {
-    return Expr.Lit(n);
-}
-
-fn neg(e: Expr): Expr {
-    return Expr.Neg(Box<Expr> { value = e });
+fn neg(x: Expr): Expr {
+    return Expr.Neg(Unary { x = x });
 }
 
 fn add(l: Expr, r: Expr): Expr {
-    return Expr.Add(Box<Expr> { value = l }, Box<Expr> { value = r });
+    return Expr.Add(Binary { l = l, r = r });
 }
 
 fn mul(l: Expr, r: Expr): Expr {
-    return Expr.Mul(Box<Expr> { value = l }, Box<Expr> { value = r });
+    return Expr.Mul(Binary { l = l, r = r });
 }
 
 fn simplify(e: Expr): Expr {
     return match (e) {
-        Lit(n) => lit(n),
-        Neg(inner) => match (inner.value) {
-            Neg(x) => simplify(x.value),
-            Lit(0) => lit(0),
-            other => neg(simplify(other)),
-        },
-        Add(l, r) => match ((l.value, r.value)) {
-            (Lit(0), x) | (x, Lit(0)) => simplify(x),
-            (Lit(a), Lit(b)) => lit(a + b),
-            (x, y) => add(simplify(x), simplify(y)),
-        },
-        Mul(l, r) => match ((l.value, r.value)) {
-            (Lit(1), x) | (x, Lit(1)) => simplify(x),
-            (Lit(0), _) | (_, Lit(0)) => lit(0),
-            (x, y) => mul(simplify(x), simplify(y)),
-        },
+        .Neg(Unary { x = .Neg(Unary { x }) }) => simplify(x),
+        .Neg(Unary { x = .Lit(0) }) => Expr.Lit(0),
+        .Add(Binary { l = .Lit(0), r }) | .Add(Binary { l = r, r = .Lit(0) }) => simplify(r),
+        .Mul(Binary { l = .Lit(1), r }) | .Mul(Binary { l = r, r = .Lit(1) }) => simplify(r),
+        .Mul(Binary { l = .Lit(0), r = _ }) | .Mul(Binary { l = _, r = .Lit(0) }) => Expr.Lit(0),
+        .Add(Binary { l = .Lit(a), r = .Lit(b) }) => Expr.Lit(a + b),
+        .Add(Binary { l, r }) => add(simplify(l), simplify(r)),
+        .Mul(Binary { l, r }) => mul(simplify(l), simplify(r)),
+        .Neg(Unary { x }) => neg(simplify(x)),
+        .Lit(n) => Expr.Lit(n),
     };
 }
 
 fn show(e: Expr): string {
     return match (e) {
-        Lit(n) => f"{n}",
-        Neg(x) => "-" + show(x.value),
-        Add(l, r) => "(" + show(l.value) + " + " + show(r.value) + ")",
-        Mul(l, r) => "(" + show(l.value) + " * " + show(r.value) + ")",
+        .Lit(n) => f"{n}",
+        .Neg(Unary { x }) => "-" + show(x),
+        .Add(Binary { l, r }) => "(" + show(l) + " + " + show(r) + ")",
+        .Mul(Binary { l, r }) => "(" + show(l) + " * " + show(r) + ")",
     };
 }
 
 fn main(): int {
-    let zero = lit(0);
-    let one = lit(1);
-    let x = neg(neg(lit(7)));
+    let zero = Expr.Lit(0);
+    let one = Expr.Lit(1);
+    let x = neg(neg(Expr.Lit(7)));
     println(show(simplify(x))); // 7
-    println(show(simplify(add(zero, mul(one, lit(5)))))); // 5
-    println(show(simplify(mul(add(lit(2), lit(3)), zero)))); // 0
-    println(show(simplify(add(lit(2), neg(lit(3)))))); // (2 + -3)
+    println(show(simplify(add(zero, mul(one, Expr.Lit(5)))))); // 5
+    println(show(simplify(mul(add(Expr.Lit(2), Expr.Lit(3)), zero)))); // 0
+    println(show(simplify(add(Expr.Lit(2), neg(Expr.Lit(3)))))); // (2 + -3)
     return 0;
 }

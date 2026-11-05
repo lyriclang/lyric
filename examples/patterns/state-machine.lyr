@@ -5,7 +5,7 @@
 // crashed the compiler at the first arm. Now every arm is tried in the order written, the
 // tuple elements are tested left to right, and the first arm whose pattern and guard both
 // hold answers.
-import std.io.console { println };
+import std.io { println };
 
 enum State {
     Idle,
