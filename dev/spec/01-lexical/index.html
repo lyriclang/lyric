@@ -71,7 +71,8 @@ variant — in Markdown (<a href="../../spec/11-metaprogramming/">11</a>); <code
 character beyond ASCII stands in no name and is refused where it stands (<code>LYR-LEX0001</code>); a word
 of letters and digits that holds such characters — <code>größe</code> — is refused once, as the name it
 would be, naming them, and read as that name, so its uses refuse it again and say nothing
-else. <code>_</code> alone is the wildcard where a name would bind.</li>
+else. <code>_</code> alone is the wildcard where a name would bind, so one parameter list may hold it
+more than once.</li>
 <li>The <strong>reserved words</strong> are no names: <code>import as pub internal private static struct class enum interface extend fn mut let var if else while do for in is match break continue return yield defer try catch throw true false null this</code>, and the compile-time words <code>comptime inline quote macro</code> (<a href="../../spec/11-metaprogramming/">11 §2</a>; <code>inline</code> sets a function in place,
 <a href="../../spec/03-types/#85-inline-functions">03 §8.5</a>; <code>macro</code> declares a macro and <code>name!</code> is its site, <code>quote { … }</code> a tree as a value with <code>#{…}</code> splices, <a href="../../spec/11-metaprogramming/#5-macros">11 §5</a>). One where a name belongs is refused — the
 parser's error for a missing name, <code>LYR-PAR0020</code> for a binding, with a note that it is a word —
