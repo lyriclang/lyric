@@ -52,11 +52,11 @@ public class InlineArrayTests
             }
             """);
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_literal_of_another_length_is_refused()
     {
-        Assert.Contains("holds 3 elements; the literal has 2", Rejected("fn f(): int { let a: int[3] = [1, 2]; return a[0]; }", "LYR-SEM0001"));
-        Assert.Contains("the repetition makes 8", Rejected("fn f(): int { let a: int[4] = [0] * 8; return a[0]; }", "LYR-SEM0001"));
+        Assert.Contains("holds 3 elements; the literal has 2", Rejected("fn f(): int { let a: int[3] = [1, 2]; return a[0]; }", "LYR-SEM0228"));
+        Assert.Contains("the repetition makes 8", Rejected("fn f(): int { let a: int[4] = [0] * 8; return a[0]; }", "LYR-SEM0228"));
     }
 
     [Fact]

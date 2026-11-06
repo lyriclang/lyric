@@ -1,6 +1,0 @@
-import std.io { println };
-
-fn main(): int {
-    println("hello");
-    return 0;
-}

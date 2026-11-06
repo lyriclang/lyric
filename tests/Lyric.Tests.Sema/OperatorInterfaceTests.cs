@@ -14,6 +14,7 @@ public class OperatorInterfaceTests
 {
     // The seed of std.core 5, as far as the operators go.
     private const string Prelude = """
+        import std.core { Add, Sub, Mul, Neg, BitAnd, BitNot, Shl, Rem };
         struct V :: [Add, Sub, Mul<int>, Neg, Equatable, Ordered, Display] {
             x: int,
             fn add(rhs: V): V { return V { x = this.x + rhs.x }; }
@@ -56,72 +57,72 @@ public class OperatorInterfaceTests
 
     // ------------------------------------------------------------------ arithmetic
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_plus_b_is_a_dot_add_b() =>
         Allowed("fn f(a: V, b: V): V { return a + b - a; }");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void The_operand_picks_the_conformance_and_the_answer_is_its_Out() =>
         Allowed("fn f(a: V): float { let w: V = a * 2; return a * 2.5; }");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_heterogeneous_block_stands_beside_the_own_member() =>
         Allowed("fn f(a: V): int { return (a * 3).x; }");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Without_the_conformance_the_operator_is_refused() =>
         Assert.Contains("':: [Add]'", Rejected("fn f(a: P, b: P): P { return a + b; }", "LYR-SEM0003"));
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Unary_minus_is_neg() =>
         Allowed("fn f(a: V): V { return -a; }");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Unary_minus_without_Neg_is_refused() =>
         Assert.Contains("'Neg'", Rejected("fn f(a: P): P { return -a; }", "LYR-SEM0003"));
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Compound_assignment_derives_from_the_operator() =>
         Allowed("fn f(a: V, b: V): V { var acc = a; acc += b; return acc; }");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void The_bit_operators_and_the_shifts_have_interfaces() =>
         Allowed("struct B :: [BitAnd, BitNot, Shl, Rem] { n: int, fn bitAnd(r: B): B { return r; } fn bitNot(): B { return this; } fn shl(r: int): B { return this; } fn rem(r: B): B { return r; } }\n"
                 + "fn f(a: B, b: B): B { return (a & b) % ~b << 2; }");
 
     // ------------------------------------------------------------------ equality and ordering
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Equality_goes_through_Equatable() =>
         Allowed("fn f(a: V, b: V): bool { return a == b && a != b; }");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Equality_without_Equatable_is_refused() =>
         Assert.Contains("':: [Equatable]'", Rejected("fn f(a: P, b: P): bool { return a == b; }", "LYR-SEM0059"));
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void The_orderings_go_through_Ordered() =>
         Allowed("fn f(a: V, b: V): bool { return a < b || a <= b || a > b || a >= b; }");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Ordering_without_Ordered_is_refused() =>
         Assert.Contains("?Ordering", Rejected("fn f(a: P, b: P): bool { return a < b; }", "LYR-SEM0003"));
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Ordered_implies_Equatable() =>
-        Rejected("struct Q :: [Ordered] { n: int, fn compare(o: Q): ?Ordering { return null; } }\nfn f(): int { return 0; }", "LYR-SEM0020");
+        Allowed("struct Q :: [Ordered] { n: int, fn compare(o: Q): ?Ordering { return null; } }\nfn f(a: Q, b: Q): bool { return a == b; }");
 
     // ------------------------------------------------------------------ the generic sum
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_fixed_Out_makes_the_sum_its_own_type() =>
         Allowed("fn sum<T :: [Add<Out = T>]>(a: T, b: T): T { return a + b; }\nfn f(a: V): V { let n: int = sum(1, 2); return sum(a, a); }");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Without_the_fixation_the_result_is_T_Out() =>
         Assert.Contains("'T.Out'", Rejected("fn sum<T :: [Add]>(a: T, b: T): T { return a + b; }\nfn f(): int { return 0; }", "LYR-SEM0001"));
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Std_core_types_are_visible_unasked() =>
         Allowed("fn f(a: V, b: V): bool { let o: ?Ordering = a.compare(b); return o == null; }");
 }

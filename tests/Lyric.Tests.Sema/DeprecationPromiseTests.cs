@@ -1,3 +1,4 @@
+using Lyric.Compiler;
 using Lyric.Core;
 using Lyric.Parsing;
 using Lyric.Resolver;
@@ -27,17 +28,9 @@ public class DeprecationPromiseTests
 
     private static DiagnosticEngine Check(string source)
     {
-        var sm = new SourceManager();
-        var id = sm.AddVirtual("test.lyr", source);
-        var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de)
-        {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
-        };
-
-        comp.AddModule(new Parser(sm, id, de).ParseModule());
-        Semantics.Analyze(comp, comp.Resolve(), de);
-        return de;
+        // The whole check: Lyric 5 reads '@Deprecated' from its value, computed after the types.
+        var options = new CompilerOptions { StdlibRoot = Path.Combine(RepoRoot(), "stdlib5") };
+        return SourceCompiler.Check(ScriptSource.FromBuffer(Path.Combine(RepoRoot(), "test.lyr"), source), options).Diagnostics;
     }
 
     /// <summary>One promise against one toolchain version, without a compilation around it.
@@ -113,7 +106,7 @@ public class DeprecationPromiseTests
 
     // ------------------------------------------------------------------ through the attribute
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void An_expired_promise_stops_the_build_at_the_declaration()
     {
         var de = Check(Import
@@ -124,7 +117,7 @@ public class DeprecationPromiseTests
         Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0081");
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void It_fires_even_though_nothing_uses_the_declaration()
     {
         // The point of checking the DECLARATION: a form kept past its date is wrong whether or
@@ -137,7 +130,7 @@ public class DeprecationPromiseTests
         Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0076");
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_promise_still_in_the_future_leaves_the_ordinary_warning_alone()
     {
         var de = Check(Import

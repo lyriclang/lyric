@@ -102,8 +102,7 @@ public class OptionalEqualityAndRepeatTests
     public void An_interface_value_element_is_refused() =>
         Rejected("fn f(w: Walker): int { let ws = [w] * 2; return ws.length(); }", "LYR-SEM0136");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
-    public void An_array_of_arrays_needs_clone_of_the_element() =>
-        // 'int[]' has no Clone conformance of its own yet (the shape conformance, M8a).
-        Rejected("fn f(): int { let xss = [[1, 2]] * 2; return xss.length(); }", "LYR-SEM0136");
+    [Fact]
+    public void An_array_of_arrays_repeats_through_the_elements_clone() =>
+        Allowed("fn f(): int { let xss = [[1, 2]] * 2; return xss.length(); }");
 }

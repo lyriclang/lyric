@@ -118,13 +118,13 @@ public class SuggestionAndNoteTests
 
     // ─── the never-reassigned hint (LYR-SEM0075) ───────────────────────────
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_var_never_reassigned_hints_at_let()
     {
         var de = Check("fn main(): int {\n    var x = 1;\n    return x;\n}\n");
         Assert.False(de.HasErrors);
         var hint = Single(de, "LYR-SEM0075");
-        Assert.Equal(Severity.Hint, hint.Severity);
+        Assert.Equal(Severity.Warning, hint.Severity);
         Assert.Contains("'let' would do", hint.Message);
     }
 

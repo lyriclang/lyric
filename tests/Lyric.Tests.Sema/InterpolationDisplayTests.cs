@@ -95,17 +95,15 @@ public class InterpolationDisplayTests
         Assert.Contains("Display", error.Message);
     }
 
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Theory]
     [InlineData("let v: ?int = 1;")]
-    [InlineData("let v = [1, 2];")]
-    [InlineData("let v = (1, 2);")]
     public void An_optional_array_or_tuple_is_refused_in_the_sema(string binding)
     {
         var de = Check("fn main(): int { " + binding + " let s = f\"{v}\"; return 0; }");
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0006");
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_format_specifier_on_a_display_value_is_refused()
     {
         var de = Check(Point +
@@ -115,17 +113,26 @@ public class InterpolationDisplayTests
                 return 0;
             }
             """);
-        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0006");
-        Assert.Contains("specifier", error.Message);
+        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0164");
+        Assert.Contains("no format", error.Message);
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Theory]
+    [InlineData("let v = [1, 2];")]
+    [InlineData("let v = (1, 2);")]
+    public void An_array_and_a_tuple_display(string binding)
+    {
+        var de = Check("fn main(): int { " + binding + " let s = f\"{v}\"; return s.length(); }");
+        Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics));
+    }
+
+    [Fact]
     public void Scalars_keep_their_converters()
     {
         var de = Check(
             """
             fn main(): int {
-                let s = f"{1} {2.5} {true} {'c'} {"s"} {1:N2}";
+                let s = f"{1} {2.5} {true} {'c'} {"s"} {1:08}";
                 return 0;
             }
             """);

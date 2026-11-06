@@ -2,7 +2,7 @@
 // Shows: an enum with tuple and struct variants and methods, match as an expression,
 // block arms, contextual variant construction, an array of enum values.
 
-import std.io.console { println };
+import std.io { println };
 import std.math { sqrt, pi };
 
 pub enum Shape {
@@ -42,7 +42,7 @@ fn main(): int {
     ];
 
     for (s in shapes) {
-        println(f"{s.name()}: Flaeche = {s.area():N2}");
+        println(f"{s.name()}: Flaeche = {s.area():.2}");
     }
     return 0;
 }

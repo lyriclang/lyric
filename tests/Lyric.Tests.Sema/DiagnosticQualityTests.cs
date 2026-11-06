@@ -159,8 +159,8 @@ public class DiagnosticQualityTests
     public void A_name_imported_twice_is_one_function()
     {
         var de = Check("""
-            import std.io.console { println };
-            import std.io.console { println };
+            import std.io { println };
+            import std.io { println };
 
             fn main(): int { println("x"); return 0; }
             """, withStdlib: true);

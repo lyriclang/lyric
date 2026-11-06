@@ -5,15 +5,15 @@
 // initializer may therefore do everything a body may do: compute, call, allocate objects.
 import std.io as console;
 
-let VERSION = "1.0";
+let version = "1.0";
 
-let BANNER = "lyric " + VERSION;
+let banner = "lyric " + version;
 
-// The order is the declaration order: BASE reads LEVELS because LEVELS stands above it. The other
+// The order is the declaration order: base reads levels because levels stands above it. The other
 // way round is LYR-SEM0057, since it would read a value nobody has written.
-let LEVELS = 4;
+let levels = 4;
 
-let BASE = LEVELS * 10;
+let base = levels * 10;
 
 pub struct Vector2 {
     x: int,
@@ -21,7 +21,7 @@ pub struct Vector2 {
 
     // A type-bound constant that is an object. This case is why the globals section references an
     // init FUNCTION rather than holding values: 'Vector2 { … }' is an expression, not a literal.
-    static let ORIGIN: Vector2 = Vector2 { x = 0, y = 0 };
+    static let origin: Vector2 = Vector2 { x = 0, y = 0 };
 
     fn sum(): int {
         return this.x + this.y;
@@ -32,26 +32,26 @@ pub class Enemy {
     name: string,
     hp: int,
 
-    static let BASE_HP: int = 10;
+    static let baseHp: int = 10;
 
     static fn new(level: int): Enemy {
-        return Enemy { name = "goblin", hp = Enemy.BASE_HP * level };
+        return Enemy { name = "goblin", hp = Enemy.baseHp * level };
     }
 }
 
 // From a body every constant is readable wherever it stands, because the init phase is long over.
-// TAIL is declared at the very bottom.
+// tail is declared at the very bottom.
 fn describe(): string {
-    return BANNER + TAIL;
+    return banner + tail;
 }
 
 fn main(): int {
     console.println(describe());
-    console.println(f"origin sum: {Vector2.ORIGIN.sum()}");
+    console.println(f"origin sum: {Vector2.origin.sum()}");
 
     var total = 0;
     var level = 1;
-    while (level <= LEVELS) {
+    while (level <= levels) {
         let e = Enemy.new(level);
         console.println(f"{e.name} lvl {level}: {e.hp} hp");
         total = total + e.hp;
@@ -59,10 +59,10 @@ fn main(): int {
     }
 
     console.println(f"total: {total}");
-    console.println(f"base: {BASE}");
+    console.println(f"base: {base}");
 
-    // 10 + 20 + 30 + 40 = 100, plus BASE 40 => 140.
-    return total + BASE;
+    // 10 + 20 + 30 + 40 = 100, plus base 40 => 140.
+    return total + base;
 }
 
-let TAIL = " (constants)";
+let tail = " (constants)";
