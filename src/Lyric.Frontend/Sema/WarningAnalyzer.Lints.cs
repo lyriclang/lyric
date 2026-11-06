@@ -85,7 +85,7 @@ internal sealed partial class WarningAnalyzer
         WarnExitCodes(fn, owner);
 
         // the scopes for shadowed-local: the parameters, then each block
-        var scopes = new List<Dictionary<string, Span>> { fn.Parameters.ToDictionary(p => p.Name, p => p.NameSpan, StringComparer.Ordinal) };
+        var scopes = new List<Dictionary<string, Span>> { fn.Parameters.Where(p => p.Name != "_").ToDictionary(p => p.Name, p => p.NameSpan, StringComparer.Ordinal) };
         foreach (var p in fn.Parameters) WarnModuleShadowing(p.Name, p.NameSpan, modules);
         Visit(fn.Body, scopes, modules, implicitIt: 0);
     }
@@ -187,7 +187,7 @@ internal sealed partial class WarningAnalyzer
                     _de.Report("LYR-SEM0209", Severity.Warning, new Span(lam.Span.File, lam.Span.Start, lam.Span.Start + 1),
                         "this block's 'it' hides the 'it' of the block around it",
                         new DiagnosticNote("name the parameter of one of them: '{ x => … }'"));
-                scopes.Add(lam.Parameters.Where(p => p.Name != "it" || !isImplicit)
+                scopes.Add(lam.Parameters.Where(p => p.Name != "_" && (p.Name != "it" || !isImplicit))
                     .ToDictionary(p => p.Name, p => p.Span, StringComparer.Ordinal));
                 Visit(lam.Body, scopes, modules, isImplicit ? implicitIt + 1 : implicitIt);
                 scopes.RemoveAt(scopes.Count - 1);
