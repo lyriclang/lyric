@@ -822,6 +822,25 @@ its <code>lib</code>; zig's index is <code>index.json</code> on its download pag
 mirrors are listed in <code>community-mirrors.txt</code> beside the index, one address a line, and serve
 an archive as <code>&lt;mirror&gt;/&lt;file&gt;</code>.</li>
 </ul>
+<h2 id="14-fix---from-4-informative">14. <code>fix --from-4</code> <em>(informative)</em></h2>
+<p><code>lyric fix --from-4 [&lt;file.lyr&gt;]</code> migrates a Lyric 4 program: the <code>lyric.json</code> of the working
+directory (<code>-C &lt;dir&gt;</code>), or the file named. Nothing here is a promise about the result, which may
+not compile; <code>lyric check</code> says what is left. The rules it applies are no part of this
+specification, and the notes it gives stand in <a href="../../spec/appendix-a-diagnostics/">Appendix A</a> under
+<code>LYR-MIG</code>.</p>
+<ul>
+<li><strong>What it reads</strong>: the program, with the front end of Lyric 4.6. A program 4.6 refuses is not
+changed (<code>LYR-MIG0001</code>, exit 1).</li>
+<li><strong>What it writes</strong>, in place: each changed source file, as replacements of what a rule changes, so
+comments and layout stay; <code>lyric.toml</code> for <code>lyric.json</code>, which goes. It moves no file: where the
+sources lie outside <code>src/</code>, a note says so.</li>
+<li><strong><code>--dry-run</code></strong> prints the changes as a unified diff and writes nothing. <code>--json</code> does not go with
+<code>--from-4</code>.</li>
+<li><strong>The report</strong>, <code>fix-from-4.txt</code> beside the manifest or the file, lists each note with its rule, place,
+reason and proposal: <code>proposal[…]</code> for a change made for a person to confirm, <code>by hand[…]</code> for one left
+to a person.</li>
+<li><strong>Exit codes</strong>: 0 when it has migrated, whatever the notes say; 1 as above; 2 for a wrong use.</li>
+</ul>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -844,6 +863,7 @@ an archive as <code>&lt;mirror&gt;/&lt;file&gt;</code>.</li>
 <li class="level-2"><a href="#12-dap">12. dap</a></li>
 <li class="level-2"><a href="#13-toolchain">13. toolchain</a></li>
 <li class="level-3"><a href="#131-the-archive-the-index-and-the-signature-informative">13.1 The archive, the index and the signature (informative)</a></li>
+<li class="level-2"><a href="#14-fix---from-4-informative">14. fix --from-4 (informative)</a></li>
 </ul>
 </aside>
 </div>

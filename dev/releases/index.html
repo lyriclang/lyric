@@ -501,7 +501,7 @@ before, the first import won and the second was called unused. The compiler's ow
 line, <code>Produced</code> names what came of the build with its size, and <code>Summary</code> the warnings and the C units from the
 cache. <code>-v</code> adds each package, <code>std</code> among them, and each C unit with its time.</p>
 </li>
-<li><p><strong><code>lyric fix --from-4</code> (M16, in progress)</strong>: migrates a Lyric 4 package (its <code>lyric.json</code>) or a file. The program
+<li><p><strong><code>lyric fix --from-4</code></strong>: migrates a Lyric 4 package (its <code>lyric.json</code>) or a file. The program
 is read with Lyric 4.6's frozen front end — one 4.6 refuses is not changed (<code>LYR-MIG0001</code>) —, the rules rewrite
 spans so comments and layout stay, and what a person decides is said as a hint (<code>LYR-MIG</code>) and written to
 <code>fix-from-4.txt</code>; <code>--dry-run</code> shows the diff. The first rules: the module header, <code>lyric.json</code> → <code>lyric.toml</code>, the
@@ -539,7 +539,12 @@ sequence, is said with <code>LYR-MIG0602</code>. Streams, processes and sockets 
 which a test now holds against the table: <code>padLeft(s, w)</code> → <code>s.padStart(w)</code>, <code>isNaN(x)</code> → <code>x.isNan()</code>, <code>formatHex(n)</code> →
 <code>f&quot;{n:x}&quot;</code>, <code>readLine()</code> → <code>(try? stdin().readLine()) ?? null</code>; <code>joinPath</code> and <code>parentDir</code> become <code>join</code> and <code>parent</code>, and what
 they do otherwise is said with <code>LYR-MIG0602</code>. <code>std.time</code> gained <code>Instant.ofEpochMillis(n)</code>, the
-inverse of <code>epochMillis()</code>, so a 4.6 call stays as it is.</p>
+inverse of <code>epochMillis()</code>, so a 4.6 call stays as it is. And what the migration of 4.6's own examples found: a module's name stays
+what the program calls it (<code>import std.io as console;</code>), <code>fn main(args: string[])</code> takes its arguments from <code>std.os</code>, a method that
+answers a public interface for a public type becomes <code>pub</code>, and a method of a class that writes <code>this</code> becomes <code>mut fn</code>; a written
+struct parameter, an enum that holds itself, a file without <code>main</code> and <code>extern &quot;dotnet&quot;</code> are said by hand.</p>
+</li>
+<li><p><strong><code>examples/</code> is Lyric 5</strong>: each program is what <code>lyric fix --from-4</code> makes of its 4.6 form, and prints what 4.6 printed.</p>
 </li>
 <li><p><strong>The language server answers a held hover after the diagnostics</strong> it waited for, not before them.</p>
 </li>
