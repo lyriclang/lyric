@@ -19,10 +19,10 @@ public class CEmitterTests
     internal static readonly string Programs = Path.Combine(Root, "tests", "Lyric5.Tests", "programs");
     private static readonly string Golden = Path.Combine(Root, "tests", "Lyric5.Tests", "golden");
 
-    internal static IReadOnlyList<CEmitter.Unit> EmitC(string name)
+    internal static IReadOnlyList<CEmitter.Unit> EmitC(string name, string directory = "programs")
     {
         var text = File.ReadAllText(Path.Combine(Programs, name + ".lyr"));
-        var result = TestCompiler.Lower($"programs/{name}.lyr", text);
+        var result = TestCompiler.Lower($"{directory}/{name}.lyr", text);
         var rendered = new StringWriter();
         result.Diagnostics.RenderText(rendered);
         Assert.True(result.Ok && result.Ir is not null, rendered.ToString());
@@ -813,9 +813,32 @@ public class CEmitterTests
             Assert.Single(lines);
             return;
         }
-        Assert.True(lines.Length == 5, $"stderr:\n{result.Stderr}");
-        Assert.Matches(@"^    at lyr_app_main_down \(.*programs[\\/]deep_error\.lyr:4\)$", lines[1]);
-        Assert.Matches(@"^    at lyr_app_main_down \(.*programs[\\/]deep_error\.lyr:5\)$", lines[2]);
+        AssertFoldedToTheCut(result.Stderr, "programs");
+    }
+
+    /// <summary>The names a trace keeps on Windows live in a pool that every frame draws its
+    /// function and its file from: under a long path a deep recursion emptied it partway, and the
+    /// frames beyond lost their file, then their name, which broke the fold. The file is named only
+    /// in the debug information, so the path needs no directory on disk. Its length is a window:
+    /// long enough to run a pool of the old size dry from CI's short checkout (32 KiB over 256
+    /// frames), short enough to stay under MAX_PATH from a long one, past which DbgHelp names no
+    /// line at all.</summary>
+    [Fact]
+    public void A_deep_trace_keeps_its_names_under_a_long_source_path()
+    {
+        var directory = new string('d', 60);
+        var result = RuntimeBuildTests.RunEmitted(EmitC("deep_error", directory), "deep_error_long_path", Profile.Debug);
+        Assert.True(result.ExitCode == 1, $"exit {result.ExitCode}\nstderr:\n{result.Stderr}");
+        AssertFoldedToTheCut(result.Stderr, directory);
+    }
+
+    private static void AssertFoldedToTheCut(string stderr, string directory)
+    {
+        var lines = stderr.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.True(lines.Length == 5, $"stderr:\n{stderr}");
+        Assert.Equal("error: deep", lines[0]);
+        Assert.Matches($@"^    at lyr_app_main_down \(.*{directory}[\\/]deep_error\.lyr:4\)$", lines[1]);
+        Assert.Matches($@"^    at lyr_app_main_down \(.*{directory}[\\/]deep_error\.lyr:5\)$", lines[2]);
         Assert.Matches(@"^    \.\.\. the frame above repeats \d+ more times$", lines[3]);
         Assert.Equal("    ... deeper frames not shown", lines[4]);
     }

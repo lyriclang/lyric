@@ -210,8 +210,13 @@ static void name_captured(const uintptr_t *pcs, int count) {
 #include <windows.h>
 #include <dbghelp.h>
 
-/* DbgHelp hands out names in caller buffers; the frames keep them here. */
-static char names[32 * 1024];
+enum { SYMBOL_NAME = 256 };
+
+/* DbgHelp hands out names in caller buffers; the frames keep them here: room for every frame's
+ * function and file, since each frame keeps its own copy and a recursion's frames repeat the same
+ * two. Smaller, a deep stack under a long path ran it dry, and the frames beyond lost their file,
+ * then their name. Untouched pages of it cost nothing until a trace writes them. */
+static char names[MAX_FRAMES * (SYMBOL_NAME + MAX_PATH)];
 static size_t names_used;
 
 static const char *keep(const char *text) {
@@ -297,10 +302,10 @@ static void name_pcs(const uintptr_t *pcs, int count, uintptr_t fault_pc) {
             for (DWORD n = 0; n < inlined; n++) {
                 union {
                     SYMBOL_INFO info;
-                    char bytes[sizeof(SYMBOL_INFO) + 256];
+                    char bytes[sizeof(SYMBOL_INFO) + SYMBOL_NAME];
                 } symbol;
                 symbol.info.SizeOfStruct = sizeof(SYMBOL_INFO);
-                symbol.info.MaxNameLen = 255;
+                symbol.info.MaxNameLen = SYMBOL_NAME - 1;
                 DWORD64 offset = 0;
                 const char *function = inline_symbol(process, address, context + n, &offset, &symbol.info) ? keep(symbol.info.Name) : NULL;
                 IMAGEHLP_LINE64 line;
@@ -315,10 +320,10 @@ static void name_pcs(const uintptr_t *pcs, int count, uintptr_t fault_pc) {
         }
         union {
             SYMBOL_INFO info;
-            char bytes[sizeof(SYMBOL_INFO) + 256];
+            char bytes[sizeof(SYMBOL_INFO) + SYMBOL_NAME];
         } symbol;
         symbol.info.SizeOfStruct = sizeof(SYMBOL_INFO);
-        symbol.info.MaxNameLen = 255;
+        symbol.info.MaxNameLen = SYMBOL_NAME - 1;
         DWORD64 offset = 0;
         const char *function = sym_from_addr && sym_from_addr(process, address, &offset, &symbol.info) ? keep(symbol.info.Name) : NULL;
         IMAGEHLP_LINE64 line;
