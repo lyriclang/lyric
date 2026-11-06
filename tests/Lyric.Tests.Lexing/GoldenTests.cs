@@ -55,7 +55,7 @@ public class GoldenTests
         return (de, dump + "\n=== diagnostics ===\n" + Normalize(sw.ToString()));
     }
 
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Theory]
     // Positive cases: no diagnostics, only the token stream.
     [InlineData("operators")]
     [InlineData("literals")]

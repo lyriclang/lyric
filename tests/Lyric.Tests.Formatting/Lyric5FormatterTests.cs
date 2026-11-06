@@ -119,11 +119,10 @@ public class Lyric5FormatterTests
     }
 
     [Fact]
-    public void Each_attribute_stands_on_its_own_line_on_every_declaration()
+    public void Attributes_stay_on_every_declaration_two_as_a_group()
     {
         Keeps("""
-            @NoInline
-            @MustUse
+            @[NoInline, MustUse]
             fn pick(): int {
                 return 1;
             }
@@ -139,6 +138,18 @@ public class Lyric5FormatterTests
             }
 
             """);
+    }
+
+    [Fact]
+    public void The_module_head_takes_the_group_and_its_header_names_nothing()
+    {
+        Assert.Equal("""
+            @[A, B]
+            module;
+
+            fn f(): void { }
+
+            """.Replace("\r\n", "\n"), Format("@A\n@B\nmodule;\n\nfn f(): void { }\n").Replace("\r\n", "\n"));
     }
 
     [Fact]

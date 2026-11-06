@@ -128,6 +128,17 @@ public static class AstDumper
                 Line(sb, indent, $"Member {n.Member}{(n.IsOptional ? " (optional)" : "")}", n.Span);
                 Write(n.Target, indent + 1, sb);
                 break;
+            case FieldByInfoExpr n:
+                Line(sb, indent, "FieldByInfo", n.Span);
+                Write(n.Target, indent + 1, sb);
+                Write(n.Info, indent + 1, sb);
+                break;
+            case PayloadByInfoExpr n:
+                Line(sb, indent, "PayloadByInfo", n.Span);
+                Write(n.Target, indent + 1, sb);
+                Write(n.Variant, indent + 1, sb);
+                Write(n.Field, indent + 1, sb);
+                break;
 
             // --- composite literals ---
             case ArrayLitExpr n:
@@ -291,6 +302,7 @@ public static class AstDumper
                 break;
             case InterfaceDecl n:
                 Line(sb, indent, $"Interface {n.Name}{Vis(n.Visibility)}{(n.IsSealed ? " sealed" : "")}", n.Span);
+                foreach (var a in n.Attributes) Write(a, indent + 1, sb);
                 foreach (var g in n.Generics) Write(g, indent + 1, sb);
                 foreach (var i in n.Interfaces) Write(i, indent + 1, sb);
                 foreach (var t in n.Types) Write(t, indent + 1, sb);
@@ -299,6 +311,7 @@ public static class AstDumper
                 break;
             case ExtendDecl n:
                 Line(sb, indent, $"Extend{Vis(n.Visibility)}", n.Span);
+                foreach (var a in n.Attributes) Write(a, indent + 1, sb);
                 foreach (var g in n.Generics) Write(g, indent + 1, sb);
                 Write(n.Target, indent + 1, sb);            // then the target type
                 foreach (var i in n.Interfaces) Write(i, indent + 1, sb);
@@ -308,11 +321,13 @@ public static class AstDumper
                 break;
             case GlobalBindingDecl n:
                 Line(sb, indent, $"Global{Vis(n.Visibility)}", n.Span);
+                foreach (var a in n.Attributes) Write(a, indent + 1, sb);
                 Write(n.Binding, indent + 1, sb);
                 break;
             case TypeAliasDecl n:
                 Line(sb, indent,
                     $"TypeAlias {n.Name}{(n.IsOpaque ? " opaque" : "")}{Vis(n.Visibility)}", n.Span);
+                foreach (var a in n.Attributes) Write(a, indent + 1, sb);
                 foreach (var g in n.Generics) Write(g, indent + 1, sb);
                 Write(n.Aliased, indent + 1, sb);
                 break;
@@ -529,9 +544,29 @@ public static class AstDumper
                 Line(sb, indent, $"StructInit {(n.IsImplicit ? "." : "")}{string.Join('.', n.Path)}", n.Span);
                 foreach (var a in n.TypeArguments) { Line(sb, indent + 1, "TypeArg", a.Span); Write(a, indent + 2, sb); }
                 foreach (var f in n.Fields) Write(f, indent + 1, sb);
+                foreach (var r in n.Rounds) Write(r, indent + 1, sb);
+                break;
+            case ComptimeIfExpr n:
+                Line(sb, indent, "ComptimeIf", n.Span);
+                Write(n.Condition, indent + 1, sb);
+                Write(n.Then, indent + 1, sb);
+                Write(n.Else, indent + 1, sb);
+                break;
+            case VariantInitExpr n:
+                Line(sb, indent, "VariantInit", n.Span);
+                Write(n.Target, indent + 1, sb);
+                Write(n.Variant, indent + 1, sb);
+                foreach (var f in n.Fields) Write(f, indent + 1, sb);
+                foreach (var r in n.Rounds) Write(r, indent + 1, sb);
+                break;
+            case StructInitRound n:
+                Line(sb, indent, $"InitRound {n.Variable}", n.Span);
+                Write(n.Iterable, indent + 1, sb);
+                Write(n.Item, indent + 1, sb);
                 break;
             case StructInitField n:
                 Line(sb, indent, $"InitField {n.Name}{(n.IsShorthand ? " shorthand" : "")}", n.Span);
+                if (n.Info is not null) Write(n.Info, indent + 1, sb);
                 Write(n.Value, indent + 1, sb);
                 break;
             case WithExpr n:

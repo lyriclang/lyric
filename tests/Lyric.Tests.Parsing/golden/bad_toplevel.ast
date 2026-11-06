@@ -2,7 +2,7 @@ Module [0..6)
   ErrorDecl [0..6)
 
 === diagnostics ===
-error[LYR-PAR0025]: expected a declaration, got IntLiteral
+error[LYR-PAR0025]: expected a declaration, got '1'
  --> bad_toplevel.lyr:1:1
   |
 1 | 1 + 2;

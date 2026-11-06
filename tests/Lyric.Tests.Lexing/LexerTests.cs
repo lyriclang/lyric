@@ -364,8 +364,7 @@ public class LexerTests
     
         // ─── Keywords (Slice 2) ────────────────────────────────────────────────
 
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
-    [InlineData("module",    TokenKind.Module)]
+    [Theory]
     [InlineData("import",    TokenKind.Import)]
     [InlineData("as",        TokenKind.As)]
     [InlineData("pub",       TokenKind.Pub)]
@@ -378,7 +377,6 @@ public class LexerTests
     [InlineData("mut",       TokenKind.Mut)]
     [InlineData("let",       TokenKind.Let)]
     [InlineData("var",       TokenKind.Var)]
-    [InlineData("params",    TokenKind.Params)]
     [InlineData("if",        TokenKind.If)]
     [InlineData("else",      TokenKind.Else)]
     [InlineData("while",     TokenKind.While)]
@@ -1069,21 +1067,6 @@ public class LexerTests
         Assert.False(diag.HasErrors);
     }
 
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
-    [InlineData("\"\\x1F\"",     6)]
-    [InlineData("\"\\xFF\"",     6)]
-    [InlineData("\"\\x00\"",     6)]
-    [InlineData("\"\\xab\"",     6)]
-    public void String_with_valid_hex_escape(string input, int expectedEnd)
-    {
-        // Regression: the loop count in ConsumeHexEscape.
-        var (tokens, diag) = Tokenize(input);
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.StringLiteral, tokens[0].TokenKind);
-        Assert.Equal(expectedEnd, tokens[0].Span.End);
-        Assert.False(diag.HasErrors);
-    }
-
     [Theory]
     [InlineData("\"\\u{41}\"",      8)]    // 'A'
     [InlineData("\"\\u{0}\"",       7)]
@@ -1117,17 +1100,6 @@ public class LexerTests
         var (tokens, diag) = Tokenize("\"\\q\"");
         Assert.Equal(TokenKind.StringLiteral, tokens[0].TokenKind);
         Assert.Equal(1, diag.ErrorCount);
-        Assert.Equal("LYR-LEX0007", diag.Diagnostics[0].Code);
-    }
-
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
-    [InlineData("\"\\x\"")]      // no hex digits
-    [InlineData("\"\\x1\"")]     // only one hex digit
-    [InlineData("\"\\xZZ\"")]    // non-hex
-    public void Invalid_hex_escape_emits_LEX0007(string input)
-    {
-        var (_, diag) = Tokenize(input);
-        Assert.True(diag.ErrorCount >= 1);
         Assert.Equal("LYR-LEX0007", diag.Diagnostics[0].Code);
     }
 
@@ -1230,8 +1202,7 @@ public class LexerTests
         Assert.False(diag.HasErrors);
     }
 
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
-    [InlineData("'\\x1F'",     6)]
+    [Theory]
     [InlineData("'\\u{41}'",   8)]
     [InlineData("'\\u{1F30D}'", 11)]
     public void Char_with_full_escape(string input, int expectedEnd)
@@ -1476,15 +1447,6 @@ public class LexerTests
     {
         var (tokens, diag) = Tokenize(input);
         Assert.Equal(4, tokens.Count);  // FStringStart, Chunk, FStringEnd, Eof
-        Assert.Equal(TokenKind.FStringChunk, tokens[1].TokenKind);
-        Assert.False(diag.HasErrors);
-    }
-
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
-    public void Fstring_chunk_with_hex_escape()
-    {
-        var (tokens, diag) = Tokenize("f\"\\x41\"");
-        Assert.Equal(4, tokens.Count);
         Assert.Equal(TokenKind.FStringChunk, tokens[1].TokenKind);
         Assert.False(diag.HasErrors);
     }

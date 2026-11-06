@@ -328,7 +328,7 @@ public sealed class NameSpanTests
     /// error the containment alone would not see, because a wrong span inside the declaration is
     /// still inside it.</para>
     /// </summary>
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Theory]
     [MemberData(nameof(RealSources))]
     public void Every_declaration_in_a_shipped_file_points_at_its_own_name(string path)
     {
@@ -341,7 +341,9 @@ public sealed class NameSpanTests
         Assert.False(de.HasErrors, $"{path} does not parse");
 
         var declarations = Named(module);
-        Assert.NotEmpty(declarations);
+
+        // std.prelude and std.meta pass on what other modules declare, and declare nothing.
+        if (Path.GetFileName(path) is not ("prelude.lyr" or "meta.lyr")) Assert.NotEmpty(declarations);
 
         foreach (var decl in declarations)
         {

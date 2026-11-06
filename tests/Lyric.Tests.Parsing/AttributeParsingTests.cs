@@ -179,14 +179,6 @@ public class AttributeParsingTests
         Assert.Equal("A", Assert.Single(member.Attributes).Path[^1]);
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
-    public void An_attribute_on_an_extend_block_is_rejected()
-    {
-        Parse("@A\nextend int { fn f(): int { return 1; } }", out var diagnostics);
-
-        Assert.Contains(diagnostics, d => d.Code == "LYR-PAR0042");
-    }
-
     /// <summary>Since 3.9 the parenthesized form IS attribute syntax: one positional value,
     /// filling the first field. Whether an attribute admits it is the checker's rule
     /// (<c>WithArg&lt;T&gt;</c>), not the parser's — here it only has to parse.</summary>

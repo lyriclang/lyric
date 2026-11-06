@@ -1,9 +1,9 @@
 Module main
-  Struct Point
+  Struct Point [internal]
     Import Self -> Struct Point
     Field x
     Field y
-    Function distance
+    Function distance [internal]
   Function origin [pub]
-  Global pi
-  Alias NodeId
+  Global pi [internal]
+  Alias NodeId [internal]

@@ -1,10 +1,10 @@
 Module main
-  Enum Shape
+  Enum Shape [internal]
     Import Self -> Enum Shape
     Variant Circle
     Variant Rectangle
     Variant Empty
-    Function area
-  Interface Damageable
-    Function takeDamage
-    Function isAlive
+    Function area [internal]
+  Interface Damageable [internal]
+    Function takeDamage [internal]
+    Function isAlive [internal]

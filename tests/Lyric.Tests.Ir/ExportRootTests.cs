@@ -80,9 +80,8 @@ public class ExportRootTests
         Assert.EndsWith(".surface", module.Functions[root.Value].Name);
     }
 
-    /// <summary>An attributed function is a root of its own — the SECOND root rule, and the one a
-    /// library needs: a host finds such a function through the row in section 11 and calls it by
-    /// that index, a caller no call graph shows.</summary>
+    /// <summary>An attribute is inert: what it marks stays only when something calls it, or when it
+    /// is pub in a library.</summary>
     private const string Attributed = """
         import std.core { OnFunction };
 
@@ -96,28 +95,15 @@ public class ExportRootTests
         pub fn surface(): int { return 7; }
         """;
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
-    public void An_attributed_function_survives_without_being_pub()
+    [Fact]
+    public void An_attribute_keeps_no_function_alive()
     {
         var module = Lower(Attributed, libraryRoots: true);
 
-        // Not pub, called by nobody, and it ships all the same. 'dead_before' is the control: it
-        // is neither, and it does not.
-        Assert.Contains(module.Functions, f => f.Name.EndsWith(".hooked"));
+        // Not pub and called by nobody, so it goes with 'dead_before'; 'surface' is the control.
+        Assert.DoesNotContain(module.Functions, f => f.Name.EndsWith(".hooked"));
         Assert.DoesNotContain(module.Functions, f => f.Name.EndsWith(".dead_before"));
-    }
-
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
-    public void An_attribute_row_follows_the_renumbering()
-    {
-        var module = Lower(Attributed, libraryRoots: true);
-
-        // 'dead_before' stood in front of 'hooked' and is gone, so every index behind it moved.
-        // A row left in the old numbering would hand the host an arbitrary survivor — here
-        // 'surface', which is the neighbour and answers a different question entirely.
-        var row = Assert.Single(module.Attributes,
-            a => a.TargetKind == IrAttributeTarget.Function);
-        Assert.EndsWith(".hooked", module.Functions[row.Target].Name);
+        Assert.Contains(module.Functions, f => f.Name.EndsWith(".surface"));
     }
 
     [Fact]

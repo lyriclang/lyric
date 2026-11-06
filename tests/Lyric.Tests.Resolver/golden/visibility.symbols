@@ -2,8 +2,8 @@ Module main
   Struct Exported [pub]
     Import Self -> Struct Exported
     Field x
-  Struct Internal
+  Struct Internal [internal]
     Import Self -> Struct Internal
     Field y
   Function publicFn [pub]
-  Function privateFn
+  Function privateFn [internal]

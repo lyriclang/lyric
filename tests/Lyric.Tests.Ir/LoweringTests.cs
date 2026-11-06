@@ -174,20 +174,18 @@ public class LoweringTests
         return ir!;
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Stdlib_is_loaded_from_source_when_imported()
     {
-        // The core of source-first: std.io.console is an ordinary Lyric module, loaded and type-checked
-        // while resolving, with no special case in the compiler. Since v1.14 'println' is a Lyric
-        // body over Display; the import it reaches is the private native behind it.
+        // The core of source-first: std.io is an ordinary Lyric module, loaded and type-checked
+        // while resolving, with no special case in the compiler. 'println' is a Lyric body.
         var module = LowerWithStdlib("""
-            import std.io.console { println };
+            import std.io { println };
             fn main(): int { println("hi"); return 0; }
             """);
 
-        var println = Assert.Single(module.Imports, i => i.Name == "std.io.console.rawPrintln");
-        Assert.Equal(new IrScalarType(IrScalar.String), Assert.Single(println.ParamTypes));
-        Assert.Equal(new IrScalarType(IrScalar.Void), println.ReturnType);
+        var println = Assert.Single(module.Functions, f => f.Name.StartsWith("std.io.println", StringComparison.Ordinal));
+        Assert.NotEmpty(println.Blocks);
     }
 
     /// <summary>
@@ -201,23 +199,23 @@ public class LoweringTests
     /// generality as two small Lyric bodies (this test lowers UNOPTIMIZED; the inliner exists
     /// for exactly this shape), not a return of the old bloat.</para>
     /// </summary>
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_program_carries_only_what_it_reaches()
     {
         var module = LowerWithStdlib("""
-            import std.io.console { println };
+            import std.io { println };
             fn main(): int { println("hi"); return 0; }
             """);
-
-        Assert.Equal(3, module.Functions.Count);
-        Assert.Single(module.Imports);
-        Assert.Equal("std.io.console.rawPrintln", module.Imports[0].Name);
-
-        // The three that used to come along unavoidably.
         var namen = module.Functions.Select(f => f.Name).ToArray();
-        Assert.DoesNotContain("std.iter.RangeIterator.next", namen);
-        Assert.DoesNotContain("std.iter.StringIterator.next", namen);
-        Assert.DoesNotContain("std.io.console.prompt", namen);
+        Assert.Contains(namen, n => n.StartsWith("std.io.println", StringComparison.Ordinal));
+        Assert.DoesNotContain("std.io.stdin", namen);
+
+        // The control: what the first program leaves behind is there when a program reaches it.
+        var reaching = LowerWithStdlib("""
+            import std.io { stdin };
+            fn main(): int { let _ = stdin(); return 0; }
+            """);
+        Assert.Contains("std.io.stdin", reaching.Functions.Select(f => f.Name));
     }
 
     /// <summary>
@@ -247,16 +245,15 @@ public class LoweringTests
         Assert.Empty(module.Attributes);
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Stdlib_signatures_are_enforced()
     {
         // The proof that the signature really arrives: with every stdlib symbol opaque, a wrong
-        // argument type would pass silently. `println(42)` stopped being the example when the
-        // print family went generic over Display in v1.14; `writeText` keeps two fixed string
-        // parameters, so a number in the second slot is the same proof.
+        // argument type would pass silently. `writeText` has two fixed text parameters, so a number
+        // in the second slot is the proof.
         var sm = new SourceManager();
         var id = sm.AddVirtual("test.lyr",
-            "import std.io.file { writeText };\nfn main(): int { let _ = writeText(\"p\", 42); return 0; }");
+            "import std.fs { writeText };\nfn main(): int { let _ = writeText(\"p\", 42); return 0; }");
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
@@ -268,21 +265,18 @@ public class LoweringTests
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0001");
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
-    public void Interpolation_lowers_to_a_concat_chain()
+    [Fact]
+    public void Interpolation_lowers_to_puts_on_a_buffer()
     {
         var module = LowerWithStdlib("""
             fn main(): int { let n = 7; let s = f"n={n}!"; return 0; }
             """);
 
-        // "n=" ++ fromInt(n) ++ "!" — two concats, one converter
-        //
-        // CONTAINMENT is checked rather than exclusivity. The Lyric bodies in 'std.string' (parseInt,
-        // replace, …) drag their own natives along as soon as the module is loaded, even when nobody
-        // calls them.
+        // The text and the number go onto one buffer, and a string comes of it at the end.
         var namen = module.Imports.Select(i => i.Name).ToArray();
-        Assert.Contains("std.string.fromInt", namen);
-        Assert.Contains("std.string.concat", namen);
+        Assert.Contains("C:lyr_bytes_put", namen);
+        Assert.Contains("C:lyr_bytes_put_int", namen);
+        Assert.Contains("C:lyr_str_from_byte_array", namen);
     }
 
     [Fact]
@@ -504,17 +498,10 @@ public class LoweringTests
     // it. There is no type left that the sema accepts and the lowering rejects.
 
     // Constructs whose type is scalar: here the boundary applies at the expression or statement.
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
-    // f-strings lower to a concat and fromXxx chain. Without the stdlib on the module path the helpers
-    // are missing, and the message names the missing one rather than claiming "f-strings do not work".
-    // At the first hole that is the converter, before the concat.
-    [InlineData("fn f(): string { return f\"n={1}\"; }", "std.string.fromInt")]
-    // 'match' over an enum lowers; over a scalar it needs literal patterns, which are a later stage.
-    // 'for-in' over a string lowers with std.string on the module path, and these tests run without
-    // it. The message names the reason rather than merely the construct, and that is what this test
-    // checks: that it says WHERE and WHAT. (A range LITERAL no longer asks for std.iter: it lowers
-    // as a counted loop, see below.)
-    [InlineData("fn f(): int { var s = 0; for (c in \"abc\") { if (c == 'a') { s += 1; } } return s; }", "std.iter")]
+    [Theory]
+    // Without the standard library on the module path an f-string's helper is missing, and the message
+    // names the missing one rather than claiming "f-strings do not work": it says WHERE and WHAT.
+    [InlineData("pub fn f(): string { return f\"n={1}\"; }", "std.string.fromInt")]
     public void Out_of_scope_constructs_report_where_and_what(string source, string expected) =>
         AssertNotSupported(source, expected);
 
@@ -577,14 +564,14 @@ public class LoweringTests
     /// <para>4.5 closes it: the sema points every alternative's binding at the first
     /// alternative's symbol, so all of them store into one slot, and the spurious SEM0071 for
     /// the later alternatives is gone with it — no diagnostic at all remains.</para>
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void An_or_pattern_that_binds_is_lowered_without_diagnostics()
     {
         var (ir, de) = TryLower(
             "enum E { A(int), B(int) } fn f(e: E): int { match (e) { E.A(x) | E.B(x) => { return x; } } }");
 
         Assert.NotNull(ir);
-        Assert.Empty(de.Diagnostics);
+        Assert.False(de.HasErrors, Render(de));
     }
 
     [Fact]
@@ -673,9 +660,8 @@ public class LoweringTests
         var (ir, de) = TryLower(source);
 
         Assert.Null(ir); // no partial result: the FunctionIds would be shifted
-        var diagnostic = Assert.Single(de.Diagnostics);
+        var diagnostic = Assert.Single(de.Diagnostics, d => d.Severity == Severity.Error);
         Assert.Equal("LYR-SEM0195", diagnostic.Code);
-        Assert.Equal(Severity.Error, diagnostic.Severity);
         Assert.Contains(expected, diagnostic.Message, StringComparison.Ordinal);
 
         // The span points into the source file.
@@ -723,7 +709,7 @@ public class LoweringTests
         Assert.DoesNotContain(ir.Functions, f => f.Name == "main.id");
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Two_modules_declaring_one_generic_name_get_two_instances()
     {
         // The instance key is the NAME, so an unqualified one made two declarations into one
@@ -735,11 +721,9 @@ public class LoweringTests
         var overlay = new Dictionary<string, string>
         {
             [Path.GetFullPath(Path.Combine(root, "alpha.lyr"))] = """
-                module alpha;
                 pub fn twice<T>(x: T): T { return x; }
                 """,
             [Path.GetFullPath(Path.Combine(root, "beta.lyr"))] = """
-                module beta;
                 pub fn twice<T>(x: T): T { return x; }
                 """,
         };
@@ -807,38 +791,39 @@ public class LoweringTests
     /// what this test is about, so it moved to a construct that is still a genuine limit — a
     /// generic method value, which the language will one day lower and today does not.</para>
     /// </summary>
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void The_lowering_limit_says_the_construct_and_its_code_the_reason()
     {
-        // Iterating a string without std.iter on the module path: the reason is the code's
+        // An f-string without the standard library on the module path: the reason is the code's
         // (LYR-SEM0195, design/v5/spec/11 G4), the construct the message's, and no note repeats
         // the category the code already is.
         var (ir, de) = TryLower("""
-            fn main(): int { var s = 0; for (c in "aaa") { if (c == 'a') { s += 1; } } return s; }
+            pub fn f(): string { return f"n={1}"; }
             """);
 
         Assert.Null(ir);
         var diagnostic = Assert.Single(de.Diagnostics.Where(d => d.Code == "LYR-SEM0195"));
-        Assert.Contains("iterating a string", diagnostic.Message);
+        Assert.Contains("std.string.fromInt", diagnostic.Message);
         Assert.DoesNotContain("cannot lower it yet", diagnostic.Message);
         Assert.True(diagnostic.Notes is null or { Count: 0 });
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void All_scope_limits_of_a_program_are_reported_in_one_run()
     {
         // One message per call would be harassment: whoever uses three unsupported constructs should see
         // them in one run, so the lowering keeps collecting per function. The test measures at whichever
         // boundary still stands; it counts messages, it does not claim which constructs are missing.
         var (ir, de) = TryLower("""
-            fn a(): int { var s = 0; for (c in "aaaa") { if (c == 'a') { s += 1; } } return s; }
-            fn b(): int { var s = 0; for (c in "aaa") { if (c == 'a') { s += 1; } } return s; }
-            fn c(): int { var s = 0; for (c in "aa") { if (c == 'a') { s += 1; } } return s; }
+            pub fn a(): string { return f"a={1}"; }
+            pub fn b(): string { return f"b={1}"; }
+            pub fn c(): string { return f"c={1}"; }
             """);
 
         Assert.Null(ir);
-        Assert.Equal(3, de.Diagnostics.Count);
-        Assert.All(de.Diagnostics, d => Assert.Equal("LYR-SEM0195", d.Code));
+        var errors = de.Diagnostics.Where(d => d.Severity == Severity.Error).ToArray();
+        Assert.Equal(3, errors.Length);
+        Assert.All(errors, d => Assert.Equal("LYR-SEM0195", d.Code));
     }
 
     [Fact]

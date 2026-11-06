@@ -2474,3 +2474,21 @@ Die Bibliothek ist tatsächlich still. Gefunden hat der Test zwei Beispiele: `ex
 
 **Befund, nicht behoben:** `struct A :: [Into<B>, Into<C>]` mit zwei `fn into()` wird angenommen, aber kein Aufruf kommt daran: `let b: B = a.into()` meldet `LYR-SEM0086` und rät zu `as`, und `as` lehnt ab (`LYR-SEM0006`, „converts numbers only"). Geprüft mit `lyric5 check`. `From` hat das Problem nicht, dort entscheidet das Argument. `OperatorIntoTests` hält nur fest, dass die Deklaration steht. Ob der erwartete Typ wählen soll oder zwei Ziele abgelehnt werden, ist eine Entscheidung des Maintainers.
 
+## Nachtrag 2026-11-06 — M17 S2c: die übrigen Suiten auf Lyric 5
+
+Die letzten 35 Marken sind weg (Ir 14, Formatting 7, Lexing 6, Parsing 5, Resolver 3). Beim Entfernen waren 54 Fälle rot. Jetzt laufen 2148 Fälle in den fünf Suiten, keiner übersprungen. Damit ist die Marke im ganzen Baum fort und S2 fertig.
+
+**Gelöscht: 6 Methoden und 4 Zeilen.** `\x` im Lexer (die Ablehnung hält die Lyric-5-Zeile mit `LYR-LEX0013`), `module` und `params` als Schlüsselwörter, `for` über einen `string` als Grenze der Senkung (`LYR-SEM0232` meldet das jetzt früher), ein Attribut auf `extend` als Parserfehler, und die beiden Tests zu den Attributzeilen des Bytecode-Formats.
+
+**Der Formatter wich vom Entwurf ab, jetzt nicht mehr.** 08 D16 und 09 F5 sagen: Zwei Attribute werden zur Gruppe `@[A, B]`. M13a S1 hatte stattdessen Stapel gebaut und einen Test darauf gesetzt, begründet mit „wie die Standardbibliothek". Das stimmte nicht: In `stdlib5` steht kein einziger Stapel. Der Zweig ist weg, der Test sagt jetzt das Gegenteil. Der Kopf eines Moduls bekommt die Gruppe auch, das war in 4.x eine Ausnahme, die der Entwurf nicht nennt. `lyric fmt --check` über das Repository bleibt grün. Dabei fiel auf: Ein Kopf ohne Namen wurde `module ;` geschrieben. Behoben, die Gegenprobe macht den neuen Test rot.
+
+**Redundante Klammern bleiben** (11 E5). Vier Tests erwarteten noch das Gegenteil von 4.x und sagen jetzt, was gilt.
+
+**`AstDumper` kannte vier Knoten nicht** (`FieldByInfoExpr`, `PayloadByInfoExpr`, `VariantInitExpr`, `ComptimeIfExpr`), und deshalb warf der Korpustest des Formatters für `std.codec`, `std.core` und `std.ffi`. Er zeigt jetzt auch die Runden eines Initialisierers und die Attribute auf Interface, `let`, Alias und `extend`. Sonst hätte der Snapshot `attr_other_targets` nicht gezeigt, dass sie ankommen.
+
+**Attribute halten nichts am Leben** (07 B6: die Wurzeln sind `main` und die Exporte). Der Test sagt das jetzt so. `ModuleLowerer.CollectAttributes` hat in Lyric 5 keinen Aufrufer mehr und geht mit S3.
+
+**Der Verifier läuft im Debug-Profil eines Programms zweimal.** Die Frage nach dem Scheduler und das Beschneiden der Globalen ändern das Modul auch ohne Optimierung. Das ist richtig, nur der Kommentar behauptete „genau einmal". Test und Kommentar sagen jetzt, wann. Der Verifier läuft in einem Release-Compiler ohnehin nicht.
+
+13 Snapshots sind neu geschrieben und einzeln gelesen. Geändert haben sich nur die Quellen des Lexer-Falls, Tokens in den Meldungen des Parsers (`'*'` statt `Star`), `[internal]` in den Symbolen des Resolvers und die Attribute im neuen Fall.
+
