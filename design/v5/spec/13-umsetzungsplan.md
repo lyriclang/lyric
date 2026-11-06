@@ -2368,3 +2368,54 @@ wäre die EBNF nach einem Monat falsch, ohne dass es jemand merkt.
 
 **Nicht in M17**: die Umbenennung `lyric5` → `lyric`, Website `/5.0/`, `lyric-script 1.0.0` (M18); eine zweite Sprache des Books (14 W4).
 
+
+## Nachtrag 2026-11-06 — M17 S1: die Messung
+
+Alle acht Suiten liefen zweimal auf main bf6b9600, einmal wie immer und einmal im Lyric-5-Modus gegen `stdlib5`. Der Schalter war eine Umgebungsvariable in
+`SourceManager`, `Compilation` und `StdlibLoader`, nur im Worktree, nie auf main. Im 4.x-Modus waren alle Suiten grün.
+
+| Suite | Tests | rot in 5 | wovon |
+|---|---:|---:|---|
+| Core | 653 | 0 | |
+| Lexing | 398 | 12 | `module`, `params` als Wörter und ihre Golden |
+| Parsing | 761 | 6 | 5 Golden, 1 Attribut |
+| Resolver | 25 | 9 | 7 Golden, 2 Regeln |
+| Formatting | 722 | 6 | Sonderformen im `FormatterTests` |
+| Sema | 1613 | 356 | siehe unten |
+| Ir | 230 | 15 | 10 `LoweringTests`, 5 andere |
+| Lsp | 384 | 0 | liest schon `stdlib5` |
+| **zusammen** | **4786** | **404** | 8,4 % |
+
+**Kontrolle**: mit einem Pfad, unter dem keine Bibliothek liegt, werden Sema 440 und Ir 47 rot statt 356 und 15. Der Schalter wirkt also, und 1173 der Sema-Tests brauchen gar keine Bibliothek.
+
+**Sema zerlegt.** 64 der 356 fallen weg, sobald der `module`-Kopf erlaubt ist (dann 292, Ir 14): Helfer mit einem eigenen kleinen `std.core`. Die 292, jeder Test nach dem ersten Befund einsortiert:
+
+| Rote | Befund | Art |
+|---:|---|---|
+| 89 | `LYR-RES0002`: `Error`, `Display`, `Add` … unbekannt, der Helfer lädt keine Bibliothek | Gerüst |
+| 46 | die Lints reden mit: `SEM0201`, `SEM0198`, `SEM0223`, wo der Test keine Warnung erwartet | Gerüst |
+| 28 | Assert ohne Code, meist die Attribute | einzeln |
+| 27 | `CorpusWarningTests` über `tests/corpus-4x` | fällt mit dem Korpus |
+| 15 | `params` | Regel von 4 |
+| 13 | Modul oder Name der 4.x-Bibliothek (`std.io.console` …) | nachziehen |
+| 11 | `WithArg`, Attributzeilen | einzeln |
+| 63 | je Code höchstens 9 | einzeln |
+
+Das sind 135 Gerüst, 42 Regeln und Korpus von 4, 13 Nachzug und 102 einzeln. Die Einsortierung liest nur den ersten Befund, die Zahlen sind daher Größenordnung, keine Zusage.
+
+**Was die Messung nicht sagt**: Grün heißt nicht, dass der Test etwas von Lyric 5 prüft. Ein Test, der nur das Fehlen eines Codes verlangt, bleibt auch über einem Quelltext grün, den Lyric 5 anders liest. Das fällt erst beim Durchsehen auf.
+
+**Zwei Befunde**:
+
+- Ein echter Bug: `fn g(_: int, _: int)` stürzte den Compiler ab (`LYR-ICE0001`), bei jedem Programm mit so einer Liste. Der Fall stand in einem Sema-Test, der nur im Modus ohne Lints lief. Behoben in lyric#674.
+- Offen: `ErrorTypeInvariantTests` zählt auf `arith.lyr` 541 Ausdrücke mit `ErrorType` ohne Meldung, 471 davon in einer Datei (`PayloadByInfoExpr`, `FieldByInfoExpr`, der Bibliothek oder dem Synthetisierten zuzurechnen, noch nicht zugeordnet). Ob das die Invariante oder ihr Gerüst trifft, klärt S2a zuerst.
+
+**Der Schnitt von S2**, kleiner als im Plan angenommen:
+
+| Slice | Inhalt | Rote |
+|---|---|---:|
+| **S2a** | Gerüst: Standard Lyric 5 in den Helfern, Bibliothek `stdlib5`, kleine `std.core` ohne Kopf, Lints abgefiltert; dazu der `ErrorType`-Befund | gut 200 |
+| **S2b** | Sema, was übrig bleibt: nachziehen oder streichen, gezählt | gut 150 |
+| **S2c** | Lexing, Parsing, Resolver, Formatting, Ir | 48 |
+
+**Reflexion**: Die Sorge hinter P2 war eine Zahl, die den Umzug unbezahlbar macht. Sie ist 8,4 %, und rund die Hälfte davon (199) hängt am Gerüst der Tests, nicht an einer Regel. Das stützt P1: Die Weichen zu entfernen ist bezahlbar.
