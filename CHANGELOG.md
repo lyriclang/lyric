@@ -375,7 +375,7 @@ promise. This entry fills with the milestones.
   `Evaluating`, `Lowering`, `Emitting`), a timed step ends with its time on a terminal and a log gets a `Timings`
   line, `Produced` names what came of the build with its size, and `Summary` the warnings and the C units from the
   cache. `-v` adds each package, `std` among them, and each C unit with its time.
-- **`lyric fix --from-4` (M16, in progress)**: migrates a Lyric 4 package (its `lyric.json`) or a file. The program
+- **`lyric fix --from-4`**: migrates a Lyric 4 package (its `lyric.json`) or a file. The program
   is read with Lyric 4.6's frozen front end — one 4.6 refuses is not changed (`LYR-MIG0001`) —, the rules rewrite
   spans so comments and layout stay, and what a person decides is said as a hint (`LYR-MIG`) and written to
   `fix-from-4.txt`; `--dry-run` shows the diff. The first rules: the module header, `lyric.json` → `lyric.toml`, the
@@ -413,7 +413,11 @@ promise. This entry fills with the milestones.
   which a test now holds against the table: `padLeft(s, w)` → `s.padStart(w)`, `isNaN(x)` → `x.isNan()`, `formatHex(n)` →
   `f"{n:x}"`, `readLine()` → `(try? stdin().readLine()) ?? null`; `joinPath` and `parentDir` become `join` and `parent`, and what
   they do otherwise is said with `LYR-MIG0602`. `std.time` gained `Instant.ofEpochMillis(n)`, the
-  inverse of `epochMillis()`, so a 4.6 call stays as it is.
+  inverse of `epochMillis()`, so a 4.6 call stays as it is. And what the migration of 4.6's own examples found: a module's name stays
+  what the program calls it (`import std.io as console;`), `fn main(args: string[])` takes its arguments from `std.os`, a method that
+  answers a public interface for a public type becomes `pub`, and a method of a class that writes `this` becomes `mut fn`; a written
+  struct parameter, an enum that holds itself, a file without `main` and `extern "dotnet"` are said by hand.
+- **`examples/` is Lyric 5**: each program is what `lyric fix --from-4` makes of its 4.6 form, and prints what 4.6 printed.
 - **The language server answers a held hover after the diagnostics** it waited for, not before them.
 - **`unused-import` no longer tells you to break the program**, and `lyric fix` no longer does it: it keeps the
   module where a method the file calls comes through a `pub import` of it, takes out an import when another one or

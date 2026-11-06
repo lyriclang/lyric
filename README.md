@@ -107,7 +107,7 @@ lyric/
 |---|---|
 | [`design/v5/spec/`](design/v5/spec/) | The Lyric 5 decisions, one document per area, and the plan (13) |
 | [`STATUS.md`](STATUS.md) | The open milestone, what was learned on the way |
-| [`docs/guide/`](docs/guide/) | The 4.x user guide (the 5 guide comes with M17) |
+| [`docs/guide/`](docs/guide/) | The 4.x user guide (M17's Book takes its place) |
 | [`docs/Grammar.md`](docs/Grammar.md), [`docs/Bytecode.md`](docs/Bytecode.md), [`docs/Pack.md`](docs/Pack.md) | The 4.x references, frozen at the 4.6 cut |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | The three rules and the process |
 | [`CHANGELOG.md`](CHANGELOG.md) | What changed per release, from v1.0.0 on |

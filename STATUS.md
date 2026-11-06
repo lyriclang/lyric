@@ -13,8 +13,8 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
   Lyric 5 migration warnings), on its own roadmap toward `lyric-script 1.0.0`.
 - **`main` is Lyric 5 in development**, no promise of any kind. Of the 4.x toolchain the tree
   keeps the front end (lexer, parser, resolver, sema, IR) the Lyric 5 compiler grows out of
-  (13, M2), the language server (`Lyric.Lsp`, Lyric 5's since M13b: `lyric lsp`, `lyric dap`), the standard library source (until M8a) and the
-  examples (the input of M16); the VM, the tools, the bytecode format and their tests went with
+  (13, M2), the language server (`Lyric.Lsp`, Lyric 5's since M13b: `lyric lsp`, `lyric dap`), the standard library source (until M8a) and, for the 4.x suites, the mixed examples in
+  `tests/corpus-4x/` (both go with M17); the VM, the tools, the bytecode format and their tests went with
   M2 S0 and live on in `lyric-script`. The 4.x code says **4.6.0**. Beside it grows **`lyric5`**
   (`src/Lyric5`), the Lyric 5 command line as one NativeAOT binary, at **5.0.0** (`dev` builds:
   `5.0.0-dev.<date>+<sha>`).
@@ -60,9 +60,9 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M14 | FFI and embedding | L | **done** 2026-10-28 |
 | M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | **done** 2026-10-29 |
 | M15 | Distribution | M | **done** 2026-10-29 but its halts (S6 signing; S7 mirror set aside by the maintainer 2026-11-04) |
-| M16 | Migration (`lyric fix --from-4`) | L | open: S1–S4 done (S4 2026-11-05, in three parts); S5 next |
+| M16 | Migration (`lyric fix --from-4`) | L | **done** 2026-11-06 |
 | P | std by subject module (design 10 P1–P12, plan in 13) | L | **done** 2026-11-04 |
-| M17 | Spec 5.0, suite, guide | L | — |
+| M17 | Spec 5.0, suite, Book; the 4.x remains leave | XL (measured, was L) | open: plan in 13 |
 | M18 | Release 5.0.0 | M | — |
 
 Sizes are sessions, not dates: S days, M 1–2 weeks, L 3–4 weeks, XL more. A milestone more than
@@ -1381,7 +1381,7 @@ released (171, 155, 168), a sweep round before M11 (10 "Review 2026-10-15"; 13 "
   job had hung in a pool call after the http client tests — a lost wake-up in the scheduler's
   step loop, fixed apart (187, lyric#475); why a wait stays armed after those tests is 191.
 
-### M16 — open (S1–S3 done)
+### M16 — done (2026-11-06)
 
 The plan is design 13's addendum "der Plan für M16" (#618; S1–S8).
 
@@ -1410,8 +1410,9 @@ The plan is design 13's addendum "der Plan für M16" (#618; S1–S8).
 - **S6d**: every public function of 4.6 held against the table by a test; what it found stood nowhere in design 12 and
   reached the user as a bare `SEM0012`: `std.fmt`, the rest of `std.math` and `std.io.console`, `joinPath`, `parentDir`, `bytes`
   (B18–B22). The test compares names, so a function that kept its name and changed its meaning passes it.
-- **Next**: S7, acceptance
-  and the test that holds every public function of 4.6 against the table. Then S7, S8 closes.
+- **S8**: `fix --from-4` in spec 14 §14, informative: no promise that the result compiles, and the rules are not specified. M16 ends; the plan for M17 stands in design 13.
+- **What it left**: a method of a class under an interface that says otherwise, a written struct parameter and an enum that holds itself are by hand. `--json` does not go with `--from-4` (the plan had it). 4.6 is frozen with its examples, and its own output is the acceptance's oracle.
+- **Next: M17**, design 13's addendum: the 4.x remains leave, spec and suite are closed, the Book is written.
 
 ### Block P — done (2026-11-04)
 
