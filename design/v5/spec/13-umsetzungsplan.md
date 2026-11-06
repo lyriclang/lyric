@@ -2438,7 +2438,7 @@ Der main-Lauf von `e70be167` (M17 S2a) stürzte im Windows-Job in `tests/std` ab
 
 **Der Fehler**: `hand_out` löscht Startbits nur in den Zeilen, die es neu ausgibt. Ein totes Objekt, dessen Kopf in einer behaltenen Zeile neben etwas Lebendigem liegt, behält sein Startbit, während sein Schwanz neu vergeben wird. Trifft ein veraltetes Wort diesen Kopf, wird das Objekt markiert. Für gewöhnliche Objekte ist das folgenlos, weil `mark_word` jedes Wort prüft. `trace_coro` aber glaubt `ctx.sp` und `ctx.base` und liest dort.
 
-**Die Korrektur**: `sweep_one` schneidet die Startbits eines behaltenen Blocks mit seinen Markbits. Danach hat nur noch Lebendiges einen Start. `runtime/tests/stale_start.c` legt die Lage deterministisch her, unter voller und unter junger Sammlung. Ohne die Korrektur stürzt der Test in beiden Profilen auf Linux ab, mit ihr läuft er durch.
+**Die Korrektur**: `sweep_one` schneidet die Startbits eines behaltenen Blocks mit seinen Markbits. Danach hat nur noch Lebendiges einen Start. `runtime/tests/stale_start.c` legt die Lage deterministisch her, unter voller und unter junger Sammlung. Ohne die Korrektur stürzt der Test in beiden Profilen auf Linux ab und ebenso in einem mit `zig cc` für Windows gebauten Programm (`-O2` und `-O0`). Mit ihr läuft er durch. Der Test wiederholt den Aufbau, falls ein veraltetes Wort die Koroutine am Leben hält, und schlägt fehl, wenn er die Lage nie herstellt.
 
 **Was nicht belegt ist**: Dass genau dieser Pfad den Absturz in CI ausgelöst hat. Die Stelle stimmt überein, die Adresse `0x68` nicht als Beleg: Der Test setzt sie selbst. Der CI-Absturz selbst ließ sich nicht wiederholen. Tritt derselbe Stack nach der Korrektur wieder auf, ist die Ursache eine andere.
 
