@@ -30,7 +30,7 @@ public class OperatorIntoTests
         return de;
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_conforming_cast_checks_clean()
     {
         var de = Check("""
@@ -43,7 +43,7 @@ public class OperatorIntoTests
             }
 
             fn main(): int {
-                let b = A { n = 1 } as B;
+                let b: B = A { n = 1 }.into();
                 return b.n;
             }
             """);
@@ -52,7 +52,7 @@ public class OperatorIntoTests
             string.Join("\n", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void The_method_alone_is_not_enough()
     {
         // The nominal rule, third time: an 'into' method without the conformance stays a cast error.
@@ -71,7 +71,7 @@ public class OperatorIntoTests
 
         var found = de.Diagnostics.FirstOrDefault(d => d.Code == "LYR-SEM0006");
         Assert.NotNull(found);
-        Assert.Contains("Into<B>", found.Message);
+        Assert.Contains("converts numbers only", found.Message);
     }
 
     [Fact]
@@ -98,12 +98,11 @@ public class OperatorIntoTests
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0006");
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
-    public void A_second_conversion_target_is_a_duplicate_member()
+    [Fact]
+    public void A_second_conversion_target_is_a_second_conformance()
     {
-        // The documented limit: 'into' is a member name and a type has one member of a name. Two
-        // conformances would need two methods; the second is a redeclaration diagnostic, and this
-        // test is where the limit is measured rather than asserted in prose.
+        // Members of a conformance are told apart at the instance: two 'into' of the same arity stand
+        // beside each other, one per target.
         var de = Check("""
             import std.core { Into };
 
@@ -112,14 +111,14 @@ public class OperatorIntoTests
 
             struct A :: [Into<B>, Into<C>] {
                 n: int,
-                fn into(): B { return B { n = this.n }; },
+                fn into(): B { return B { n = this.n }; }
                 fn into(): C { return C { n = this.n }; }
             }
 
             fn main(): int { return 0; }
             """);
 
-        Assert.True(de.HasErrors);
+        Assert.False(de.HasErrors);
     }
 
     [Fact]

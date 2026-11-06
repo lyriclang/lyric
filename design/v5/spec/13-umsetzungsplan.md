@@ -2445,3 +2445,32 @@ Der main-Lauf von `e70be167` (M17 S2a) stürzte im Windows-Job in `tests/std` ab
 **Kosten**: 256 Byte je gefegtem Block, im Rauschen der Messung. `bench/gc`, Minimum aus 5 Läufen, zwei Runden, vorher / nachher: `binarytrees` 1,048 und 0,921 s / 0,901 und 0,929 s; `lru` 3,603 und 3,530 s / 3,594 und 3,678 s. RSS und Zahl der Sammlungen sind gleich. Die Maschine war zu Beginn belastet.
 
 **Reflexion**: Die Alternative war, nur Koroutinen zu behandeln und das Startbit zu löschen, wenn der Stack geht. Das reicht nicht: Eine normal beendete Koroutine ist dann schon abgemeldet, und niemand sieht ihren Tod. Der Schnitt beim Fegen erledigt es an einer Stelle für jedes Objekt.
+
+## Nachtrag 2026-11-06 — M17 S2b: die Sema-Suite auf Lyric 5
+
+Die 146 zurückgestellten Methoden der Sema-Suite laufen wieder, die Marke ist dort weg. Beim Abbau waren 185 Fälle rot. Danach: 1580 Fälle, alle grün, keiner übersprungen. Vorher waren es 1621.
+
+**Gestrichen sind 40 Methoden und eine Zeile.** Maßstab war: Die Regel gibt es in Lyric 5 nicht mehr, und jemand anderes hält das fest (`CatalogTests.StillInTheSharedFrontend`, Katalogprogramme, Konformanz).
+
+| Gruppe | Methoden | Warum |
+|---|---:|---|
+| `opaque type` | 14 | Keine Form von Lyric 5, `LYR-SEM0175` steht im Katalog |
+| Attribut-Zeilen, `WithArg` | 17 | `SEM0066`, `0069`, `0095`, `0096` erreicht kein `lyric5`-Programm; der doppelte Feldname ist jetzt eine Zeile in `Lyric5.Tests` (`SEM0070`) |
+| Optionale Elemente laufen | 4 | `SEM0091`: `std.core` hat das Protokoll |
+| Einzelne | 5 | Generischer Alias außerhalb von 5, `Add<Money>` als 2.x-Schreibweise, `std.string.concat`, `@Deprecated` über ein Interface (`Lyric5.Tests` zählt die Stellen), `std.io` fehlt |
+
+Dazu die Zeile `neg_bad_main`: `SEM0021` prüft nur der Einstieg, den dieses Gerüst nicht setzt; der Katalog hält den Code.
+
+**Gekippt, weil Lyric 5 anders entschieden hat:** ein Wert aus einer Form (`let d: Describe = [1, 2]`), ein Feld aus Feldern (`[[1, 2]] * 2`), `let a: Any = 5` (03 S8b), `Ordered` ohne geschriebenes `Equatable`, Arrays und Tupel im f-String, nur geschriebene und nie gelesene Variablen (`SEM0199`), unbenutzte Parameter (`SEM0198`). `@Deprecated` wird erst nach den Typen ausgewertet, deshalb laufen `DeprecatedTests` und `DeprecationPromiseTests` jetzt durch die ganze Prüfung statt durch `Semantics.Analyze`; dort waren die „sagt nichts"-Tests leer erfüllt.
+
+**`CorpusWarningTests` prüfte die Bibliothek nicht, zweimal.**
+
+- Der Vergleich stand noch auf dem Wurzelnamen `stdlib`. Jede Bibliotheksdatei lief deshalb als Einstieg und war rot. Das war der sichtbare Teil.
+- Die Probe hatte kein `main`. Der Fehler darin beendete die Prüfung vor den Warnungen, gefiltert wurde er als Rauschen. Grün hieß also nichts. Das hat erst die Gegenprobe gezeigt: Eine eingebaute Warnung in `std/path.lyr` ließ den Test zuerst grün. Mit `main` und `WarnDeps` wird er rot, und die Datei selbst ist unter den roten Zeilen.
+
+Die Bibliothek ist tatsächlich still. Gefunden hat der Test zwei Beispiele: `examples/constants.lyr` (Namen in Großbuchstaben, `SEM0215`) und `examples/patterns/binding-conditions.lyr` (`Result` verdeckt das des Preludes). Beide sind bereinigt.
+
+`ErrorTypeInvariantTests` zählt nur noch die Ausdrücke des Programms, wie in S2a begründet.
+
+**Befund, nicht behoben:** `struct A :: [Into<B>, Into<C>]` mit zwei `fn into()` wird angenommen, aber kein Aufruf kommt daran: `let b: B = a.into()` meldet `LYR-SEM0086` und rät zu `as`, und `as` lehnt ab (`LYR-SEM0006`, „converts numbers only"). Geprüft mit `lyric5 check`. `From` hat das Problem nicht, dort entscheidet das Argument. `OperatorIntoTests` hält nur fest, dass die Deklaration steht. Ob der erwartete Typ wählen soll oder zwei Ziele abgelehnt werden, ist eine Entscheidung des Maintainers.
+

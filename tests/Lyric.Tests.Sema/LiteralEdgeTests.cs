@@ -38,12 +38,12 @@ public class LiteralEdgeTests
         Assert.Equal(2, de.Diagnostics.Count(d => d.Code == "LYR-SEM0001"));
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void An_oversized_literal_in_an_int_context_is_an_error_not_a_reinterpretation()
     {
         // int64.max+1 held its BITS before the wave: the binding read -9223372036854775808.
         var de = Check("fn main(): int {\n    let x = 9223372036854775808;\n    let _ = x;\n    return 0;\n}\n");
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0001" && d.Message.Contains("does not fit 'int'"));
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0227" && d.Message.Contains("does not fit 'int'"));
     }
 
     [Fact]

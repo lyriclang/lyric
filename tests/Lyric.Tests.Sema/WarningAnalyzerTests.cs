@@ -44,7 +44,7 @@ public class WarningAnalyzerTests
             + string.Join("\n", de.Diagnostics.Select(d => $"{d.Code}: {d.Message}")));
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void An_import_used_only_in_a_pattern_path_is_used()
     {
         // 'Color.Red' in a match arm is a VariantPattern whose path is strings — the qualifier
@@ -55,8 +55,6 @@ public class WarningAnalyzerTests
         // --deny-warnings breaks the build the new convention recommends.
         var sm = new SourceManager();
         var libId = sm.AddVirtual("hues.lyr", """
-            module hues;
-
             pub enum Color {
                 Red,
                 Blue,
@@ -84,7 +82,7 @@ public class WarningAnalyzerTests
             """);
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de);
-        comp.AddModule(new Parser(sm, libId, de).ParseModule());
+        comp.AddModule(new Parser(sm, libId, de).ParseModule(), "hues");
         comp.AddModule(new Parser(sm, mainId, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
 
@@ -115,12 +113,11 @@ public class WarningAnalyzerTests
         AssertSilent(Check("fn f(): int { return 1; }\nfn main(): int {\n    let _ = f();\n    return 0;\n}\n"));
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
-    public void A_write_counts_as_a_reference()
+    [Fact]
+    public void A_write_is_no_read()
     {
-        // 'never used' means never referenced. A write-only variable is referenced — whether the
-        // WRITES are pointless is a different analysis, deliberately not this one.
-        AssertSilent(Check("fn main(): int {\n    var x = 1;\n    x = 2;\n    return 0;\n}\n"));
+        // Lyric 5 has that analysis: assigned and never read.
+        AssertWarns(Check("fn main(): int {\n    var x = 1;\n    x = 2;\n    return 0;\n}\n"), "LYR-SEM0199");
     }
 
     [Fact]
@@ -186,12 +183,11 @@ public class WarningAnalyzerTests
         Assert.Contains(de.Diagnostics, d => d.Message.Contains("'width' is never used"));
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
-    public void An_unused_parameter_is_deliberately_exempt()
+    [Fact]
+    public void An_unused_parameter_warns()
     {
-        // A signature is often not the author's to change: interface conformance and callback
-        // shapes fix it. No warning, by decision rather than by gap.
-        AssertSilent(Check("fn f(unused: int): int { return 1; }\nfn main(): int { return f(2); }\n"));
+        // Lyric 5 warns; a name that starts with '_' says it is meant.
+        AssertWarns(Check("fn f(unused: int): int { return 1; }\nfn main(): int { return f(2); }\n"), "LYR-SEM0198");
     }
 
     [Fact]
@@ -215,26 +211,26 @@ public class WarningAnalyzerTests
         Assert.Contains(de.Diagnostics, d => d.Message.Contains("import 'pi'"));
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_used_import_is_silent()
     {
         AssertSilent(Check(
-            "import std.string { concat, parseInt };\n\nfn main(): int {\n    return parseInt(concat(\"4\", \"2\")) ?? 0;\n}\n",
+            "import std.path { stem, parent };\n\nfn main(): int {\n    return stem(parent(\"a/b.c\")).length();\n}\n",
             withStdlib: true));
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Only_the_unused_name_of_a_clause_warns()
     {
         var de = Check(
-            "import std.string { concat, repeat };\n\nfn main(): int {\n    return concat(\"a\", \"b\").length();\n}\n",
+            "import std.path { stem, parent };\n\nfn main(): int {\n    return stem(\"a.b\").length();\n}\n",
             withStdlib: true);
         AssertWarns(de, "LYR-SEM0072");
-        Assert.Contains(de.Diagnostics, d => d.Message.Contains("import 'repeat'"));
-        Assert.DoesNotContain(de.Diagnostics, d => d.Message.Contains("import 'concat'"));
+        Assert.Contains(de.Diagnostics, d => d.Message.Contains("import 'parent'"));
+        Assert.DoesNotContain(de.Diagnostics, d => d.Message.Contains("import 'stem'"));
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_type_used_only_in_an_annotation_counts_as_used()
     {
         // The use stands in a type position, not in an expression: the resolver's table carries
@@ -242,11 +238,11 @@ public class WarningAnalyzerTests
         AssertSilent(Check(
             "import std.core { Exception };\n\n"
             + "fn describe(e: Exception): string {\n    return e.message();\n}\n"
-            + "fn main(): int {\n    return 0;\n}\n",
+            + "fn main(): int {\n    return describe(Exception { text = \"x\" }).length();\n}\n",
             withStdlib: true));
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void An_alias_used_only_as_a_type_qualifier_counts_as_used()
     {
         // The qualifier of a type path has no node of its own, so neither reference table
@@ -255,15 +251,15 @@ public class WarningAnalyzerTests
         AssertSilent(Check(
             "import std.core as base;\n\n"
             + "fn describe(e: base.Exception): string {\n    return e.message();\n}\n"
-            + "fn main(): int {\n    return 0;\n}\n",
+            + "fn main(): int {\n    return describe(base.Exception { text = \"x\" }).length();\n}\n",
             withStdlib: true));
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void An_alias_mentioned_nowhere_still_warns()
     {
         // The negative beside the case above: marking qualifiers used must not blunt the warning.
-        var de = Check("import std.core as base;\n\nfn main(): int {\n    return 0;\n}\n",
+        var de = Check("import std.path as base;\n\nfn main(): int {\n    return 0;\n}\n",
             withStdlib: true);
         AssertWarns(de, "LYR-SEM0072");
         Assert.Contains(de.Diagnostics, d => d.Message.Contains("import 'base'"));
@@ -280,11 +276,11 @@ public class WarningAnalyzerTests
         Assert.Contains(de.Diagnostics, d => d.Message.Contains("shadowing the builtin type"));
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_selective_import_of_the_same_module_is_silent()
     {
         AssertSilent(Check(
-            "import std.string { parseInt };\n\nfn main(): int {\n    return parseInt(\"ab\") ?? 0;\n}\n",
+            "import std.path { stem };\n\nfn main(): int {\n    return stem(\"a.b\").length();\n}\n",
             withStdlib: true));
     }
 

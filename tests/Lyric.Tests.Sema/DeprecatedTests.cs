@@ -1,3 +1,4 @@
+using Lyric.Compiler;
 using Lyric.Core;
 using Lyric.Parsing;
 using Lyric.Resolver;
@@ -19,22 +20,14 @@ public class DeprecatedTests
 
     private static DiagnosticEngine Check(string source)
     {
-        var sm = new SourceManager();
-        var id = sm.AddVirtual("test.lyr", source);
-        var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de)
-        {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
-        };
-
-        comp.AddModule(new Parser(sm, id, de).ParseModule());
-        Semantics.Analyze(comp, comp.Resolve(), de);
-        return de;
+        // The whole check: Lyric 5 reads '@Deprecated' from its value, computed after the types.
+        var options = new CompilerOptions { StdlibRoot = Path.Combine(RepoRoot(), "stdlib5") };
+        return SourceCompiler.Check(ScriptSource.FromBuffer(Path.Combine(RepoRoot(), "test.lyr"), source), options).Diagnostics;
     }
 
     private const string Import = "import std.core { Deprecated };\n\n";
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_use_of_a_deprecated_function_warns_with_the_message()
     {
         var de = Check(Import
@@ -50,7 +43,7 @@ public class DeprecatedTests
         Assert.True(note.Location.File.IsValid);
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Without_a_message_the_warning_stands_alone()
     {
         var de = Check(Import
@@ -60,7 +53,7 @@ public class DeprecatedTests
         Assert.Equal("'old' is deprecated", warning.Message);
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_type_used_only_in_an_annotation_warns_too()
     {
         // The annotation use lives in the resolver's table; the pass reads both.
@@ -117,7 +110,7 @@ public class DeprecatedTests
         Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0076");
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_generic_declaration_may_carry_Deprecated()
     {
         // The one exception to LYR-SEM0067: the compiler-read attribute needs no metadata row,
@@ -142,7 +135,7 @@ public class DeprecatedTests
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0067");
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Every_use_site_warns_not_just_the_first()
     {
         var de = Check(Import
@@ -153,7 +146,7 @@ public class DeprecatedTests
 
     // ─── members (2.1) ─────────────────────────────────────────────────────
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_deprecated_method_warns_at_the_call()
     {
         var de = Check(Import
@@ -166,7 +159,7 @@ public class DeprecatedTests
         Assert.Equal("'bump' is deprecated: use tick()", warning.Message);
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_deprecated_field_static_and_extension_method_warn_too()
     {
         var de = Check(Import
@@ -185,7 +178,7 @@ public class DeprecatedTests
         Assert.Equal(4, de.Diagnostics.Count(d => d.Code == "LYR-SEM0076"));
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Any_other_attribute_on_a_member_is_refused()
     {
         var de = Check(
@@ -195,7 +188,7 @@ public class DeprecatedTests
             + "    pub fn f(): int {\n        return 1;\n    }\n}\n\n"
             + "fn main(): int {\n    return 0;\n}\n");
         var refusal = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0065");
-        Assert.Contains("only '@Deprecated' may", refusal.Message);
+        Assert.Contains("cannot sit on a method", refusal.Message);
     }
 
     [Fact]

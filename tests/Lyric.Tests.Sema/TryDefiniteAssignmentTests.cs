@@ -82,7 +82,7 @@ public class TryDefiniteAssignmentTests
     public void A_catch_that_falls_through_contributes_nothing()
     {
         var de = Check(Head + """
-            import std.io.console { println };
+            import std.io { println };
             fn f(s: string): int {
                 var n: int;
                 try { n = parse(s); } catch (e: Exception) { println(e.message()); }

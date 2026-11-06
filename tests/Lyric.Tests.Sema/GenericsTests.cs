@@ -94,18 +94,18 @@ public class GenericsTests
     private static DiagnosticEngine CheckWithLibrary(string mainSource)
     {
         var sm = new SourceManager();
-        var libId = sm.AddVirtual("m.lyr", "module m;\n\npub fn ident<T>(x: T): T { return x; }\n");
+        var libId = sm.AddVirtual("m.lyr", "pub fn ident<T>(x: T): T { return x; }\n");
         var mainId = sm.AddVirtual("test.lyr", mainSource);
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de);
-        comp.AddModule(new Parser(sm, libId, de).ParseModule());
+        comp.AddModule(new Parser(sm, libId, de).ParseModule(), "m");
         comp.AddModule(new Parser(sm, mainId, de).ParseModule());
         var binding = comp.Resolve();
         new TypeChecker(comp, binding, de).Check();
         return de;
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_generic_function_reached_through_its_module_is_not_a_value_either()
     {
         // The unqualified refusal landed with 3.6.0; the QUALIFIED path went through
@@ -126,7 +126,7 @@ public class GenericsTests
         Assert.Contains("ident", error.Message, StringComparison.Ordinal);
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_generic_function_called_through_its_module_is_untouched()
     {
         var de = CheckWithLibrary("""

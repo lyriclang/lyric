@@ -186,13 +186,13 @@ public class CoroutineTests
             d => d.Code == "LYR-SEM0001");
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_coroutine_with_a_result_returns_it_on_every_path()
     {
         Assert.Contains(Diags("fn co(c: bool): Coroutine<int, int> { yield 1; if (c) { return 2; } }").Diagnostics,
             d => d.Code == "LYR-SEM0017");
         Assert.Contains(Diags("fn co(): Coroutine<int, int> { yield 1; return; }").Diagnostics,
-            d => d.Code == "LYR-SEM0001");
+            d => d.Code == "LYR-SEM0226");
         // A body that never ends needs no return.
         AssertClean(Diags("fn co(): Coroutine<int, int> { while (true) { yield 1; } }"));
     }

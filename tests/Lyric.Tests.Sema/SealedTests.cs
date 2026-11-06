@@ -13,12 +13,11 @@ namespace Lyric.Tests.Sema;
 public class SealedTests
 {
     private const string Shapes = """
-        module shapes;
         pub interface Display { fn show(): string; }
         pub sealed interface Shape :: [Display] { fn area(): int; }
-        pub struct Circle :: [Shape] { r: int, fn area(): int { return 1; } fn show(): string { return "c"; } }
-        pub class Rect :: [Shape] { w: int, fn area(): int { return 2; } fn show(): string { return "r"; } }
-        pub struct Tri { b: int }
+        pub struct Circle :: [Shape] { pub r: int, pub fn area(): int { return 1; } pub fn show(): string { return "c"; } }
+        pub class Rect :: [Shape] { pub w: int, pub fn area(): int { return 2; } pub fn show(): string { return "r"; } }
+        pub struct Tri { pub b: int }
         extend Tri :: [Shape] { fn area(): int { return 3; } fn show(): string { return "t"; } }
         pub interface Other { fn other(): int; }
 
@@ -35,7 +34,7 @@ public class SealedTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de);
         var lib = sm.AddVirtual("shapes.lyr", shapes ?? Shapes);
-        comp.AddModule(new Parser(sm, lib, de).ParseModule());
+        comp.AddModule(new Parser(sm, lib, de).ParseModule(), "shapes");
         var id = sm.AddVirtual("test.lyr", Prelude + body);
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -58,45 +57,45 @@ public class SealedTests
 
     // ------------------------------------------------------------------ the closed set
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Type_patterns_over_a_sealed_interface_are_exhaustive_without_the_catch_all() =>
         Allowed("fn f(s: Shape): int { return match (s) { c: Circle => c.r, r: Rect => r.w, t: Tri => t.b }; }");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_missing_conformer_is_named() =>
         Assert.Contains("'_: Rect'", Rejected("fn f(s: Shape): int { return match (s) { c: Circle => c.r, t: Tri => t.b }; }", "LYR-SEM0050"));
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_guarded_arm_does_not_count() =>
         Assert.Contains("'_: Rect'", Rejected("fn f(s: Shape): int { return match (s) { c: Circle => c.r, r: Rect if r.w > 0 => r.w, t: Tri => t.b }; }", "LYR-SEM0050"));
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_conformer_in_another_module_is_refused() =>
-        Assert.Contains("sealed", Rejected("struct Sq :: [Shape] { s: int, fn area(): int { return 4; } fn show(): string { return \"s\"; } }\nfn f(): int { return 0; }", "LYR-SEM0132"));
+        Assert.Contains("sealed", Rejected("struct Sq :: [Shape] { s: int, pub fn area(): int { return 4; } pub fn show(): string { return \"s\"; } }\nfn f(): int { return 0; }", "LYR-SEM0132"));
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_conformance_block_in_another_module_is_refused() =>
         Assert.Contains("sealed", Rejected("struct Sq { s: int }\nextend Sq :: [Shape] { fn area(): int { return 4; } fn show(): string { return \"s\"; } }\nfn f(): int { return 0; }", "LYR-SEM0132"));
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_child_interface_in_another_module_is_refused() =>
         Assert.Contains("sealed", Rejected("interface Child :: [Shape] { fn extra(): int; }\nfn f(): int { return 0; }", "LYR-SEM0132"));
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void An_open_interface_still_needs_the_catch_all() =>
         Rejected("fn f(d: Display): int { return match (d) { c: Circle => c.r }; }", "LYR-SEM0050");
 
     // ------------------------------------------------------------------ D10
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_child_interface_value_is_a_parent_value() =>
         Allowed("fn f(s: Shape): string { let d: Display = s; return d.show(); }\nfn g(d: Display): string { return d.show(); }\nfn h(s: Shape): string { return g(s); }");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void An_unrelated_interface_is_not_reached() =>
         Rejected("fn f(s: Shape): Other { return s; }", "LYR-SEM0001");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void The_way_down_is_no_coercion() =>
         Rejected("fn f(d: Display): Shape { return d; }", "LYR-SEM0001");
 }

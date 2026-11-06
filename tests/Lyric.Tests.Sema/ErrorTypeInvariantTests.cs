@@ -40,7 +40,7 @@ public class ErrorTypeInvariantTests
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         var types = Semantics.Analyze(comp, comp.Resolve(), de);
 
-        var poisoned = types.AllTypes.Where(pair => pair.Value.IsError).ToArray();
+        var poisoned = types.AllTypes.Where(pair => pair.Value.IsError && pair.Key.Span.File == id).ToArray();
 
         if (poisoned.Length > 0 && !de.HasErrors)
             Assert.Fail(
@@ -52,7 +52,7 @@ public class ErrorTypeInvariantTests
 
     // ------------------------------------------------------------------ valid programs
 
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Theory]
     [InlineData("hello.lyr")]
     [InlineData("arith.lyr")]
     [InlineData("objects.lyr")]

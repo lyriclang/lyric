@@ -3,7 +3,7 @@
 // own type, closures with captures as function parameters, a generic function with a
 // constraint, a pattern match on an enum with a payload, a nullable return.
 
-import std.io.console { println };
+import std.io { println };
 
 // An interface with an abstract and a default method.
 interface Priced {

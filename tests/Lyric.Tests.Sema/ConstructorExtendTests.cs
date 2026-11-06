@@ -82,11 +82,11 @@ public class ConstructorExtendTests
             + "fn tell<T :: [Describe]>(x: T): string { return x.describe(); }\n"
             + "fn f(): string { return tell([1, 2]); }");
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
-    public void A_value_is_not_made_from_a_shape_yet() =>
-        Rejected("interface Describe { fn describe(): string; }\n"
+    [Fact]
+    public void A_value_is_made_from_a_shape() =>
+        Allowed("interface Describe { fn describe(): string; }\n"
             + "extend<T> T[] :: [Describe] { fn describe(): string { return \"xs\"; } }\n"
-            + "fn f(): int { let d: Describe = [1, 2]; return 0; }", "LYR-SEM0047");
+            + "fn f(): int { let d: Describe = [1, 2]; return 0; }");
 
     // A function type is a shape since M8a S12 (05 §13 rule 6): `this` is the function.
     [Fact]

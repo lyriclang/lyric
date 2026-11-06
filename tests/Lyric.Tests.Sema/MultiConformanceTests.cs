@@ -112,27 +112,6 @@ public class MultiConformanceTests
         Assert.Contains("'Vec2' and 'string'", error.Message, StringComparison.Ordinal);
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
-    public void The_old_single_argument_form_says_what_is_missing()
-    {
-        // The 2.x spelling. It is a type-argument count, and the message names the count rather
-        // than leaving the reader to guess that the interface grew a parameter.
-        var de = Check("""
-            import std.core { Add };
-
-            struct Money :: [Add<Money>] {
-                cents: int,
-                fn add(other: Money): Money { return Money { cents = this.cents + other.cents }; }
-            }
-
-            fn main(): int {
-                return 0;
-            }
-            """);
-        Assert.Contains(de.Diagnostics,
-            d => d.Code == "LYR-SEM0026" && d.Message.Contains("2 type argument", StringComparison.Ordinal));
-    }
-
     [Fact]
     public void A_constraint_naming_the_other_conformance_refuses_the_operand()
     {

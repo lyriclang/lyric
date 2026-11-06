@@ -111,10 +111,10 @@ public class ValueBlockTests
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0022");
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void In_a_match_statement_a_call_tail_is_fine() =>
         Compiles("""
-            import std.io.console { println };
+            import std.io { println };
             fn f(b: bool): int {
                 match (b) { true => { println("t") }, false => { println("f"); } }
                 return 0;

@@ -27,7 +27,7 @@ enum Shape {
     Empty,
 }
 
-enum Result<T, E> {
+enum Outcome<T, E> {
     Ok(T),
     Err(E),
 }
@@ -67,7 +67,7 @@ fn drain(q: Deque<int>): int {
 }
 
 // let-else over a generic enum whose payload is itself optional
-fn unwrapOr(r: Result<?int, string>, d: int): int {
+fn unwrapOr(r: Outcome<?int, string>, d: int): int {
     let Ok(v) = r else {
         return d;
     };
@@ -107,9 +107,9 @@ fn main(): int {
     println(f"drain = {drain(q)}");
 
     let none: ?int = null;
-    let ok: Result<?int, string> = Result.Ok(7);
-    let okNull: Result<?int, string> = Result.Ok(none);
-    let err: Result<?int, string> = Result.Err("bad");
+    let ok: Outcome<?int, string> = Outcome.Ok(7);
+    let okNull: Outcome<?int, string> = Outcome.Ok(none);
+    let err: Outcome<?int, string> = Outcome.Err("bad");
     println(f"{unwrapOr(ok, -1)} {unwrapOr(okNull, -1)} {unwrapOr(err, -1)}");
 
     println(

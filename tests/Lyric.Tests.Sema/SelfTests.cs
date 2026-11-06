@@ -86,9 +86,9 @@ public class SelfTests
     public void A_static_member_is_implemented_by_a_static_member() =>
         Assert.Contains("static", Rejected("struct R :: [Parse] { n: int, fn parse(s: string): R { return R { n = 1 }; } }\nfn f(): int { return 0; }", "LYR-SEM0042"));
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_static_interface_member_declares_only() =>
-        Rejected("interface Bad { static fn make(): int { return 1; } }\nfn f(): int { return 0; }", "LYR-SEM0127");
+        Rejected("interface Bad { static let size: int = 8; }\nfn f(): int { return 0; }", "LYR-SEM0127");
 
     [Fact]
     public void A_static_member_is_not_called_on_a_value_of_the_parameter() =>

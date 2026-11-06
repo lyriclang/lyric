@@ -102,11 +102,11 @@ public class ImplicitMemberTests
 
     /// <summary>Equality itself comes from <c>Equatable</c> (02 M10); what the implicit member
     /// adds is the type, from the OTHER side — on either side of the operator.</summary>
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Either_side_of_an_equality_lends_its_type() =>
         Allowed("""
             import std.core { Equatable };
-            enum Light :: [Equatable<Light>] {
+            enum Light :: [Equatable] {
                 On, Off;
                 fn equals(other: Light): bool {
                     return match ((this, other)) { (.On, .On) => true, (.Off, .Off) => true, _ => false };

@@ -66,14 +66,14 @@ public class BuiltinShadowingImportTests
     /// conforming to <c>Error</c>, reported as "returns '&lt;error&gt;'" at the conformance
     /// rather than at the import.
     /// </summary>
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_conformance_naming_the_builtin_still_holds()
     {
         var de = Check("""
             import std.string;
 
             pub class Boom :: [Error] {
-                fn message(): string { return "boom"; }
+                pub fn message(): string { return "boom"; }
             }
 
             fn main(): int { return 0; }

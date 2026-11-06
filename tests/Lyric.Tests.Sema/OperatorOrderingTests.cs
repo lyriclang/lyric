@@ -49,15 +49,15 @@ public class OperatorOrderingTests
             """);
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_conforming_struct_checks_clean()
     {
         AssertClean("""
             import std.core { Ordered };
 
-            struct M :: [Ordered<M>] {
+            struct M :: [Ordered] {
                 v: int,
-                fn compare(other: M): int { return 0; }
+                fn compare(other: M): ?Ordering { return Ordering.Equal; }
             }
 
             fn main(): int {
@@ -75,7 +75,7 @@ public class OperatorOrderingTests
         var de = Check("""
             struct M {
                 v: int,
-                fn compare(other: M): int { return 0; }
+                fn compare(other: M): ?Ordering { return Ordering.Equal; }
             }
 
             fn main(): int {

@@ -54,20 +54,20 @@ public class SilentSkipTests
 
     // --- a type or module name in value position ---
 
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Theory]
     // 'P(1, 2, 3)' stood here as the first case until Lyric 5 gave the form a meaning: a type name
     // in call position is the type's factory (ConstructionTests pins it).
     [InlineData("class P { hp: int }\nfn main(): int { let x = P; return x.quatsch; }")]
-    [InlineData("import std.io.console;\nfn main(): int { let x = console; return x.quatsch; }")]
+    [InlineData("import std.io;\nfn main(): int { let x = io; return x.quatsch; }")]
     public void A_type_or_module_in_value_position_is_reported(string source) =>
         AssertReports(source, "LYR-SEM0052");
 
     /// <summary>The counter-check, without which the fix would be a regression: as a member target a type
     /// or module name is legitimate, and both forms have to keep passing. That is what the obvious fix
     /// "just report it at the producer" fails on.</summary>
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Theory]
     [InlineData("class P {\n  hp: int,\n  static fn make(): P { return P { hp = 1 }; }\n}\nfn main(): int { return P.make().hp; }")]
-    [InlineData("import std.io.console;\nfn main(): int { console.println(\"hi\"); return 0; }")]
+    [InlineData("import std.io;\nfn main(): int { io.println(\"hi\"); return 0; }")]
     public void A_type_or_module_as_a_member_target_stays_legal(string source)
     {
         var de = Check(source);
@@ -102,9 +102,9 @@ public class SilentSkipTests
 
     /// <summary>An unknown SYMBOL in a known module was always reported. The test holds the asymmetry
     /// that existed before: symbol yes, module no.</summary>
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void An_unknown_symbol_in_a_known_module_is_reported() =>
-        AssertReports("import std.io.console { printlnn };\nfn main(): int { return 0; }",
+        AssertReports("import std.io { printlnn };\nfn main(): int { return 0; }",
             "LYR-RES0004");
 
     // --- Attribute ---
