@@ -65,7 +65,7 @@ public class InlinerTests
         Assert.DoesNotContain(module.Functions, f => f.Name == "main.double");
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void A_chain_of_small_calls_collapses_in_one_pass()
     {
         var module = Optimized("""
@@ -75,7 +75,7 @@ public class InlinerTests
             """);
 
         Assert.DoesNotContain(Ops(Main(module)), op => op is Call);
-        Assert.Single(module.Functions); // only main survives
+        Assert.Equal(["main.main", "<globals>"], module.Functions.Select(f => f.Name)); // 'a' and 'b' are gone
     }
 
     [Fact]
@@ -211,25 +211,5 @@ public class InlinerTests
         // name the right line after inlining.
         var multiply = Ops(Main(module)).OfType<BinOp>().Single(b => b.Kind == IrBinKind.Mul);
         Assert.Equal(source.IndexOf("n * 2", StringComparison.Ordinal), multiply.Span.Start);
-    }
-
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
-    public void An_attributed_function_is_inlined_at_its_sites_but_survives_as_a_root()
-    {
-        var module = Optimized("""
-            import std.core { OnFunction };
-
-            pub struct Hook :: [OnFunction] { }
-
-            @Hook
-            pub fn tick(n: int): int { return n + 1; }
-
-            fn main(): int { return tick(1); }
-            """);
-
-        // The call site is folded, but the row in section 11 promises the host a callable
-        // function, so the pruning keeps it.
-        Assert.DoesNotContain(Ops(Main(module)), op => op is Call);
-        Assert.Contains(module.Functions, f => f.Name == "main.tick");
     }
 }

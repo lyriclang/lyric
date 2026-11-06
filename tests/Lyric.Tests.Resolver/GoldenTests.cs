@@ -44,7 +44,7 @@ public class GoldenTests
         return dump + "\n=== diagnostics ===\n" + Normalize(sw.ToString());
     }
 
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Theory]
     [InlineData("basic_module")]    // struct + Methode, pub fn, global let, type-Alias
     [InlineData("imports")]         // three import forms, external because this is a single file
     [InlineData("enum_interface")]  // enum variants and methods, interface members

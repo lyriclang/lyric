@@ -1,5 +1,5 @@
 Module main
-  Function main
+  Function main [internal]
   External io (from std.io)
   External println (from std.io)
   External eprintln (from std.io)

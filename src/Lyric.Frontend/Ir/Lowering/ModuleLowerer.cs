@@ -803,10 +803,10 @@ public static class ModuleLowerer
             result.Capabilities = needed;
         }
 
-        // THE SECOND VERIFICATION, and it names the other culprit. Only when a pass really ran: with
-        // none of them enabled the module is what the first run already accepted, and a second pass
-        // over it would buy nothing for 90% of the lowering time. That is why the debug profile —
-        // which optimizes nothing — still verifies exactly once.
+        // THE SECOND VERIFICATION, and it names the other culprit. Only when something changed the
+        // module: otherwise it is what the first run already accepted, and a second pass over it
+        // would buy nothing for 90% of the lowering time. A program's debug build changes it too,
+        // through the scheduler question and the pruned globals.
         if (verifies && (enabled != IrPasses.None || prunedGlobals || narrowed))
             Timed(timings, () => IrVerifier.VerifyOrThrow(result, "after the optimizations"));
 

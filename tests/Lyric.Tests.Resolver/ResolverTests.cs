@@ -71,14 +71,14 @@ public class ResolverTests
 
     /// <summary>The word as written; no word is the module's for the 4.x tools this compilation
     /// stands for (Lyric 5 reads it as 'internal', design/v5/spec/07 V2).</summary>
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Visibility_is_captured()
     {
         var (comp, _, _) = Resolve(("m", "pub fn a(): int { return 0; } fn b(): int { return 0; } "
                                          + "internal fn c(): int { return 0; } private fn d(): int { return 0; }"));
         var m = comp.Modules[0];
         Assert.Equal(Visibility.Public, ((FunctionSymbol)m.Members.LookupLocal("a")!).Visibility);
-        Assert.Equal(Visibility.Private, ((FunctionSymbol)m.Members.LookupLocal("b")!).Visibility);
+        Assert.Equal(Visibility.Internal, ((FunctionSymbol)m.Members.LookupLocal("b")!).Visibility);
         Assert.Equal(Visibility.Internal, ((FunctionSymbol)m.Members.LookupLocal("c")!).Visibility);
         Assert.Equal(Visibility.Private, ((FunctionSymbol)m.Members.LookupLocal("d")!).Visibility);
     }
@@ -132,7 +132,7 @@ public class ResolverTests
         Assert.IsType<ExternalSymbol>(comp.Modules[0].Members.LookupLocal("io")); // std.io is not in the compilation
     }
 
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void Import_of_missing_or_private_symbol_reports()
     {
         var (_, missing, _) = Resolve(
@@ -143,7 +143,7 @@ public class ResolverTests
         var (_, priv, _) = Resolve(
             ("lib", "fn secret(): int { return 0; }"),
             ("app", "import lib { secret };"));
-        Assert.Contains(priv.Diagnostics, d => d.Code == "LYR-RES0004");
+        Assert.Contains(priv.Diagnostics, d => d.Code == "LYR-RES0009");
     }
 
     [Fact]

@@ -308,7 +308,8 @@ public sealed class AstFormatter
         // Attributes, header and declarations in one sequence: the air rule knows the header
         // gets a blank after it, imports sit together, and everything else breathes.
         var items = new List<Node>();
-        items.AddRange(module.Attributes);
+        // The head's attributes are one item, the group, as anywhere else.
+        if (module.Attributes is [var head, ..]) items.Add(head);
         if (module.Header is { } header) items.Add(header);
         // the functions of an extern block go back into the block they were written in
         foreach (var decl in module.Declarations)
@@ -326,7 +327,8 @@ public sealed class AstFormatter
 
         Doc ItemDoc(Node item) => item switch
         {
-            AttributeNode a => AttributeDoc(a),
+            AttributeNode a => module.Attributes.Length > 1 ? AttributeGroup(module.Attributes) : AttributeDoc(a),
+            ModulePath { Segments: [] } => Doc.From("module;"),
             ModulePath h => Doc.From($"module {string.Join(".", h.Segments)};"),
             Decl d => DeclDoc(d),
             ExternBlock b => ExternBlockDoc(b),
@@ -462,21 +464,19 @@ public sealed class AstFormatter
         if (attributes.Length == 0) return Doc.Nil;
         if (attributes.Length == 1)
             return Doc.Of(AttributeDoc(attributes[0]), Doc.NewLine);
-        // Lyric 5 writes each attribute on a line of its own, as its standard library does.
-        if (_grouped is not null)
-            return new Doc.Concat([.. attributes.Select(a => Doc.Of(AttributeDoc(a), Doc.NewLine))]);
-
-        // Two or more attributes take the GROUP shape — one spelling in the formatted corpus,
-        // however the source wrote them. The parser flattens both spellings to the same list,
-        // which is what keeps this rewrite reparse-identical.
-        return Doc.Of(Doc.GroupOf(Doc.From("@["),
-                Doc.IndentOf(Doc.LineOrNothing,
-                    Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace),
-                        attributes.Select(AttributeEntryDoc).ToArray()),
-                    Doc.WhenBroken(Doc.From(","))),
-                Doc.LineOrNothing, Doc.From("]")),
-            Doc.NewLine);
+        return Doc.Of(AttributeGroup(attributes), Doc.NewLine);
     }
+
+    /// <summary>Two or more attributes take the GROUP shape — one spelling in the formatted corpus,
+    /// however the source wrote them. The parser flattens both spellings to the same list, which is
+    /// what keeps this rewrite reparse-identical.</summary>
+    private Doc AttributeGroup(AttributeNode[] attributes) =>
+        Doc.GroupOf(Doc.From("@["),
+            Doc.IndentOf(Doc.LineOrNothing,
+                Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace),
+                    attributes.Select(AttributeEntryDoc).ToArray()),
+                Doc.WhenBroken(Doc.From(","))),
+            Doc.LineOrNothing, Doc.From("]"));
 
     private Doc FunctionDoc(FunctionDecl decl)
     {

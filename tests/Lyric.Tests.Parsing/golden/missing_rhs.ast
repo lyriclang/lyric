@@ -3,7 +3,7 @@ Binary Add [0..4)
   Error [4..4)
 
 === diagnostics ===
-error[LYR-PAR0002]: expected an expression, got Eof
+error[LYR-PAR0002]: expected an expression, got the end of the file
  --> missing_rhs.lyr:2:1
   |
 2 |

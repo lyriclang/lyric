@@ -98,16 +98,14 @@ public sealed class ProfileTests
     /// the lowering sees; the profile only sets it (<see cref="Profile.Debug"/> off,
     /// <see cref="Profile.Release"/> on, asserted above).</para>
     /// </summary>
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
-    [InlineData(false, 1)]
-    [InlineData(true, 2)]
-    public void The_verifier_runs_once_without_the_passes_and_twice_with_them(bool optimize, int runs)
+    [Theory]
+    [InlineData(false, 1, "pub fn go(): int { return step(1); }")]
+    [InlineData(true, 2, "pub fn go(): int { return step(1); }")]
+    // A program's scheduler question and its pruned globals change the module with no pass enabled.
+    [InlineData(false, 2, "fn main(): int { return step(1); }")]
+    public void The_verifier_runs_again_only_when_something_changed_the_module(bool optimize, int runs, string entry)
     {
-        const string source =
-            """
-            fn step(n: int): int { return n + 1; }
-            fn main(): int { return step(1); }
-            """;
+        var source = "fn step(n: int): int { return n + 1; }\n" + entry;
 
         var timings = new LoweringTimings();
         Lower(source, IrPasses.All, optimize, timings);

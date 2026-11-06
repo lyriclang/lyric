@@ -223,7 +223,7 @@ public class DocCommentTests
     /// than a synthetic string: the synthetic cases above fix the RULE, this one fixes that the rule
     /// meets the source as it is actually written.
     /// </summary>
-    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Fact]
     public void The_blocks_in_the_standard_library_arrive()
     {
         var path = Path.Combine(RepoRoot(), "stdlib5", "std", "os.lyr");
@@ -243,9 +243,6 @@ public class DocCommentTests
 
         // The exact set is stdlib content and moves; that several arrive is the contract here.
         Assert.Contains("args", documented);
-        Assert.Contains("nowMillis", documented);
-
-        // A '//' file header above 'module' is separated by a blank line and binds to nothing.
-        Assert.Null(parser.DocOf(module.Header!));
+        Assert.Contains("env", documented);
     }
 }

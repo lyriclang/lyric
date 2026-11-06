@@ -1,4 +1,4 @@
 Module main
-  Function foo
-  Function foo
-  Function foo
+  Function foo [internal]
+  Function foo [internal]
+  Function foo [internal]

@@ -57,7 +57,7 @@ public class CorpusTests
         Assert.Equal(source, Format(source, relativePath));
     }
 
-    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
+    [Theory]
     [MemberData(nameof(Files))]
     public void Formatting_preserves_the_program(string relativePath)
     {
