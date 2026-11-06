@@ -2431,3 +2431,17 @@ Das sind 135 Gerüst, 42 Regeln und Korpus von 4, 13 Nachzug und 102 einzeln. Di
 **Der `ErrorType`-Befund aus S1 ist geklärt und kein Bug**: 471 der 541 Ausdrücke sind `this.[v, p]` in `std/core.lyr`, Reflexion, die erst pro Instanz einen Typ hat. Die übrigen stehen im synthetisierten `Debug` von Typen der Bibliothek mit Funktionsfeld (`MapIter` …). Dort entfällt die Synthese still: `it.debug()` auf einem `MapIter` meldet `LYR-SEM0012`, bei einem eigenen Typ, der `Debug` verlangt, nennt der Fehler das Feld. Die Invariante gilt also für die Dateien des Programms; S2b schränkt den Test darauf ein.
 
 **Reflexion**: Die Alternative war, die Suiten einzeln umzuschalten. Dafür hätte es einen Schalter je Testlauf gebraucht, der bis S3 lebt und selbst eine Weiche wäre. Die Skip-Marke ist die ehrlichere Schuld: Sie ist zählbar, und CI meldet sie bei jedem Lauf.
+
+## Nachtrag 2026-11-06 — ein Startbit überlebt sein Objekt
+
+Der main-Lauf von `e70be167` (M17 S2a) stürzte im Windows-Job in `tests/std` ab: Zugriffsverletzung bei `0x68`, in `scan_range` unter `trace_coro`. S2a ändert keine Laufzeit, der gleiche Stand war im Plattformlauf des PR grün.
+
+**Der Fehler**: `hand_out` löscht Startbits nur in den Zeilen, die es neu ausgibt. Ein totes Objekt, dessen Kopf in einer behaltenen Zeile neben etwas Lebendigem liegt, behält sein Startbit, während sein Schwanz neu vergeben wird. Trifft ein veraltetes Wort diesen Kopf, wird das Objekt markiert. Für gewöhnliche Objekte ist das folgenlos, weil `mark_word` jedes Wort prüft. `trace_coro` aber glaubt `ctx.sp` und `ctx.base` und liest dort.
+
+**Die Korrektur**: `sweep_one` schneidet die Startbits eines behaltenen Blocks mit seinen Markbits. Danach hat nur noch Lebendiges einen Start. `runtime/tests/stale_start.c` legt die Lage deterministisch her, unter voller und unter junger Sammlung. Ohne die Korrektur stürzt der Test in beiden Profilen auf Linux ab, mit ihr läuft er durch.
+
+**Was nicht belegt ist**: Dass genau dieser Pfad den Absturz in CI ausgelöst hat. Die Stelle stimmt überein, die Adresse `0x68` nicht als Beleg: Der Test setzt sie selbst. Der CI-Absturz selbst ließ sich nicht wiederholen. Tritt derselbe Stack nach der Korrektur wieder auf, ist die Ursache eine andere.
+
+**Kosten**: 256 Byte je gefegtem Block, im Rauschen der Messung. `bench/gc`, Minimum aus 5 Läufen, zwei Runden, vorher / nachher: `binarytrees` 1,048 und 0,921 s / 0,901 und 0,929 s; `lru` 3,603 und 3,530 s / 3,594 und 3,678 s. RSS und Zahl der Sammlungen sind gleich. Die Maschine war zu Beginn belastet.
+
+**Reflexion**: Die Alternative war, nur Koroutinen zu behandeln und das Startbit zu löschen, wenn der Stack geht. Das reicht nicht: Eine normal beendete Koroutine ist dann schon abgemeldet, und niemand sieht ihren Tod. Der Schnitt beim Fegen erledigt es an einer Stelle für jedes Objekt.
