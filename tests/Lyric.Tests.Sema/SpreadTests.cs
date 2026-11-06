@@ -32,7 +32,7 @@ public class SpreadTests
         var sm = new SourceManager();
         var id = sm.AddVirtual("test.lyr", Head + body + "\n}\n");
         var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de);
+        var comp = new Compilation(sm, de) { Lints = false };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
         return de;

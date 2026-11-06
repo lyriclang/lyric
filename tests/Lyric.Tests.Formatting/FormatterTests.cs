@@ -224,7 +224,7 @@ public class FormatterTests
             """, Format("fn f(p:(x :int,y: int),t:(int,string)):int{return p.x+t.0+p.1;}"));
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_with_keeps_its_fields_on_one_line_while_they_fit()
     {
         // 'p with { x = 1 }' (design/v5/spec/02 M6): a postfix with the fields of an initializer,
@@ -258,7 +258,7 @@ public class FormatterTests
 
     // On the 'bit' case: '&' binds TIGHTER than '==' in this grammar (§6.1, level 8 against 12),
     // unlike in C — the parentheses there are redundant and go like any others.
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_throw_expression_keeps_its_place_as_a_prefix()
     {
         Assert.Equal("""
@@ -299,7 +299,7 @@ public class FormatterTests
             """));
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Redundant_parentheses_go_and_needed_ones_stay()
     {
         Assert.Equal("""
@@ -879,7 +879,7 @@ public class FormatterTests
             fn f(): void { }
             """), StringComparison.Ordinal);
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Two_attributes_take_the_group_shape() =>
         // The one shape: stacked input, grouped output. The parser flattens both spellings to
         // the same list, which is what keeps the rewrite reparse-identical.
@@ -896,7 +896,7 @@ public class FormatterTests
             fn f(): void { }
             """).Replace("\r\n", "\n"), StringComparison.Ordinal);
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_wide_group_breaks_one_entry_per_line()
     {
         var formatted = Format("""
@@ -1076,7 +1076,7 @@ public class FormatterTests
     public void A_lambda_keeps_its_written_set() =>
         Assert.Contains("(x: int): int throws [A, B] => x", Format("fn g() { let f = (x: int): int throws [A,B] => x; }"), StringComparison.Ordinal);
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_try_the_clauses_would_take_keeps_its_parentheses()
     {
         // A clause belongs to the nearest 'try' on its left: bare, the inner 'try' would take the

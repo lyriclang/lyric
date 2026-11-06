@@ -18,7 +18,7 @@ public static class StdlibLoader
     /// <summary>The environment variable that overrides the stdlib path.</summary>
     public const string RootEnvironmentVariable = "LYRIC_STDLIB";
 
-    /// <summary>Where the stdlib lives: the environment variable first, otherwise <c>stdlib/</c>
+    /// <summary>Where the stdlib lives: the environment variable first, otherwise <c>stdlib5/</c>
     /// next to the binary, where the CLI project copies it and where it survives
     /// <c>dotnet publish</c>.</summary>
     public static string DefaultRoot()
@@ -26,7 +26,7 @@ public static class StdlibLoader
         var configured = Environment.GetEnvironmentVariable(RootEnvironmentVariable);
         return !string.IsNullOrWhiteSpace(configured)
             ? configured
-            : Path.Combine(AppContext.BaseDirectory, "stdlib");
+            : Path.Combine(AppContext.BaseDirectory, "stdlib5");
     }
 
     /// <summary>

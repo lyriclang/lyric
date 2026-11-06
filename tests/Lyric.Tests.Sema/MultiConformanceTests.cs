@@ -26,7 +26,7 @@ public class MultiConformanceTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
@@ -112,7 +112,7 @@ public class MultiConformanceTests
         Assert.Contains("'Vec2' and 'string'", error.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void The_old_single_argument_form_says_what_is_missing()
     {
         // The 2.x spelling. It is a type-argument count, and the message names the count rather

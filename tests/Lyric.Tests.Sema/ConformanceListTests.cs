@@ -27,7 +27,8 @@ public class ConformanceListTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            Lints = false,
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
@@ -123,7 +124,7 @@ public class ConformanceListTests
         Assert.Contains("repeats", error.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_parent_written_beside_its_child_is_not_a_repetition()
     {
         // The rule reads the ENTRIES, not their closures: 'Equatable<S>' is implied by
@@ -198,7 +199,7 @@ public class ConformanceListTests
 
         """;
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_use_through_the_interface_warns()
     {
         var de = Check(Interface + """

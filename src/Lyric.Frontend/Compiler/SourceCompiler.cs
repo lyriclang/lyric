@@ -92,7 +92,7 @@ public static class SourceCompiler
         {
             var built = new Compilation(sources, diagnostics)
             {
-                Lyric5Modules = options.PackageRoots is not null,
+                Lyric5Modules = true,
                 Library = options.Library,
                 WarnNative = options.WarnDeps,
                 PackageDependencies = options.PackageDependencies,
@@ -496,7 +496,7 @@ public static class SourceCompiler
     /// <summary>A compilation's source manager: the seed's fork where the options hold a seed of
     /// the library they read, a fresh one otherwise.</summary>
     private static SourceManager SourcesFor(CompilerOptions options) =>
-        SeedOf(options) is { } seed ? seed.Fork() : new SourceManager { Lyric5 = options.PackageRoots is not null };
+        SeedOf(options) is { } seed ? seed.Fork() : new SourceManager();
 
     /// <summary>The options' seed, where it is a Lyric 5 compilation's of the library the options
     /// read.</summary>
@@ -550,7 +550,7 @@ public static class SourceCompiler
         var compilation = new Compilation(sources, diagnostics)
         {
             ModuleLoader = loader,
-            Lyric5Modules = options.PackageRoots is not null,
+            Lyric5Modules = true,
             WarnNative = options.WarnDeps,
             PackageDependencies = options.PackageDependencies,
             ModuleOnDisk = ModuleProbe(options),

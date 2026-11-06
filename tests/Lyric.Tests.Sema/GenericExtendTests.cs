@@ -12,14 +12,6 @@ namespace Lyric.Tests.Sema;
 /// </summary>
 public class GenericExtendTests
 {
-    private const string Core = """
-        module std.core;
-        pub interface Display { fn show(): string; }
-        extend int :: [Display] { fn show(): string { return "i"; } }
-        extend string :: [Display] { fn show(): string { return this; } }
-
-        """;
-
     private const string Prelude = """
         struct Foo { n: int }
         struct Box<T> { v: T }
@@ -33,9 +25,7 @@ public class GenericExtendTests
     {
         var sm = new SourceManager();
         var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de);
-        var core = sm.AddVirtual("core.lyr", Core);
-        comp.AddModule(new Parser(sm, core, de).ParseModule());
+        var comp = new Compilation(sm, de) { ModuleLoader = Library.Loader(sm, de) };
         var id = sm.AddVirtual("test.lyr", Prelude + body);
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);

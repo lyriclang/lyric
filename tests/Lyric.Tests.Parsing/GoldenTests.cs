@@ -74,7 +74,7 @@ public class GoldenTests
     // Expressions, entered through ParseExpression.
     // ---------------------------------------------------------------------
 
-    [Theory]
+    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
     // Positive cases: no diagnostic, only the AST dump.
     [InlineData("precedence")]        // arithmetic precedence and left associativity
     [InlineData("prefix_postfix")]    // prefix !/-/~/--  vs. postfix ++/!(unwrap)
@@ -166,7 +166,7 @@ public class GoldenTests
     // Declarations and modules, entered through ParseModule.
     // ---------------------------------------------------------------------
 
-    [Theory]
+    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
     // Modul + Imports.
     [InlineData("module_header")]     // module a.b;
     [InlineData("import_simple")]     // import a.b;

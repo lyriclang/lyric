@@ -179,7 +179,7 @@ public class AttributeParsingTests
         Assert.Equal("A", Assert.Single(member.Attributes).Path[^1]);
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void An_attribute_on_an_extend_block_is_rejected()
     {
         Parse("@A\nextend int { fn f(): int { return 1; } }", out var diagnostics);

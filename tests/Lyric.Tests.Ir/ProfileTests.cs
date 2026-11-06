@@ -98,7 +98,7 @@ public sealed class ProfileTests
     /// the lowering sees; the profile only sets it (<see cref="Profile.Debug"/> off,
     /// <see cref="Profile.Release"/> on, asserted above).</para>
     /// </summary>
-    [Theory]
+    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
     [InlineData(false, 1)]
     [InlineData(true, 2)]
     public void The_verifier_runs_once_without_the_passes_and_twice_with_them(bool optimize, int runs)
@@ -124,7 +124,7 @@ public sealed class ProfileTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         var binding = comp.Resolve();

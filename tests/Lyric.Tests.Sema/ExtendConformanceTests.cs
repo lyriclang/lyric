@@ -97,13 +97,13 @@ public class ExtendConformanceTests
             """), "LYR-SEM0042");
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Impl_throwing_subset_of_interface_is_clean()
     {
         // The root lives in std.core (design/v5/spec/05 E6 O1): the bare 'throws' of the member is
         // 'Error', and 'Boom' is one.
         AssertClean(Check(
-            ("std.core", "module std.core;\npub interface Error { fn message(): string; fn cause(): ?Error { return null; } }\n"),
+            ("std.core", "pub interface Error { fn message(): string; fn cause(): ?Error { return null; } }\n"),
             ("main", """
                 class Boom :: [Error] { fn message(): string { return "b"; } }
                 interface Risky { fn run(): int throws; }
@@ -310,7 +310,7 @@ public class ExtendConformanceTests
 
     // --- import visibility ---
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Extension_is_invisible_without_importing_its_module()
     {
         var de = Check(

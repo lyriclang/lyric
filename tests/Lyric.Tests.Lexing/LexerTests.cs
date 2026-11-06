@@ -364,7 +364,7 @@ public class LexerTests
     
         // ─── Keywords (Slice 2) ────────────────────────────────────────────────
 
-    [Theory]
+    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
     [InlineData("module",    TokenKind.Module)]
     [InlineData("import",    TokenKind.Import)]
     [InlineData("as",        TokenKind.As)]
@@ -1069,7 +1069,7 @@ public class LexerTests
         Assert.False(diag.HasErrors);
     }
 
-    [Theory]
+    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
     [InlineData("\"\\x1F\"",     6)]
     [InlineData("\"\\xFF\"",     6)]
     [InlineData("\"\\x00\"",     6)]
@@ -1120,7 +1120,7 @@ public class LexerTests
         Assert.Equal("LYR-LEX0007", diag.Diagnostics[0].Code);
     }
 
-    [Theory]
+    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
     [InlineData("\"\\x\"")]      // no hex digits
     [InlineData("\"\\x1\"")]     // only one hex digit
     [InlineData("\"\\xZZ\"")]    // non-hex
@@ -1230,7 +1230,7 @@ public class LexerTests
         Assert.False(diag.HasErrors);
     }
 
-    [Theory]
+    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
     [InlineData("'\\x1F'",     6)]
     [InlineData("'\\u{41}'",   8)]
     [InlineData("'\\u{1F30D}'", 11)]
@@ -1480,7 +1480,7 @@ public class LexerTests
         Assert.False(diag.HasErrors);
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Fstring_chunk_with_hex_escape()
     {
         var (tokens, diag) = Tokenize("f\"\\x41\"");

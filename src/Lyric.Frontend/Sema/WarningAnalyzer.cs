@@ -82,8 +82,8 @@ internal sealed partial class WarningAnalyzer
         WarnBuiltinShadowingImports();
         if (_comp.Lyric5Modules) WarnMembersMoreVisibleThanTheirType();
         if (_comp.Lyric5Modules) WarnPreludeShadowing();
-        if (_comp.Lyric5Modules) RunLints();
-        if (_comp.Lyric5Modules) RunGroupLints();
+        if (_comp.Lyric5Modules && _comp.Lints) RunLints();
+        if (_comp.Lyric5Modules && _comp.Lints) RunGroupLints();
 
         // Lyric 5 reads '@Deprecated' from its value, which the compiler computes after this
         // (RunDeprecated); the 4.x tools from the literals the attribute writes
