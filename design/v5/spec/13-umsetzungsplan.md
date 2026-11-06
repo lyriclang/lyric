@@ -2468,7 +2468,7 @@ Dazu die Zeile `neg_bad_main`: `SEM0021` prüft nur der Einstieg, den dieses Ger
 - Der Vergleich stand noch auf dem Wurzelnamen `stdlib`. Jede Bibliotheksdatei lief deshalb als Einstieg und war rot. Das war der sichtbare Teil.
 - Die Probe hatte kein `main`. Der Fehler darin beendete die Prüfung vor den Warnungen, gefiltert wurde er als Rauschen. Grün hieß also nichts. Das hat erst die Gegenprobe gezeigt: Eine eingebaute Warnung in `std/path.lyr` ließ den Test zuerst grün. Mit `main` und `WarnDeps` wird er rot, und die Datei selbst ist unter den roten Zeilen.
 
-Die Bibliothek ist tatsächlich still. Gefunden hat der Test zwei Beispiele: `examples/constants.lyr` (Namen in Großbuchstaben, `SEM0215`) und `examples/patterns/binding-conditions.lyr` (`Result` verdeckt das des Preludes). Beide sind bereinigt.
+Die Bibliothek ist tatsächlich still. Gefunden hat der Test zwei Beispiele: `examples/constants.lyr` (Namen in Großbuchstaben, `SEM0215`) und `examples/patterns/binding-conditions.lyr` (`Result` verdeckt das des Preludes). Beide sind bereinigt und stehen jetzt in `FixFrom4AcceptanceTests.ChangedByHand`: `fix from-4` lässt diese Namen stehen, und ein Beispiel soll seinem Leser keine Warnung zeigen. Der Preis: Für diese zwei Dateien prüft der Test nicht mehr, dass sie die Werkzeugausgabe sind.
 
 `ErrorTypeInvariantTests` zählt nur noch die Ausdrücke des Programms, wie in S2a begründet.
 

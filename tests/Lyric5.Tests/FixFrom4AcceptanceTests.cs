@@ -22,8 +22,12 @@ public class FixFrom4AcceptanceTests
     /// .NET have no form in Lyric 5, and the macros have their own package there.</summary>
     private static readonly HashSet<string> Unplaced = new(StringComparer.Ordinal) { "embedded", "ffi/dotnet", "macros/comptime" };
 
-    /// <summary>The programs whose code a person changed after the tool, each for a note in the report.</summary>
-    private static readonly HashSet<string> ChangedByHand = new(StringComparer.Ordinal) { "vectors", "patterns/simplifier" };
+    /// <summary>The programs whose code a person changed after the tool: each for a note in the report,
+    /// or for a warning the tool leaves, which an example does not show its reader.</summary>
+    private static readonly HashSet<string> ChangedByHand = new(StringComparer.Ordinal)
+    {
+        "vectors", "patterns/simplifier", "constants", "patterns/binding-conditions",
+    };
 
     /// <summary>The programs that print a map's entries, whose order is the map's own in both languages.</summary>
     private static readonly HashSet<string> AnyOrder = new(StringComparer.Ordinal) { "lambdas/destructuring" };
