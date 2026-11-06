@@ -2311,3 +2311,60 @@ Empfänger**: `std.path` (`fileName(p)`, `join(…)` über `StringView` — ein 
 Methoden stünden sie an jedem Text) und `std.http.reasonOf`. **Was der Block kostete**: die Testauswahl verfehlte
 zweimal eine Folge (die Lint-Abhängigkeiten in P-S2, das API-Golden in P-S5) — bei einem Umzug in der std läuft die
 ganze Suite vor dem Ausliefern. **Türen**: `rfind` in O(n+m) (P-S3), die Türen von P7.
+
+## Nachtrag 2026-11-06 — der Plan für M17
+
+M17 nach seiner Zeile oben, 12 R4 und 14 W6: **Spec 5.0, Suite, Book**, dazu was die Tabelle „Uhren“ ihm gibt: die 4.x-`stdlib/` und
+Version 4.6.0. Artefakt: **Spec 5.0 getaggt, Suite grün, jedes Snippet des Books läuft**. Gemessen auf main 1d60d456, vor dem Plan:
+
+- **Spec**: `02-grammar` hat 9 Zeilen und keine EBNF — die Sprache steht in 03–11, ihre Grammatik nirgends; `docs/Grammar.md` ist die von 4.x.
+  `10-concurrency` trägt noch den Kopf „Skeleton“, `14-cli` „Partly written“, das README „skeleton“, obwohl der Text steht. 07–09 sind kurz (169, 178,
+  134 Zeilen) neben 03 (866) und 12 (1586): ob das Lücken sind, sagt erst ein Lesen gegen 08.
+- **Suite**: 1682 Fälle, alle `since: 5.0.0`, keiner für 02 und 14. Die Regeln tragen keine Nummern, „vollständig“ ist also noch nicht messbar.
+- **Katalog-Appendix**: schon generiert (`tooling/diagnostics/appendix.py`); der Punkt der Zeile ist erledigt.
+- **Book**: vier Kapitel, 1172 Zeilen — Einstieg, erstes Programm, Diagnosen, C-Bibliotheken. W6 verlangt den ganzen Lernweg mit zwei Projektkapiteln. Der Guide
+  (21 Kapitel, 4.x) ist Steinbruch, kein Text: er beschreibt die andere Sprache.
+- **Die 4.x-Reste**: `stdlib/` (25 Dateien) lesen 44 Testdateien (Sema 37, Ir 7), die Suiten Sema (1613 Fälle) und Ir (230) laufen im 4.x-Modus; der Modus hat 123 Weichen in
+  `Lyric.Frontend`/`Lyric.Core`. Nur 17 Stellen in den Tests schalten Lyric 5 ein. Dazu `tests/corpus-4x/`, `Directory.Build.props` auf 4.6.0, `docs/guide`, `Grammar`, `Bytecode`, `Pack`.
+- **Offene Punkte**: `open-points` hält gut 160 Einträge, viele „observe“. CONTRIBUTING Regel 1 verlangt je Punkt Entscheidung oder Uhr, und vor 5.0 läuft jede Uhr ab.
+
+Das ist mehr als **L**. Die Zeile wird hier auf **XL** gesetzt, statt sie später zu überziehen.
+
+| # | Entscheidung | Vergleich / Verworfen |
+|---|---|---|
+| P1 | **Erst die 4.x-Reste, dann der Text.** Solange die Suiten im 4.x-Modus laufen, prüft ein Teil der Tests eine Sprache, die niemand mehr spricht, und jede Spec-Lücke müsste gegen zwei Modi gelesen werden | verworfen: bis M18 mitschleppen — die Zeile dort nennt nur den Treiber, und die Weichen kosten jeden Compiler-Slice |
+| P2 | **Die Suiten ziehen um, sie fallen nicht pauschal.** Der Standard wird Lyric 5, `stdlib5` ist die Bibliothek. Ein roter Test wird einzeln entschieden: nachziehen, wenn er eine Regel von 5 prüft; streichen, wenn er nur eine Regel von 4 prüft, und die Streichung zählt im PR. Die Messung kommt zuerst (S1), weil die Zahl den Schnitt bestimmt | verworfen: alles streichen und auf die Konformanz vertrauen — die Suiten prüfen Spans, Hilfen und Folgefehler, die kein Konformanzfall sieht; alles halten — manche Regel gibt es nicht mehr |
+| P3 | **Die EBNF von Hand (R4 P1), geprüft gegen den Parser**: ein kleiner Erkenner im Spec-Repo (`tools/`) liest die EBNF aus 02 und muss jedes vom Compiler angenommene Programm der Suite annehmen. Die Richtung ist bewusst einseitig: was der Parser ablehnt, lehnt oft erst eine Regel neben der Grammatik ab. Fälle für 02 sind damit die ganze Suite | Rust Reference (von Hand, ohne Prüfung; sie driftet); verworfen: aus dem Parser generieren — R4 P1, und ein handgeschriebener rekursiver Abstieg gibt keine lesbare Grammatik her |
+| P4 | **„Vollständig“ der Suite wird messbar an dem, was schon Nummern hat**: jeder Fehler- und Warncode des Katalogs hat einen Fall, der ihn auslöst, oder steht in einer Liste mit Grund; jeder Abschnitt der Kapitel 03–13, 15, 16 hat mindestens einen Fall. Ein Test im Spec-Repo hält beides. Regelnummern für die ganze Spec wären ein eigener Umbau ohne Nutzer | Go (Spec ohne Nummern); verworfen: jede Regel nummerieren |
+| P5 | **Der Lückenschluss liest die Bereichsdokumente gegen die Spec**, Bereich für Bereich, wie es die Prüfung von 2026-10-07 tat: was entschieden ist und in keinem Kapitel steht, bekommt Regel und Fall; ein Bug dabei ist ein eigener Slice. Die Köpfe „Skeleton“ fallen dabei | die Lehre aus M8a: was nur eine Bereichsentscheidung war, hatte keine Uhr |
+| P6 | **Das Book** nach dem Lernweg. Vorschlag: 1 Getting started *(steht)*, 2 A first program *(steht)*, 3 Values and types, 4 Functions and closures, 5 Structs, classes, enums, 6 Patterns, 7 Errors, 8 Interfaces and generics, 9 Collections and iterators, 10 Modules and packages, **11 Projekt: ein Kommandozeilenwerkzeug**, 12 Tasks and coroutines, 13 Files, processes, the network, **14 Projekt: ein Server**, 15 Testing and tools, 16 What the compiler tells you *(steht)*, 17 C libraries *(steht)*, 18 Comptime and macros, 19 Coming from Lyric 4. Jedes Snippet läuft (`BookTests`, C8); Beispiele nehmen `examples/` als Stoff, wo es passt | Rust Book; verworfen: der Guide nach Bereichen (12 Q2) und ein Kapitel je std-Modul — das leistet `lyric doc` |
+| P7 | **Die offenen Punkte bekommen je eine Entscheidung oder eine Tür** in einem Durchgang, gesammelt dem Maintainer vorgelegt, mit Empfehlung. Was vor 5.0 gebaut werden muss, wird ein eigener Slice | wie Sweep-Runde 1 und 2 |
+| P8 | **Der Tag der Spec 5.0 kommt auf Wort des Maintainers**, als letzter Schritt, zusammen mit dem Pin. Er ist die erste Hälfte dessen, was M18 ausliefert | M18s Regel „Spec-Pin zuletzt“ |
+
+| Slice | Inhalt | Artefakt |
+|---|---|---|
+| **S1** Messung | P2: Sema, Ir, Formatting, Parsing im Lyric-5-Modus gegen `stdlib5` laufen lassen, je Suite die Zahl und Art der Roten; der Schnitt von S2 danach | Tabelle im Plan; kein Verhalten geändert |
+| **S2** Suiten um | P2, mehrere PRs je Suite: Tests nachgezogen oder gestrichen, jeweils gezählt | die Suiten laufen in Lyric 5, kein Test liest `stdlib/` |
+| **S3** Modus raus | die 123 Weichen, `stdlib/`, `tests/corpus-4x/`, 4.6.0; `docs/guide`, `Grammar`, `Bytecode`, `Pack` ins Archiv; CLAUDE.md und CONTRIBUTING zeigen auf das, was gilt | ein Frontend, eine Version; `Lyric4.Frontend` bleibt, es ist nicht dasselbe |
+| **S4** Grammatik | P3: Spec 02 mit EBNF und Erkenner | die Suite wird von der EBNF angenommen |
+| **S5** Kern-Lücken | P5: 01–09 gegen 01–08 der Bereiche | was fehlt: Regel, Fall |
+| **S6** Rest-Lücken | P5: 10–16 gegen die übrigen, die Köpfe, das README der Spec | kein Kapitel heißt „Skeleton“ |
+| **S7** Suite messbar | P4 | beide Tests grün, die Liste der Ausnahmen mit Gründen |
+| **S8** Book I | P6: 3–6 | Kapitel, Snippets laufen |
+| **S9** Book II | P6: 7–10 | dito |
+| **S10** Book III | P6: 11–15, die zwei Projekte | die Projekte bauen als Programme in der Suite |
+| **S11** Book IV | P6: 18, 19, Durchsicht von vorn nach hinten, `SUMMARY`, Startseite verlinkt | die Seite baut mit dem ganzen Book |
+| **S12** offene Punkte | P7 | jeder Punkt entschieden oder Tür; dem Maintainer vorgelegt |
+| **S13** Abschluss | P8 (auf Wort), STATUS, CHANGELOG, Bericht, der Plan für M18 | Spec 5.0 getaggt, Pin darauf |
+
+Nach Aufwand: groß S2, S5, S8–S11; mittel S1, S3, S4, S6, S7, S12; klein S13. Reihenfolge: S1 → S2 → S3 hängen aneinander; S4–S7 und S8–S11 sind unabhängig voneinander und
+könnten parallel laufen, S12 nach dem Lesen der Spec, S13 zuletzt. Vor dem letzten Push von 5.0 wird angehalten (M18).
+
+**Abhängigkeit von außen**: M15 S6 und S7 (Signatur, Mirror) laufen mit dem Maintainer; M18 braucht sie, M17 nicht.
+
+**Reflexion**: Die Versuchung ist, mit dem Book anzufangen, weil es sichtbar ist. Es zuerst zu schreiben hieße aber, Lücken der Spec in Prosa zu gießen und sie beim Lesen von S5 wieder zu ändern. Rust hat seine Reference
+nie vollständig gehabt und lebt damit; R4 will eine Spec, aus der eine zweite Implementierung baubar ist, und das geht ohne Grammatik nicht. Der Erkenner ist die eine Zutat, die teurer ist als ein Text: er ist klein, und ohne ihn
+wäre die EBNF nach einem Monat falsch, ohne dass es jemand merkt.
+
+**Nicht in M17**: die Umbenennung `lyric5` → `lyric`, Website `/5.0/`, `lyric-script 1.0.0` (M18); eine zweite Sprache des Books (14 W4).
+
