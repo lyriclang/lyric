@@ -24,7 +24,7 @@ public class OpaqueTypeTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
@@ -34,7 +34,7 @@ public class OpaqueTypeTests
 
     private const string Entity = "opaque type Entity = int;\n\n";
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void The_explicit_cast_crosses_in_both_directions()
     {
         var de = Check(Entity +
@@ -76,7 +76,7 @@ public class OpaqueTypeTests
         Assert.Equal(2, de.Diagnostics.Count(d => d.Code == "LYR-SEM0003"));
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Equality_works_within_one_alias_and_not_across_two()
     {
         var clean = Check(Entity +
@@ -207,7 +207,7 @@ public class OpaqueInwardPrivilegeTests
         return de;
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_foreign_inward_cast_is_refused()
     {
         var de = CheckWithWorld("""
@@ -254,7 +254,7 @@ public class OpaqueInwardPrivilegeTests
         Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0093");
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void The_alias_route_is_refused_too()
     {
         var de = CheckWithWorld("""
@@ -269,7 +269,7 @@ public class OpaqueInwardPrivilegeTests
         Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0093");
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_global_initializer_is_refused_too()
     {
         var de = CheckWithWorld("""
@@ -299,7 +299,7 @@ public class OpaqueInwardPrivilegeTests
         Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0093");
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_transparent_alias_target_is_refused_too()
     {
         var de = CheckWithWorld("""

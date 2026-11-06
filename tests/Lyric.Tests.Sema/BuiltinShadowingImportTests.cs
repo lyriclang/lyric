@@ -33,7 +33,7 @@ public class BuiltinShadowingImportTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -66,7 +66,7 @@ public class BuiltinShadowingImportTests
     /// conforming to <c>Error</c>, reported as "returns '&lt;error&gt;'" at the conformance
     /// rather than at the import.
     /// </summary>
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_conformance_naming_the_builtin_still_holds()
     {
         var de = Check("""

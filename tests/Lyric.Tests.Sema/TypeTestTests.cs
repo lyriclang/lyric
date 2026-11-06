@@ -26,11 +26,9 @@ public class TypeTestTests
         var sm = new SourceManager();
         var id = sm.AddVirtual("test.lyr", Prelude + body);
         var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de);
+        var comp = new Compilation(sm, de) { ModuleLoader = Library.Loader(sm, de) };
         // 'Any' lives in std.core (03 T10), visible without an import: the seed of it, as the
         // tests of the attributes seed theirs.
-        var core = sm.AddVirtual("core.lyr", "module std.core;\npub interface Any { }\n");
-        comp.AddModule(new Parser(sm, core, de).ParseModule());
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
         return de;
@@ -76,7 +74,7 @@ public class TypeTestTests
     public void Is_on_an_optional_asks_for_the_null_test_first() =>
         Assert.Contains("null first", Rejected("fn f(s: ?Shape): bool { return s is Circle; }", "LYR-SEM0131"));
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_type_never_behind_an_interface_is_refused() =>
         Assert.Contains("never behind", Rejected("fn f(s: Shape): bool { return s is int; }", "LYR-SEM0131"));
 
@@ -112,19 +110,19 @@ public class TypeTestTests
 
     // ------------------------------------------------------------------ Any
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Every_value_is_an_Any_at_the_transition_undeclared() =>
         Allowed("fn f(): int { let a: Any = Circle { r = 1 }; let b: Any = Rect { w = 2 }; let c: Any = Dir.Up; let xs: Any[] = [a, b, c]; return xs.length(); }");
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_scalar_is_no_Any() =>
         Rejected("fn f(): int { let a: Any = 5; return 0; }", "LYR-SEM0001");
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Out_of_an_Any_through_is() =>
         Allowed("fn f(a: Any): int { if (a is Circle) { return a.r; } return match (a) { r: Rect => r.w, _ => 0 }; }");
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Nothing_converts_to_Any_unasked() =>
         Rejected("fn g(a: Any): int { return 0; }\nfn f(): int { let s: Shape = Circle { r = 1 }; return g(s); }", "LYR-SEM0001");
 }

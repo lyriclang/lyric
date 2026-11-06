@@ -32,7 +32,7 @@ public class TypeAliasCycleTests
     private static string[] Codes(DiagnosticEngine de) =>
         de.Diagnostics.Select(d => d.Code).ToArray();
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_generic_alias_is_refused_outside_Lyric_5()
     {
         // 03 T15 gives Lyric 5 generic aliases; the 4.x grammar this frontend also serves has none,

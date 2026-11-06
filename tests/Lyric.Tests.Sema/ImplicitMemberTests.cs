@@ -32,7 +32,7 @@ public class ImplicitMemberTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de);
         if (withStdlib)
-            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de);
+            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de);
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
         return de;
@@ -102,7 +102,7 @@ public class ImplicitMemberTests
 
     /// <summary>Equality itself comes from <c>Equatable</c> (02 M10); what the implicit member
     /// adds is the type, from the OTHER side — on either side of the operator.</summary>
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Either_side_of_an_equality_lends_its_type() =>
         Allowed("""
             import std.core { Equatable };

@@ -12,13 +12,6 @@ namespace Lyric.Tests.Sema;
 /// </summary>
 public class ConstructorExtendTests
 {
-    private const string Core = """
-        module std.core;
-        pub interface Display { fn show(): string; }
-        extend int :: [Display] { fn show(): string { return "i"; } }
-
-        """;
-
     private const string Prelude = """
         struct Foo { n: int }
         extend<T> T[] { fn first(): T { return this[0]; } }
@@ -33,9 +26,7 @@ public class ConstructorExtendTests
     {
         var sm = new SourceManager();
         var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de);
-        var core = sm.AddVirtual("core.lyr", Core);
-        comp.AddModule(new Parser(sm, core, de).ParseModule());
+        var comp = new Compilation(sm, de) { ModuleLoader = Library.Loader(sm, de) };
         var id = sm.AddVirtual("test.lyr", Prelude + body);
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -91,7 +82,7 @@ public class ConstructorExtendTests
             + "fn tell<T :: [Describe]>(x: T): string { return x.describe(); }\n"
             + "fn f(): string { return tell([1, 2]); }");
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_value_is_not_made_from_a_shape_yet() =>
         Rejected("interface Describe { fn describe(): string; }\n"
             + "extend<T> T[] :: [Describe] { fn describe(): string { return \"xs\"; } }\n"

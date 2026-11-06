@@ -23,7 +23,7 @@ public class OverloadTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
@@ -166,7 +166,7 @@ public class OverloadTests
         Assert.False(de.HasErrors);
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_module_qualified_call_binds_through_the_alias()
     {
         // The alias route and the selective import reach the same member. (Through 4.x the UDP

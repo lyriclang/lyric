@@ -24,7 +24,7 @@ public class TryDefiniteAssignmentTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);

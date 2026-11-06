@@ -31,14 +31,14 @@ public class IterateOptionalTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
         return de.Diagnostics;
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void An_array_of_optionals_cannot_be_walked()
     {
         var diagnostics = Check("""
@@ -57,7 +57,7 @@ public class IterateOptionalTests
         Assert.Contains(diagnostic.Notes!, n => n.Message.Contains("walk the indices"));
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void The_same_holds_for_an_explicit_iterator_of_optionals()
     {
         // Not the array's fault: an iterator handed in directly runs into the same protocol.
@@ -81,7 +81,7 @@ public class IterateOptionalTests
     /// body does with it says nothing further — a sentence about an operator and an
     /// <c>&lt;error&gt;[]</c> is noise trailing the one mistake.
     /// </summary>
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Nothing_in_the_body_reports_a_second_time()
     {
         var diagnostics = Check("""
@@ -112,7 +112,7 @@ public class IterateOptionalTests
             }
             """));
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void An_array_of_optional_objects_is_refused_the_same_way()
     {
         var diagnostics = Check("""

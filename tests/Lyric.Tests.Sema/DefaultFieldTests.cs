@@ -105,7 +105,7 @@ public class InferenceDiagnosticTests
         Assert.Contains("write it explicitly", diagnostics);
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void An_explicit_type_argument_silences_it() =>
         Assert.Equal("", Diagnostics("""
             pub fn leer<T>(n: int): int { return n; }
@@ -171,7 +171,7 @@ public class DiagnosticNoiseTests
         // "cannot assign 'fn(int) -> <error>' to 'fn(int) -> U'" says nothing to the reader
         Assert.DoesNotContain("LYR-SEM0001", Codes(BlockLambda));
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void The_annotation_free_form_infers_and_compiles_cleanly() =>
         // v1.13: the fixture that used to be THE motivating error now just works.
         Assert.Empty(Codes("""

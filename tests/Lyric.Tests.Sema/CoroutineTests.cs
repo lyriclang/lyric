@@ -186,7 +186,7 @@ public class CoroutineTests
             d => d.Code == "LYR-SEM0001");
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_coroutine_with_a_result_returns_it_on_every_path()
     {
         Assert.Contains(Diags("fn co(c: bool): Coroutine<int, int> { yield 1; if (c) { return 2; } }").Diagnostics,

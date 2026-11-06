@@ -95,7 +95,11 @@ public sealed class Compilation
     /// route that reaches it. Off for the 4.x tools that still read headers, the language
     /// server first.
     /// </summary>
-    public bool Lyric5Modules { get; init; }
+    public bool Lyric5Modules { get; init; } = true;
+
+    /// <summary>Whether the analysis reports what it finds about style and about use. A check of one
+    /// rule says no, so that a function nothing calls does not answer in its place.</summary>
+    public bool Lints { get; init; } = true;
 
     /// <summary>Whether the program is a library C links: <see cref="Entry"/> is its root module,
     /// which has no <c>main</c>; the exports are what it starts from.</summary>

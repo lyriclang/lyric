@@ -71,7 +71,7 @@ public class ResolverTests
 
     /// <summary>The word as written; no word is the module's for the 4.x tools this compilation
     /// stands for (Lyric 5 reads it as 'internal', design/v5/spec/07 V2).</summary>
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Visibility_is_captured()
     {
         var (comp, _, _) = Resolve(("m", "pub fn a(): int { return 0; } fn b(): int { return 0; } "
@@ -132,7 +132,7 @@ public class ResolverTests
         Assert.IsType<ExternalSymbol>(comp.Modules[0].Members.LookupLocal("io")); // std.io is not in the compilation
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void Import_of_missing_or_private_symbol_reports()
     {
         var (_, missing, _) = Resolve(

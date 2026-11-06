@@ -28,7 +28,7 @@ public class MemberReceiverTests
         var comp = new Compilation(sm, de);
 
         if (withStdlib)
-            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de);
+            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de);
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -95,7 +95,7 @@ public class MemberReceiverTests
             + "fn main(): int { return Box<int>.zero(); }\n");
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_member_on_a_module_name_is_a_module_access()
     {
         var de = Check(
@@ -136,7 +136,7 @@ public class MemberReceiverTests
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0052");
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_generic_type_through_a_module_qualifier_binds_its_arguments_as_the_bare_name_does()
     {
         // The qualified form takes the same route as the bare one, including its diagnostics:

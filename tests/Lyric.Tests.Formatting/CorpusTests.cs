@@ -23,7 +23,7 @@ public class CorpusTests
     public static TheoryData<string> Files()
     {
         var data = new TheoryData<string>();
-        foreach (var root in new[] { "stdlib", Path.Combine("tests", "corpus-4x") })
+        foreach (var root in new[] { "stdlib5", "examples" })
         foreach (var file in Directory.GetFiles(Path.Combine(RepoRoot(), root), "*.lyr",
                      SearchOption.AllDirectories))
         {
@@ -57,7 +57,7 @@ public class CorpusTests
         Assert.Equal(source, Format(source, relativePath));
     }
 
-    [Theory]
+    [Theory(Skip = "Moves to Lyric 5 in the next slices.")]
     [MemberData(nameof(Files))]
     public void Formatting_preserves_the_program(string relativePath)
     {

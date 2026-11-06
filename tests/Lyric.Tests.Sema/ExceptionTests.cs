@@ -20,15 +20,6 @@ namespace Lyric.Tests.Sema;
 /// </summary>
 public class ExceptionTests
 {
-    private const string Core = """
-        module std.core;
-        pub interface Error {
-            fn message(): string;
-            fn cause(): ?Error { return null; }
-        }
-        pub interface Closeable { fn close(): void throws Error; }
-        """;
-
     private const string Prelude = """
         interface IOError :: [Error] { }
         class NotFound :: [Error] {
@@ -52,9 +43,7 @@ public class ExceptionTests
     {
         var sm = new SourceManager();
         var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de);
-        var core = sm.AddVirtual("core.lyr", Core);
-        comp.AddModule(new Parser(sm, core, de).ParseModule());
+        var comp = new Compilation(sm, de) { ModuleLoader = Library.Loader(sm, de) };
         var id = sm.AddVirtual("test.lyr", source);
         var module = new Parser(sm, id, de).ParseModule();
         comp.AddModule(module);

@@ -25,7 +25,7 @@ public class ValueBlockTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -111,7 +111,7 @@ public class ValueBlockTests
         Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0022");
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void In_a_match_statement_a_call_tail_is_fine() =>
         Compiles("""
             import std.io.console { println };

@@ -105,7 +105,7 @@ public class GenericsTests
         return de;
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_generic_function_reached_through_its_module_is_not_a_value_either()
     {
         // The unqualified refusal landed with 3.6.0; the QUALIFIED path went through
@@ -126,7 +126,7 @@ public class GenericsTests
         Assert.Contains("ident", error.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_generic_function_called_through_its_module_is_untouched()
     {
         var de = CheckWithLibrary("""

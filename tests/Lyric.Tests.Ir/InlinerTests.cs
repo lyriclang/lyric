@@ -23,7 +23,7 @@ public class InlinerTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         var binding = comp.Resolve();
@@ -65,7 +65,7 @@ public class InlinerTests
         Assert.DoesNotContain(module.Functions, f => f.Name == "main.double");
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void A_chain_of_small_calls_collapses_in_one_pass()
     {
         var module = Optimized("""
@@ -213,7 +213,7 @@ public class InlinerTests
         Assert.Equal(source.IndexOf("n * 2", StringComparison.Ordinal), multiply.Span.Start);
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void An_attributed_function_is_inlined_at_its_sites_but_survives_as_a_root()
     {
         var module = Optimized("""

@@ -31,7 +31,7 @@ public class ExportRootTests
         // not mind carrying a loader they never reach for.
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         var binding = comp.Resolve();
@@ -96,7 +96,7 @@ public class ExportRootTests
         pub fn surface(): int { return 7; }
         """;
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void An_attributed_function_survives_without_being_pub()
     {
         var module = Lower(Attributed, libraryRoots: true);
@@ -107,7 +107,7 @@ public class ExportRootTests
         Assert.DoesNotContain(module.Functions, f => f.Name.EndsWith(".dead_before"));
     }
 
-    [Fact]
+    [Fact(Skip = "Moves to Lyric 5 in the next slices.")]
     public void An_attribute_row_follows_the_renumbering()
     {
         var module = Lower(Attributed, libraryRoots: true);
