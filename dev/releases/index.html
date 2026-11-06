@@ -556,6 +556,8 @@ another module's type and interface. A module import counts as used by the block
 <li><p><strong><code>'File' has no member 'writeAll'</code> names the module to import</strong> where a blanket block, or a block on a built-in
 shape, adds the member in a module of the program this one does not import.</p>
 </li>
+<li><p><strong><code>lyric fmt</code> writes two attributes as one group</strong>, <code>@[A, B]</code>, as the design says, on every declaration and at the head of a module; it had kept them stacked. A header without a name is <code>module;</code>, no longer <code>module ;</code>.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
