@@ -239,7 +239,7 @@ and associated type of the type's own body, in declaration order — <code>kind<
 which are static (the sweep after M10, X4); <code>conformances&lt;T&gt;()</code> and <code>hasConformance&lt;T, I&gt;()</code>;
 <code>typeName&lt;T&gt;()</code>; <code>isStruct</code>, <code>isClass</code>, <code>isEnum</code>, <code>isInterface&lt;T&gt;()</code>. A <code>Type</code> holds its name
 and its <code>kind</code>, a <code>TypeKind</code>: <code>Primitive</code> (the scalars, <code>string</code>), <code>Struct</code>, <code>Class</code>, <code>Enum</code>,
-<code>Interface</code>, <code>Opaque</code>, <code>Optional</code>, <code>Array</code>, <code>InlineArray</code>, <code>Slice</code> (a view), <code>Tuple</code>,
+<code>Interface</code>, <code>Optional</code>, <code>Array</code>, <code>InlineArray</code>, <code>Slice</code> (a view), <code>Tuple</code>,
 <code>Function</code>, <code>Parameter</code> (a type parameter), <code>Other</code> (W9).
 Each answer is a constant of the type at the instance it is asked at — in a generic function or a
 default, of each instance (R3). Nothing is reflected at run time (R6): a program reads a type
