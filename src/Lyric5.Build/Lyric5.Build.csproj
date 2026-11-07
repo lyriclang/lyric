@@ -7,7 +7,6 @@
     to a binary. The driver's build and run verbs are thin over this.
   -->
   <PropertyGroup>
-    <Version>5.0.0</Version>
     <AssemblyName>lyric5.build</AssemblyName>
     <RootNamespace>Lyric5.Build</RootNamespace>
     <IsAotCompatible>true</IsAotCompatible>

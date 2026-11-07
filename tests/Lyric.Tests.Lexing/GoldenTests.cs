@@ -92,8 +92,7 @@ public class GoldenTests
     [Fact]
     public void Example_hello_tokenizes_without_errors()
     {
-        // tests/corpus-4x/hello.lyr tokenizes without errors.
-        var path = Path.Combine(RepoRoot(), "tests", "corpus-4x", "hello.lyr");
+        var path = Path.Combine(RepoRoot(), "examples", "hello.lyr");
         Assert.True(File.Exists(path), $"missing example: {path}");
 
         var (diag, _) = LexAndDump("hello.lyr", File.ReadAllText(path, Encoding.UTF8));

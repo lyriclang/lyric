@@ -1,2 +1,2 @@
 proposal[LYR-MIG0211] main.lyr:4:17: 'Indexable<int>' is 'IndexSet<int>' in Lyric 5: 'x[i]' calls 'index', 'x[i] = v' calls 'setIndex', which forward to 'get' and 'set' — fold 'get' and 'set' into them where nothing else calls them
-proposal[LYR-MIG0211] main.lyr:16:13: 'Indexable<int>' as a type has no counterpart: Lyric 5's 'Indexable' names its element by an associated type — take the concrete type, or a type parameter with '[IndexSet<int>]'
+proposal[LYR-MIG0211] main.lyr:16:13: 'Indexable<int>' as a type has no counterpart: Lyric 5's 'IndexSet' names its element by an associated type — take the concrete type, or a type parameter with '[IndexSet<int>]'

@@ -97,17 +97,14 @@ public partial class CatalogTests
     };
 
     /// <summary>
-    /// Codes retired for Lyric 5 whose sites stay in source: the front end still serves the 4.x
-    /// semantics its own suites test (`stdlib/`, the Sema and Ir suites — until M17 replaces it; one of
-    /// them reads the 4.x <c>lyric.json</c>), and a single-item parse reports
-    /// into an engine of its own. No <c>lyric5</c> program reaches one of them (M12a S3, each checked).
+    /// Codes retired whose sites stay in source, and no program reaches one of them: a single-item
+    /// parse reports into an engine of its own, and a checker without a library still asks for a
+    /// range's type.
     /// </summary>
     private static readonly Dictionary<string, string> StillInTheSharedFrontend = new(StringComparer.Ordinal)
     {
         ["LYR-PAR0001"] = "the single-item parse of std.syntax and a macro's read-back reports into its own engine",
         ["LYR-SEM0090"] = "a range value without std.core: lyric5 always loads it",
-        ["LYR-CLI0010"] = "a lyric.json that cannot be read: the 4.x project file the Sema suite's corpus reads",
-        ["LYR-CLI0018"] = "a lyric.json that asks for a newer toolchain: the same",
     };
 
     [Fact]

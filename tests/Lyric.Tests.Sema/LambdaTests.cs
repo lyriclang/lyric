@@ -8,8 +8,8 @@ using Xunit;
 namespace Lyric.Tests.Sema;
 
 /// <summary>
-/// Lambdas + Closures — M4-Slice 4a (docs/Grammar.md §6.2). Bidirektionale
-/// Inference: unannotated parameters take the context FnType (a call argument, a binding, a return, a
+/// Lambdas + closures. Bidirectional
+/// inference: unannotated parameters take the context FnType (a call argument, a binding, a return, a
 /// field); generic calls run in two phases (T from the eagerly typed arguments, U from the lambda
 /// return). Block lambdas deliver values through 'return'; without an annotation or a context the
 /// type is inferred from the body's returns (v1.13), unified like match arms. Captures are

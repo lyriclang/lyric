@@ -2523,3 +2523,14 @@ Der Abgleich jeder Bibliotheksfrage des Frontends gegen `stdlib5` zeigt mehr als
 
 **S3b2, gebaut:** `opaque type` wird weiter geparst und mit `LYR-SEM0175` abgelehnt, liest sich danach aber als gewöhnlicher Alias: Die Mauer hinter der Ablehnung meldete nur Folgefehler. `TypeKind` verliert `Opaque` (Spec 11). `isOpaque` in `std.syntax` bleibt: Ein Makro, das eine Deklaration liest und zurückschreibt, darf die Ablehnung nicht verlieren. `FieldOpaqueNames` im IR geht mit, kein Backend las es. Die Host-Typen gehen ganz, mit `LYR-SEM0061` und dem Empfänger eines Importaufrufs.
 
+## Nachtrag 2026-11-07 — M17 S3c geschnitten
+
+Die Zählung zeigt rund 100 Kommentare im Frontend, die noch von Bytecode und der VM reden, dazu `CapabilityTable`, die das IR noch füllt, ohne dass das Backend sie liest. Das steht nicht in der Plan-Zeile von S3c und bekommt einen eigenen PR.
+
+| Slice | Inhalt |
+|---|---|
+| **S3c1** | `stdlib/`, `tests/corpus-4x/`, `ProjectFile`, die Version, die `retired`-Sätze samt Spec-Anhang, `docs/guide`, `Grammar`, `Bytecode`, `Pack` ins Archiv, README, CONTRIBUTING, STATUS |
+| **S3c2** | die Fähigkeiten im IR und die Wurzeln ohne Aufrufer, soweit sie nicht tragen; die Kommentare über Bytecode und VM; verwaiste `<summary>`-Blöcke |
+
+**S3c1, gebaut:** Die Version steht jetzt an einer Stelle, `Directory.Build.props`; die fünf `<Version>` der Lyric-5-Projekte sind weg. Die Tests, die `tests/corpus-4x/` lasen, lesen dieselben Programme unter `examples/`. `CLAUDE.md` ist nicht eingecheckt (`.gitignore`) und geht deshalb nicht durch diesen PR: Die Änderung liegt dem Maintainer als Vorschlag vor, weil die Datei die Regeln für die Arbeit selbst setzt.
+

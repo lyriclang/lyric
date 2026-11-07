@@ -7,7 +7,7 @@ namespace Lyric.Tests.Sema;
 
 /// <summary>
 /// The repository holds itself to its own diagnostics: every real Lyric file — the standard
-/// library, the examples, the project templates — checks in complete silence. The formatter's
+/// library and the examples — checks in complete silence. The formatter's
 /// corpus rule, applied to warnings: a new warning that fires on the corpus either found real
 /// dirt (clean it in the same commit) or is wrong (fix it before it ships).
 /// </summary>
@@ -30,8 +30,8 @@ public class CorpusWarningTests
             var segments = relative.Split(
                 Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             if (segments.Any(s => s is "bin" or "obj" or "out")) continue;
-            // A Lyric 5 package under examples/ (a lyric.toml beside, or above src/) is not the 4.x
-            // corpus: Lyric5.Tests builds and runs it (M9b S6, examples/macros).
+            // A package under examples/ (a lyric.toml beside, or above src/) needs its manifest:
+            // Lyric5.Tests builds and runs it.
             if (File.Exists(Path.Combine(Path.GetDirectoryName(file)!, "lyric.toml"))
                 || File.Exists(Path.Combine(Path.GetDirectoryName(file)!, "..", "lyric.toml"))) continue;
 
@@ -45,19 +45,9 @@ public class CorpusWarningTests
     [MemberData(nameof(Files))]
     public void The_repository_checks_in_silence(string relativePath)
     {
-        // The roots the file is actually compiled with. A corpus file belongs to a project —
-        // the templates have a lyric.json, and their test files import their source root — so
-        // checking it without one would report an import that resolves perfectly well in every
-        // real compile, which is how a corpus rule stops meaning anything.
-        var project = ProjectFile.Discover(
-            Path.GetDirectoryName(Path.Combine(RepoRoot(), relativePath))!);
-
         var options = new CompilerOptions
         {
             StdlibRoot = Path.Combine(RepoRoot(), "stdlib5"),
-            SourceRoot = project?.SourceRoot,
-            NativeRoots = project?.NativeRoots,
-            DependencyRoots = project?.Dependencies,
             WarnDeps = true,
         };
 
@@ -66,12 +56,6 @@ public class CorpusWarningTests
         // probe that imports it.
         // The probe has a 'main': an error in it would end the check before any warning is said,
         // and the library would seem silent however it read.
-        //
-        // The test is on the FIRST SEGMENT and not on the prefix, which is what it was until
-        // 4.5: 'stdlib-tests\…' starts with 'stdlib', so every one of the standard library's
-        // own test files went through the probe as 'import tests.math_tests' — a path that
-        // resolves nowhere, whose error sat in the probe file and was dropped as the harness's
-        // noise. Sixteen files were in the corpus and none of them was read.
         var result = SegmentsOf(relativePath)[0] == "stdlib5"
             ? SourceCompiler.Check(ScriptSource.FromBuffer(
                     Path.Combine(RepoRoot(), "corpus_probe.lyr"),
