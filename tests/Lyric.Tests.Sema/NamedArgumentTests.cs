@@ -16,7 +16,7 @@ public class NamedArgumentTests
     private const string Prelude = """
         fn connect(host: int, port: int = 80, retries: int = 3): int { return host + port + retries; }
         fn span(from: int, to: int = from + 10, step: int = to - from): int { return step; }
-        fn sum(base: int, params xs: int[]): int { return base; }
+        fn sum(base: int, xs: int...): int { return base; }
         fn of(hex: int): int { return hex; }
         fn of(r: int, g: int, b: int): int { return r + g + b; }
 
@@ -101,8 +101,8 @@ public class NamedArgumentTests
         Assert.Contains("twice", Rejected("fn f(): int { return connect(1, port: 2, port: 3); }", "LYR-SEM0119"));
 
     [Fact]
-    public void The_params_parameter_is_not_named() =>
-        Assert.Contains("params", Rejected("fn f(): int { return sum(1, xs: [2]); }", "LYR-SEM0119"));
+    public void The_variadic_parameter_is_not_named() =>
+        Assert.Contains("variadic", Rejected("fn f(): int { return sum(1, xs: [2]); }", "LYR-SEM0119"));
 
     [Fact]
     public void A_parameter_without_a_default_left_out_by_a_named_call_is_named() =>

@@ -47,7 +47,7 @@ public class SyntaxTests
 
     private static Module Parse(string displayName, string text)
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual(displayName, text);
         var de = new DiagnosticEngine(sm);
         var module = new Parser(sm, id, de).ParseModule();
@@ -57,7 +57,7 @@ public class SyntaxTests
 
     private static Stmt[] ParseStatements(string text)
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual("<stmts>", text);
         var de = new DiagnosticEngine(sm);
         var stmts = new Parser(sm, id, de).ParseStatements();

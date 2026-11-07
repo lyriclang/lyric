@@ -7,9 +7,8 @@ namespace Lyric.Resolver;
 // rather than records.
 
 /// <summary>
-/// Who may name a declaration: its module, its package, everyone. What a
-/// declaration without a word gets is the reader's rule — <see cref="Internal"/> in Lyric 5,
-/// <see cref="Private"/> for the 4.x tools, whose unmarked names were their module's.
+/// Who may name a declaration: its module, its package, everyone. A declaration without a word
+/// is <see cref="Internal"/>.
 /// </summary>
 public enum Visibility
 {

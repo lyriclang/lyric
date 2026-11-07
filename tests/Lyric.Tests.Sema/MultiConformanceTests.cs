@@ -26,7 +26,7 @@ public class MultiConformanceTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
@@ -78,12 +78,14 @@ public class MultiConformanceTests
         var de = Check("""
             import std.core { Mul };
 
-            struct Vec2 :: [Mul<int, Vec2>] {
+            struct Vec2 :: [Mul<int>] {
+                type Out = Vec2;
                 x: int,
                 fn mul(other: int): Vec2 { return Vec2 { x = this.x * other }; }
             }
 
-            extend Vec2 :: [Mul<int, int>] {
+            extend Vec2 :: [Mul<int>] {
+                type Out = int;
                 fn mul(other: int): int { return this.x * other; }
             }
 
@@ -110,27 +112,6 @@ public class MultiConformanceTests
             """);
         var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0003");
         Assert.Contains("'Vec2' and 'string'", error.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void The_old_single_argument_form_says_what_is_missing()
-    {
-        // The 2.x spelling. It is a type-argument count, and the message names the count rather
-        // than leaving the reader to guess that the interface grew a parameter.
-        var de = Check("""
-            import std.core { Add };
-
-            struct Money :: [Add<Money>] {
-                cents: int,
-                fn add(other: Money): Money { return Money { cents = this.cents + other.cents }; }
-            }
-
-            fn main(): int {
-                return 0;
-            }
-            """);
-        Assert.Contains(de.Diagnostics,
-            d => d.Code == "LYR-SEM0026" && d.Message.Contains("2 type argument", StringComparison.Ordinal));
     }
 
     [Fact]

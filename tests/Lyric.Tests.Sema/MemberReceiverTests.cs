@@ -28,7 +28,7 @@ public class MemberReceiverTests
         var comp = new Compilation(sm, de);
 
         if (withStdlib)
-            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de);
+            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de);
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -99,7 +99,7 @@ public class MemberReceiverTests
     public void A_member_on_a_module_name_is_a_module_access()
     {
         var de = Check(
-            "import std.io.console;\nfn main(): int {\n    console.println(\"hi\");\n    return 0;\n}\n",
+            "import std.io;\nfn main(): int {\n    io.println(\"hi\");\n    return 0;\n}\n",
             withStdlib: true);
 
         Assert.False(de.HasErrors,
@@ -145,7 +145,7 @@ public class MemberReceiverTests
         // this was LYR-SEM0063, "write its type arguments", for every call.
         var open = Check(
             "import std.collections;\nfn main(): int {\n"
-            + "    let xs = collections.List.empty();\n    return 0;\n}\n",
+            + "    let xs = collections.List.new();\n    return 0;\n}\n",
             withStdlib: true);
         var said = Assert.Single(open.Diagnostics, d => d.Severity == Severity.Error);
         Assert.Equal("LYR-SEM0060", said.Code);
@@ -153,7 +153,7 @@ public class MemberReceiverTests
 
         var asked = Check(
             "import std.collections;\nfn main(): int {\n"
-            + "    let xs: collections.List<int> = collections.List.empty();\n    return 0;\n}\n",
+            + "    let xs: collections.List<int> = collections.List.new();\n    return 0;\n}\n",
             withStdlib: true);
         Assert.DoesNotContain(asked.Diagnostics, d => d.Severity == Severity.Error);
     }

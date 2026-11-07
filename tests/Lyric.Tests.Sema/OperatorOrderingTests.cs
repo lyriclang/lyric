@@ -26,7 +26,7 @@ public class OperatorOrderingTests
         var comp = new Compilation(sm, de);
 
         if (withStdlib)
-            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de);
+            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de);
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -55,9 +55,9 @@ public class OperatorOrderingTests
         AssertClean("""
             import std.core { Ordered };
 
-            struct M :: [Ordered<M>] {
+            struct M :: [Ordered] {
                 v: int,
-                fn compare(other: M): int { return 0; }
+                fn compare(other: M): ?Ordering { return Ordering.Equal; }
             }
 
             fn main(): int {
@@ -75,7 +75,7 @@ public class OperatorOrderingTests
         var de = Check("""
             struct M {
                 v: int,
-                fn compare(other: M): int { return 0; }
+                fn compare(other: M): ?Ordering { return Ordering.Equal; }
             }
 
             fn main(): int {

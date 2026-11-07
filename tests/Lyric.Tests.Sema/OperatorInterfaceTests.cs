@@ -13,28 +13,8 @@ namespace Lyric.Tests.Sema;
 public class OperatorInterfaceTests
 {
     // The seed of std.core 5, as far as the operators go.
-    private const string Core = """
-        module std.core;
-        pub interface Add<Rhs = Self> { type Out = Self; fn add(rhs: Rhs): Self.Out; }
-        pub interface Sub<Rhs = Self> { type Out = Self; fn sub(rhs: Rhs): Self.Out; }
-        pub interface Mul<Rhs = Self> { type Out = Self; fn mul(rhs: Rhs): Self.Out; }
-        pub interface Rem<Rhs = Self> { type Out = Self; fn rem(rhs: Rhs): Self.Out; }
-        pub interface Neg { type Out = Self; fn neg(): Self.Out; }
-        pub interface BitAnd<Rhs = Self> { type Out = Self; fn bitAnd(rhs: Rhs): Self.Out; }
-        pub interface BitNot { type Out = Self; fn bitNot(): Self.Out; }
-        pub interface Shl<Rhs = int> { type Out = Self; fn shl(rhs: Rhs): Self.Out; }
-        pub interface Equatable { fn equals(o: Self): bool; }
-        pub enum Ordering { Less, Equal, Greater }
-        pub interface Ordered :: [Equatable] { fn compare(o: Self): ?Ordering; }
-        pub interface Display { fn show(): string; }
-        extend int :: [Add, Equatable] {
-            fn add(rhs: int): int { return this + rhs; }
-            fn equals(o: int): bool { return this == o; }
-        }
-
-        """;
-
     private const string Prelude = """
+        import std.core { Add, Sub, Mul, Neg, BitAnd, BitNot, Shl, Rem };
         struct V :: [Add, Sub, Mul<int>, Neg, Equatable, Ordered, Display] {
             x: int,
             fn add(rhs: V): V { return V { x = this.x + rhs.x }; }
@@ -54,9 +34,7 @@ public class OperatorInterfaceTests
     {
         var sm = new SourceManager();
         var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de);
-        var core = sm.AddVirtual("core.lyr", Core);
-        comp.AddModule(new Parser(sm, core, de).ParseModule());
+        var comp = new Compilation(sm, de) { ModuleLoader = Library.Loader(sm, de) };
         var id = sm.AddVirtual("test.lyr", Prelude + body);
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -132,7 +110,7 @@ public class OperatorInterfaceTests
 
     [Fact]
     public void Ordered_implies_Equatable() =>
-        Rejected("struct Q :: [Ordered] { n: int, fn compare(o: Q): ?Ordering { return null; } }\nfn f(): int { return 0; }", "LYR-SEM0020");
+        Allowed("struct Q :: [Ordered] { n: int, fn compare(o: Q): ?Ordering { return null; } }\nfn f(a: Q, b: Q): bool { return a == b; }");
 
     // ------------------------------------------------------------------ the generic sum
 

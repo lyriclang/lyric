@@ -103,33 +103,13 @@ public sealed class TypeChecker
     /// <summary>The <c>Iterator&lt;T&gt;</c> interface from <c>std.iter</c>, what <c>for-in</c> checks
     /// against. <c>null</c> when the stdlib is not loaded; the loop head then reports the ordinary
     /// "not iterable" diagnostic.</summary>
-    private readonly TypeSymbol? _iterator;
-    private readonly TypeSymbol? _arrayIterator;
-    private readonly TypeSymbol? _rangeIterator;
-    private readonly TypeSymbol? _inclusiveRangeIterator;
-    private readonly TypeSymbol? _unsignedRangeIterator;
-    private readonly TypeSymbol? _inclusiveUnsignedRangeIterator;
-    private readonly TypeSymbol? _stringIterator;
-    private readonly TypeSymbol? _iterable;
-    private readonly TypeSymbol? _indexable;
     private readonly TypeSymbol? _coreIndex;     // std.core's Index<K>: 'x[k]'
     private readonly TypeSymbol? _coreIndexSet;
     private readonly TypeSymbol? _coreLength;    // std.core's Length: 'x[^n]' through a type's own index
     private readonly TypeSymbol? _coreAsSlice;   // std.core's AsSlice<T>: 'x[a..b]' through the view
-    // 'Format': std.core declaring it is Lyric 5's format language — a spec checked here,
-    // the hole a call of std.core's (12 §2); the 4.x tools keep their std.fmt converters.
+    // 'Format': the format language — a spec checked here, the hole a call of std.core's (12 §2).
     private readonly TypeSymbol? _coreFormat;
     private readonly TypeSymbol? _debug;  // and IndexSet<K>: 'x[k] = v'
-    // 'fstringStart': std.core declaring it is Lyric 5's f-string — one builder, each hole a
-    // piece of it (12 §2 rule 4); the 4.x tools keep their converters and concat chain.
-    private readonly bool _fstringBuilder;
-    /// <summary>Lyric 5's std.core, whose <c>repeatText</c> is what <c>"x" * n</c> means.</summary>
-    private readonly bool _coreRepeatText;
-    /// <summary>Lyric 5's std.core, which fills its own tables through <c>filled</c>:
-    /// there a type parameter counts as maybe an object where <c>[x] * n</c> asks (03 §5.1). The
-    /// 4.x library the shared front end still checks repeats type parameters natively, as 4.x
-    /// did.</summary>
-    private readonly bool _repeatAsksTypeParameters;
     // 'Contains<T>': what 'x in xs' asks of the right operand's type.
     private readonly TypeSymbol? _coreContains;
     // 'FromArrayLiteral<T>': what an array literal becomes where a type is expected.
@@ -163,7 +143,6 @@ public sealed class TypeChecker
         _result.MetaVariants = MetaVariantsOf;
         _result.MetaConformances = MetaConformancesOf;
         _result.MetaMembers = MetaMembersOf;
-        _result.Lyric5Modules = comp.Lyric5Modules;
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
         _backtrace = comp.FindModule(["std", "core"])?.Members.LookupLocal("Backtrace") as TypeSymbol is { Kind: TypeSymbolKind.Struct } backtrace ? backtrace : null;
         _closeable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") as TypeSymbol is { Kind: TypeSymbolKind.Interface } closeable ? closeable : null;
@@ -175,24 +154,10 @@ public sealed class TypeChecker
         _slice = comp.Builtins.LookupLocal("Slice") as TypeSymbol;
         _stringView = comp.Builtins.LookupLocal("StringView") as TypeSymbol;
 
-        // 'Iterator<T>' lives in the stdlib rather than among the builtins: it is an ordinary
-        // interface anyone can implement. The compiler only has to FIND it to check 'for-in'
-        // against it.
-        var iter = comp.FindModule(["std", "iter"])?.Members;
-        _iterator = iter?.LookupLocal("Iterator") as TypeSymbol;
-        _arrayIterator = iter?.LookupLocal("ArrayIterator") as TypeSymbol;
-        _rangeIterator = iter?.LookupLocal("RangeIterator") as TypeSymbol;
-        _inclusiveRangeIterator = iter?.LookupLocal("InclusiveRangeIterator") as TypeSymbol;
-        _unsignedRangeIterator = iter?.LookupLocal("UnsignedRangeIterator") as TypeSymbol;
-        _inclusiveUnsignedRangeIterator = iter?.LookupLocal("InclusiveUnsignedRangeIterator") as TypeSymbol;
-        _stringIterator = iter?.LookupLocal("StringIterator") as TypeSymbol;
-        _iterable = iter?.LookupLocal("Iterable") as TypeSymbol;
-        // Lyric 5's protocol is std.core's: what 'for' walks is an Iterable there.
-        _coreIterable = comp.Lyric5Modules
-            && comp.FindModule(["std", "core"])?.Members.LookupLocal("Iterable") is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIterable
+        // The protocol is std.core's: what 'for' walks is an Iterable.
+        _coreIterable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Iterable") is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIterable
             ? coreIterable : null;
-        _coreIterator = comp.Lyric5Modules
-            && comp.FindModule(["std", "core"])?.Members.LookupLocal("Iterator") is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIterator
+        _coreIterator = comp.FindModule(["std", "core"])?.Members.LookupLocal("Iterator") is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIterator
             ? coreIterator : null;
         // Whatever the module mode: a build from a stdlib root alone (the emitter's tests) checks
         // std.core's Zip as a package build does, and 'Join' is stdlib5's alone.
@@ -204,8 +169,6 @@ public sealed class TypeChecker
         // 'Indexable<T>' lives in std.collections and is to '[i]' what 'Iterator<T>' is to 'for-in':
         // the compiler knows ONE built-in form, the array, and binds everything else to an interface
         // from the stdlib.
-        _indexable = comp.FindModule(["std", "collections"])?.Members
-            .LookupLocal("Indexable") as TypeSymbol;
         _coreIndex = comp.FindModule(["std", "core"])?.Members.LookupLocal("Index")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIndex ? coreIndex : null;
         _coreIndexSet = comp.FindModule(["std", "core"])?.Members.LookupLocal("IndexSet")
@@ -218,9 +181,6 @@ public sealed class TypeChecker
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreFormat ? coreFormat : null;
         _debug = comp.FindModule(["std", "core"])?.Members.LookupLocal("Debug")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } debug ? debug : null;
-        _fstringBuilder = comp.FindModule(["std", "core"])?.Members.LookupLocal("fstringStart") is not null;
-        _coreRepeatText = comp.FindModule(["std", "core"])?.Members.LookupLocal("repeatText") is FunctionSymbol;
-        _repeatAsksTypeParameters = comp.FindModule(["std", "core"])?.Members.LookupLocal("filled") is FunctionSymbol;
         _coreContains = comp.FindModule(["std", "core"])?.Members.LookupLocal("Contains")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreContains ? coreContains : null;
         _fromArrayLiteral = comp.FindModule(["std", "core"])?.Members.LookupLocal("FromArrayLiteral")
@@ -241,7 +201,6 @@ public sealed class TypeChecker
         _sub = core?.LookupLocal("Sub") as TypeSymbol;
         _mul = core?.LookupLocal("Mul") as TypeSymbol;
         _div = core?.LookupLocal("Div") as TypeSymbol;
-        _into = core?.LookupLocal("Into") as TypeSymbol;
         _rem = core?.LookupLocal("Rem") as TypeSymbol;
         _neg = core?.LookupLocal("Neg") as TypeSymbol;
         _bitAnd = core?.LookupLocal("BitAnd") as TypeSymbol;
@@ -254,7 +213,6 @@ public sealed class TypeChecker
         _onModule = core?.LookupLocal("OnModule") as TypeSymbol;
         _onType = core?.LookupLocal("OnType") as TypeSymbol;
         _onFunction = core?.LookupLocal("OnFunction") as TypeSymbol;
-        _withArg = core?.LookupLocal("WithArg") as TypeSymbol;
     }
 
     /// <summary>The three attribute markers, under the same rules as <see cref="_equatable"/>:
@@ -270,10 +228,8 @@ public sealed class TypeChecker
     /// <summary>The positional-argument conformance (3.9), under the same rules: an attribute
     /// declaring <c>WithArg&lt;T&gt;</c> takes one parenthesized value, filling its first
     /// field.</summary>
-    private readonly TypeSymbol? _withArg;
 
     /// <summary>What a non-numeric <c>as</c> converts through, under the same rules.</summary>
-    private readonly TypeSymbol? _into;
 
     /// <summary>The rest of the operator interfaces, on the same footing
     /// as <see cref="_add"/>: present where <c>std.core</c> declares them.</summary>
@@ -357,15 +313,6 @@ public sealed class TypeChecker
     private TypeResult CheckInner()
     {
         var errorsAtStart = _de.ErrorCount;
-        _result.IteratorInterface = _iterator;
-        _result.ArrayIterator = _arrayIterator;
-        _result.RangeIterator = _rangeIterator;
-        _result.InclusiveRangeIterator = _inclusiveRangeIterator;
-        _result.UnsignedRangeIterator = _unsignedRangeIterator;
-        _result.InclusiveUnsignedRangeIterator = _inclusiveUnsignedRangeIterator;
-        _result.StringIterator = _stringIterator;
-        _result.Indexable = _indexable;
-        _result.Iterable = _iterable;
 
         // DEPENDENCY order, not discovery order: a module's globals are computed after those of
         // everything it imports, so an initializer may read across an import it declared itself.
@@ -396,10 +343,10 @@ public sealed class TypeChecker
         CheckExtensionBlocks(); // extend bodies, conformance
         CheckMethodSets();      // one name, one function per type
         CheckStaticSets();      // one constant of a name per type (05 §6)
-        if (_comp.Lyric5Modules) ExpandMetaDefaults();
+        ExpandMetaDefaults();
         foreach (var asked in _metaAttributeCalls) CheckFieldAttributeQuery(asked); // R4
-        if (_comp.Lyric5Modules) CheckInlineFunctions();
-        if (_comp.Lyric5Modules) RecordAskedConformances();
+        CheckInlineFunctions();
+        RecordAskedConformances();
         JudgeContextless(errorsAtStart); // the '[]' outside every function body
         _currentModule = null;
         new FlowAnalyzer(_comp, _result, _de).Run(); // definite assignment
@@ -411,8 +358,7 @@ public sealed class TypeChecker
     private void ComputeGlobals(ModuleSymbol module)
     {
         // This pass runs before the declaration walk, so the module context is set here as
-        // well: an initializer's expression check reads it — extension visibility, and which
-        // module an inward opaque cast stands in. Null would mean "bare snippet" for every
+        // well: an initializer's expression check reads it — extension visibility. Null would mean "bare snippet" for every
         // global of a real module.
         _currentModule = module;
 
@@ -554,7 +500,6 @@ public sealed class TypeChecker
     /// </summary>
     private bool AnswerTwoInstances(TypeSymbol owner, FunctionSymbol a, FunctionSymbol b)
     {
-        if (!_comp.Lyric5Modules) return false;
         var at = SelfType(owner);
         var answers = new List<(TypeSymbol Iface, LyrType Instance, FunctionSymbol Member)>();
         foreach (var (iface, subst) in InterfacesOf(owner))
@@ -586,17 +531,6 @@ public sealed class TypeChecker
                 ? bound
                 : new TypeParamType(iface.Generics[i]);
         return new GenericInstance(iface, arguments);
-    }
-
-    private bool SameParameters(FunctionSymbol a, FunctionSymbol b)
-    {
-        var left = FnTypeOf(a).Parameters;
-        var right = FnTypeOf(b).Parameters;
-        if (left.Length != right.Length) return false;
-        for (var i = 0; i < left.Length; i++)
-            if (!LyrType.Equal(left[i], right[i]))
-                return false;
-        return true;
     }
 
     private void CheckDecl(Decl decl, ModuleSymbol module)
@@ -687,13 +621,6 @@ public sealed class TypeChecker
                 // and a word that says nothing is refused rather than ignored.
                 foreach (var member in i.Members)
                 {
-                    if (!_comp.Lyric5Modules)
-                    {
-                        if (member.IsPublic)
-                            _de.Report("LYR-SEM0118", Severity.Error, member.NameSpan,
-                                $"'pub' on '{member.Name}' — an interface's members are public always; drop it");
-                        continue;
-                    }
                     // The one word an interface member takes: 'private' on a helper with a body.
                     if (member.Visibility == VisibilityWord.None || member.IsPrivateHelper) continue;
                     _de.Report("LYR-SEM0118", Severity.Error, member.NameSpan, member.Visibility == VisibilityWord.Private
@@ -733,8 +660,7 @@ public sealed class TypeChecker
         if (fn.Body is not null || _comp.IsNative(module)) return;
 
         // An 'extern' declaration is the one bodyless form user code may write: the body lives
-        // in the host, the runtime binds it by symbol, and the capability the ABI needs is
-        // recorded in the module (hostAccess for "dotnet").
+        // in C, and the linker binds it by symbol.
         if (fn.Extern is { } spec)
         {
             CheckExtern(fn, spec, module);
@@ -745,67 +671,14 @@ public sealed class TypeChecker
             $"'{fn.Name}' has no body; only standard-library modules may declare native functions");
     }
 
-    /// <summary>
-    /// What may cross an <c>extern</c> boundary, checked where the declaration stands so a
-    /// signature nobody can bind is refused at the declaration rather than at load time.
-    ///
-    /// <para>Stage 1 of the ABI: the <c>"dotnet"</c> ABI, and the marshalling set is the
-    /// scalars, <c>bool</c>, <c>char</c> and <c>string</c>, with <c>void</c> as a return. Every
-    /// other type is a question the design leaves to a later stage (optionals as
-    /// <c>Nullable</c>/null, arrays as <c>Span</c>, structs by field), and until it is answered
-    /// the checker says so rather than letting the binder guess.</para>
-    /// </summary>
+    /// <summary>The one foreign boundary is C: another ABI is refused where it is written.</summary>
     private void CheckExtern(FunctionDecl fn, ExternSpec spec, ModuleSymbol module)
     {
-        // Lyric 5's one foreign boundary is C; "dotnet" is the 4.x VM's.
-        var abi = _comp.Lyric5Modules ? "C" : "dotnet";
-        if (spec.Abi != abi)
-        {
+        if (spec.Abi == "C") CheckCExtern(fn, spec, module);
+        else
             _de.Report("LYR-SEM0099", Severity.Error, spec.Span,
-                $"unknown ABI \"{spec.Abi}\" — this compiler binds \"{abi}\"");
-            return;
-        }
-        if (abi == "C")
-        {
-            CheckCExtern(fn, spec, module);
-            return;
-        }
-
-        // The symbol carries the type; a bare function name could not say where to look.
-        if (spec.Symbol is null || !spec.Symbol.Contains("::", StringComparison.Ordinal))
-            _de.Report("LYR-SEM0099", Severity.Error, spec.Span,
-                $"extern '{fn.Name}' needs a symbol of the form \"Type::Method\" after '=' — "
-                + "the \"dotnet\" ABI binds a public static method of a named type");
-
-        if (fn.Generics.Length > 0)
-            _de.Report("LYR-SEM0099", Severity.Error, fn.Span,
-                $"'{fn.Name}' is extern and cannot have type parameters — a host symbol is one signature");
-
-        if (fn.Throws is not null)
-            _de.Report("LYR-SEM0099", Severity.Error, fn.Throws.Span,
-                $"'{fn.Name}' is extern and cannot declare 'throws' — a host exception arrives as a panic in stage 1");
-
-        foreach (var p in fn.Parameters)
-        {
-            var type = ResolveType(p.Type, module.Members);
-            if (!CrossesHostBoundary(type, asReturn: false))
-                _de.Report("LYR-SEM0099", Severity.Error, p.Type.Span,
-                    $"parameter '{p.Name}' of extern '{fn.Name}' has type '{TypeFacts.Display(type)}', which does not "
-                    + "cross the \"dotnet\" boundary — scalars, bool, char and string do");
-        }
-
-        if (fn.ReturnType is { } ret)
-        {
-            var type = ResolveType(ret, module.Members);
-            if (!CrossesHostBoundary(type, asReturn: true))
-                _de.Report("LYR-SEM0099", Severity.Error, ret.Span,
-                    $"extern '{fn.Name}' returns '{TypeFacts.Display(type)}', which does not cross the \"dotnet\" "
-                    + "boundary — scalars, bool, char, string and void do");
-        }
+                $"unknown ABI \"{spec.Abi}\" — this compiler binds \"C\"");
     }
-
-    private static bool CrossesHostBoundary(LyrType type, bool asReturn) =>
-        type is PrimitiveType { Kind: var kind } && (kind != PrimitiveKind.Void || asReturn);
 
     /// <summary>
     /// <c>extern "C" fn add(a: int, b: int): int;</c> — the C ABI's first stage: a C function the program calls by its symbol, the function's name unless
@@ -1334,7 +1207,7 @@ public sealed class TypeChecker
             // With the type's PARAMETERS in scope: 'items: List<T> =
             // List<T>.new()'. The parameters alone — the type's members are no part of a
             // default's scope: it has no 'this' and names a static through the type.
-            if (m is FieldDecl field && (field.Default is not null || _comp.Lyric5Modules))
+            if (m is FieldDecl field)
             {
                 var defaults = module.Members;
                 if (ts.Generics.Length > 0)
@@ -1353,13 +1226,6 @@ public sealed class TypeChecker
 
             if (m is not FunctionDecl fn) continue;
             if (!isInterface) RequireBody(fn, module);
-            // A static interface member with a body is a default in Lyric 5: set in place per
-            // conformer as an instance default is, 'E.m(…)' and 'T.m(…)' the conformer's instance
-            // of it. The 4.x
-            // frontend keeps the rule: nothing sets a default in place there.
-            if (isInterface && fn.IsStatic && fn.Body is not null && !_comp.Lyric5Modules)
-                _de.Report("LYR-SEM0127", Severity.Error, fn.NameSpan,
-                    $"'{fn.Name}' is a static member of an interface and declares only — it is implemented by every conforming type and reached as 'T.{fn.Name}(…)'; drop the body");
 
             // A GENERIC interface member gets no table slot — a slot holds one function and this is
             // one per instantiation. Abstract, every conformer writes it and a constraint reaches it
@@ -1794,7 +1660,7 @@ public sealed class TypeChecker
     /// </summary>
     private void CheckConformanceWords(ExtensionBlock block)
     {
-        if (!_comp.Lyric5Modules || block.Decl.Interfaces.Length == 0) return;
+        if (block.Decl.Interfaces.Length == 0) return;
         if (block.Decl.Visibility != VisibilityWord.None)
         {
             var start = block.Decl.Span.Start;
@@ -2394,7 +2260,6 @@ public sealed class TypeChecker
         }
     }
 
-
     /// <summary>
     /// The warning for a blanket member a type's own hides (<c>LYR-SEM0168</c>):
     /// where the type's member stands — the function the author wrote, in the body or in a
@@ -2594,17 +2459,12 @@ public sealed class TypeChecker
         if (from is not null)
             foreach (var parent in ParentsGivenBeside(from)) seen.Add(WithoutFixations(new NamedRef(parent)));
 
-        // A GENERIC member of an interface may not be overridden (2.17). It has no slot, so a call
-        // picks its target by the receiver's STATIC type: through the interface it would find the
-        // default, through the concrete type the override — one name, two functions, chosen by
-        // where the caller happens to stand. That is the failure SEM0079 refuses inside a chain,
-        // and it is the same one here.
-        //
-        // That is the 4.x rule. In Lyric 5 an interface with a
-        // generic member has no value, so nothing is chosen by one: a conformer's own takes the
-        // default's place, and is checked against it below. A GENERIC interface keeps the refusal
-        // for now — its defaults are still lowered for its value, and one of them calling the
-        // member on 'this' would run the default past the conformer's own.
+        // A generic member of an interface with no value takes a conformer's own in the default's
+        // place, checked against it below: no value's static type chooses between them. A GENERIC
+        // interface refuses that for now (2.17): its defaults are still lowered for its value, so a
+        // call would pick its target by the receiver's static type — the default through the
+        // interface, the override through the concrete type — and a default calling the member on
+        // 'this' would run past the conformer's own. SEM0079 refuses the same failure in a chain.
         foreach (var node in interfaces)
         {
             if (Conformance.InterfaceOf(node, _binding) is not { } iface) continue;
@@ -2618,15 +2478,10 @@ public sealed class TypeChecker
                         {
                             if (own.Declaration is not { } ownDeclaration) continue;
                             _de.Report("LYR-SEM0082", Severity.Error, ownDeclaration.Span,
-                                _comp.Lyric5Modules
-                                    ? $"'{name}.{generic.Name}' stands in place of a generic default of the generic "
+                                $"'{name}.{generic.Name}' stands in place of a generic default of the generic "
                                       + $"interface '{contributed.Name}', which is not possible yet — a default of "
                                       + $"'{contributed.Name}' that calls '{generic.Name}' on 'this' would not reach "
-                                      + "it; give it another name"
-                                    : $"'{name}.{generic.Name}' overrides a generic member of "
-                                      + $"'{contributed.Name}', which cannot be overridden — it has no "
-                                      + "slot to dispatch through, so the two would be chosen by the "
-                                      + "static type of the receiver rather than by the value",
+                                      + "it; give it another name",
                                 new DiagnosticNote(generic.Declaration?.Span ?? default,
                                     $"'{generic.Name}' is declared here"));
                         }
@@ -2670,34 +2525,6 @@ public sealed class TypeChecker
             // (05 §8 rule 7).
             CheckFixedAnswers(node, direct, entry, self ?? SelfType(implementer), name);
 
-            // The WithArg promise (3.9, §4.7): the parenthesized value fills the FIRST field,
-            // and the type argument names its type. Checked at the entry that REACHES the
-            // conformance — the type's own list, an extend block, or an entry whose interface
-            // parent carries it (3.9.1) — so a mismatch lands with whoever declared it, not at
-            // a use. Only a struct can be an attribute, so only a struct carries the promise.
-            if (_withArg is not null && implementer.Declaration is StructDecl attrDecl)
-            {
-                foreach (var reached in InstancesOfNode(node, implementer, _withArg, EmptySubst))
-                {
-                    if (reached is not GenericInstance { Arguments: [var promised] }) continue;
-                    var firstField = attrDecl.Members.OfType<FieldDecl>().FirstOrDefault();
-                    var actual = firstField is not null
-                        && implementer.Members.LookupLocal(firstField.Name) is FieldSymbol ffs
-                            ? FieldType(ffs)
-                            : null;
-                    if (actual is null)
-                        _de.Report("LYR-SEM0095", Severity.Error, NodeSpan(node),
-                            $"'{name}' declares 'WithArg<{TypeFacts.Display(promised)}>' and "
-                            + "has no field — the parenthesized value fills the first field, "
-                            + "so there must be one");
-                    else if (!LyrType.Equal(actual, promised))
-                        _de.Report("LYR-SEM0095", Severity.Error, NodeSpan(node),
-                            $"'{name}' declares 'WithArg<{TypeFacts.Display(promised)}>' but "
-                            + $"its first field '{firstField!.Name}' is "
-                            + $"'{TypeFacts.Display(actual)}' — the conformance names what "
-                            + $"'@{name}(value)' fills");
-                }
-            }
 
             foreach (var (iface, subst) in ClosureOfNode(node, seen))
             {
@@ -2723,14 +2550,7 @@ public sealed class TypeChecker
                         {
                             // Forwarded to the field (05 §5 rule 1) — a generic member too, one
                             // forwarder per use. A field of an interface holds no generic member:
-                            // such an interface is no type of a value (LYR-SEM0126). The 4.x
-                            // lowering builds no such forwarder.
-                            if (!_comp.Lyric5Modules && im.Generics.Length > 0 && im.Body is null)
-                                _de.Report("LYR-SEM0020", Severity.Error, NodeSpan(node),
-                                    $"'{name}' does not implement the generic member '{im.Name}' of interface "
-                                    + $"'{iface.Name}'{implied} — a generic member is not forwarded to a field yet; "
-                                    + "write it on the type, calling the field's",
-                                    new DiagnosticNote(im.Span, $"'{im.Name}' is declared here"));
+                            // such an interface is no type of a value (LYR-SEM0126).
                             // As if 'mut fn m(…) { this.field.m(…); }' were written (05 §5): a
                             // 'mut fn' writes the field's value, so a VALUE in the field — a
                             // struct, an enum, a builtin — is in a 'var' field, as the written
@@ -2861,7 +2681,6 @@ public sealed class TypeChecker
     /// </summary>
     private void CheckWitnessWord(Symbol witness, TypeSymbol implementer, TypeSymbol iface, string typeName, Span entry)
     {
-        if (!_comp.Lyric5Modules) return;
         var (written, how) = witness switch
         {
             FunctionSymbol fn => (fn.Visibility, $"{(fn.IsStatic ? "static " : "")}{(fn.IsMut ? "mut " : "")}fn {fn.Name}"),
@@ -2899,7 +2718,7 @@ public sealed class TypeChecker
     /// <summary>Whether a conformer's own member takes the place of a generic default of this
     /// interface: in Lyric 5, for an interface that is generic in
     /// nothing — the one whose defaults are instantiated per conformer.</summary>
-    private bool ReplacesGenericDefaults(TypeSymbol iface) => _comp.Lyric5Modules && iface.Generics.Length == 0;
+    private bool ReplacesGenericDefaults(TypeSymbol iface) => iface.Generics.Length == 0;
 
     /// <summary>Why a conformer's generic member does not answer an abstract generic one of the
     /// interface, or <c>null</c>: as many type parameters, the same constraints on each, and
@@ -3559,7 +3378,7 @@ public sealed class TypeChecker
         if (operation is null) return;
         for (var i = 0; i < _unsafeOperations.Count; i++) _unsafeOperations[i]++;
         if (_unsafeDepth == 0)
-            _de.Report(Lyric5Code("LYR-SEM0233"), Severity.Error, call.Span,
+            _de.Report("LYR-SEM0233", Severity.Error, call.Span,
                 $"'{operation}' holds to what the compiler cannot see — that the memory is there and of its type: "
                 + "call it in an 'unsafe { … }' block");
         var moved = operation switch
@@ -3628,7 +3447,7 @@ public sealed class TypeChecker
                     else if (r.Value is not null)
                         CheckAssignable(r.Value, CheckExpr(r.Value, scope, ending.Result), ending.Result, r.Span);
                     else if (!TypeFacts.IsVoid(ending.Result) && !ending.Result.IsError)
-                        _de.Report(Lyric5Code("LYR-SEM0226"), Severity.Error, r.Span,
+                        _de.Report("LYR-SEM0226", Severity.Error, r.Span,
                             $"'return' without a value in a coroutine whose result is '{TypeFacts.Display(ending.Result)}'");
                 }
                 // A block lambda inferring its return type: the returns are COLLECTED here and
@@ -3645,7 +3464,7 @@ public sealed class TypeChecker
                 }
                 else if (r.Value is not null) CheckAssignable(r.Value, CheckExpr(r.Value, scope, _currentReturn), _currentReturn, r.Span);
                 else if (!TypeFacts.IsVoid(_currentReturn) && !_currentReturn.IsError)
-                    _de.Report(Lyric5Code("LYR-SEM0226"), Severity.Error, r.Span, "return without a value in a non-void function");
+                    _de.Report("LYR-SEM0226", Severity.Error, r.Span, "return without a value in a non-void function");
                 break;
             case ExprStmt es:
             {
@@ -3763,7 +3582,7 @@ public sealed class TypeChecker
         var fresh = scope.TryDeclare(local);
         // '_' binds nothing (09 §1 rule 1): 'let _ = f();' twice in a block keeps two values
         // nobody reads, and is no name bound twice
-        if (_comp.Lyric5Modules && bnd.Name != "_")
+        if (bnd.Name != "_")
         {
             if (!fresh)
                 _de.Report("LYR-SEM0176", Severity.Error, bnd.Span,
@@ -3862,7 +3681,7 @@ public sealed class TypeChecker
         // A string is no sequence of one kind: its characters and its lines are each a walk of
         // their own. Refused here, where the loop is written, with the walk most loops mean.
         // A 'comptime for' walks an array alone, and said so above.
-        if (_comp.Lyric5Modules && !fo.Comptime && iterType is PrimitiveType { Kind: PrimitiveKind.String })
+        if (!fo.Comptime && iterType is PrimitiveType { Kind: PrimitiveKind.String })
         {
             var at = fo.Iterable.Span;
             var simple = fo.Iterable is IdentifierExpr or MemberExpr or CallExpr or StringLiteralExpr;
@@ -3871,60 +3690,27 @@ public sealed class TypeChecker
                 simple ? [DiagnosticNote.Suggest("walk its characters", new Replacement(new Span(at.File, at.End, at.End), ".chars()", Applicability.Safe))] : []));
             iterType = LyrType.Error;
         }
-        // Lyric 5: anything but a range literal — the counted loop — and the shapes the
-        // compiler walks itself goes through the protocol.
-        var protocol = _coreIterable is not null
-                       && !(fo.Iterable is RangeExpr && iterType is RangeOf)
+        // Anything but a range literal — the counted loop — and the shapes the compiler walks
+        // itself goes through the protocol.
+        var protocol = !(fo.Iterable is RangeExpr && iterType is RangeOf)
                        && iterType is not (ArrayOf or SliceOf or InlineArrayOf or ErrorType)
                        && iterType is not PrimitiveType { Kind: PrimitiveKind.String };
         // An array, a view, an inline array: the index loop, no iterator.
-        var indexed = _coreIterable is not null && iterType is ArrayOf or SliceOf or InlineArrayOf;
+        var indexed = iterType is ArrayOf or SliceOf or InlineArrayOf;
         if (indexed) _result.MarkIndexed(fo);
         var elem = protocol ? CheckForInProtocol(fo, iterType, scope) : iterType switch
         {
-            // The three built-in forms. They have no declaration a conformance could hang on, so the
-            // compiler builds an adapter from std.iter for them. Semantically the same protocol; only
-            // the way it is obtained differs.
             ArrayOf a => a.Element,
             SliceOf s => s.Element,
             InlineArrayOf ia => ia.Element,
             RangeOf r => r.Element,
-            PrimitiveType { Kind: PrimitiveKind.String } => LyrType.Char,
-
-            ErrorType => LyrType.Error,
-
-            // Everything else has to satisfy 'Iterator<T>'. What T is stands in the type's
-            // conformance. 'Iterable<T>' comes first — a container SAYS how to walk it — then
-            // 'Iterator<T>', for the case where the expression is already a cursor
-            // ('for (x in myIterator)').
-            //
-            // The order matters: reversed, a type satisfying both would be used as its own cursor,
-            // and two loops over it would advance each other.
-            _ => TypeArgumentOfConformance(iterType, _iterable)
-                 ?? YieldTypeOfIterator(iterType, fo.Iterable.Span)
-                 ?? Report(fo.Iterable.Span, "LYR-SEM0007",
-                     $"'{TypeFacts.Display(iterType)}' is not iterable — it must implement "
-                     + "'Iterable<T>' or 'Iterator<T>' from std.iter")
+            _ => LyrType.Error,
         };
-        // An OPTIONAL element cannot be walked, and the reason is the protocol rather than the
-        // container: 'next()' answers '?T' and uses null to mean "the end", so an element that is
-        // itself optional would need '??T' to be told apart from it — and '?' does not nest.
-        // Refused here, where the source position is, rather than in the lowering: it produced
-        // '??i64' in the IR, which crashed the verifier in debug and, in release, wrote a module
-        // the loader refuses. 'check' answered 'ok' either way. Lyric 5's protocol has '??T' (10
-        // B6 I1): 'next()' answers '??T' for an Item '?T', and the loop gets the inner level.
-        if (elem is Optional && !protocol && !indexed)
-            _de.Report("LYR-SEM0091", Severity.Error, fo.Iterable.Span,
-                $"iterating this yields '{TypeFacts.Display(elem)}', and an iterator already "
-                + "answers null to mean the end — an optional element cannot be told apart from it",
-                new DiagnosticNote(
-                    "walk the indices instead: 'for (i in 0..xs.length) { let x = xs[i]; ... }'"));
 
         if (protocol && !elem.IsError) NoteWalk(fo, iterType);
 
         var loopScope = new SymbolTable(scope);
-        var loopVar = new LocalSymbol(fo.Variable, elem is Optional && !protocol && !indexed ? LyrType.Error : elem,
-            false, fo);
+        var loopVar = new LocalSymbol(fo.Variable, elem, false, fo);
         loopScope.TryDeclare(loopVar);
         _result.BindRef(fo, loopVar); // for definite-assignment analysis
 
@@ -4045,92 +3831,6 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0098", Severity.Error, pattern.Span,
                 $"this pattern can fail on a '{TypeFacts.Display(type)}', and {where} has no path for a miss — bind a name and use 'let … else' in the body");
         BindPattern(pattern, type, scope);
-    }
-
-    /// <summary>
-    /// What does this type yield when iterated? The yield type stands in its
-    /// <c>Iterator&lt;T&gt;</c> conformance.
-    ///
-    /// <para><c>null</c> when the type is not an iterator; the caller reports then. A return value
-    /// rather than a diagnostic here, so the message sits at ONE place and can name the expression it
-    /// is about.</para>
-    /// </summary>
-    private LyrType? YieldTypeOfIterator(LyrType type, Span span) =>
-        TypeArgumentOfConformance(type, _iterator);
-
-    /// <summary>
-    /// The type argument with which <paramref name="type"/> satisfies the interface
-    /// <paramref name="iface"/>: <c>class Ones :: [Iterator&lt;int&gt;]</c> yields <c>int</c>.
-    ///
-    /// <para>One function for both existing cases: <c>Iterator&lt;T&gt;</c> behind <c>for-in</c> and
-    /// <c>Indexable&lt;T&gt;</c> behind <c>[i]</c>.</para>
-    ///
-    /// <para><c>null</c> when the type does not satisfy the interface; the caller reports then. A
-    /// return value rather than a diagnostic here, so the message sits at ONE place and can name the
-    /// expression it is about.</para>
-    /// </summary>
-    private LyrType? TypeArgumentOfConformance(LyrType type, TypeSymbol? iface)
-    {
-        if (iface is null) return null;
-
-        if (TypeFacts.SymbolOf(type) is not { } symbol) return null;
-
-        // The type IS the interface ('Iterator<int>' as a parameter type) or implements it.
-        if (ReferenceEquals(symbol, iface))
-            return type is GenericInstance { Arguments.Length: 1 } direct ? direct.Arguments[0] : null;
-
-        if (!Conformance.Implements(symbol, iface, _binding)) return null;
-
-        // The type argument stands in the declaration's conformance list.
-        var declared = symbol.Declaration switch
-        {
-            ClassDecl c => c.Interfaces,
-            StructDecl v => v.Interfaces,
-            _ => null,
-        };
-
-        if (declared is null) return null;
-
-        foreach (var node in declared)
-        {
-            if (node is not NamedType { TypeArguments.Length: 1 } named) continue;
-
-            // Bound through an import ('import std.iter { Iterator }'), the binding points at the
-            // import symbol rather than at the type. Without this step the comparison never finds
-            // anything, and 'for-in' rejects every user-written iterator.
-            var bound = _binding.Resolve(named);
-            if (bound is ImportBindingSymbol import) bound = import.Target;
-
-            if (bound is TypeSymbol target && ReferenceEquals(target, iface))
-            {
-                var argument = ResolveType(named.TypeArguments[0], _comp.Builtins);
-
-                // The conformance list holds the declaration's type PARAMETER:
-                // 'class List<T> :: [Indexable<T>]' names T there. For an instance it has to be
-                // substituted, or 'List<int>' yields 'T' as its element type instead of 'int'.
-                //
-                // For a non-generic conformance ('class Ones :: [Iterator<int>]') the substitution is
-                // empty and the result unchanged, so there is no special case here.
-                return type is GenericInstance instance
-                    ? Substitute(argument, SubstMap(instance))
-                    : argument;
-            }
-        }
-
-        // Reached when the conformance is inherited: 'class Ones :: [Counting]' with
-        // 'interface Counting :: [Iterator<int>]'. The direct list has no Iterator node, but the
-        // closure carries the parent instance with the child's arguments substituted through.
-        foreach (var node in declared)
-        {
-            if (Conformance.InterfaceOf(node, _binding) is not { } direct) continue;
-            foreach (var (p, inst) in InterfaceClosure(direct, ResolveType(node, DeclarationScope(symbol))))
-                if (ReferenceEquals(p, iface) && inst is GenericInstance { Arguments.Length: 1 } via)
-                    return type is GenericInstance outer
-                        ? Substitute(via.Arguments[0], SubstMap(outer))
-                        : via.Arguments[0];
-        }
-
-        return null;
     }
 
     /// <summary>
@@ -4988,7 +4688,7 @@ public sealed class TypeChecker
                 _result.SetType(one, inline);
                 _result.SetType(count, LyrType.Int);
                 if (count.Value != (ulong)inline.Length)
-                    return Report(repeat.Span, Lyric5Code("LYR-SEM0228"),
+                    return Report(repeat.Span, "LYR-SEM0228",
                         $"'{TypeFacts.Display(inline)}' holds {inline.Length} elements; the repetition makes {count.Value}");
                 return inline;
             }
@@ -5009,7 +4709,7 @@ public sealed class TypeChecker
                 return CheckInterpolation(fs, scope);
             case ErrorExpr: return LyrType.Error;
 
-            case CallExpr { Callee: FieldByInfoExpr byInfoCallee } call when _comp.Lyric5Modules: return CheckVariantCallByInfo(call, byInfoCallee, scope, expected);
+            case CallExpr { Callee: FieldByInfoExpr byInfoCallee } call: return CheckVariantCallByInfo(call, byInfoCallee, scope, expected);
             case CallExpr call: return CheckCall(call, scope, expected);
             case MemberExpr mem:
             {
@@ -5419,9 +5119,7 @@ public sealed class TypeChecker
             // style. Only public members take part from the outside, as for the single lookup.
             case MemberExpr mem when ModuleReceiverOf(mem.Target, scope) is { } mod:
                 return mod.Members.OverloadsLocal(mem.Member)
-                    .Where(f => _comp.Lyric5Modules
-                        ? _currentModule is null || _comp.Visible(f, _currentModule)
-                        : f.Visibility == Visibility.Public || ReferenceEquals(mod, _currentModule))
+                    .Where(f => _currentModule is null || _comp.Visible(f, _currentModule))
                     .Select(f => new OverloadCandidate(f, FromExtension: false)).ToArray();
 
             // A method or an extension. Both scopes contribute, because both are searched when a
@@ -5460,7 +5158,6 @@ public sealed class TypeChecker
     /// interface — <c>From&lt;int&gt;</c> and <c>From&lt;string&gt;</c>?</summary>
     private bool InstancesOfOneInterface(TypeSymbol ts, string member)
     {
-        if (!_comp.Lyric5Modules) return false;
         var given = _comp.Extensions.MethodsFor(ts)
             .Where(ext => ext.Symbol.Name == member && ext.InConformanceBlock)
             .Select(ext => ext.Block).Distinct()
@@ -5600,7 +5297,7 @@ public sealed class TypeChecker
     /// </summary>
     private (FunctionSymbol? Chosen, bool Settled)? ChosenByInstance(CallExpr call, List<OverloadCandidate> fitting, SymbolTable scope)
     {
-        if (!_comp.Lyric5Modules || call.Callee is not MemberExpr mem) return null;
+        if (call.Callee is not MemberExpr mem) return null;
         var owner = _result.TypeOf(mem.Target) switch
         {
             NonValueType { Symbol: TypeSymbol named } => named,
@@ -5718,7 +5415,7 @@ public sealed class TypeChecker
         // 'T { a = 1; b = 2; }': an initializer whose fields end with ';' reads as a block after a
         // call. Where the name is a type and the block holds nothing but such assignments, it is
         // the initializer — each ';' said, and the fields checked as written.
-        if (_comp.Lyric5Modules && call.TypeArguments is null
+        if (call.TypeArguments is null
             && call.Arguments is [LambdaExpr { Form: LambdaForm.Trailing, Body: Block { Statements.Length: > 0 } body } assigned]
             && assigned.Parameters.All(p => p.Implicit)
             && body.Statements.All(s => s is ExprStmt { Expr: AssignExpr { Operator: null, Target: IdentifierExpr } }
@@ -5856,9 +5553,6 @@ public sealed class TypeChecker
         _result.DesugarOperator(call, meant);
         return result;
     }
-
-    private string DisplayParameters(FunctionSymbol candidate) =>
-        string.Join(", ", FnTypeOf(candidate).Parameters.Select(TypeFacts.Display));
 
     /// <summary>
     /// The callee of a call, checked with the expected RESULT type behind it.
@@ -6107,7 +5801,7 @@ public sealed class TypeChecker
             case BinaryOp.BitAnd or BinaryOp.BitXor or BinaryOp.BitOr or BinaryOp.Shl or BinaryOp.Shr:
             {
                 if (TypeFacts.IsInteger(l) && TypeFacts.IsInteger(r))
-                    return _comp.Lyric5Modules && b.Operator is BinaryOp.Shl or BinaryOp.Shr
+                    return b.Operator is BinaryOp.Shl or BinaryOp.Shr
                         ? ShiftOf(b, l, r)
                         : UnifyNumeric(b.Left, l, b.Right, r) ?? BadBinary(b, l, r);
                 var (bitIface, bitMethod, bitText) = b.Operator switch
@@ -6259,7 +5953,7 @@ public sealed class TypeChecker
     /// </remarks>
     /// <summary>The instance a conformance question about <paramref name="self"/> asks for: the
     /// bare interface where <c>Self</c> names the conformer (<c>Equatable</c>), the
-    /// instance at the type where the library parametrizes it (<c>Equatable&lt;T&gt;</c> of 4.x).</summary>
+    /// instance at the type where the interface is generic.</summary>
     private static LyrType SelfInstance(TypeSymbol iface, LyrType self) =>
         iface.Generics.Length == 0 ? new NamedRef(iface) : new GenericInstance(iface, [self]);
 
@@ -6275,14 +5969,6 @@ public sealed class TypeChecker
             return;
         }
         if (l is PrimitiveType or ErrorType) return;
-
-        // Two values of the SAME opaque alias compare like their underlying — a handle must be
-        // able to find itself. Everything else about the alias stays walled off: mixed-type
-        // equality already failed the Equal test before this method, arithmetic and ordering
-        // never reach an opcode, and the lowering sees the underlying scalar here.
-        if (l is OpaqueRef lo && r is OpaqueRef && LyrType.Equal(l, r)
-            && lo.Underlying is PrimitiveType)
-            return;
 
         var op = b.Operator is BinaryOp.Eq ? "==" : "!=";
 
@@ -6464,7 +6150,7 @@ public sealed class TypeChecker
     private bool HoldsReference(LyrType type) => type switch
     {
         ArrayOf or SliceOf or FnType or CoroutineOf => true,
-        TypeParamType or AssocOf => _repeatAsksTypeParameters,
+        TypeParamType or AssocOf => true,
         Optional o => HoldsReference(o.Inner),
         InlineArrayOf ia => HoldsReference(ia.Element),
         TupleOf t => t.Elements.Any(HoldsReference),
@@ -6560,12 +6246,10 @@ public sealed class TypeChecker
     private LyrType CheckMul(BinaryExpr b, LyrType l, LyrType r, SymbolTable scope)
     {
         if (UnifyNumeric(b.Left, l, b.Right, r) is { } n) return n;
-        // "x" * 3 is std.core's repetition of a text in Lyric 5, in the one order:
-        // '3 * "x"' is refused, as 'n * [x]' is. Until N1a the checker took both and the lowering
-        // called a helper only the 4.x library has (LYR-ICE0002). The 4.x path keeps its helper.
+        // "x" * 3 is std.core's repetition of a text, in the one order: '3 * "x"' is refused,
+        // as 'n * [x]' is.
         if (TypeFacts.IsString(l) && TypeFacts.IsInteger(r))
-            return _coreRepeatText ? DesugarToFreeCall(b, "repeatText", scope, b.Left, b.Right) : LyrType.String;
-        if (TypeFacts.IsString(r) && TypeFacts.IsInteger(l) && !_coreRepeatText) return LyrType.String;
+            return DesugarToFreeCall(b, "repeatText", scope, b.Left, b.Right);
         // '[x] * n' repeats; 'n * [x]' does not — one order, as for a string.
         if (l is ArrayOf la && TypeFacts.IsInteger(r))
         {
@@ -6713,10 +6397,9 @@ public sealed class TypeChecker
 
         foreach (var (instance, site) in ConformancesTo(ts, iface, ofInstance))
         {
-            // Two shapes: 'Add<T, R>' of the 4.x library, and 'Add<Rhs = Self>' with its 'Out'
-            // answer — the one argument is the operand either way. Another shape is a
-            // stdlib mismatch, not a program error; it matches nothing.
-            if (instance is not GenericInstance { Arguments.Length: 1 or 2 } inst) continue;
+            // 'Add<Rhs = Self>' with its 'Out' answer: the one argument is the operand. Another
+            // shape is a stdlib mismatch, not a program error; it matches nothing.
+            if (instance is not GenericInstance { Arguments.Length: 1 } inst) continue;
             var operandType = Substitute(inst.Arguments[0], SelfMap(iface, receiver));
             if (ImplementationOf(ts, site, method, operandType, ofInstance) is not { } impl)
                 continue;
@@ -7158,7 +6841,7 @@ public sealed class TypeChecker
     {
         // an interface asked about: the conformances blocks give it are recorded for every type a
         // value of the program has (RecordAskedConformances)
-        if (_comp.Lyric5Modules && TypeFacts.KindOf(target) == TypeSymbolKind.Interface
+        if (TypeFacts.KindOf(target) == TypeSymbolKind.Interface
             && !_askedInterfaces.Any(known => LyrType.Equal(known, target)))
             _askedInterfaces.Add(target);
         switch (target)
@@ -7181,12 +6864,12 @@ public sealed class TypeChecker
             // A built-in's value lies behind an interface in a box of its own, whose
             // descriptor names the type: the test is exact — an 'int8' is no 'int', nothing widens
             // (05 §9 rule 3), and an alias is the type it names.
-            case var builtin when _comp.Lyric5Modules && BoxesAsBuiltin(builtin):
+            case var builtin when BoxesAsBuiltin(builtin):
                 return true;
             default:
                 _de.Report("LYR-SEM0131", Severity.Error, span,
                     $"'{TypeFacts.Display(target)}' is never behind an interface value — only a struct, a class, an enum"
-                    + (_comp.Lyric5Modules ? ", a built-in type" : "") + " or an interface is");
+                    + ", a built-in type or an interface is");
                 return false;
         }
     }
@@ -7222,55 +6905,11 @@ public sealed class TypeChecker
             return target;
         }
 
-        // An opaque alias converts to EXACTLY its underlying and back — the one door in its
-        // wall, and it is explicit by construction: this cast is the only way through. At
-        // runtime the value is untouched; the lowering emits nothing for it.
-        if (op is OpaqueRef from && LyrType.Equal(from.Underlying, target)) return target;
-        if (target is OpaqueRef to && LyrType.Equal(op, to.Underlying))
-        {
-            // Making one is the declaring module's privilege (§3.5): elsewhere the inward cast
-            // forges a handle the alias exists to protect. An ERROR since 4.0 — 3.8 announced
-            // it as a warning, the LYR-SEM0074 path, and this is the clock coming due. The
-            // outward cast above stays free everywhere: reading the number breaks no promise.
-            // A null module is a bare snippet, which has no module line to cross.
-            if (_currentModule is { } here && !DeclaredInModule(to.Symbol, here))
-            {
-                var owner = _comp.Modules.FirstOrDefault(
-                    m => ReferenceEquals(m.Members.LookupLocal(to.Symbol.Name), to.Symbol));
-                var ownerName = owner?.FullName ?? "its declaring module";
-                _de.Report("LYR-SEM0093", Severity.Error, c.Span,
-                    $"making a '{to.Symbol.Name}' is '{ownerName}''s privilege — a handle is "
-                    + $"issued, not assembled; let '{ownerName}' offer a constructor for values "
-                    + "rebuilt from a stored number");
-            }
-            return target;
-        }
-
-        // 'as' through 'Into' is 4.x's. Lyric 5's 'as' converts numbers only (03 §1.4); its
-        // std.core has an 'Into' too, and the desugar would find it.
-        if (_coreFormat is not null)
-            return Report(c.Span, "LYR-SEM0006",
-                $"cannot cast '{TypeFacts.Display(op)}' to '{TypeFacts.Display(target)}' — 'as' converts numbers only; "
-                + $"a conversion is a method: '{TypeFacts.Display(target)}.from(v)' or 'v.into()', through a "
-                + $"'From<{TypeFacts.Display(op)}>' of '{TypeFacts.Display(target)}'");
-
-        if (_into is { } into && (CanConform(op) || op is PrimitiveType)
-            && Satisfies(op, into, new GenericInstance(into, [target])))
-        {
-            // MemberSpan stays invalid, as on the operator desugar: 'as T' writes no 'into'.
-            var member = new MemberExpr(c.Operand, "into", IsOptional: false, c.Span)
-                { MemberSpan = default };
-            var call = new CallExpr(member, [], c.Span);
-
-            if (!CheckExpr(call, scope).IsError) _result.DesugarOperator(c, call);
-            return target;
-        }
-
-        _de.Report("LYR-SEM0006", Severity.Error, c.Span,
-            $"cannot cast '{TypeFacts.Display(op)}' to '{TypeFacts.Display(target)}' — a "
-            + $"conversion comes from 'Into': give '{TypeFacts.Display(op)}' the conformance "
-            + $":: [Into<{TypeFacts.Display(target)}>]' with a 'fn into(): {TypeFacts.Display(target)}'");
-        return target;
+        // 'as' converts numbers only (03 §1.4); a conversion is a method.
+        return Report(c.Span, "LYR-SEM0006",
+            $"cannot cast '{TypeFacts.Display(op)}' to '{TypeFacts.Display(target)}' — 'as' converts numbers only; "
+            + $"a conversion is a method: '{TypeFacts.Display(target)}.from(v)' or 'v.into()', through a "
+            + $"'From<{TypeFacts.Display(op)}>' of '{TypeFacts.Display(target)}'");
     }
 
     /// <summary>
@@ -7393,13 +7032,8 @@ public sealed class TypeChecker
         foreach (var seg in fs.Segments)
             if (seg is InterpHole h) holes.Add(CheckExpr(h.Expr, scope));
         if (holes.Count == 0) return LyrType.String;
-        if (!_fstringBuilder)
-        {
-            var index = 0;
-            foreach (var seg in fs.Segments)
-                if (seg is InterpHole h) ShownHole(h, holes[index++], scope);
-            return LyrType.String;
-        }
+        // Without a library there is no builder: the lowering says what is missing (LYR-SEM0195).
+        if (CoreMember("fstringStart", internals: true) is null) return LyrType.String;
 
         var span = fs.Span;
         // Twenty bytes a hole: what an integer's digits reserve, so a text of numbers is built
@@ -7454,33 +7088,10 @@ public sealed class TypeChecker
         return LyrType.String;
     }
 
-    /// <summary>A hole of the 4.x tools, whose stdlib has no builder: refused as
-    /// <see cref="HolePiece"/> refuses; a scalar stays the lowering's converters, another value is
-    /// the <c>show()</c> recorded on the hole.</summary>
-    private void ShownHole(InterpHole hole, LyrType type, SymbolTable scope)
-    {
-        if (type.IsError || OpaqueRefused(hole, type) || type is PrimitiveType || !RendersInAHole(hole, type)) return;
-        // MemberSpan stays invalid, as on the operator desugar: '{p}' writes no 'show'.
-        var member = new MemberExpr(hole.Expr, "show", IsOptional: false, hole.Expr.Span) { MemberSpan = default };
-        var call = new CallExpr(member, [], hole.Expr.Span);
-        if (!CheckExpr(call, scope).IsError) _result.DesugarOperator(hole, call);
-    }
-
-    /// <summary>An opaque value does not render: the converter would print the underlying and leak
-    /// exactly what the wall hides. The way through is explicit, like every other crossing.</summary>
-    private bool OpaqueRefused(InterpHole hole, LyrType type)
-    {
-        if (type is not OpaqueRef opaque) return false;
-        _de.Report("LYR-SEM0006", Severity.Error, hole.Expr.Span,
-            $"'{TypeFacts.Display(type)}' is opaque and does not render in an f-string — convert explicitly: "
-            + $"'{{value as {TypeFacts.Display(opaque.Underlying)}}}'");
-        return true;
-    }
-
     /// <summary>What a hole appends: by its value's kind, through its spec, or refused.</summary>
     private CallExpr? HolePiece(InterpHole hole, LyrType type, Func<Expr> output)
     {
-        if (type.IsError || OpaqueRefused(hole, type)) return null;
+        if (type.IsError) return null;
         if (_coreFormat is { } format && hole.FormatSpec is not null) return FormattedPiece(hole, type, format, output);
         if (type is PrimitiveType primitive)
         {
@@ -7588,13 +7199,9 @@ public sealed class TypeChecker
 
             ErrorType => LyrType.Error,
 
-            // Everything else has to satisfy 'Indexable<T>' from std.collections — the same rule and
-            // mechanism 'for-in' uses for 'Iterator<T>'. The compiler knows exactly ONE built-in
-            // indexable form, the array; every other container goes through the interface.
-            _ => TypeArgumentOfConformance(target, _indexable)
-                 ?? Report(ix.Span, "LYR-SEM0007",
-                     $"'{TypeFacts.Display(target)}' is not indexable — it must implement "
-                     + "'Indexable<T>' from std.collections")
+            _ => Report(ix.Span, "LYR-SEM0007",
+                $"'{TypeFacts.Display(target)}' is not indexable — 'x[k]' reads 'x.index(k)', through an "
+                + $"'Index<K>' of '{TypeFacts.Display(target)}'")
         };
     }
 
@@ -7762,7 +7369,7 @@ public sealed class TypeChecker
             foreach (var element in arr.Elements)
                 CheckAssignable(element, CheckExpr(element, scope, inline.Element), inline.Element, element.Span);
             if (arr.Elements.Length != inline.Length)
-                return Report(arr.Span, Lyric5Code("LYR-SEM0228"),
+                return Report(arr.Span, "LYR-SEM0228",
                     $"'{TypeFacts.Display(inline)}' holds {inline.Length} elements; the literal has {arr.Elements.Length}");
             return inline;
         }
@@ -7860,7 +7467,7 @@ public sealed class TypeChecker
         {
             foreach (var leftover in call.Arguments) CheckOrphanArgument(leftover, scope);
             var conformer = call.TypeArguments is [NamedType { Path: var written }, ..] ? string.Join(".", written) : "Item";
-            return Report(call.Span, Lyric5Code("LYR-SEM0231"),
+            return Report(call.Span, "LYR-SEM0231",
                 $"'{staticOwner.Name}.{staticQualified.Member}' is a static member of the interface, and the interface has no value "
                 + $"to call it for — call it on a type that conforms, '{conformer}.{staticQualified.Member}(…)', or through a type "
                 + $"parameter the interface bounds, 'T.{staticQualified.Member}(…)'");
@@ -8363,7 +7970,7 @@ public sealed class TypeChecker
             // Nothing widens and nothing is wrapped: the callee writes the parameter's type into
             // the caller's place.
             if (!argTypes[i]!.IsError && !fn.Parameters[i].IsError && !LyrType.Equal(argTypes[i]!, fn.Parameters[i]))
-                _de.Report(Lyric5Code("LYR-SEM0229"), Severity.Error, a.Span,
+                _de.Report("LYR-SEM0229", Severity.Error, a.Span,
                     $"a place of '{TypeFacts.Display(argTypes[i]!)}' is no place of '{TypeFacts.Display(fn.Parameters[i])}' — "
                     + "a place parameter takes its type exactly, nothing widens into it");
         }
@@ -8675,8 +8282,7 @@ public sealed class TypeChecker
             return BindMember(mem, blanket);
         if (targetType.IsError) return LyrType.Error;
         return Report(mem.Span, "LYR-SEM0012", $"'{TypeFacts.Display(targetType)}' has no member '{mem.Member}'",
-            !_comp.Lyric5Modules ? null
-            : (TypeFacts.SymbolOf(targetType) is { } owner ? HiddenCandidate(owner, mem.Member) : null)
+            (TypeFacts.SymbolOf(targetType) is { } owner ? HiddenCandidate(owner, mem.Member) : null)
                 ?? HiddenBlockMember(baseType, mem.Member));
     }
 
@@ -9524,8 +9130,6 @@ public sealed class TypeChecker
     /// (<see cref="NeverMayAnswer"/>), for a parameter.</summary>
     private void CheckNeverArgument(GenericParamSymbol param, Span at)
     {
-        // 4.x: SemaRules refused the position already.
-        if (!_comp.Lyric5Modules) return;
         if (_error is { } root && param.Constraints.Any(c => ConstraintInterface(c) is { } bound
                 && Conformance.WithParents(bound, _binding).Any(p => ReferenceEquals(p, root))))
             return;
@@ -9862,7 +9466,6 @@ public sealed class TypeChecker
     {
         AssocOf a => ContainsError(a.Base),
         ErrorType => true,
-        OpaqueRef oq => ContainsError(oq.Underlying),
         Optional o => ContainsError(o.Inner),
         ArrayOf a => ContainsError(a.Element),
         SliceOf s => ContainsError(s.Element),
@@ -10025,19 +9628,13 @@ public sealed class TypeChecker
         // rule 6): what passed every constraint here before failed in the lowering.
         ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType => BlockConforms(arg, iface, wanted, shapes: true),
 
-        // An OPAQUE alias satisfies nothing: it has no conformance list, and falling into the
-        // permissive default below would let 'Map<Entity, V>' compile against members the type
-        // walled off. Convert to the underlying where a constraint is needed.
-        OpaqueRef => false,
-
         // 'null' alone is no type a constraint could hold for: bound as a type argument it passed
         // every one and failed in the lowering. A name that is no value is reported
         // where it stands.
         NullType or NonValueType => false,
 
-        // An error was reported where it arose. A primitive without std.core's blocks and the
-        // internal range type are the 4.x tools' (their stdlib conforms neither).
-        ErrorType or PrimitiveType or RangeOf => true,
+        // An error was reported where it arose.
+        ErrorType => true,
 
         // Nothing else passes unasked.
         _ => false,
@@ -10149,20 +9746,6 @@ public sealed class TypeChecker
     }
 
     private static bool IsShape(LyrType type) => type is ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType;
-
-    /// <summary>Does the type conform to the interface through a shape's block or a blanket block
-    /// alone (05 §13 rules 6, 8)? A shape conforms no other way; a named type might by its own
-    /// list or a block on it, which a value can be made through.</summary>
-    private bool OnlyThroughABlock(LyrType from, TypeSymbol iface, LyrType wanted)
-    {
-        if (IsShape(from)) return Satisfies(from, iface, wanted);
-        if (from is not (NamedRef or GenericInstance or PrimitiveType)) return false;
-        bool direct;
-        _withoutBlocks = true;
-        try { direct = Satisfies(from, iface, wanted); }
-        finally { _withoutBlocks = false; }
-        return !direct && Satisfies(from, iface, wanted);
-    }
 
     /// <summary>Set while asking whether a type conforms without a shape's or a blanket block.</summary>
     private bool _withoutBlocks;
@@ -10420,11 +10003,6 @@ public sealed class TypeChecker
 
     /// <summary>Whether the module being checked may name this member — for the sets a
     /// call chooses from, where what may not be named is not there.</summary>
-    /// <summary>A code of Lyric 5's own: where one rule of the shared front end was split off a code
-    /// the 4.x tools still report it under, their suites keep the old one.</summary>
-    private string Lyric5Code(string code, string before = "LYR-SEM0001") =>
-        _comp.Lyric5Modules ? code : before;
-
     private bool MayName(Symbol symbol) => _currentModule is null || _comp.Visible(symbol, _currentModule);
 
     /// <summary>A candidate the lookup of <paramref name="member"/> passed over because this module
@@ -10470,7 +10048,6 @@ public sealed class TypeChecker
     /// overload beside an imported function: said beside the counts the call could choose from.</summary>
     private DiagnosticNote? HiddenOverload(CallExpr call, string name, int count)
     {
-        if (!_comp.Lyric5Modules) return null;
         switch (call.Callee)
         {
             case MemberExpr mem when TypeFacts.SymbolOf(ReceiverTypeOf(mem)) is { } owner:
@@ -10504,7 +10081,7 @@ public sealed class TypeChecker
     /// has an <c>m</c>: the note says that the name is the local here, and what it hides.</summary>
     private DiagnosticNote? ShadowNote(MemberExpr mem)
     {
-        if (!_comp.Lyric5Modules || mem.Target is not IdentifierExpr id || _currentModule is null) return null;
+        if (mem.Target is not IdentifierExpr id || _currentModule is null) return null;
         var (declared, type) = _result.RefOf(id) switch
         {
             LocalSymbol l => (l.Declaration, l.Type),
@@ -10602,7 +10179,7 @@ public sealed class TypeChecker
         // A blanket block's member, asked last: the receiver binds its parameter.
         var receiver = _memberReceiver is GenericInstance own && ReferenceEquals(own.Definition, ts) ? own : SelfType(ts);
         if (BlanketMember(receiver, member, span) is { } blanket) return blanket;
-        var hidden = _comp.Lyric5Modules ? HiddenCandidate(ts, member) ?? HiddenBlockMember(receiver, member) : null;
+        var hidden = HiddenCandidate(ts, member) ?? HiddenBlockMember(receiver, member);
         var near = NameSuggestion.Note(member, MemberFacts
             .OfInstance(_comp, _binding, ts, _currentModule)
             .Select(candidate => candidate.Symbol.Name));
@@ -10901,7 +10478,7 @@ public sealed class TypeChecker
             if (passedOn.Target is ModuleSymbol inner) return (new NonValueType(inner, "module"), inner);
             found = passedOn.Target;
         }
-        if (_comp.Lyric5Modules && _currentModule is { } from && found is not null && !_comp.Visible(found, from))
+        if (_currentModule is { } from && found is not null && !_comp.Visible(found, from))
         {
             // Of an overload set the first VISIBLE function answers, so the call's selection
             // starts from what this module may name; none visible is the one error.
@@ -11016,7 +10593,6 @@ public sealed class TypeChecker
 
     // --- attributes ---
 
-    private enum AttributeTarget { Module, Type, Function, Member }
 
     /// <summary>Where an attribute stands in Lyric 5: on every declaration.</summary>
     private enum AttributeSite { Module, Function, Method, Field, StaticLet, Variant, Parameter, Type, Interface, Alias, Extend, Binding, AssociatedType }
@@ -11041,22 +10617,6 @@ public sealed class TypeChecker
         _ => ["OnMember", "OnDecl", "OnAny"], // an associated type
     };
 
-    /// <summary>The 4.x target a site was: the module, a type, a function, a member.</summary>
-    private static AttributeTarget TargetOf(AttributeSite site) => site switch
-    {
-        AttributeSite.Module => AttributeTarget.Module,
-        AttributeSite.Type or AttributeSite.Interface or AttributeSite.Alias => AttributeTarget.Type,
-        AttributeSite.Function => AttributeTarget.Function,
-        _ => AttributeTarget.Member,
-    };
-
-    private static string MarkerName(AttributeTarget target) => target switch
-    {
-        AttributeTarget.Module => "OnModule",
-        AttributeTarget.Type => "OnType",
-        _ => "OnFunction",
-    };
-
     /// <summary>
     /// The attributes of one declaration or of the module header.
     ///
@@ -11077,9 +10637,7 @@ public sealed class TypeChecker
         var seen = new List<TypeSymbol>();
         foreach (var attribute in attributes)
         {
-            var ts = _comp.Lyric5Modules
-                ? CheckAttribute5(attribute, site, targetIsGeneric, scope, targetDescription)
-                : CheckAttribute(attribute, TargetOf(site), targetIsGeneric, scope, targetDescription);
+            var ts = CheckAttribute5(attribute, site, targetIsGeneric, scope, targetDescription);
             if (ts is null) continue;
             if (seen.Contains(ts))
                 _de.Report("LYR-SEM0068", Severity.Error, attribute.PathSpan,
@@ -11088,7 +10646,7 @@ public sealed class TypeChecker
                 seen.Add(ts);
         }
         // two hints that say opposite things, which the C compiler would refuse
-        if (_comp.Lyric5Modules && _coreMembers is { } core
+        if (_coreMembers is { } core
             && seen.Any(t => ReferenceEquals(t, core.LookupLocal("AlwaysInline")))
             && attributes.FirstOrDefault(a => ReferenceEquals(_result.RefOf(a), core.LookupLocal("NoInline"))) is { } noInline)
             _de.Report("LYR-SEM0177", Severity.Error, noInline.PathSpan,
@@ -11115,142 +10673,6 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0154", Severity.Error, fn.NameSpan, $"a test {fault}");
     }
 
-    /// <returns>The resolved attribute type, or <c>null</c> when the name resolved to nothing an
-    /// attribute could be. Diagnosed findings beyond that still return the symbol, so the
-    /// duplicate check above keeps working on a faulty attribute.</returns>
-    private TypeSymbol? CheckAttribute(AttributeNode attribute, AttributeTarget target,
-        bool targetIsGeneric, SymbolTable scope, string targetDescription)
-    {
-        var (sym, _) = ResolveInitPath(attribute.Path, scope, attribute.PathSpan);
-        var written = string.Join('.', attribute.Path);
-        if (sym is null)
-        {
-            Report(attribute.PathSpan, "LYR-SEM0011", $"unknown type '{written}'",
-                attribute.Path is [var single]
-                    ? NameSuggestion.Note(single, NamesIn(scope, typesOnly: true), attribute.PathSpan)
-                    : null);
-            foreach (var f in attribute.Fields) CheckExpr(f.Value, scope);
-            return null;
-        }
-
-        if (sym is not TypeSymbol { Kind: TypeSymbolKind.Struct } ts)
-        {
-            _de.Report("LYR-SEM0065", Severity.Error, attribute.PathSpan,
-                $"'@{written}' is not an attribute — an attribute is a struct declaring "
-                + $"'{MarkerName(target)}'");
-            foreach (var f in attribute.Fields) CheckExpr(f.Value, scope);
-            return null;
-        }
-
-        _result.BindRef(attribute, ts); // '@Component' is a reference to its type, as an initializer is
-
-        if (ts.Generics.Length > 0)
-        {
-            _de.Report("LYR-SEM0065", Severity.Error, attribute.PathSpan,
-                $"a generic type cannot be an attribute — one metadata row cannot stand for every "
-                + $"instance of '{ts.Name}'");
-            return ts;
-        }
-
-        // A MEMBER carries only the row-less '@Deprecated' (§4.7): the module format has no
-        // member targets, so any attribute that would need a row has no slot to land in. The
-        // marker test is bypassed — 'Deprecated' declares no OnMember, and inventing one for
-        // a single permitted attribute would be a marker without a second customer.
-        if (target == AttributeTarget.Member)
-        {
-            if (!IsCanonicalDeprecated(ts))
-            {
-                _de.Report("LYR-SEM0065", Severity.Error, attribute.PathSpan,
-                    $"'@{ts.Name}' cannot sit on {targetDescription} — only '@Deprecated' may: "
-                    + "the module format has no member rows for anything else");
-                return ts;
-            }
-        }
-        else
-        {
-            var marker = target switch
-            {
-                AttributeTarget.Module => _onModule,
-                AttributeTarget.Type => _onType,
-                _ => _onFunction,
-            };
-            if (marker is null || !Satisfies(new NamedRef(ts), marker, new NamedRef(marker)))
-            {
-                _de.Report("LYR-SEM0065", Severity.Error, attribute.PathSpan,
-                    $"'@{ts.Name}' cannot sit on {targetDescription} — declare '{ts.Name}' with "
-                    + $"':: [{MarkerName(target)}]' to allow it here");
-                return ts;
-            }
-        }
-
-        // One exception: the compiler-read @Deprecated. Its consumer is the sema, not a
-        // metadata row, so the one-row-many-instances conflict does not arise — the lowering
-        // emits NO row for an attribute on a generic declaration.
-        if (targetIsGeneric && !IsCanonicalDeprecated(ts))
-            _de.Report("LYR-SEM0067", Severity.Error, attribute.PathSpan,
-                "an attribute cannot sit on a generic declaration — there is one metadata row "
-                + "and as many instances as the program creates");
-
-        // A row holds a number, a string, a char, a bool or a variant tag (3.9.1, §4.7): a
-        // field of any other type has no encoding, however writable its literal looks after
-        // adaptation — the writer's total-function throw is what named this place. At the USE,
-        // because the struct alone is an ordinary struct.
-        foreach (var field in (ts.Declaration as StructDecl)?.Members.OfType<FieldDecl>() ?? [])
-        {
-            if (ts.Members.LookupLocal(field.Name) is not FieldSymbol rfs) continue;
-            var rft = FieldType(rfs);
-            if (rft.IsError || RowableType(rft)) continue;
-            _de.Report("LYR-SEM0096", Severity.Error, attribute.PathSpan,
-                $"'@{ts.Name}' cannot form a row: field '{field.Name}' is "
-                + $"'{TypeFacts.Display(rft)}', and a row holds a number, a string, a char, a "
-                + "bool or a unit variant");
-        }
-
-        var writtenFields = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var field in attribute.Fields)
-        {
-            if (!writtenFields.Add(field.Name))
-                _de.Report("LYR-SEM0068", Severity.Error, field.Span,
-                    $"'@{ts.Name}' sets '{field.Name}' twice");
-
-            if (ts.Members.LookupLocal(field.Name) is FieldSymbol fs)
-            {
-                var ft = FieldType(fs);
-                CheckAssignable(field.Value, CheckExpr(field.Value, scope, ft), ft, field.Span);
-                // AFTER the check, which is what binds the name this may be resolving through.
-                if (AttributeValues.LiteralOf(field.Value, _result) is null)
-                    ReportAttributeValueNotLiteral(field.Value);
-            }
-            else
-            {
-                _de.Report("LYR-SEM0015", Severity.Error, field.Span,
-                    $"'{ts.Name}' has no field '{field.Name}'");
-                CheckExpr(field.Value, scope);
-            }
-        }
-
-        if (attribute.Positional is { } positional
-            && !CheckPositionalValue(attribute, ts, positional, scope, writtenFields))
-            return ts; // the form itself was refused; completeness would only echo it
-
-        // The emitted row is COMPLETE: absent fields are filled from their defaults, so the host
-        // never resolves one. A field that is neither written nor literal-defaulted has no value
-        // to fill in.
-        foreach (var field in (ts.Declaration as StructDecl)?.Members.OfType<FieldDecl>() ?? [])
-        {
-            if (writtenFields.Contains(field.Name)) continue;
-            if (field.Default is not null && AttributeValues.LiteralOf(field.Default, _result) is not null)
-                continue;
-            _de.Report("LYR-SEM0069", Severity.Error, attribute.Span,
-                field.Default is null
-                    ? $"'@{ts.Name}' leaves '{field.Name}' without a value — write it, or give "
-                      + "the field a literal default"
-                    : $"'@{ts.Name}' leaves '{field.Name}' to a default that is not a value at "
-                      + "compile time — a literal, or a 'let' whose initializer is one");
-        }
-        return ts;
-    }
-
     /// <summary>
     /// A Lyric 5 attribute: a struct that declares a
     /// marker admitting the site (<see cref="Admitting"/>), whose value is the struct it writes —
@@ -11261,7 +10683,7 @@ public sealed class TypeChecker
     private TypeSymbol? CheckAttribute5(AttributeNode attribute, AttributeSite site, bool targetIsGeneric,
         SymbolTable scope, string targetDescription)
     {
-        // the 4.x call sites call every member "a member"; Lyric 5 names the kind
+        // the call sites call every member "a member": here it names the kind
         targetDescription = site switch
         {
             AttributeSite.Method => "a method",
@@ -11343,64 +10765,6 @@ public sealed class TypeChecker
         _result.SetAttributeValue(attribute, value);
         return ts;
     }
-
-    /// <summary>The parenthesized value (3.9, §4.7): admitted by the WithArg conformance and
-    /// filling the FIRST field under the same value rules as a written one. False when the
-    /// attribute does not take the form at all.</summary>
-    private bool CheckPositionalValue(AttributeNode attribute, TypeSymbol ts, Expr value,
-        SymbolTable scope, HashSet<string> writtenFields)
-    {
-        var admitted = _withArg is not null && ConformancesTo(ts, _withArg, EmptySubst).Any();
-        if (!admitted)
-        {
-            _de.Report("LYR-SEM0094", Severity.Error, attribute.Span,
-                $"'@{ts.Name}' does not take a parenthesized value — the form belongs to an "
-                + $"attribute declaring ':: [WithArg<T>]'; write the field by name instead");
-            CheckExpr(value, scope);
-            return false;
-        }
-
-        // The value fills the first field; that its type is the declared T is the DECLARATION's
-        // promise (LYR-SEM0095), so here the field itself is the measure — as for a named write.
-        var first = (ts.Declaration as StructDecl)?.Members.OfType<FieldDecl>().FirstOrDefault();
-        if (first is null || ts.Members.LookupLocal(first.Name) is not FieldSymbol fs)
-        {
-            CheckExpr(value, scope);
-            return true; // no field at all: SEM0095 already stands at the declaration
-        }
-        writtenFields.Add(first.Name);
-        var ft = FieldType(fs);
-        CheckAssignable(value, CheckExpr(value, scope, ft), ft, value.Span);
-        if (AttributeValues.LiteralOf(value, _result) is null)
-            ReportAttributeValueNotLiteral(value);
-        return true;
-    }
-
-    /// <summary>Can a metadata row hold a value of this type? Scalars, string, char, bool and
-    /// enums — the set §11's ConstValue encodes. Everything else has no encoding.</summary>
-    private static bool RowableType(LyrType t) => t switch
-    {
-        PrimitiveType p => p.Kind != PrimitiveKind.Void,
-        _ => TypeSymbolOf(t) is { Kind: TypeSymbolKind.Enum },
-    };
-
-    private void ReportAttributeValueNotLiteral(Expr value) =>
-        _de.Report("LYR-SEM0066", Severity.Error, value.Span,
-            PayloadVariant(value) is { } carried
-                ? $"'{carried}' carries a payload; a row holds one value per field, "
-                  + "so only a variant without one stands in an attribute"
-                : "an attribute argument must be a value at compile time — a number, "
-                  + "a string, a char, a bool, a unit enum variant, or a 'let' bound "
-                  + "to one");
-
-    /// <summary>The variant name when the expression CONSTRUCTS one with a payload — the near
-    /// miss of an enum attribute argument, and worth its own sentence: "must be a literal" says
-    /// nothing to someone who wrote a variant and only got the payload wrong.</summary>
-    private string? PayloadVariant(Expr expr) =>
-        expr is CallExpr { Callee: MemberExpr member }
-        && _result.RefOf(member) is EnumVariantSymbol
-            ? $"{string.Join('.', Flatten(member))}"
-            : null;
 
     private static IEnumerable<string> Flatten(MemberExpr member) =>
         member.Target is MemberExpr inner
@@ -11550,19 +10914,6 @@ public sealed class TypeChecker
         if (HiddenField(ts) is { } hidden)
             _de.Report("LYR-RES0009", Severity.Error, si.Span,
                 $"'{ts.Name}' cannot be built here: {_comp.Hidden(hidden)} — its factory builds it");
-
-        // A HOST type cannot be constructed. It has no layout this module knows: the host creates it
-        // and the script passes it on. Without this diagnostic it is a compiler crash — the lowering
-        // allocates an object after the empty class declaration while the variable carries the host
-        // type, and the verifier reports 'cannot compare IrHostType with IrRefType'.
-        if (Ir.Lowering.HostTypes.NameOf(ts, _comp) is { } hostName)
-        {
-            _de.Report("LYR-SEM0061", Severity.Error, si.Span,
-                $"'{hostName}' is a host type — only the host can create one; a script receives "
-                + "it and passes it on");
-            foreach (var f in si.Fields) CheckExpr(f.Value, scope);
-            return LyrType.Error;
-        }
 
         // A generic type takes its type arguments from what is WRITTEN, else from the context,
         // else from the FIELD VALUES, as a call takes them from its arguments:
@@ -12418,7 +11769,7 @@ public sealed class TypeChecker
     /// </summary>
     private List<string> ForeignNonExhaustive(TypeSymbol ts, AttributeNode[] attributes)
     {
-        if (!_comp.Lyric5Modules || attributes.Length == 0 || _currentModule is not { Path: [var here, ..] }
+        if (attributes.Length == 0 || _currentModule is not { Path: [var here, ..] }
             || _coreMembers?.LookupLocal("NonExhaustive") is not TypeSymbol marker
             || _comp.Modules.FirstOrDefault(m => DeclaredInModule(ts, m)) is not { Path: [var package, ..] } declaring
             || package == here)
@@ -14914,7 +14265,7 @@ public sealed class TypeChecker
     /// is the initializer's, and the written type carries the label — "expected 'int' here".</summary>
     private void CheckBindingAssignable(Expr initializer, LyrType from, LyrType to, Span statement, TypeNode? written)
     {
-        if (!_comp.Lyric5Modules || written is null) { CheckAssignable(initializer, from, to, statement); return; }
+        if (written is null) { CheckAssignable(initializer, from, to, statement); return; }
         _expectedAt = written.Span;
         try { CheckAssignable(initializer, from, to, initializer.Span); }
         finally { _expectedAt = null; }
@@ -14944,18 +14295,7 @@ public sealed class TypeChecker
             return;
         }
         // A value of an interface through a shape's block or a blanket conformance (05 §13
-        // rules 6, 8) is made in Lyric 5 — the shape in a box, the type with the block's row. The
-        // 4.x lowering has neither; a constraint reaches the conformance there.
-        if (!_comp.Lyric5Modules && TypeFacts.KindOf(liftedTo) == TypeSymbolKind.Interface && !LyrType.Equal(from, liftedTo) && !from.IsError
-            && TypeFacts.SymbolOf(liftedTo) is { } through && OnlyThroughABlock(from, through, liftedTo))
-        {
-            _de.Report("LYR-SEM0047", Severity.Error, span,
-                $"'{TypeFacts.Display(from)}' is a '{through.Name}' through "
-                + (IsShape(from) ? "the block on its shape" : "a blanket block")
-                + $", and a value of '{through.Name}' made that way is not written yet — reach it through a constraint, "
-                + $"'fn f<T :: [{through.Name}]>(…)'");
-            return;
-        }
+        // rules 6, 8) is made — the shape in a box, the type with the block's row.
         if (AdaptEmptyArray(expr, to)) return;
 
         // An error INSIDE one of the types means the cause is already reported, by the poison rule.
@@ -15018,7 +14358,6 @@ public sealed class TypeChecker
             if (LiteralAdaptsTo(shift.Right, target)) AdaptLiteralType(shift.Right, target);
         }
     }
-
 
     /// <summary>
     /// A value type must not contain itself, not even indirectly.
@@ -15161,10 +14500,10 @@ public sealed class TypeChecker
         if (coercionSite && TypeFacts.Widens(from, to)) return true;                           // int8 to int, T1c
         if (ImplementsInterface(from, to)) return true;   // T to I when T :: [I]
         // Every struct, class and enum value is an 'Any' at the transition: the empty
-        // interface asks nothing, so nothing has to be declared. In Lyric 5 a built-in's value
-        // too, in its box ('let a: Any = 5', 05 §9 rule 1); the 4.x lowering has none.
+        // interface asks nothing, so nothing has to be declared. A built-in's value
+        // too, in its box ('let a: Any = 5', 05 §9 rule 1).
         if (IsAny(to) && (TypeFacts.SymbolOf(from) is { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }
-                          || _comp.Lyric5Modules && BoxesAsBuiltin(from)))
+                          || BoxesAsBuiltin(from)))
             return true;
         // A child interface value where a parent is expected: a coercion, the parent's
         // table found at the transition through the concrete type's conformance list.
@@ -15226,12 +14565,11 @@ public sealed class TypeChecker
     /// more. Silent where <paramref name="at"/> is null — a
     /// signature read again. Within the type too, where a value of it holds values of another —
     /// an element of an array, a view or a tuple, a type argument (<c>List&lt;Equatable&gt;</c>), and
-    /// a field's type. Lyric 5's: the 4.x line keeps
-    /// saying it at the transition alone.
+    /// a field's type.
     /// </summary>
     private LyrType ValueTypeAt(LyrType type, Span? at)
     {
-        if (!_comp.Lyric5Modules || type.IsError) return type;
+        if (type.IsError) return type;
         if (ConstraintWithin(type) is not var (inner, iface, reason)) return type;
         var outer = type;
         while (outer is Optional { Inner: var wrapped }) outer = wrapped;
@@ -15302,20 +14640,17 @@ public sealed class TypeChecker
                 if (fn.IsStatic) { reason = $"it declares the static member '{fn.Name}'"; return false; }
                 // A generic member, with a body too: one function per
                 // instantiation, and no slot holds that. Not a private helper, which is no member
-                // of the contract. The 4.x path keeps a generic default beside a value
-                // until it leaves main.
+                // of the contract.
                 if (fn.Generics.Length > 0
                     && (fn.Declaration is FunctionDecl { Body: null }
-                        || (_comp.Lyric5Modules && fn.Declaration is FunctionDecl { IsPrivateHelper: false })))
+                        || fn.Declaration is FunctionDecl { IsPrivateHelper: false }))
                 { reason = $"its member '{fn.Name}' is generic, reached through a constraint alone"; return false; }
             }
         foreach (var part in Conformance.WithParents(iface, _binding))
             foreach (var symbol in part.Members.Symbols)
             {
                 if (symbol is not FunctionSymbol fn) continue;
-                // (A generic interface's members are the first loop's. The 4.x library reaches
-                // 'Iterator<T>' values with a generic 'map' — 05 §5.2a of the 4.x text,
-                // monomorphized and not overridable — and keeps them in its own path.)
+                // (A generic interface's members are the first loop's.)
                 // 'Self.Item' is an answer the value's type fixes; 'Self' itself — 'equals(o: Self)' —
                 // is the one type no table has a function for.
                 if (part.SelfParam is { } self && FnTypeOf(fn) is { } signature
@@ -15412,12 +14747,11 @@ public sealed class TypeChecker
 
         // A built-in's value conforms through std.core's blocks on it, and goes into its interface
         // in a box: 'let d: Display = 5;', 'f(1, "two")' for 'f(xs: Display...)'.
-        // Lyric 5's: the 4.x lowering has no box for it.
-        if (_comp.Lyric5Modules && BoxesAsBuiltin(from))
+        if (BoxesAsBuiltin(from))
             return Satisfies(from, target, to);
         // A shape's value conforms through a block on its constructor or a blanket block, and goes
         // into its interface in a box as a built-in's does (05 §13 rule 6).
-        if (_comp.Lyric5Modules && IsShape(from))
+        if (IsShape(from))
             return Satisfies(from, target, to);
 
         // A type parameter satisfies what its constraints demand. It has no symbol of its own, so it
@@ -15436,7 +14770,7 @@ public sealed class TypeChecker
         // the shift, so it adapts wherever that literal would — 'flags & (1 << bit)' is the
         // flags' type, whatever 'bit' is. The count has no say. Lyric 5: there the two sides
         // of a shift are not unified.
-        if (_comp.Lyric5Modules && TypeFacts.IsInteger(target)
+        if (TypeFacts.IsInteger(target)
             && expr is BinaryExpr { Operator: BinaryOp.Shl or BinaryOp.Shr, Left: var shifted })
             return LiteralAdaptsTo(shifted, target);
 
@@ -15703,16 +15037,9 @@ public sealed class TypeChecker
             {
                 underlying = Substitute(underlying, arguments);
                 // the alias's right side is checked as the use spells it: 'Table<NoHash>' is the use's error
-                if (_comp.Lyric5Modules && use is not null && _boundsChecked.Add(use)) CheckInstanceBounds(underlying, span);
+                if (use is not null && _boundsChecked.Add(use)) CheckInstanceBounds(underlying, span);
             }
-            if (!decl.IsOpaque) return underlying;
-            if (underlying.IsError) return LyrType.Error;
-
-            // An OPAQUE alias (v1.15) keeps its identity instead of expanding: the underlying
-            // travels along for the layout and for 'as', but nothing else looks through. An
-            // opaque over an opaque flattens to the innermost layout under THIS identity.
-            var layout = underlying is OpaqueRef o ? o.Underlying : underlying;
-            return new OpaqueRef(alias, layout);
+            return underlying;
         }
         finally { _expanding.Remove(alias); }
     }
@@ -15804,7 +15131,7 @@ public sealed class TypeChecker
         // one: 'fn f(s: Set<NoHash>)' is the signature's error.
         // A block's target names the type with the block's parameters, and those take the type's
         // bounds with it: 'extend<I, E> MapIter<I, E>' is MapIter's, whatever its own list says.
-        else if (_comp.Lyric5Modules && args.Length > 0 && !args.Any(ContainsError) && !BlockTargets.Contains(n)
+        else if (args.Length > 0 && !args.Any(ContainsError) && !BlockTargets.Contains(n)
                  && !AliasBodies.Contains(n) && _boundsChecked.Add(n))
             CheckConstraints(ts.Generics, args, n.Span);
         if (args.Length == 0 && fixations is null) return new NamedRef(ts);
@@ -15884,17 +15211,17 @@ public sealed class TypeChecker
 
     /// <summary>A name not in scope: the prelude's in a program's own
     /// code — a type, a function, a binding (<c>target</c>, <c>profile</c>) —, std.core's in
-    /// what the compiler wrote — and for the 4.x tools, as before.</summary>
+    /// what the compiler wrote.</summary>
     private Symbol? ImplicitMember(Node at, string name) =>
-        _comp.Lyric5Modules && !WrittenByCompiler(at)
+        !WrittenByCompiler(at)
             ? _comp.PreludeMember(name) is (TypeSymbol or FunctionSymbol or GlobalSymbol) and var passed ? passed : null
             : CoreMember(name, internals: WrittenByCompiler(at));
 
     private IReadOnlyList<FunctionSymbol> ImplicitOverloads(Node at, string name) =>
-        _comp.Lyric5Modules && !WrittenByCompiler(at) ? _comp.PreludeOverloads(name) : CoreOverloads(name, internals: WrittenByCompiler(at));
+        !WrittenByCompiler(at) ? _comp.PreludeOverloads(name) : CoreOverloads(name, internals: WrittenByCompiler(at));
 
     private TypeSymbol? ImplicitType(FileId file, string name) =>
-        _comp.Lyric5Modules && !_comp.IsSynthesized(file) ? _comp.PreludeMember(name) as TypeSymbol : CoreType(name);
+        !_comp.IsSynthesized(file) ? _comp.PreludeMember(name) as TypeSymbol : CoreType(name);
 
     /// <summary>A public type of <c>std.core</c>, visible without an import (10 U-series).</summary>
     private TypeSymbol? CoreType(string name) =>
@@ -15941,7 +15268,7 @@ public sealed class TypeChecker
             if (sym is not TypeSymbol ts || !ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("callerExpr")))
             {
                 // Lyric 5: a parameter carries what declares a marker for it
-                if (_comp.Lyric5Modules && sym is TypeSymbol marked)
+                if (sym is TypeSymbol marked)
                 {
                     CheckAttribute5(attribute, AttributeSite.Parameter, fn.Generics.Length > 0, scope, "a parameter");
                     if (CallerPlaceOf(marked) is { } place) CheckCallerPlace(attribute, p, type, place, written);
@@ -16013,12 +15340,6 @@ public sealed class TypeChecker
     /// a <c>Test</c> struct of a program's own is data, not a test.</summary>
     private bool IsCanonicalTest(TypeSymbol ts) =>
         ReferenceEquals(ts, _comp.FindModule(["std", "core"])?.Members.LookupLocal("Test"));
-
-    /// <summary>Whether this is THE <c>Deprecated</c> struct of <c>std.core</c> — by identity,
-    /// the same rule the WarningAnalyzer applies when it reads the attribute.</summary>
-    private bool IsCanonicalDeprecated(TypeSymbol ts) =>
-        ReferenceEquals(ts,
-            _comp.FindModule(["std", "core"])?.Members.LookupLocal("Deprecated"));
 
     private LyrType Report(Span span, string code, string message)
     {

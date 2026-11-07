@@ -13,51 +13,10 @@ namespace Lyric.Tests.Sema;
 /// </summary>
 public class SynthesisTests
 {
-    private const string Core = """
-        module std.core;
-        pub enum Ordering { Less, Equal, Greater }
-        pub interface Equatable { fn equals(o: Self): bool; }
-        pub interface Ordered :: [Equatable] { fn compare(o: Self): ?Ordering; }
-        pub interface TotalOrder :: [Ordered] { fn totalCompare(o: Self): Ordering; }
-        pub interface Hashable :: [Equatable] { fn hash(): int; }
-        pub interface Display { fn show(): string; }
-        pub interface Debug { fn debug(): string; }
-        pub interface Clone { fn clone(): Self; }
-        pub interface Default { static fn default(): Self; }
-        extend int :: [Equatable, Ordered, TotalOrder, Hashable, Display, Debug, Clone, Default] {
-            fn equals(o: int): bool { return true; }
-            fn compare(o: int): ?Ordering { return Ordering.Equal; }
-            fn totalCompare(o: int): Ordering { return Ordering.Equal; }
-            fn hash(): int { return 1; }
-            fn show(): string { return ""; }
-            fn debug(): string { return ""; }
-            fn clone(): int { return this; }
-            static fn default(): int { return 0; }
-        }
-        extend string :: [Equatable, Ordered, TotalOrder, Hashable, Display, Debug, Clone, Default] {
-            fn equals(o: string): bool { return true; }
-            fn compare(o: string): ?Ordering { return Ordering.Equal; }
-            fn totalCompare(o: string): Ordering { return Ordering.Equal; }
-            fn hash(): int { return 1; }
-            fn show(): string { return this; }
-            fn debug(): string { return this; }
-            fn clone(): string { return this; }
-            static fn default(): string { return ""; }
-        }
-        pub fn equalArrays<T :: [Equatable]>(a: T[], b: T[]): bool { return true; }
-        pub fn equalOptionals<T :: [Equatable]>(a: ?T, b: ?T): bool { return true; }
-        pub fn hashArray<T :: [Hashable]>(xs: T[]): int { return 1; }
-        pub fn hashOptional<T :: [Hashable]>(o: ?T): int { return 1; }
-        pub fn cloneArray<T :: [Clone]>(xs: T[]): T[] { return xs; }
-        pub fn cloneOptional<T :: [Clone]>(o: ?T): ?T { return o; }
-        pub fn debugArray<T :: [Debug]>(xs: T[]): string { return ""; }
-        pub fn debugOptional<T :: [Debug]>(o: ?T): string { return ""; }
-
-        """;
-
     private const string Prelude = """
         struct NoEq { n: int }
         interface Walker { fn walk(): int; }
+        fn hashes<T :: [Hashable]>(v: T): bool { return true; }
 
         """;
 
@@ -65,9 +24,7 @@ public class SynthesisTests
     {
         var sm = new SourceManager();
         var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de);
-        var core = sm.AddVirtual("core.lyr", Core);
-        comp.AddModule(new Parser(sm, core, de).ParseModule());
+        var comp = new Compilation(sm, de) { ModuleLoader = Library.Loader(sm, de) };
         var id = sm.AddVirtual("test.lyr", Prelude + body);
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -95,7 +52,7 @@ public class SynthesisTests
         Allowed("""
             struct P :: [Equatable, Hashable, Ordered, TotalOrder, Clone, Default, Display] { x: int, y: string }
             fn f(p: P, q: P): bool {
-                let h: int = p.hash();
+                let h: bool = hashes(p);
                 let c: P = p.clone();
                 let d: P = P.default();
                 let s: string = p.show();
@@ -107,15 +64,15 @@ public class SynthesisTests
     [Fact]
     public void A_class_with_reference_fields_is_synthesized() =>
         Allowed("""
-            class C :: [Equatable, Hashable, Clone] { items: int[], o: ?int, t: (int, string) }
-            fn f(a: C, b: C): bool { let c: C = a.clone(); return a == b && a.hash() == b.hash(); }
+            class C :: [Equatable, Clone] { items: int[], o: ?int, t: (int, string) }
+            fn f(a: C, b: C): bool { let c: C = a.clone(); return a == b; }
             """);
 
     [Fact]
     public void An_enum_is_synthesized_variant_by_variant() =>
         Allowed("""
             enum E :: [Equatable, Hashable, Ordered, Clone] { A, B(int), R { w: int } }
-            fn f(a: E, b: E): bool { let c: E = a.clone(); return a == b && a < b && a.hash() == 1; }
+            fn f(a: E, b: E): bool { let c: E = a.clone(); return a == b && a < b && hashes(a); }
             """);
 
     [Fact]
@@ -124,7 +81,7 @@ public class SynthesisTests
             struct W :: [Equatable, Hashable] { x: int, y: int,
                 fn equals(o: W): bool { return this.x == o.x; }
             }
-            fn f(a: W, b: W): bool { return a == b && a.hash() == b.hash(); }
+            fn f(a: W, b: W): bool { return a == b && hashes(a) && hashes(b); }
             """);
 
     [Fact]
@@ -141,7 +98,7 @@ public class SynthesisTests
     public void A_generic_type_is_synthesized_conditionally() =>
         Allowed("""
             struct Pair<T> :: [Equatable, Hashable, Default] { a: T, b: T }
-            fn f(p: Pair<int>, q: Pair<int>): bool { let d: Pair<int> = Pair<int>.default(); return p == q && p.hash() == 1; }
+            fn f(p: Pair<int>, q: Pair<int>): bool { let d: Pair<int> = Pair<int>.default(); return p == q && hashes(p); }
             """);
 
     [Fact]
@@ -157,11 +114,11 @@ public class SynthesisTests
     public void A_field_without_the_conformance_is_named_at_the_declaration()
     {
         var error = Rejected("struct N :: [Equatable] { k: int, f: NoEq }\n", "LYR-SEM0059");
-        Assert.Contains("in the 'Equatable' synthesized for 'N'", error.Message);
-        Assert.Contains(error.Notes!, n => n.Message.Contains("this.f == o.f"));
-        // Pointed at the conformance list entry in test.lyr (the second file), not into the
+        Assert.Contains("'Equatable' is not synthesized for 'N'", error.Message);
+        Assert.Contains(error.Notes!, n => n.Message.Contains("the field 'f' of 'N'"));
+        // Pointed at the conformance list entry in test.lyr, the first file, not into the
         // synthesized text.
-        Assert.Equal(2, error.Span.File.Value);
+        Assert.Equal(1, error.Span.File.Value);
     }
 
     [Fact]
@@ -170,7 +127,7 @@ public class SynthesisTests
 
     [Fact]
     public void A_clone_of_a_function_field_is_refused() =>
-        Assert.Contains("has no synthesized clone", Rejected("struct F :: [Clone] { f: fn() -> int }\n", "LYR-SEM0135").Message);
+        Assert.Contains("'Clone' is not synthesized for 'F'", Rejected("struct F :: [Clone] { f: fn() -> int }\n", "LYR-SEM0012").Message);
 
     [Fact]
     public void A_hint_from_the_synthesized_text_does_not_surface() =>

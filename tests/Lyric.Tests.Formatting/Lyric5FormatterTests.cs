@@ -11,7 +11,7 @@ public class Lyric5FormatterTests
 {
     private static string Format(string source)
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual("<test>", source);
         var de = new DiagnosticEngine(sm);
         var formatted = Formatter.Format(sm, id, de);
@@ -19,7 +19,7 @@ public class Lyric5FormatterTests
         Assert.False(de.HasErrors, "the test source did not parse");
         Assert.NotNull(formatted);
 
-        var sm2 = new SourceManager { Lyric5 = true };
+        var sm2 = new SourceManager();
         var id2 = sm2.AddVirtual("<test2>", formatted);
         Assert.Equal(formatted, Formatter.Format(sm2, id2, new DiagnosticEngine(sm2)));
         return formatted;
@@ -119,11 +119,10 @@ public class Lyric5FormatterTests
     }
 
     [Fact]
-    public void Each_attribute_stands_on_its_own_line_on_every_declaration()
+    public void Attributes_stay_on_every_declaration_two_as_a_group()
     {
         Keeps("""
-            @NoInline
-            @MustUse
+            @[NoInline, MustUse]
             fn pick(): int {
                 return 1;
             }
@@ -139,6 +138,18 @@ public class Lyric5FormatterTests
             }
 
             """);
+    }
+
+    [Fact]
+    public void The_module_head_takes_the_group_and_its_header_names_nothing()
+    {
+        Assert.Equal("""
+            @[A, B]
+            module;
+
+            fn f(): void { }
+
+            """.Replace("\r\n", "\n"), Format("@A\n@B\nmodule;\n\nfn f(): void { }\n").Replace("\r\n", "\n"));
     }
 
     [Fact]

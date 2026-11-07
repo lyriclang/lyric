@@ -182,11 +182,6 @@ public sealed class TypeResult
     /// table, and only its defaults are lowered once for it.</summary>
     public Func<TypeSymbol, bool>? ValueInterface { get; internal set; }
 
-    /// <summary>Whether the program is Lyric 5's: there a generic default of an
-    /// interface is instantiated per conformer, and a conformer's own may stand in its place. The
-    /// 4.x path keeps a generic default for the interface's value until it leaves main.</summary>
-    public bool Lyric5Modules { get; internal set; }
-
     /// <summary>
     /// Which function satisfied which conformance: keyed by (implementing type, interface,
     /// member), holding one entry per INSTANCE.
@@ -593,19 +588,10 @@ public sealed class TypeResult
     /// lowering a second lookup, and two lookups would be two opportunities to find different
     /// symbols.</para>
     /// </summary>
-    public TypeSymbol? IteratorInterface { get; set; }
-    public TypeSymbol? ArrayIterator { get; set; }
-    public TypeSymbol? RangeIterator { get; set; }
-    public TypeSymbol? InclusiveRangeIterator { get; set; }
-    public TypeSymbol? UnsignedRangeIterator { get; set; }
-    public TypeSymbol? InclusiveUnsignedRangeIterator { get; set; }
-    public TypeSymbol? StringIterator { get; set; }
 
     /// <summary>'Indexable&lt;T&gt;' from std.collections, what '[i]' dispatches to.</summary>
-    public TypeSymbol? Indexable { get; set; }
 
     /// <summary>'Iterable&lt;T&gt;' from std.iter, what 'for-in' asks first.</summary>
-    public TypeSymbol? Iterable { get; set; }
 
     /// <summary>Does this symbol live in a cell rather than in a frame slot? The lowering asks at
     /// EVERY access site, outside the closure too, because both sides have to see the same

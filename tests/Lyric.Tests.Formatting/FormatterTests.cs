@@ -232,7 +232,7 @@ public class FormatterTests
         Assert.Equal("""
             fn f(p: Point): Point {
                 let q = p with { x = 1, pos.y = p.y };
-                return q with { x = 2 }.x;
+                return (q with { x = 2 }).x;
             }
 
             """, Format("fn f(p:Point):Point{let q=p with{x=1,pos.y=p.y};return (q with {x=2}).x;}"));
@@ -269,8 +269,8 @@ public class FormatterTests
 
             """, Format("""
             fn f(o: ?int): int throws E {
-                let v = (o ?? (throw E {}));
-                return if (v > 0) v else (throw E {});
+                let v = o ?? throw E {};
+                return if (v > 0) v else throw E {};
             }
             """));
     }
@@ -300,14 +300,14 @@ public class FormatterTests
     }
 
     [Fact]
-    public void Redundant_parentheses_go_and_needed_ones_stay()
+    public void Written_parentheses_stay_however_redundant()
     {
         Assert.Equal("""
             fn f(a: int, b: int): int {
-                let keep = (a + b) * 2;
-                let drop = a * b + 2;
-                let bit = a & 3 == 1;
-                return keep + drop;
+                let keep = ((a + b)) * 2;
+                let drop = ((a * b)) + (2);
+                let bit = ((a & 3) == 1);
+                return (keep) + (drop);
             }
 
             """, Format("""
@@ -880,6 +880,34 @@ public class FormatterTests
             """), StringComparison.Ordinal);
 
     [Fact]
+    public void A_member_takes_the_group_and_a_comment_between_stays()
+    {
+        var once = Format("""
+            struct S {
+                @A
+                @B
+                n: int,
+            }
+
+            enum E {
+                @A
+                @B
+                V,
+            }
+
+            @A
+            // why
+            @B
+            fn f(): void { }
+            """).Replace("\r\n", "\n");
+
+        Assert.Contains("@[A, B]\n    n: int", once, StringComparison.Ordinal);
+        Assert.Contains("@[A, B]\n    V", once, StringComparison.Ordinal);
+        Assert.Contains("// why", once, StringComparison.Ordinal);
+        Assert.Equal(once, Format(once).Replace("\r\n", "\n"));
+    }
+
+    [Fact]
     public void Two_attributes_take_the_group_shape() =>
         // The one shape: stacked input, grouped output. The parser flattens both spellings to
         // the same list, which is what keeps the rewrite reparse-identical.
@@ -1086,6 +1114,6 @@ public class FormatterTests
         Assert.Contains("catch (_: A) (try h() catch (_: C) 3) catch (_: B) 2",
             Format("fn g(): int { return try f() catch (_: A) (try h() catch (_: C) 3) catch (_: B) 2; }"), StringComparison.Ordinal);
         Assert.Contains("catch (_: A) try h() catch (_: C) 3;",
-            Format("fn g(): int { return try f() catch (_: A) (try h() catch (_: C) 3); }"), StringComparison.Ordinal);
+            Format("fn g(): int { return try f() catch (_: A) try h() catch (_: C) 3; }"), StringComparison.Ordinal);
     }
 }

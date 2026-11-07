@@ -23,7 +23,7 @@ public class CorpusTests
     public static TheoryData<string> Files()
     {
         var data = new TheoryData<string>();
-        foreach (var root in new[] { "stdlib", Path.Combine("tests", "corpus-4x") })
+        foreach (var root in new[] { "stdlib5", "examples" })
         foreach (var file in Directory.GetFiles(Path.Combine(RepoRoot(), root), "*.lyr",
                      SearchOption.AllDirectories))
         {

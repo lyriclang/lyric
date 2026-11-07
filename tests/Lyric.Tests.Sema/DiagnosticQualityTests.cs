@@ -26,7 +26,7 @@ public class DiagnosticQualityTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de);
         if (withStdlib)
-            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de);
+            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de);
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
         return de;
@@ -159,8 +159,8 @@ public class DiagnosticQualityTests
     public void A_name_imported_twice_is_one_function()
     {
         var de = Check("""
-            import std.io.console { println };
-            import std.io.console { println };
+            import std.io { println };
+            import std.io { println };
 
             fn main(): int { println("x"); return 0; }
             """, withStdlib: true);

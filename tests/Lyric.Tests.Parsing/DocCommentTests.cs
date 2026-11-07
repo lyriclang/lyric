@@ -226,7 +226,7 @@ public class DocCommentTests
     [Fact]
     public void The_blocks_in_the_standard_library_arrive()
     {
-        var path = Path.Combine(RepoRoot(), "stdlib", "std", "os.lyr");
+        var path = Path.Combine(RepoRoot(), "stdlib5", "std", "os.lyr");
         var sm = new SourceManager();
         var id = sm.AddVirtual("os.lyr", File.ReadAllText(path));
         var de = new DiagnosticEngine(sm);
@@ -243,9 +243,6 @@ public class DocCommentTests
 
         // The exact set is stdlib content and moves; that several arrive is the contract here.
         Assert.Contains("args", documented);
-        Assert.Contains("nowMillis", documented);
-
-        // A '//' file header above 'module' is separated by a blank line and binds to nothing.
-        Assert.Null(parser.DocOf(module.Header!));
+        Assert.Contains("env", documented);
     }
 }

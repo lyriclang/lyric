@@ -19,7 +19,7 @@ public class CorpusWarningTests
     public static TheoryData<string> Files()
     {
         var data = new TheoryData<string>();
-        foreach (var root in new[] { "stdlib", Path.Combine("tests", "corpus-4x") })
+        foreach (var root in new[] { "stdlib5", "examples" })
         foreach (var file in Directory.GetFiles(Path.Combine(RepoRoot(), root), "*.lyr",
                      SearchOption.AllDirectories))
         {
@@ -54,25 +54,28 @@ public class CorpusWarningTests
 
         var options = new CompilerOptions
         {
-            StdlibRoot = Path.Combine(RepoRoot(), "stdlib"),
+            StdlibRoot = Path.Combine(RepoRoot(), "stdlib5"),
             SourceRoot = project?.SourceRoot,
             NativeRoots = project?.NativeRoots,
             DependencyRoots = project?.Dependencies,
+            WarnDeps = true,
         };
 
         // A standard library file is not an entry file — as one it may not even declare its
         // natives. It is checked the way it is ever compiled: loaded through the std root, by a
         // probe that imports it.
+        // The probe has a 'main': an error in it would end the check before any warning is said,
+        // and the library would seem silent however it read.
         //
         // The test is on the FIRST SEGMENT and not on the prefix, which is what it was until
         // 4.5: 'stdlib-tests\…' starts with 'stdlib', so every one of the standard library's
         // own test files went through the probe as 'import tests.math_tests' — a path that
         // resolves nowhere, whose error sat in the probe file and was dropped as the harness's
         // noise. Sixteen files were in the corpus and none of them was read.
-        var result = SegmentsOf(relativePath)[0] == "stdlib"
+        var result = SegmentsOf(relativePath)[0] == "stdlib5"
             ? SourceCompiler.Check(ScriptSource.FromBuffer(
                     Path.Combine(RepoRoot(), "corpus_probe.lyr"),
-                    $"import {ModulePathOf(relativePath)};\n"),
+                    $"import {ModulePathOf(relativePath)};\n\nfn main(): void {{\n}}\n"),
                 options)
             : SourceCompiler.Check(Path.Combine(RepoRoot(), relativePath), options);
 
@@ -91,9 +94,9 @@ public class CorpusWarningTests
                     $"{d.Severity.ToDisplayString()}[{d.Code}]: {d.Message}")));
     }
 
-    /// <summary>stdlib/std/io/file.lyr → std.io.file</summary>
+    /// <summary>stdlib5/std/io.lyr → std.io</summary>
     private static string ModulePathOf(string relativePath) =>
-        string.Join('.', SegmentsOf(relativePath).Skip(1)); // drop the 'stdlib' root segment
+        string.Join('.', SegmentsOf(relativePath).Skip(1)); // drop the 'stdlib5' root segment
 
     private static string[] SegmentsOf(string relativePath) =>
         Path.ChangeExtension(relativePath, null)!

@@ -64,6 +64,7 @@ public class AttributeTests
     [InlineData("struct Two :: [OnAny] {\n    a: int,\n    b: int,\n}\n\n@Two(1)\nfn f(): void {\n}\n", "LYR-SEM0094", "fills the one field without a default, and 'Two' has 2")]
     [InlineData("class C {\n}\n\nstruct Holds :: [OnAny] {\n    c: C,\n}\n\n@Holds { c = C { } }\nfn f(): void {\n}\n", "LYR-SEM0100", "'C' is a class")]
     [InlineData("struct Plain {\n}\n\n@Plain\nfn f(): void {\n}\n", "LYR-SEM0065", "'@Plain' cannot sit on a function")]
+    [InlineData("@Tag { name = \"a\", name = \"b\" }\nfn f(): void {\n}\n", "LYR-SEM0070", "duplicate field 'name'")]
     [InlineData("@Tag { name = \"v\" }\nfn f(): void {\n}\n\nenum K {\n    @Level(1) A,\n}\n", "LYR-SEM0065", "'@Level' cannot sit on a variant — declare 'Level' with ':: [OnVariant]'")]
     public void An_attribute_refuses_a_place_its_marker_does_not_admit_and_a_value_no_literal_makes(string declarations, string? code, string? why)
     {

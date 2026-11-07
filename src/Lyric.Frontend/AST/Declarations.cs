@@ -31,8 +31,8 @@ public sealed record AttributeNode(string[] Path, StructInitField[] Fields, Span
     public required Span NameSpan { get; init; }
 
     /// <summary>The parenthesized argument — <c>@On(Event.Damage)</c> — or <c>null</c>. It fills
-    /// the attribute's first field; which attributes admit the form is the checker's rule
-    /// (<c>WithArg&lt;T&gt;</c>). Grammatically an attribute carries either this or
+    /// the attribute's first field; which attributes admit the form is the checker's rule.
+    /// Grammatically an attribute carries either this or
     /// <see cref="Fields"/>, never both.</summary>
     public Expr? Positional { get; init; }
 }
@@ -41,8 +41,8 @@ public abstract record Decl(Span Span) : Node(Span);
 
 /// <summary>
 /// The visibility word written before a declaration: <c>pub</c> —
-/// exported —, <c>internal</c> — the package's —, <c>private</c> — the module's —, or none. What
-/// none means is the reader's: Lyric 5 reads it as <c>internal</c>, the 4.x tools as the module's.
+/// exported —, <c>internal</c> — the package's —, <c>private</c> — the module's —, or none, which
+/// reads as <c>internal</c>.
 /// </summary>
 public enum VisibilityWord
 {
@@ -104,9 +104,9 @@ public sealed record Param(bool IsParams, string Name, TypeNode Type, Expr? Defa
     /// caller, which the function reads and writes, not a value.</summary>
     public bool IsPlace { get; init; }
 
-    /// <summary><c>nums: int...</c>: Lyric 5's variadic parameter, written with
-    /// the element type — <see cref="Param.Type"/> is the array, as for 4.x's <c>params nums:
-    /// int[]</c>, and <see cref="Param.IsParams"/> holds for both.</summary>
+    /// <summary><c>nums: int...</c>: the variadic parameter, written with
+    /// the element type — <see cref="Param.Type"/> is the array, and <see cref="Param.IsParams"/>
+    /// holds too, as it does for the old word the checker refuses.</summary>
     public bool IsEllipsis { get; init; }
 }
 /// <summary><c>throws E</c>, <c>throws [A, B]</c>, or bare <c>throws</c>:
@@ -162,7 +162,7 @@ public sealed record FunctionDecl(
 /// <summary>
 /// The foreign side of an <c>extern</c> declaration: which ABI binds it and under which symbol.
 /// </summary>
-/// <param name="Abi">The ABI string — <c>"dotnet"</c> is the one this compiler knows.</param>
+/// <param name="Abi">The ABI string — <c>"C"</c> is the one this compiler knows.</param>
 /// <param name="Symbol">The symbol named after <c>=</c>, or <c>null</c> when the function's own
 /// name is the symbol.</param>
 public sealed record ExternSpec(string Abi, string? Symbol, Span Span) : Node(Span)
@@ -284,8 +284,7 @@ public sealed record EnumVariant(string Name, TypeNode[]? TupleFields, FieldDecl
 {
     public required Span NameSpan { get; init; }
 
-    /// <summary>Its attributes (every declaration carries them in Lyric 5;
-    /// the 4.x parser refuses them here).</summary>
+    /// <summary>Its attributes: every declaration carries them.</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 
     /// <summary>The integer written after <c>=</c>, <c>Read = 4</c>: the value C holds for a unit
@@ -314,8 +313,7 @@ public sealed record InterfaceDecl(VisibilityWord Visibility, string Name, Gener
     /// every conformer answers them with a <c>static let</c> of its own.</summary>
     public StaticBindingDecl[] Statics { get; init; } = [];
 
-    /// <summary>Its attributes (every declaration carries them in Lyric 5;
-    /// the 4.x parser refuses them here).</summary>
+    /// <summary>Its attributes: every declaration carries them.</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 }
 
@@ -338,8 +336,7 @@ public sealed record ExtendDecl(VisibilityWord Visibility, TypeNode Target, Type
     /// answers for its interfaces (05 §6, §7).</summary>
     public StaticBindingDecl[] Statics { get; init; } = [];
 
-    /// <summary>Its attributes (every declaration carries them in Lyric 5;
-    /// the 4.x parser refuses them here).</summary>
+    /// <summary>Its attributes: every declaration carries them.</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 }
 
@@ -361,8 +358,7 @@ public sealed record AssociatedTypeDecl(string Name, TypeNode? Type, Span Span) 
     /// <c>type Iter :: [Iterator];</c> —, as a type parameter's constraints are written.</summary>
     public TypeNode[] Bounds { get; init; } = [];
 
-    /// <summary>Its attributes (every declaration carries them in Lyric 5;
-    /// the 4.x parser refuses them here).</summary>
+    /// <summary>Its attributes: every declaration carries them.</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 }
 
@@ -376,8 +372,7 @@ public sealed record GlobalBindingDecl(VisibilityWord Visibility, BindingStmt Bi
 
     public Span NameSpan => Binding.NameSpan;
 
-    /// <summary>Its attributes (every declaration carries them in Lyric 5;
-    /// the 4.x parser refuses them here).</summary>
+    /// <summary>Its attributes: every declaration carries them.</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 }
 
@@ -390,8 +385,7 @@ public sealed record TypeAliasDecl(VisibilityWord Visibility, bool IsOpaque, str
     /// <summary>The parameters of a generic alias, <c>type Pair&lt;T&gt; = (T, T)</c>.</summary>
     public GenericParam[] Generics { get; init; } = [];
 
-    /// <summary>Its attributes (every declaration carries them in Lyric 5;
-    /// the 4.x parser refuses them here).</summary>
+    /// <summary>Its attributes: every declaration carries them.</summary>
     public AttributeNode[] Attributes { get; init; } = [];
 }
 

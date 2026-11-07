@@ -142,7 +142,7 @@ public static class TypeFacts
     /// type is. The lowering writes the variant by this
     /// index.</summary>
     public static readonly string[] TypeKindNames =
-        ["Primitive", "Struct", "Class", "Enum", "Interface", "Opaque", "Optional", "Array", "InlineArray", "Slice", "Tuple", "Function", "Parameter", "Other"];
+        ["Primitive", "Struct", "Class", "Enum", "Interface", "Optional", "Array", "InlineArray", "Slice", "Tuple", "Function", "Parameter", "Other"];
 
     /// <summary>std.core's <c>MemberKind</c>, in its declaration order.</summary>
     public static readonly string[] MemberKindNames = ["Function", "Constant", "AssociatedType"];
@@ -151,7 +151,6 @@ public static class TypeFacts
     public static string TypeKindNameOf(LyrType type) => type switch
     {
         PrimitiveType => "Primitive",
-        OpaqueRef => "Opaque",
         Optional => "Optional",
         ArrayOf => "Array",
         InlineArrayOf => "InlineArray",
@@ -308,7 +307,6 @@ public static class TypeFacts
                 _ => "?"
             };
             case NamedRef n: return name(n.Symbol);
-            case OpaqueRef o: return name(o.Symbol);
             case TypeParamType tp: return tp.Param.Name;
             case GenericInstance gi:
                 var fixations = gi.Fixations is { Length: > 0 } fs ? fs.Select(f => $"{f.Member.Name} = {Render(f.Type, name)}") : [];

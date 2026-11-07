@@ -24,7 +24,7 @@ public class StringMethodApiTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
@@ -76,22 +76,5 @@ public class StringMethodApiTests
             }
             """);
         Assert.Equal(2, de.Diagnostics.Count(d => d.Code == "LYR-RES0004"));
-    }
-
-    [Fact]
-    public void Concat_and_repeat_stay_undeprecated()
-    {
-        // They back '+' and '*'; deprecating them would warn on compiler-written calls.
-        var de = Check(
-            """
-            import std.string { concat, repeat };
-
-            fn main(): int {
-                let joined = concat("a", "b") + repeat("c", 2);
-                return joined.length();
-            }
-            """);
-        Assert.False(de.HasErrors);
-        Assert.DoesNotContain(de.Diagnostics, d => d.Code == "LYR-SEM0076");
     }
 }

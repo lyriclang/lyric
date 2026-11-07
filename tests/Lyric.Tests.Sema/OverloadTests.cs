@@ -23,7 +23,7 @@ public class OverloadTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
@@ -169,19 +169,12 @@ public class OverloadTests
     [Fact]
     public void A_module_qualified_call_binds_through_the_alias()
     {
-        // The alias route and the selective import reach the same member. (Through 4.x the UDP
-        // 'localPort'/'close' were the TCP names' second members by type; D4 gave them names.)
+        // The alias route and the selective import reach the same member.
         var de = Check("""
-            import std.io.net as net;
+            import std.path as paths;
 
             fn main(): int {
-                let sock = net.bind("127.0.0.1", 0);
-                if (sock == null) {
-                    return 1;
-                }
-                let p = net.udpLocalPort(sock);
-                net.closeUdp(sock);
-                return if (p > 0) 0 else 1;
+                return paths.join("a", "b").length();
             }
             """);
         Assert.False(de.HasErrors);

@@ -59,7 +59,7 @@ public partial class FormatterProofTests
     /// <summary>A Lyric source formatted, or as it is where it does not parse.</summary>
     public static string Formatted(string text, string name)
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual(name, text);
         return Formatter.Format(sm, id, new DiagnosticEngine(sm)) ?? text;
     }

@@ -38,9 +38,9 @@ public sealed class StdlibSeed
     /// Parses every module under <paramref name="root"/>. A file that does not parse cleanly is
     /// left out: it is parsed again by each compilation, which reports what is wrong with it.
     /// </summary>
-    public static StdlibSeed Parse(string root, bool lyric5 = true)
+    public static StdlibSeed Parse(string root)
     {
-        var sources = new SourceManager { Lyric5 = lyric5 };
+        var sources = new SourceManager();
         var modules = new Dictionary<string, (LoadedModule, DateTime, long)>(PathComparer);
         var std = Path.Combine(root, "std");
         if (Directory.Exists(std))

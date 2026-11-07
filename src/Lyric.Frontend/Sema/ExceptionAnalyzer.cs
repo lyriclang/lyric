@@ -179,7 +179,7 @@ internal sealed class ExceptionAnalyzer
     /// <summary>The program's <c>main</c>: the function of that name at the top of the entry
     /// module.</summary>
     private bool IsEntry(FunctionDecl fn) =>
-        fn.Name == "main" && _comp.Lyric5Modules && _comp.Entry is { } entry && ReferenceEquals(entry, _module)
+        fn.Name == "main" && _comp.Entry is { } entry && ReferenceEquals(entry, _module)
         && _comp.AstOf(entry).Declarations.Contains(fn);
 
     private void InContext(Context context, Action walk)

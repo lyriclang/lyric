@@ -192,7 +192,7 @@ public class CoroutineTests
         Assert.Contains(Diags("fn co(c: bool): Coroutine<int, int> { yield 1; if (c) { return 2; } }").Diagnostics,
             d => d.Code == "LYR-SEM0017");
         Assert.Contains(Diags("fn co(): Coroutine<int, int> { yield 1; return; }").Diagnostics,
-            d => d.Code == "LYR-SEM0001");
+            d => d.Code == "LYR-SEM0226");
         // A body that never ends needs no return.
         AssertClean(Diags("fn co(): Coroutine<int, int> { while (true) { yield 1; } }"));
     }

@@ -103,8 +103,9 @@ public class ExtendConformanceTests
         // The root lives in std.core (design/v5/spec/05 E6 O1): the bare 'throws' of the member is
         // 'Error', and 'Boom' is one.
         AssertClean(Check(
-            ("std.core", "module std.core;\npub interface Error { fn message(): string; fn cause(): ?Error { return null; } }\n"),
+            ("std.core", "pub interface Error { fn message(): string; fn cause(): ?Error { return null; } }\npub interface Debug { fn debug(): string; }\n"),
             ("main", """
+                import std.core { Error };
                 class Boom :: [Error] { fn message(): string { return "b"; } }
                 interface Risky { fn run(): int throws; }
                 struct S :: [Risky] { fn run(): int throws Boom { throw Boom { }; } }
@@ -316,7 +317,7 @@ public class ExtendConformanceTests
         var de = Check(
             ("helpers", """
                 pub struct Vec { x: int }
-                extend Vec { fn sum(): int { return this.x; } }
+                extend Vec { pub fn sum(): int { return this.x; } }
                 """),
             ("main", """
                 import helpers { Vec };

@@ -49,19 +49,18 @@ internal static class Synthesis
 
     /// <summary>What a type asks to have synthesized: the listed interfaces of the family without
     /// the member written, the parents those imply when neither listed nor written, and
-    /// <c>Debug</c> unasked where <c>std.core</c> declares it. A class listing <c>Identity</c>
+    /// <c>Debug</c> unasked. A class listing <c>Identity</c>
     /// has its <c>Equatable</c> and <c>Hashable</c> by identity, listed beside it or not.</summary>
-    public static List<Request> RequestsOf(TypeNode[] interfaces, IEnumerable<FunctionDecl> methods, bool coreHasDebug,
-        bool coreHasIdentity = false, bool isClass = false)
+    public static List<Request> RequestsOf(TypeNode[] interfaces, IEnumerable<FunctionDecl> methods, bool isClass)
     {
         var written = new HashSet<string>(methods.Select(m => m.Name), StringComparer.Ordinal);
         var listed = new HashSet<string>(StringComparer.Ordinal);
         var requests = new List<Request>();
-        var identity = coreHasIdentity && isClass
+        var identity = isClass
             && interfaces.Any(n => n is NamedType { Path: ["Identity"], TypeArguments.Length: 0 });
         foreach (var node in interfaces)
             if (node is NamedType { Path: [var name], TypeArguments.Length: 0 } && Names.Contains(name)
-                && (name != "Identity" || coreHasIdentity) && listed.Add(name) && !written.Contains(MethodOf(name)))
+                && listed.Add(name) && !written.Contains(MethodOf(name)))
                 requests.Add(new Request(name, node, identity && name is "Equatable" or "Hashable",
                     name == "Identity" ? new[] { "equals", "hash" }.FirstOrDefault(written.Contains) : null));
         foreach (var request in requests.ToArray())
@@ -69,7 +68,7 @@ internal static class Synthesis
                 if (!listed.Contains(parent) && !written.Contains(MethodOf(parent)) && requests.All(r => r.Interface != parent)
                     && (request.Interface != "Identity" || identity && request.Contradicted is null))
                     requests.Add(new Request(parent, request.Node, identity && parent is "Equatable" or "Hashable"));
-        if (coreHasDebug && !written.Contains("debug") && !listed.Contains("Debug"))
+        if (!written.Contains("debug") && !listed.Contains("Debug"))
             requests.Add(new Request("Debug", null));
         return requests;
     }
@@ -100,7 +99,7 @@ internal static class Synthesis
     /// <summary>The block for one request, as source; <c>null</c> where the form is not written
     /// yet (reported by the caller).</summary>
     public static string? Block(Request request, string name, GenericParam[] generics, FieldDecl[] fields,
-        EnumVariant[]? variants, bool isClass, SourceManager sm, bool streamsHash, out string? refusal)
+        EnumVariant[]? variants, bool isClass, SourceManager sm, out string? refusal)
     {
         refusal = null;
         var iface = request.Interface;
@@ -112,11 +111,11 @@ internal static class Synthesis
             : identity
                 ? $"extend<{string.Join(", ", generics.Select(g => g.Name))}> {typeText} :: [{iface}] {{\n"
                 : $"extend<{string.Join(", ", generics.Select(g => $"{g.Name} :: [{BoundOf(iface)}]"))}> {typeText} :: [{iface}] {{\n";
-        // Lyric 5: the family's members are std.core's defaults over Self's fields
+        // The family's members are std.core's defaults over Self's fields
         // and variants, set in place per conformer — the block carries the conformance and its
         // condition (05 §14 rule 4), nothing else. 'Default' stays written here: a static member of
         // an interface declares only (SEM0127), so no default can build 'Self' for it.
-        if (streamsHash && !request.ByIdentity && iface is "Equatable" or "Hashable" or "Ordered" or "TotalOrder" or "Clone")
+        if (!request.ByIdentity && iface is "Equatable" or "Hashable" or "Ordered" or "TotalOrder" or "Clone")
             return head + "}\n";
         if (iface == "Identity")
         {
@@ -132,75 +131,20 @@ internal static class Synthesis
                 : "    fn hash<H :: [Hasher]>(&h: H): void {\n        hashIdentityInto(this, &h);\n    }\n") + "}\n";
         string Text(TypeNode t) => sm.Slice(t.Span).ToString();
         var body = variants is null
-            ? StructBody(iface, name, typeText, fields, Text, streamsHash, out refusal)
-            : EnumBody(iface, name, typeText, variants, Text, streamsHash, out refusal);
+            ? StructBody(iface, name, typeText, fields, Text, out refusal)
+            : EnumBody(iface, name, variants, out refusal);
         return body is null ? null : head + body + "}\n";
     }
 
     // --- structs and classes ---------------------------------------------------------------
 
     private static string? StructBody(string iface, string name, string typeText, FieldDecl[] fields,
-        Func<TypeNode, string> text, bool streamsHash, out string? refusal)
+        Func<TypeNode, string> text, out string? refusal)
     {
         refusal = null;
         var sb = new StringBuilder();
         switch (iface)
         {
-            case "Equatable":
-                sb.Append($"    fn equals(o: {typeText}): bool {{\n        return ");
-                sb.Append(fields.Length == 0 ? "true" : string.Join("\n            && ", fields.Select(f => EqOf($"this.{f.Name}", $"o.{f.Name}", f.Type, text, streamsHash))));
-                sb.Append(";\n    }\n");
-                break;
-            case "Hashable" when streamsHash:
-                // Every field into the hasher, in order, one line each.
-                sb.Append("    fn hash<H :: [Hasher]>(&h: H): void {\n");
-                foreach (var f in fields)
-                {
-                    if (HashInto($"this.{f.Name}", f.Type) is not { } written)
-                    {
-                        refusal = $"the field '{f.Name}' is an array or a view, which is no Hashable";
-                        return null;
-                    }
-                    sb.Append($"        {written}\n");
-                }
-                sb.Append("    }\n");
-                break;
-            case "Hashable":
-                sb.Append("    fn hash(): int {\n        var h = 17;\n");
-                foreach (var f in fields) sb.Append($"        h = h *% 31 +% {HashOf($"this.{f.Name}", f.Type, text)};\n");
-                sb.Append("        return h;\n    }\n");
-                break;
-            case "Ordered":
-                sb.Append($"    fn compare(o: {typeText}): ?Ordering {{\n");
-                for (var i = 0; i < fields.Length; i++)
-                    sb.Append($"        let c{i} = this.{fields[i].Name}.compare(o.{fields[i].Name});\n"
-                        + $"        if (c{i} == null) {{ return null; }}\n"
-                        + $"        match (c{i}) {{ .Equal => {{ }}, _ => {{ return c{i}; }} }}\n"); // narrowed past the null check
-                sb.Append("        return Ordering.Equal;\n    }\n");
-                break;
-            case "TotalOrder":
-                sb.Append($"    fn totalCompare(o: {typeText}): Ordering {{\n");
-                for (var i = 0; i < fields.Length; i++)
-                    sb.Append($"        let c{i} = this.{fields[i].Name}.totalCompare(o.{fields[i].Name});\n"
-                        + $"        match (c{i}) {{ .Equal => {{ }}, _ => {{ return c{i}; }} }}\n");
-                sb.Append("        return Ordering.Equal;\n    }\n");
-                break;
-            case "Clone":
-            {
-                var parts = new List<string>();
-                foreach (var f in fields)
-                {
-                    // '@Shared': the reference copied, not cloned — a parent,
-                    // a service, a cycle. Read by its name here; the checker holds it to std.core's.
-                    var cloned = f.Attributes.Any(a => a.Path is [.., "Shared"])
-                        ? $"this.{f.Name}"
-                        : CloneOf($"this.{f.Name}", f.Type, text);
-                    if (cloned is null) { refusal = $"a field of type '{text(f.Type)}' has no synthesized clone"; return null; }
-                    parts.Add($"            {f.Name} = {cloned}");
-                }
-                sb.Append($"    fn clone(): {typeText} {{\n        return {typeText} {{\n{string.Join(",\n", parts)}\n        }};\n    }}\n");
-                break;
-            }
             case "Default":
             {
                 var parts = new List<string>();
@@ -224,7 +168,7 @@ internal static class Synthesis
                 {
                     sb.Append($"\"{name} {{ \"\n");
                     for (var i = 0; i < fields.Length; i++)
-                        sb.Append($"            + \"{(i > 0 ? ", " : "")}{fields[i].Name} = \" + {DebugOf($"this.{fields[i].Name}", fields[i].Type, text, streamsHash)}\n");
+                        sb.Append($"            + \"{(i > 0 ? ", " : "")}{fields[i].Name} = \" + {DebugOf($"this.{fields[i].Name}", fields[i].Type)}\n");
                     sb.Append("            + \" }\"");
                 }
                 sb.Append(";\n    }\n");
@@ -232,68 +176,6 @@ internal static class Synthesis
         }
         return sb.ToString();
     }
-
-    /// <summary><c>a == b</c> for a field of this type: the value's own equality, a helper for a
-    /// shape, element by element for a tuple. An inline array is whole where Lyric 5's std.core
-    /// gives each written length its blocks (<paramref name="whole"/>): its own
-    /// <c>==</c> walks it, so a <c>uint8[4096]</c> field is one comparison, not 4096.
-    /// The 4.x library has no such block: there it is unrolled.</summary>
-    private static string EqOf(string a, string b, TypeNode type, Func<TypeNode, string> text, bool whole) => type switch
-    {
-        ArrayType { Length: null } => $"equalArrays({a}, {b})",
-        ArrayType { Length: not null } when whole => $"{a} == {b}",
-        // Element by element, unrolled: a view of it is taken only on the heap, and
-        // 'this' of a struct lies in a frame.
-        ArrayType { Length: { } n, Element: var e } => n == 0 ? "true"
-            : "(" + string.Join(" && ", Enumerable.Range(0, n).Select(i => EqOf($"{a}[{i}]", $"{b}[{i}]", e, text, whole))) + ")",
-        NullableType => $"equalOptionals({a}, {b})",
-        NamedType { Path: ["Slice"], TypeArguments.Length: 1 } => $"equalSlices({a}, {b})",
-        AST.TupleType t => "(" + string.Join(" && ", t.Elements.Select((e, i) => EqOf($"{a}.{i}", $"{b}.{i}", e, text, whole))) + ")",
-        _ => $"{a} == {b}",
-    };
-
-    private static string HashOf(string expr, TypeNode type, Func<TypeNode, string> text) => type switch
-    {
-        ArrayType { Length: null } => $"hashArray({expr})",
-        ArrayType { Length: { } n, Element: var e } => Enumerable.Range(0, n).Select(i => HashOf($"{expr}[{i}]", e, text)).Aggregate("11", (acc, h) => $"({acc} *% 31 +% {h})"),
-        NullableType => $"hashOptional({expr})",
-        NamedType { Path: ["Slice"], TypeArguments.Length: 1 } => $"hashSlice({expr})",
-        AST.TupleType t => t.Elements.Select((e, i) => HashOf($"{expr}.{i}", e, text)).Aggregate("7", (acc, h) => $"({acc} *% 31 +% {h})"),
-        _ => $"{expr}.hash()",
-    };
-
-    /// <summary>A field written into the hasher <c>h</c>: an optional through its mark, a tuple
-    /// element by element, an inline array through its own <c>hash</c> — the length's block writes its
-    /// elements in order, so the bytes are the ones the unrolled form wrote; <c>null</c>
-    /// for an array or a view, which is no <c>Hashable</c>, and an inline array of them. Lyric 5's
-    /// alone: the 4.x library's <c>hash(): int</c> takes <see cref="HashOf"/>.</summary>
-    private static string? HashInto(string expr, TypeNode type) => type switch
-    {
-        ArrayType { Length: null } => null,
-        ArrayType { Length: not null, Element: var e } => HashInto($"{expr}[0]", e) is not null ? $"{expr}.hash(&h);" : null,
-        NullableType => $"hashOptionalInto({expr}, &h);",
-        NamedType { Path: ["Slice"], TypeArguments.Length: 1 } => null,
-        AST.TupleType t => t.Elements.Select((e, i) => HashInto($"{expr}.{i}", e)).ToArray() is var items && items.All(p => p is not null)
-            ? string.Join(" ", items) : null,
-        _ => $"{expr}.hash(&h);",
-    };
-
-    /// <summary><c>a.compare(b)</c> (or <c>totalCompare</c>) for a payload of this type; a shape
-    /// has no ordering yet and falls to the method call, which the checker then refuses.</summary>
-    private static string CompareOf(string a, string b, string method) => $"{a}.{method}({b})";
-
-    private static string? CloneOf(string expr, TypeNode type, Func<TypeNode, string> text) => type switch
-    {
-        ArrayType { Length: null } => $"cloneArray({expr})",
-        ArrayType { Length: { } n, Element: var e } => Enumerable.Range(0, n).Select(i => CloneOf($"{expr}[{i}]", e, text)).ToArray() is var items && items.All(p => p is not null)
-            ? "[" + string.Join(", ", items) + "]" : null,
-        NullableType => $"cloneOptional({expr})",
-        NamedType { Path: ["Slice"], TypeArguments.Length: 1 } => null,
-        FunctionType => null,
-        AST.TupleType t => t.Elements.Select((e, i) => CloneOf($"{expr}.{i}", e, text)).ToArray() is var parts && parts.All(p => p is not null)
-            ? "(" + string.Join(", ", parts) + ")" : null,
-        _ => $"{expr}.clone()",
-    };
 
     /// <summary>The value a field of this type takes in a synthesized <c>default()</c>.</summary>
     private static string? DefaultOf(TypeNode type, Func<TypeNode, string> text) => type switch
@@ -310,24 +192,20 @@ internal static class Synthesis
     };
 
     /// <summary>The text rendering a value of this type in a synthesized <c>debug()</c>: the
-    /// value's own, or a helper of <c>std.core</c> for a shape that has none. An inline array is
-    /// whole as in <see cref="EqOf"/>: its own text is the unrolled one, <c>[1, 2]</c>.</summary>
-    private static string DebugOf(string expr, TypeNode type, Func<TypeNode, string> text, bool whole) => type switch
+    /// value's own, or a helper of <c>std.core</c> for a shape that has none. An inline array's own
+    /// text is the unrolled one, <c>[1, 2]</c>.</summary>
+    private static string DebugOf(string expr, TypeNode type) => type switch
     {
         ArrayType { Length: null } => $"debugArray({expr})",
-        ArrayType { Length: not null } when whole => $"{expr}.debug()",
-        ArrayType { Length: { } n, Element: var e } => n == 0 ? "\"[]\""
-            : "\"[\" + " + string.Join(" + \", \" + ", Enumerable.Range(0, n).Select(i => DebugOf($"{expr}[{i}]", e, text, whole))) + " + \"]\"",
         NullableType => $"debugOptional({expr})",
         NamedType { Path: ["Slice"], TypeArguments.Length: 1 } => $"debugSlice({expr})",
-        AST.TupleType t => "\"(\" + " + string.Join(" + \", \" + ", t.Elements.Select((e, i) => DebugOf($"{expr}.{i}", e, text, whole))) + " + \")\"",
+        AST.TupleType t => "\"(\" + " + string.Join(" + \", \" + ", t.Elements.Select((e, i) => DebugOf($"{expr}.{i}", e))) + " + \")\"",
         _ => $"{expr}.debug()",
     };
 
     // --- enums --------------------------------------------------------------------------------
 
-    private static string? EnumBody(string iface, string name, string typeText, EnumVariant[] variants,
-        Func<TypeNode, string> text, bool streamsHash, out string? refusal)
+    private static string? EnumBody(string iface, string name, EnumVariant[] variants, out string? refusal)
     {
         refusal = null;
         var sb = new StringBuilder();
@@ -346,100 +224,8 @@ internal static class Synthesis
             }
             return ($".{v.Name}", [], []);
         }
-        // The pattern matching a variant whatever its payload.
-        static string Wild(EnumVariant v) =>
-            v.TupleFields is { Length: > 0 } tuple ? $".{v.Name}({string.Join(", ", tuple.Select(_ => "_"))})"
-            : v.StructFields is { Length: > 0 } fields ? $".{v.Name} {{ {string.Join(", ", fields.Select(f => $"{f.Name} = _"))} }}"
-            : $".{v.Name}";
         switch (iface)
         {
-            case "Equatable":
-                sb.Append($"    fn equals(o: {typeText}): bool {{\n        return match (this) {{\n");
-                foreach (var v in variants)
-                {
-                    var (pa, an, at) = Bind(v, "a_");
-                    var (pb, bn, _) = Bind(v, "b_");
-                    var same = an.Length == 0 ? "true" : string.Join(" && ", an.Select((n, i) => EqOf(n, bn[i], at[i], text, streamsHash)));
-                    sb.Append($"            {pa} => match (o) {{ {pb} => {same}, _ => false }},\n");
-                }
-                sb.Append("        };\n    }\n");
-                break;
-            case "Hashable" when streamsHash:
-                // The variant's position, then its payload.
-                sb.Append("    fn hash<H :: [Hasher]>(&h: H): void {\n        match (this) {\n");
-                for (var i = 0; i < variants.Length; i++)
-                {
-                    var (p, names, types) = Bind(variants[i], "a_");
-                    var parts = new List<string> { $"h.writeInt({i});" };
-                    for (var k = 0; k < names.Length; k++)
-                    {
-                        if (HashInto(names[k], types[k]) is not { } written)
-                        {
-                            refusal = $"a payload of '{variants[i].Name}' is an array or a view, which is no Hashable";
-                            return null;
-                        }
-                        parts.Add(written);
-                    }
-                    var joined = string.Join(" ", parts);
-                    sb.Append($"            {p} => {{ {joined} }},\n");
-                }
-                sb.Append("        }\n    }\n");
-                break;
-            case "Hashable":
-                sb.Append("    fn hash(): int {\n        return match (this) {\n");
-                for (var i = 0; i < variants.Length; i++)
-                {
-                    var (p, names, types) = Bind(variants[i], "a_");
-                    var h = $"{i + 1}";
-                    for (var k = 0; k < names.Length; k++) h = $"({h} *% 31 +% {HashOf(names[k], types[k], text)})";
-                    sb.Append($"            {p} => {h},\n");
-                }
-                sb.Append("        };\n    }\n");
-                break;
-            case "Ordered" or "TotalOrder":
-            {
-                // Lexicographic as for a struct, the variant's position first:
-                // a variant before another is Less whatever the payloads; the same
-                // variant compares its payload field by field.
-                var ret = iface == "Ordered" ? "?Ordering" : "Ordering";
-                var method = iface == "Ordered" ? "compare" : "totalCompare";
-                sb.Append($"    fn {method}(o: {typeText}): {ret} {{\n        match (this) {{\n");
-                for (var i = 0; i < variants.Length; i++)
-                {
-                    var (pa, an, at) = Bind(variants[i], "a_");
-                    var (pb, bn, _) = Bind(variants[i], "b_");
-                    sb.Append($"            {pa} => {{ match (o) {{\n");
-                    for (var j = 0; j < i; j++) sb.Append($"                {Wild(variants[j])} => {{ return Ordering.Greater; }},\n");
-                    sb.Append($"                {pb} => {{\n");
-                    for (var k = 0; k < an.Length; k++)
-                    {
-                        sb.Append($"                    let c{k} = {CompareOf(an[k], bn[k], method)};\n");
-                        if (iface == "Ordered") sb.Append($"                    if (c{k} == null) {{ return null; }}\n");
-                        sb.Append($"                    match (c{k}) {{ .Equal => {{ }}, _ => {{ return c{k}; }} }}\n");
-                    }
-                    sb.Append("                    return Ordering.Equal;\n                },\n");
-                    if (i < variants.Length - 1) sb.Append("                _ => { return Ordering.Less; },\n");
-                    sb.Append("            } },\n");
-                }
-                sb.Append("        }\n        return Ordering.Equal;\n    }\n");
-                break;
-            }
-            case "Clone":
-                sb.Append($"    fn clone(): {typeText} {{\n        return match (this) {{\n");
-                foreach (var v in variants)
-                {
-                    var (p, names, types) = Bind(v, "a_");
-                    var cloned = names.Select((n, i) => CloneOf(n, types[i], text)).ToArray();
-                    if (cloned.Any(c => c is null)) { refusal = "a payload that has no synthesized clone"; return null; }
-                    var rebuilt = v.TupleFields is { Length: > 0 }
-                        ? $".{v.Name}({string.Join(", ", cloned)})"
-                        : v.StructFields is { Length: > 0 } fs
-                            ? $".{v.Name} {{ {string.Join(", ", fs.Select((f, i) => $"{f.Name} = {cloned[i]}"))} }}"
-                            : $".{v.Name}";
-                    sb.Append($"            {p} => {rebuilt},\n");
-                }
-                sb.Append("        };\n    }\n");
-                break;
             case "Default":
                 refusal = "a default of an enum — say which variant"; return null;
             case "Display":
@@ -452,9 +238,9 @@ internal static class Synthesis
                     var (p, names, types) = Bind(v, "a_");
                     string rendered;
                     if (v.TupleFields is { Length: > 0 })
-                        rendered = $"\"{name}.{v.Name}(\" + " + string.Join(" + \", \" + ", names.Select((n, i) => DebugOf(n, types[i], text, streamsHash))) + " + \")\"";
+                        rendered = $"\"{name}.{v.Name}(\" + " + string.Join(" + \", \" + ", names.Select((n, i) => DebugOf(n, types[i]))) + " + \")\"";
                     else if (v.StructFields is { Length: > 0 } fs)
-                        rendered = $"\"{name}.{v.Name} {{ \" + " + string.Join(" + \", \" + ", fs.Select((f, i) => $"\"{f.Name} = \" + {DebugOf(names[i], types[i], text, streamsHash)}")) + " + \" }\"";
+                        rendered = $"\"{name}.{v.Name} {{ \" + " + string.Join(" + \", \" + ", fs.Select((f, i) => $"\"{f.Name} = \" + {DebugOf(names[i], types[i])}")) + " + \" }\"";
                     else rendered = $"\"{name}.{v.Name}\"";
                     sb.Append($"            {p} => {rendered},\n");
                 }

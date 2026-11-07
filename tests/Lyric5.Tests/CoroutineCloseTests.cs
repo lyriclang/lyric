@@ -65,7 +65,7 @@ public class CoroutineCloseTests
         // Without a standard library there is no 'Cancelled', so nothing could unwind the body.
         var result = SourceCompiler.Lower(ScriptSource.FromBuffer("close.lyr",
             "fn gen(): Coroutine<int> { yield 1; }\nfn main(): int { let c = gen(); c.close(); return 0; }"),
-            new CompilerOptions());
+            new CompilerOptions { StdlibRoot = Path.Combine(AppContext.BaseDirectory, "no-such-library") });
         Assert.Contains(result.Diagnostics.Diagnostics, d => d.Code == "LYR-SEM0012");
     }
 }

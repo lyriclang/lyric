@@ -34,7 +34,7 @@ public sealed partial class Parser
                 + "process down");
             // the file is read as holding nothing: what follows from that — a 'main' missing, a name
             // an import does not find — is the wreckage, not another mistake
-            if (_sm.Lyric5) _de.MarkUnparsed(new Span(deep.At.File, 0, _sm.GetText(deep.At.File).Length + 1));
+            _de.MarkUnparsed(new Span(deep.At.File, 0, _sm.GetText(deep.At.File).Length + 1));
             return new Module(null, [], deep.At);
         }
     }
@@ -110,7 +110,7 @@ public sealed partial class Parser
     /// the same list the stacked spelling declares. The VALUES are parsed as expressions; that
     /// they must be literals is a semantic rule, so the message can name the offending
     /// expression instead of refusing to read it — and which attribute admits the parenthesized
-    /// form is the checker's rule too (<c>WithArg&lt;T&gt;</c>).
+    /// form is the checker's rule too.
     /// </summary>
     private AttributeNode[] ParseAttributeList()
     {
@@ -219,14 +219,13 @@ public sealed partial class Parser
     /// before <c>;</c> alone: Lyric 5's header, which names nothing and carries the module's
     /// attributes (<c>@When(…) module;</c>).</summary>
     private bool AtModuleHeader => _buffer.Check(TokenKind.Module)
-        || AtContextual("module") && _buffer.Peek(1).TokenKind == TokenKind.Identifier
-        || _sm.Lyric5 && AtContextual("module") && _buffer.Peek(1).TokenKind == TokenKind.Semicolon;
+        || AtContextual("module") && _buffer.Peek(1).TokenKind is TokenKind.Identifier or TokenKind.Semicolon;
 
     private ModulePath ParseModuleHeader()
     {
         var kw = _buffer.Advance(); // 'module'
         // Lyric 5's header names nothing: the path does
-        var segments = _sm.Lyric5 && _buffer.Check(TokenKind.Semicolon) ? Array.Empty<string>() : ParseDottedName();
+        var segments = _buffer.Check(TokenKind.Semicolon) ? Array.Empty<string>() : ParseDottedName();
         var semi = ExpectSemicolon();
         return new ModulePath(segments, Span.Union(kw.Span, semi.Span));
     }
@@ -295,7 +294,7 @@ public sealed partial class Parser
             default:
                 if (AtContextual("type"))
                     return Attach(ParseTypeAlias(isPublic, isOpaque: false, start), attributes, "a type alias");
-                // 'extern "dotnet" fn f(x: int): int = "System.Math::Abs";' — contextual like
+                // 'extern "C" fn f(x: int): int = "abs";' — contextual like
                 // 'type': the word stays an identifier everywhere else, so no program that names
                 // something 'extern' loses that name.
                 if (AtContextual("extern") && _buffer.Peek(1).TokenKind == TokenKind.StringLiteral)
@@ -360,16 +359,10 @@ public sealed partial class Parser
             + "a member of one, or the module header carries one");
     }
 
-    /// <summary>In Lyric 5 every declaration carries attributes; the 4.x
-    /// parser refuses them where its module format had no row for them.</summary>
+    /// <summary>Every declaration carries attributes.</summary>
     private Decl Attach(Decl decl, AttributeNode[] attributes, string what)
     {
         if (attributes.Length == 0) return decl;
-        if (!_sm.Lyric5)
-        {
-            RejectAttributes(attributes, what);
-            return decl;
-        }
         return decl switch
         {
             InterfaceDecl i => i with { Attributes = attributes },
@@ -539,7 +532,7 @@ public sealed partial class Parser
     private FunctionDecl ParseFunctionDecl(VisibilityWord isPublic, Span start, bool isStatic = false,
         ExternSpec? spec = null)
     {
-        // 'inline fn': a word of Lyric 5's alone — the 4.x lexer reads 'inline' as a name
+        // 'inline fn'
         var isInline = _buffer.Match(TokenKind.Inline);
         // the order is '[static] [inline] [mut] fn': 'inline static' is refused and read as what it
         // says — the rest of the member parses as written, no cascade
@@ -700,8 +693,7 @@ public sealed partial class Parser
             var name = ExpectNamed("LYR-PAR0026", "parameter name");
             _buffer.Expect(TokenKind.Colon, "LYR-PAR0031", "expected ':' after parameter name");
             var type = ParseType();
-            // 'nums: int...': the variadic parameter names its element; it is
-            // an array of it, as 4.x's 'params nums: int[]' was, and the rules are the same ones.
+            // 'nums: int...': the variadic parameter names its element; it is an array of it.
             var isEllipsis = _buffer.Check(TokenKind.DotDotDot);
             if (isEllipsis) type = new ArrayType(type, Span.Union(type.Span, _buffer.Advance().Span));
             Expr? def = _buffer.Match(TokenKind.Equal) ? ParseExpr(0) : null;
@@ -756,7 +748,7 @@ public sealed partial class Parser
                 _buffer.Match(TokenKind.Comma);
             // A field that ends with ';': the separator a statement takes, said where it stands and
             // read as the ',' it stands for, so the next member is read as it is.
-            else if (_sm.Lyric5 && _buffer.Check(TokenKind.Semicolon))
+            else if (_buffer.Check(TokenKind.Semicolon))
             {
                 var semi = _buffer.Advance();
                 _de.Report(new Diagnostic("LYR-PAR0064", Severity.Error, semi.Span,
@@ -893,7 +885,7 @@ public sealed partial class Parser
     /// braces or parentheses, each <c>@[…]</c> group, balanced.</summary>
     private bool AtAttributedVariant()
     {
-        if (!_sm.Lyric5 || !AtAttributeStart) return false;
+        if (!AtAttributeStart) return false;
         var at = 0;
         while (true)
         {
@@ -962,7 +954,7 @@ public sealed partial class Parser
             {
                 // a payload's field is a field (Lyric 5, 11 §1 rule 4): it takes attributes as a struct's does
                 var fieldStart = _buffer.Current.Span;
-                var fieldAttributes = _sm.Lyric5 && AtAttributeStart ? ParseAttributeList() : [];
+                var fieldAttributes = AtAttributeStart ? ParseAttributeList() : [];
                 fields.Add(ParseField(fieldStart, isVar: false, VisibilityWord.None) with { Attributes = fieldAttributes });
                 if (!_buffer.Match(TokenKind.Comma)) break;
             }
@@ -972,7 +964,7 @@ public sealed partial class Parser
         }
 
         // 'Read = 4': the integer C holds for it; the checker says where one may stand
-        if (_sm.Lyric5 && _buffer.Match(TokenKind.Equal))
+        if (_buffer.Match(TokenKind.Equal))
         {
             var value = ParseExpr(0);
             return new EnumVariant(name, null, null, Span.Union(nameTok.Span, value.Span))
@@ -1061,9 +1053,7 @@ public sealed partial class Parser
             }
             if (types is not null && AtContextual("type") && _buffer.Peek(1).TokenKind == TokenKind.Identifier)
             {
-                // an associated type carries attributes in Lyric 5
-                if (attributes.Length > 0 && !_sm.Lyric5) RejectAttributes(attributes, "an associated type");
-                types.Add(ParseAssociatedType() with { Attributes = _sm.Lyric5 ? attributes : [] });
+                types.Add(ParseAssociatedType() with { Attributes = attributes });
                 continue;
             }
 

@@ -455,6 +455,12 @@ static uint32_t sweep_one(void) {
             POISON(block_address(block), BLOCK);
         } else {
             info->state = live == LINES_PER_BLOCK ? BLOCK_FULL : BLOCK_RECYCLABLE;
+            /* What died keeps no start. Its head may lie on a line that stays, beside something
+             * alive, and its tail on lines handed out again: a stale word on its start would mark
+             * an object whose fields are another's now — and a coroutine's fields say where to read. */
+            uint8_t *starts = start_bits + granule_of(block_address(block)) / 8;
+            const uint8_t *marked = mark_bits + granule_of(block_address(block)) / 8;
+            for (size_t b = 0; b < BLOCK / GRANULE / 8; b++) starts[b] &= marked[b];
             for (size_t l = 0; l < LINES_PER_BLOCK; l++) {
                 if (marks[l] != epoch) POISON(block_address(block) + l * LINE, LINE);
             }

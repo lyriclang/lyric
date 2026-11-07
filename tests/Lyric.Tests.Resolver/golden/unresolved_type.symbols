@@ -1,5 +1,5 @@
 Module main
-  Struct Widget
+  Struct Widget [internal]
     Import Self -> Struct Widget
     Field thing
 

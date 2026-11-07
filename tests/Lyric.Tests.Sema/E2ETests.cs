@@ -33,7 +33,7 @@ public class E2ETests
         // silently opaque, and every use of the imported names went unchecked.
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         var binding = comp.Resolve();
@@ -65,33 +65,9 @@ public class E2ETests
         Assert.False(de.HasErrors, $"{name} should check clean but got: {Errors(de)}");
     }
 
-    /// <summary>
-    /// Programs importing a stdlib module that does not exist yet. That used to go unnoticed: an
-    /// unfindable module counted as "external and opaque", and every use of the imported names was
-    /// silently unchecked. Since <c>LYR-RES0003</c> it is an error, and these fixtures show it.
-    ///
-    /// <para>They stand here rather than in the list above, because they are VALID LYRIC — the library is
-    /// missing, not the language. When the module appears they move back; that this test then fails is
-    /// the reminder.</para>
-    ///
-    /// <para>That is exactly what happened with <c>shapes.lyr</c>: <c>std.math</c> exists, the program
-    /// runs, and the line moved from this list into the one for clean programs. The test did its job — it
-    /// reported that the expectation no longer held rather than silently claiming the module was
-    /// missing.</para>
-    /// </summary>
-    [Theory]
-    [InlineData("imports.lyr", "std.io")]
-    public void Program_waiting_on_a_stdlib_module_reports_it(string name, string missing)
-    {
-        var de = Analyze(name);
-        Assert.Contains(de.Diagnostics, d =>
-            d.Code == "LYR-RES0003" && d.Message.Contains(missing, StringComparison.Ordinal));
-    }
-
     [Theory]
     [InlineData("neg_no_return.lyr", "LYR-SEM0017")]
     [InlineData("neg_immutable.lyr", "LYR-SEM0019")]
-    [InlineData("neg_bad_main.lyr", "LYR-SEM0021")]
     [InlineData("neg_mut_free.lyr", "LYR-SEM0023")]
     [InlineData("neg_type_mismatch.lyr", "LYR-SEM0001")]
     [InlineData("neg_unassigned.lyr", "LYR-SEM0018")]

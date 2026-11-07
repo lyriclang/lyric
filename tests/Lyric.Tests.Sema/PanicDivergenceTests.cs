@@ -33,7 +33,7 @@ public class PanicDivergenceTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -89,7 +89,7 @@ public class PanicDivergenceTests
     public void An_ordinary_void_call_does_not_cover_a_missing_return()
     {
         var de = Check("""
-            import std.io.console { println };
+            import std.io { println };
             fn f(o: ?int): int {
                 if (o != null) { return o; }
                 println("nichts");

@@ -24,7 +24,7 @@ public class TryDefiniteAssignmentTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -82,7 +82,7 @@ public class TryDefiniteAssignmentTests
     public void A_catch_that_falls_through_contributes_nothing()
     {
         var de = Check(Head + """
-            import std.io.console { println };
+            import std.io { println };
             fn f(s: string): int {
                 var n: int;
                 try { n = parse(s); } catch (e: Exception) { println(e.message()); }

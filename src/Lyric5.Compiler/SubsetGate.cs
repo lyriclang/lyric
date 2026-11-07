@@ -130,9 +130,6 @@ public static class SubsetGate
                 case IrPlaceType p:
                     Type(p.Value, span, where);
                     break;
-                case IrHostType:
-                    Refuse(span, $"host types, {where}");
-                    break;
                 default:
                     Refuse(span, $"the type {type}, {where}", bug: true);
                     break;

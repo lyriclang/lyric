@@ -24,7 +24,7 @@ public class InterpolationDisplayTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
@@ -97,8 +97,6 @@ public class InterpolationDisplayTests
 
     [Theory]
     [InlineData("let v: ?int = 1;")]
-    [InlineData("let v = [1, 2];")]
-    [InlineData("let v = (1, 2);")]
     public void An_optional_array_or_tuple_is_refused_in_the_sema(string binding)
     {
         var de = Check("fn main(): int { " + binding + " let s = f\"{v}\"; return 0; }");
@@ -115,8 +113,17 @@ public class InterpolationDisplayTests
                 return 0;
             }
             """);
-        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0006");
-        Assert.Contains("specifier", error.Message);
+        var error = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0164");
+        Assert.Contains("no format", error.Message);
+    }
+
+    [Theory]
+    [InlineData("let v = [1, 2];")]
+    [InlineData("let v = (1, 2);")]
+    public void An_array_and_a_tuple_display(string binding)
+    {
+        var de = Check("fn main(): int { " + binding + " let s = f\"{v}\"; return s.length(); }");
+        Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics));
     }
 
     [Fact]
@@ -125,7 +132,7 @@ public class InterpolationDisplayTests
         var de = Check(
             """
             fn main(): int {
-                let s = f"{1} {2.5} {true} {'c'} {"s"} {1:N2}";
+                let s = f"{1} {2.5} {true} {'c'} {"s"} {1:08}";
                 return 0;
             }
             """);

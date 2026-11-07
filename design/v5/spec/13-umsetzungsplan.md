@@ -2368,3 +2368,158 @@ wäre die EBNF nach einem Monat falsch, ohne dass es jemand merkt.
 
 **Nicht in M17**: die Umbenennung `lyric5` → `lyric`, Website `/5.0/`, `lyric-script 1.0.0` (M18); eine zweite Sprache des Books (14 W4).
 
+
+## Nachtrag 2026-11-06 — M17 S1: die Messung
+
+Alle acht Suiten liefen zweimal auf main bf6b9600, einmal wie immer und einmal im Lyric-5-Modus gegen `stdlib5`. Der Schalter war eine Umgebungsvariable in
+`SourceManager`, `Compilation` und `StdlibLoader`, nur im Worktree, nie auf main. Im 4.x-Modus waren alle Suiten grün.
+
+| Suite | Tests | rot in 5 | wovon |
+|---|---:|---:|---|
+| Core | 653 | 0 | |
+| Lexing | 398 | 12 | `module`, `params` als Wörter und ihre Golden |
+| Parsing | 761 | 6 | 5 Golden, 1 Attribut |
+| Resolver | 25 | 9 | 7 Golden, 2 Regeln |
+| Formatting | 722 | 6 | Sonderformen im `FormatterTests` |
+| Sema | 1613 | 356 | siehe unten |
+| Ir | 230 | 15 | 10 `LoweringTests`, 5 andere |
+| Lsp | 384 | 0 | liest schon `stdlib5` |
+| **zusammen** | **4786** | **404** | 8,4 % |
+
+**Kontrolle**: mit einem Pfad, unter dem keine Bibliothek liegt, werden Sema 440 und Ir 47 rot statt 356 und 15. Der Schalter wirkt also, und 1173 der Sema-Tests brauchen gar keine Bibliothek.
+
+**Sema zerlegt.** 64 der 356 fallen weg, sobald der `module`-Kopf erlaubt ist (dann 292, Ir 14): Helfer mit einem eigenen kleinen `std.core`. Die 292, jeder Test nach dem ersten Befund einsortiert:
+
+| Rote | Befund | Art |
+|---:|---|---|
+| 89 | `LYR-RES0002`: `Error`, `Display`, `Add` … unbekannt, der Helfer lädt keine Bibliothek | Gerüst |
+| 46 | die Lints reden mit: `SEM0201`, `SEM0198`, `SEM0223`, wo der Test keine Warnung erwartet | Gerüst |
+| 28 | Assert ohne Code, meist die Attribute | einzeln |
+| 27 | `CorpusWarningTests` über `tests/corpus-4x` | fällt mit dem Korpus |
+| 15 | `params` | Regel von 4 |
+| 13 | Modul oder Name der 4.x-Bibliothek (`std.io.console` …) | nachziehen |
+| 11 | `WithArg`, Attributzeilen | einzeln |
+| 63 | je Code höchstens 9 | einzeln |
+
+Das sind 135 Gerüst, 42 Regeln und Korpus von 4, 13 Nachzug und 102 einzeln. Die Einsortierung liest nur den ersten Befund, die Zahlen sind daher Größenordnung, keine Zusage.
+
+**Was die Messung nicht sagt**: Grün heißt nicht, dass der Test etwas von Lyric 5 prüft. Ein Test, der nur das Fehlen eines Codes verlangt, bleibt auch über einem Quelltext grün, den Lyric 5 anders liest. Das fällt erst beim Durchsehen auf.
+
+**Zwei Befunde**:
+
+- Ein echter Bug: `fn g(_: int, _: int)` stürzte den Compiler ab (`LYR-ICE0001`), bei jedem Programm mit so einer Liste. Der Fall stand in einem Sema-Test, der nur im Modus ohne Lints lief. Behoben in lyric#674.
+- Offen: `ErrorTypeInvariantTests` zählt auf `arith.lyr` 541 Ausdrücke mit `ErrorType` ohne Meldung, 471 davon in einer Datei (`PayloadByInfoExpr`, `FieldByInfoExpr`, der Bibliothek oder dem Synthetisierten zuzurechnen, noch nicht zugeordnet). Ob das die Invariante oder ihr Gerüst trifft, klärt S2a zuerst.
+
+**Der Schnitt von S2**, kleiner als im Plan angenommen:
+
+| Slice | Inhalt | Rote |
+|---|---|---:|
+| **S2a** | Gerüst: Standard Lyric 5 in den Helfern, Bibliothek `stdlib5`, kleine `std.core` ohne Kopf, Lints abgefiltert; dazu der `ErrorType`-Befund | gut 200 |
+| **S2b** | Sema, was übrig bleibt: nachziehen oder streichen, gezählt | gut 150 |
+| **S2c** | Lexing, Parsing, Resolver, Formatting, Ir | 48 |
+
+**Reflexion**: Die Sorge hinter P2 war eine Zahl, die den Umzug unbezahlbar macht. Sie ist 8,4 %, und rund die Hälfte davon (199) hängt am Gerüst der Tests, nicht an einer Regel. Das stützt P1: Die Weichen zu entfernen ist bezahlbar.
+
+## Nachtrag 2026-11-06 — M17 S2a: der Standard ist Lyric 5
+
+`main` baut seit M2 S0 (`0e7b1712`) keinen 4.x-Compiler mehr, nur noch die Tests riefen den 4.x-Modus. Daher kippt S2a den Standard an der Wurzel statt je Suite: `SourceManager.Lyric5` und `Compilation.Lyric5Modules` stehen auf `true`, `StdlibLoader.DefaultRoot` zeigt auf `stdlib5`. Die Weichen selbst bleiben bis S3.
+
+- **Gerüst**: Die Tests lesen `stdlib5`, die acht kleinen eigenen `std.core` weichen der echten Bibliothek (`Library.cs`).
+- **`Compilation.Lints`**, Standard `true`: Eine Prüfung einer einzelnen Regel schaltet die Lints ab, damit ein unbenutztes `f` nicht an ihrer Stelle antwortet. Acht Testklassen nutzen das.
+- **181 Testmethoden sind zurückgestellt** (`Skip = "Moves to Lyric 5 in the next slices."`): Sema 146, Ir 14, Formatting 7, Lexing 6, Parsing 5, Resolver 3. Ein `[Theory]` zählt ganz, auch seine grünen Zeilen. Deshalb laufen derzeit 4472 statt 4818 Fälle. S2b und S2c bauen die Marke vollständig ab, S3 setzt erst danach an.
+
+**Der `ErrorType`-Befund aus S1 ist geklärt und kein Bug**: 471 der 541 Ausdrücke sind `this.[v, p]` in `std/core.lyr`, Reflexion, die erst pro Instanz einen Typ hat. Die übrigen stehen im synthetisierten `Debug` von Typen der Bibliothek mit Funktionsfeld (`MapIter` …). Dort entfällt die Synthese still: `it.debug()` auf einem `MapIter` meldet `LYR-SEM0012`, bei einem eigenen Typ, der `Debug` verlangt, nennt der Fehler das Feld. Die Invariante gilt also für die Dateien des Programms; S2b schränkt den Test darauf ein.
+
+**Reflexion**: Die Alternative war, die Suiten einzeln umzuschalten. Dafür hätte es einen Schalter je Testlauf gebraucht, der bis S3 lebt und selbst eine Weiche wäre. Die Skip-Marke ist die ehrlichere Schuld: Sie ist zählbar, und CI meldet sie bei jedem Lauf.
+
+## Nachtrag 2026-11-06 — ein Startbit überlebt sein Objekt
+
+Der main-Lauf von `e70be167` (M17 S2a) stürzte im Windows-Job in `tests/std` ab: Zugriffsverletzung bei `0x68`, in `scan_range` unter `trace_coro`. S2a ändert keine Laufzeit, der gleiche Stand war im Plattformlauf des PR grün.
+
+**Der Fehler**: `hand_out` löscht Startbits nur in den Zeilen, die es neu ausgibt. Ein totes Objekt, dessen Kopf in einer behaltenen Zeile neben etwas Lebendigem liegt, behält sein Startbit, während sein Schwanz neu vergeben wird. Trifft ein veraltetes Wort diesen Kopf, wird das Objekt markiert. Für gewöhnliche Objekte ist das folgenlos, weil `mark_word` jedes Wort prüft. `trace_coro` aber glaubt `ctx.sp` und `ctx.base` und liest dort.
+
+**Die Korrektur**: `sweep_one` schneidet die Startbits eines behaltenen Blocks mit seinen Markbits. Danach hat nur noch Lebendiges einen Start. `runtime/tests/stale_start.c` legt die Lage deterministisch her, unter voller und unter junger Sammlung. Ohne die Korrektur stürzt der Test in beiden Profilen auf Linux ab und ebenso in einem mit `zig cc` für Windows gebauten Programm (`-O2` und `-O0`). Mit ihr läuft er durch. Der Test wiederholt den Aufbau, falls ein veraltetes Wort die Koroutine am Leben hält, und schlägt fehl, wenn er die Lage nie herstellt.
+
+**Was nicht belegt ist**: Dass genau dieser Pfad den Absturz in CI ausgelöst hat. Die Stelle stimmt überein, die Adresse `0x68` nicht als Beleg: Der Test setzt sie selbst. Der CI-Absturz selbst ließ sich nicht wiederholen. Tritt derselbe Stack nach der Korrektur wieder auf, ist die Ursache eine andere.
+
+**Kosten**: 256 Byte je gefegtem Block, im Rauschen der Messung. `bench/gc`, Minimum aus 5 Läufen, zwei Runden, vorher / nachher: `binarytrees` 1,048 und 0,921 s / 0,901 und 0,929 s; `lru` 3,603 und 3,530 s / 3,594 und 3,678 s. RSS und Zahl der Sammlungen sind gleich. Die Maschine war zu Beginn belastet.
+
+**Reflexion**: Die Alternative war, nur Koroutinen zu behandeln und das Startbit zu löschen, wenn der Stack geht. Das reicht nicht: Eine normal beendete Koroutine ist dann schon abgemeldet, und niemand sieht ihren Tod. Der Schnitt beim Fegen erledigt es an einer Stelle für jedes Objekt.
+
+## Nachtrag 2026-11-06 — M17 S2b: die Sema-Suite auf Lyric 5
+
+Die 146 zurückgestellten Methoden der Sema-Suite laufen wieder, die Marke ist dort weg. Beim Abbau waren 185 Fälle rot. Danach: 1580 Fälle, alle grün, keiner übersprungen. Vorher waren es 1621.
+
+**Gestrichen sind 40 Methoden und eine Zeile.** Maßstab war: Die Regel gibt es in Lyric 5 nicht mehr, und jemand anderes hält das fest (`CatalogTests.StillInTheSharedFrontend`, Katalogprogramme, Konformanz).
+
+| Gruppe | Methoden | Warum |
+|---|---:|---|
+| `opaque type` | 14 | Keine Form von Lyric 5, `LYR-SEM0175` steht im Katalog |
+| Attribut-Zeilen, `WithArg` | 17 | `SEM0066`, `0069`, `0095`, `0096` erreicht kein `lyric5`-Programm; der doppelte Feldname ist jetzt eine Zeile in `Lyric5.Tests` (`SEM0070`) |
+| Optionale Elemente laufen | 4 | `SEM0091`: `std.core` hat das Protokoll |
+| Einzelne | 5 | Generischer Alias außerhalb von 5, `Add<Money>` als 2.x-Schreibweise, `std.string.concat`, `@Deprecated` über ein Interface (`Lyric5.Tests` zählt die Stellen), `std.io` fehlt |
+
+Dazu die Zeile `neg_bad_main`: `SEM0021` prüft nur der Einstieg, den dieses Gerüst nicht setzt; der Katalog hält den Code.
+
+**Gekippt, weil Lyric 5 anders entschieden hat:** ein Wert aus einer Form (`let d: Describe = [1, 2]`), ein Feld aus Feldern (`[[1, 2]] * 2`), `let a: Any = 5` (03 S8b), `Ordered` ohne geschriebenes `Equatable`, Arrays und Tupel im f-String, nur geschriebene und nie gelesene Variablen (`SEM0199`), unbenutzte Parameter (`SEM0198`). `@Deprecated` wird erst nach den Typen ausgewertet, deshalb laufen `DeprecatedTests` und `DeprecationPromiseTests` jetzt durch die ganze Prüfung statt durch `Semantics.Analyze`; dort waren die „sagt nichts"-Tests leer erfüllt.
+
+**`CorpusWarningTests` prüfte die Bibliothek nicht, zweimal.**
+
+- Der Vergleich stand noch auf dem Wurzelnamen `stdlib`. Jede Bibliotheksdatei lief deshalb als Einstieg und war rot. Das war der sichtbare Teil.
+- Die Probe hatte kein `main`. Der Fehler darin beendete die Prüfung vor den Warnungen, gefiltert wurde er als Rauschen. Grün hieß also nichts. Das hat erst die Gegenprobe gezeigt: Eine eingebaute Warnung in `std/path.lyr` ließ den Test zuerst grün. Mit `main` und `WarnDeps` wird er rot, und die Datei selbst ist unter den roten Zeilen.
+
+Die Bibliothek ist tatsächlich still. Gefunden hat der Test zwei Beispiele: `examples/constants.lyr` (Namen in Großbuchstaben, `SEM0215`) und `examples/patterns/binding-conditions.lyr` (`Result` verdeckt das des Preludes). Beide sind bereinigt und stehen jetzt in `FixFrom4AcceptanceTests.ChangedByHand`: `fix from-4` lässt diese Namen stehen, und ein Beispiel soll seinem Leser keine Warnung zeigen. Der Preis: Für diese zwei Dateien prüft der Test nicht mehr, dass sie die Werkzeugausgabe sind.
+
+`ErrorTypeInvariantTests` zählt nur noch die Ausdrücke des Programms, wie in S2a begründet.
+
+**Befund, nicht behoben:** `struct A :: [Into<B>, Into<C>]` mit zwei `fn into()` wird angenommen, aber kein Aufruf kommt daran: `let b: B = a.into()` meldet `LYR-SEM0086` und rät zu `as`, und `as` lehnt ab (`LYR-SEM0006`, „converts numbers only"). Geprüft mit `lyric5 check`. `From` hat das Problem nicht, dort entscheidet das Argument. `OperatorIntoTests` hält nur fest, dass die Deklaration steht. Ob der erwartete Typ wählen soll oder zwei Ziele abgelehnt werden, ist eine Entscheidung des Maintainers.
+
+## Nachtrag 2026-11-06 — M17 S2c: die übrigen Suiten auf Lyric 5
+
+Die letzten 35 Marken sind weg (Ir 14, Formatting 7, Lexing 6, Parsing 5, Resolver 3). Beim Entfernen waren 54 Fälle rot. Jetzt laufen 2148 Fälle in den fünf Suiten, keiner übersprungen. Damit ist die Marke im ganzen Baum fort und S2 fertig.
+
+**Gelöscht: 6 Methoden und 4 Zeilen.** `\x` im Lexer (die Ablehnung hält die Lyric-5-Zeile mit `LYR-LEX0013`), `module` und `params` als Schlüsselwörter, `for` über einen `string` als Grenze der Senkung (`LYR-SEM0232` meldet das jetzt früher), ein Attribut auf `extend` als Parserfehler, und die beiden Tests zu den Attributzeilen des Bytecode-Formats.
+
+**Der Formatter wich vom Entwurf ab, jetzt nicht mehr.** 08 D16 und 09 F5 sagen: Zwei Attribute werden zur Gruppe `@[A, B]`. M13a S1 hatte stattdessen Stapel gebaut und einen Test darauf gesetzt, begründet mit „wie die Standardbibliothek". Das stimmte nicht: In `stdlib5` steht kein einziger Stapel. Der Zweig ist weg, der Test sagt jetzt das Gegenteil. Der Kopf eines Moduls bekommt die Gruppe auch, das war in 4.x eine Ausnahme, die der Entwurf nicht nennt. `lyric fmt --check` über das Repository bleibt grün. Dabei fiel auf: Ein Kopf ohne Namen wurde `module ;` geschrieben. Behoben, die Gegenprobe macht den neuen Test rot.
+
+**Redundante Klammern bleiben** (11 E5). Vier Tests erwarteten noch das Gegenteil von 4.x und sagen jetzt, was gilt.
+
+**`AstDumper` kannte vier Knoten nicht** (`FieldByInfoExpr`, `PayloadByInfoExpr`, `VariantInitExpr`, `ComptimeIfExpr`), und deshalb warf der Korpustest des Formatters für `std.codec`, `std.core` und `std.ffi`. Er zeigt jetzt auch die Runden eines Initialisierers und die Attribute auf Interface, `let`, Alias und `extend`. Sonst hätte der Snapshot `attr_other_targets` nicht gezeigt, dass sie ankommen.
+
+**Attribute halten nichts am Leben** (07 B6: die Wurzeln sind `main` und die Exporte). Der Test sagt das jetzt so. `ModuleLowerer.CollectAttributes` hat in Lyric 5 keinen Aufrufer mehr und geht mit S3.
+
+**Der Verifier läuft im Debug-Profil eines Programms zweimal.** Die Frage nach dem Scheduler und das Beschneiden der Globalen ändern das Modul auch ohne Optimierung. Das ist richtig, nur der Kommentar behauptete „genau einmal". Test und Kommentar sagen jetzt, wann. Der Verifier läuft in einem Release-Compiler ohnehin nicht.
+
+13 Snapshots sind neu geschrieben und einzeln gelesen. Geändert haben sich nur die Quellen des Lexer-Falls, Tokens in den Meldungen des Parsers (`'*'` statt `Star`), `[internal]` in den Symbolen des Resolvers und die Attribute im neuen Fall.
+
+## Nachtrag 2026-11-07 — M17 S3 geschnitten, S3a: der Schalter
+
+Die 123 Weichen aus dem Plan sind nur ein Teil. Die Messung vor dem Ausbau zeigt drei Arten von Rest, und jede bekommt ihren PR:
+
+| Slice | Inhalt |
+|---|---|
+| **S3a** | der Schalter: `SourceManager.Lyric5`, `Compilation.Lyric5Modules`, `TypeResult.Lyric5Modules`, jede Weiche darüber und der Code, der nur hinter ihr lag |
+| **S3b** | die 4.x-Pfade ohne Schalter: Zweige, die fragen, ob die Bibliothek eine Deklaration hat (`_coreFormat`, `_fstringBuilder`, `hash(): int`), und was nur `stdlib/` brauchte. Rund 40 Stellen laut Kommentar |
+| **S3c** | `stdlib/`, `tests/corpus-4x/`, Version 4.6.0, die `retired`-Sätze im Katalog samt Spec-Anhang, `docs/guide`, `Grammar`, `Bytecode`, `Pack` ins Archiv, CLAUDE.md und CONTRIBUTING |
+
+**S3a** faltet den Schalter auf Lyric 5. Das Verhalten eines `lyric5`-Programms ändert sich nicht: Der Schalter stand dort überall schon auf wahr. 16 private Methoden hatten danach keinen Aufrufer mehr und sind weg, darunter die Attributzeilen des Bytecode-Formats (`CollectAttributes`, `BuildAttributeRow`).
+
+Zwei Tests sind gestrichen, sie prüften nur den 4.x-Pfad (`GenericMemberTests`). Zwei Lexer-Tests verlieren ihre 4.x-Zeile. `LYR-RES0006`, `SEM0066`, `SEM0069` und `SEM0096` stehen nicht mehr auf der Liste der Codes, deren Stelle im geteilten Frontend überlebte: Ihre Stelle ist weg. Sie waren schon `retired`; die Sätze dort nennen teils noch den 4.x-Pfad und werden mit S3c korrigiert, weil der Spec-Anhang aus ihnen entsteht.
+
+**Lokal gilt ab hier zig 0.16.0 ausdrücklich.** Das WSL-System steht seit dem 2026-11-06 auf 0.17.0, die CI und das Book auf 0.16.0. Unter 0.17 sind die Bindgen- und Link-Tests rot, ohne dass ein Slice etwas dafür kann. Der Umstieg auf 0.17 ist eine eigene Frage und nicht Teil von M17.
+
+## Nachtrag 2026-11-07 — M17 S3b: die 4.x-Pfade ohne Schalter
+
+Der Abgleich jeder Bibliotheksfrage des Frontends gegen `stdlib5` zeigt mehr als die rund 40 Stellen laut Kommentar: Auch der Adapterweg von `for` (`RangeIterator`, `StringIterator`, `rawToChars`) und `WithArg` fragen nach Namen, die `stdlib5` nicht deklariert. S3b wird deshalb geteilt:
+
+| Slice | Inhalt |
+|---|---|
+| **S3b1** | die Bibliotheksfragen gefaltet, die synthetisierten Rümpfe der Familie, die `std.core` als Defaults gibt, der `concat`-Weg der f-strings, die `dotnet`-Prüfung, `as` über `Into`, der Adapterweg von `for`, `WithArg`; die Kommentare über 4.x im Frontend |
+| **S3b2** | `OpaqueRef` mit dem Fall `Opaque` in `std.core` und in der Spec, die Host-Typen (`HostTypes`, `SEM0061`), der Rest der Liste in `CatalogTests` |
+
+**Ohne Bibliothek** bleibt eine eigene Frage: Ein f-string nennt dann im Lowering den fehlenden Baustein (`LYR-SEM0195`), und `Synthesize` schreibt nichts, solange kein `std.core` geladen ist. Das ist keine 4.x-Weiche, sondern der Fall einer kaputten Installation und der Suiten, die nur den Resolver oder den Checker prüfen.
+
+`LYR-SEM0091` und `LYR-SEM0095` verlieren ihre Stelle und verlassen die Liste. Die Erklärung von `LYR-SEM0007` im Katalog nennt noch `Indexable<T>`; sie ändert sich mit S3c, weil der Spec-Anhang aus dem Katalog entsteht. Die Meldung selbst nennt ab S3b1 `Index<K>`: Sie verlangte ein Interface, das es in Lyric 5 nicht gibt.
+
+**S3b2, gebaut:** `opaque type` wird weiter geparst und mit `LYR-SEM0175` abgelehnt, liest sich danach aber als gewöhnlicher Alias: Die Mauer hinter der Ablehnung meldete nur Folgefehler. `TypeKind` verliert `Opaque` (Spec 11). `isOpaque` in `std.syntax` bleibt: Ein Makro, das eine Deklaration liest und zurückschreibt, darf die Ablehnung nicht verlieren. `FieldOpaqueNames` im IR geht mit, kein Backend las es. Die Host-Typen gehen ganz, mit `LYR-SEM0061` und dem Empfänger eines Importaufrufs.
+

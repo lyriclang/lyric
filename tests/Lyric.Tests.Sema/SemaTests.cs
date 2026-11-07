@@ -116,10 +116,9 @@ public class SemaTests
     // --- `+` and `*` for string and T[] ---
 
     [Fact]
-    public void String_concat_and_repeat()
+    public void String_concat()
     {
         AssertType(LyrType.String, LastInit("fn t() { let x = \"a\" + \"b\"; }").type);
-        AssertType(LyrType.String, LastInit("fn t() { let x = \"ab\" * 3; }").type);
     }
 
     [Fact]

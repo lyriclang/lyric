@@ -1,5 +1,5 @@
 Module main
-  Function foo
+  Function foo [internal]
 
 === diagnostics ===
 error[LYR-RES0001]: 'foo' is already declared in this module — only two FUNCTIONS may share a name, told apart by how many arguments they take

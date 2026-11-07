@@ -204,7 +204,7 @@ public class GoldenTests
     [InlineData("attr_module")]       // before the module header
     // Negativ.
     [InlineData("bad_toplevel")]      // Ausdruck statt Deklaration
-    [InlineData("attr_bad_target")]   // on interface, let and type alias (LYR-PAR0042)
+    [InlineData("attr_other_targets")] // on interface, let and type alias: every declaration carries them
     [InlineData("attr_dangling")]     // an attribute with nothing behind it (LYR-PAR0042)
     public void Golden_module_matches_snapshot(string name)
         => Check(name, p => p.ParseModule());

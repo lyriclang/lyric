@@ -37,7 +37,7 @@ public class AttributeParsingTests
     [Fact]
     public void A_type_through_an_info_is_its_own_node()
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual("test.lyr", "fn f(): void { let x: Self.[f] = e.[f]; let y: a.B.[g][] = []; }");
         var de = new DiagnosticEngine(sm);
         var module = new Parser(sm, id, de).ParseModule();
@@ -59,7 +59,7 @@ public class AttributeParsingTests
     [Fact]
     public void A_payload_field_takes_attributes()
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual("test.lyr", "enum Shape { Dot, Box { @Mark(\"w\") width: int, height: int } }");
         var de = new DiagnosticEngine(sm);
         var module = new Parser(sm, id, de).ParseModule();
@@ -177,14 +177,6 @@ public class AttributeParsingTests
         var member = Assert.Single(i.Members);
         Assert.Equal("f", member.Name);
         Assert.Equal("A", Assert.Single(member.Attributes).Path[^1]);
-    }
-
-    [Fact]
-    public void An_attribute_on_an_extend_block_is_rejected()
-    {
-        Parse("@A\nextend int { fn f(): int { return 1; } }", out var diagnostics);
-
-        Assert.Contains(diagnostics, d => d.Code == "LYR-PAR0042");
     }
 
     /// <summary>Since 3.9 the parenthesized form IS attribute syntax: one positional value,

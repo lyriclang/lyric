@@ -429,6 +429,8 @@ promise. This entry fills with the milestones.
 - **`'File' has no member 'writeAll'` names the module to import** where a blanket block, or a block on a built-in
   shape, adds the member in a module of the program this one does not import.
 
+- **`lyric fmt` writes two attributes as one group**, `@[A, B]`, as the design says, on every declaration and at the head of a module; it had kept them stacked. A header without a name is `module;`, no longer `module ;`.
+
 ---
 
 ## v4.6.0 — never released

@@ -158,7 +158,7 @@ public static class ApiSurface
 
     private static IEnumerable<string> Tokens(string written)
     {
-        var sources = new SourceManager { Lyric5 = true };
+        var sources = new SourceManager();
         var file = sources.AddVirtual("signature.lyr", written);
         var lexer = new Lexer(sources, file, new DiagnosticEngine(sources));
         var tokens = new List<string>();

@@ -23,7 +23,7 @@ public class OperatorIntoTests
         var comp = new Compilation(sm, de);
 
         if (withStdlib)
-            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de);
+            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de);
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -43,7 +43,7 @@ public class OperatorIntoTests
             }
 
             fn main(): int {
-                let b = A { n = 1 } as B;
+                let b: B = A { n = 1 }.into();
                 return b.n;
             }
             """);
@@ -71,7 +71,7 @@ public class OperatorIntoTests
 
         var found = de.Diagnostics.FirstOrDefault(d => d.Code == "LYR-SEM0006");
         Assert.NotNull(found);
-        Assert.Contains("Into<B>", found.Message);
+        Assert.Contains("converts numbers only", found.Message);
     }
 
     [Fact]
@@ -99,11 +99,10 @@ public class OperatorIntoTests
     }
 
     [Fact]
-    public void A_second_conversion_target_is_a_duplicate_member()
+    public void A_second_conversion_target_is_a_second_conformance()
     {
-        // The documented limit: 'into' is a member name and a type has one member of a name. Two
-        // conformances would need two methods; the second is a redeclaration diagnostic, and this
-        // test is where the limit is measured rather than asserted in prose.
+        // Members of a conformance are told apart at the instance: two 'into' of the same arity stand
+        // beside each other, one per target.
         var de = Check("""
             import std.core { Into };
 
@@ -112,14 +111,14 @@ public class OperatorIntoTests
 
             struct A :: [Into<B>, Into<C>] {
                 n: int,
-                fn into(): B { return B { n = this.n }; },
+                fn into(): B { return B { n = this.n }; }
                 fn into(): C { return C { n = this.n }; }
             }
 
             fn main(): int { return 0; }
             """);
 
-        Assert.True(de.HasErrors);
+        Assert.False(de.HasErrors);
     }
 
     [Fact]

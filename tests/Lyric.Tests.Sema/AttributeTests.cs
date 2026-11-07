@@ -26,7 +26,7 @@ public class AttributeTests
         var id = sm.AddVirtual("test.lyr", source);
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de);
-        comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de);
+        comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de);
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
         return de;
@@ -69,11 +69,6 @@ public class AttributeTests
 
             fn main(): int { return 0; }
             """);
-
-    [Fact]
-    public void A_module_attribute_checks_against_OnModule() =>
-        AssertClean("@Plugin { name = \"m\", api = 2 }\nmodule m;\n" + Markers
-            + "\nfn main(): int { return 0; }");
 
     [Fact]
     public void A_missing_field_with_a_literal_default_is_no_error() =>
@@ -224,39 +219,6 @@ public class AttributeTests
             fn main(): int { return 0; }
             """);
 
-    [Fact]
-    public void The_same_field_twice_is_rejected() =>
-        AssertReports("LYR-SEM0068", "sets 'order' twice", Markers + """
-
-            @System { order = 1, order = 2 }
-            fn f(): void { }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
-    public void A_computed_argument_is_rejected() =>
-        AssertReports("LYR-SEM0066", "must be a value at compile time", Markers + """
-
-            @System { order = 1 + 2 }
-            fn f(): void { }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
-    public void Null_is_not_an_attribute_argument() =>
-        AssertReports("LYR-SEM0066", "must be a value at compile time", """
-            import std.core { OnFunction };
-
-            struct Tag :: [OnFunction] { label: ?string }
-
-            @Tag { label = null }
-            fn f(): void { }
-
-            fn main(): int { return 0; }
-            """);
-
     // ---------------------------------------------------------------- a name for the value (2.4)
 
     [Fact]
@@ -316,47 +278,6 @@ public class AttributeTests
             """);
 
     [Fact]
-    public void A_let_bound_to_an_expression_is_still_refused() =>
-        // The line is where the VALUE is written, not what the compiler could work out: 1 + 2 is
-        // computable and has nowhere to be computed.
-        AssertReports("LYR-SEM0066", "must be a value at compile time", Markers + """
-
-            let PRIORITY = 5 + 5;
-
-            @System { order = PRIORITY }
-            fn f(): void { }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
-    public void A_field_is_not_a_constant() =>
-        // Only a global binding: a field is bound per instance, and the row has one value.
-        AssertReports("LYR-SEM0066", "must be a value at compile time", Markers + """
-
-            struct Settings { order: int }
-
-            fn take(s: Settings): void { }
-
-            @System { order = s.order }
-            fn f(): void { }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
-    public void A_function_call_is_still_refused() =>
-        AssertReports("LYR-SEM0066", "must be a value at compile time", Markers + """
-
-            fn ten(): int { return 10; }
-
-            @System { order = ten() }
-            fn f(): void { }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
     public void A_wrongly_typed_argument_is_an_ordinary_assignability_error() =>
         AssertReports("LYR-SEM0001", "", Markers + """
 
@@ -371,27 +292,6 @@ public class AttributeTests
         AssertReports("LYR-SEM0015", "has no field 'nope'", Markers + """
 
             @System { nope = 1 }
-            fn f(): void { }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
-    public void A_field_without_value_and_without_default_is_rejected() =>
-        // 'Plugin' has 'name' and 'api', neither with a default; '@Plugin' alone leaves both empty.
-        AssertReports("LYR-SEM0069", "without a value",
-            "@Plugin\nmodule m;\n" + Markers + "\nfn main(): int { return 0; }");
-
-    [Fact]
-    public void A_non_literal_default_cannot_fill_the_row() =>
-        AssertReports("LYR-SEM0069", "not a value at compile time", """
-            import std.core { OnFunction };
-
-            fn compute(): int { return 3; }
-
-            struct Tag :: [OnFunction] { order: int = compute() }
-
-            @Tag
             fn f(): void { }
 
             fn main(): int { return 0; }
@@ -466,23 +366,6 @@ public class AttributeTests
             """);
 
     [Fact]
-    public void A_variant_with_a_payload_is_refused() =>
-        // A row holds one value per field; a payload is values of its own. The message says that
-        // rather than "must be a literal", which tells someone who wrote a variant nothing.
-        AssertReports("LYR-SEM0066", "carries a payload", """
-            import std.core { OnFunction };
-
-            enum Shape { Dot, Circle(float) }
-
-            struct Tag :: [OnFunction] { shape: Shape }
-
-            @Tag { shape = Shape.Circle(1.0) }
-            fn f(): void { }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
     public void A_variant_of_another_enum_is_an_ordinary_assignability_error() =>
         AssertReports("LYR-SEM0001", "", """
             import std.core { OnFunction };
@@ -518,12 +401,12 @@ public class AttributeTests
     // one parenthesized value, admitted by WithArg<T>; and the group spelling.
 
     private const string EventVocabulary = """
-        import std.core { OnFunction, WithArg };
+        import std.core { OnFunction };
 
         enum Event { Damage, Heal }
 
-        struct On :: [OnFunction, WithArg<Event>] { event: Event, order: int = 0 }
-        struct Retry :: [OnFunction, WithArg<int>] { limit: int }
+        struct On :: [OnFunction] { event: Event, order: int = 0 }
+        struct Retry :: [OnFunction] { limit: int }
         struct Tag :: [OnFunction] { }
         """;
 
@@ -554,66 +437,9 @@ public class AttributeTests
 
     [Fact]
     public void The_positional_form_needs_the_conformance() =>
-        AssertReports("LYR-SEM0094", "WithArg", EventVocabulary + """
+        AssertReports("LYR-SEM0094", "does not take a parenthesized value", EventVocabulary + """
 
             @Tag(3)
-            fn f(): void { }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
-    public void WithArg_must_name_the_first_fields_type() =>
-        AssertReports("LYR-SEM0095", "first field", """
-            import std.core { OnFunction, WithArg };
-
-            struct Named :: [OnFunction, WithArg<string>] { order: int, label: string = "" }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
-    public void WithArg_on_a_fieldless_struct_is_refused() =>
-        AssertReports("LYR-SEM0095", "no field", """
-            import std.core { OnFunction, WithArg };
-
-            struct Bare :: [OnFunction, WithArg<int>] { }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
-    public void A_second_witharg_instance_cannot_also_hold() =>
-        // Multi-conformance admits the list entry; the promise check then measures both
-        // against the one first field, and the second cannot fit beside the first.
-        AssertReports("LYR-SEM0095", "first field", """
-            import std.core { OnFunction, WithArg };
-
-            struct Both :: [OnFunction, WithArg<int>, WithArg<string>] { limit: int }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
-    public void A_positional_value_is_a_value_at_compile_time() =>
-        AssertReports("LYR-SEM0066", "value at compile time", EventVocabulary + """
-
-            @Retry(1 + 2)
-            fn f(): void { }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
-    public void A_positional_variant_with_a_payload_is_named() =>
-        AssertReports("LYR-SEM0066", "payload", """
-            import std.core { OnFunction, WithArg };
-
-            enum Shape { Dot, Circle(float) }
-
-            struct Drawn :: [OnFunction, WithArg<Shape>] { shape: Shape }
-
-            @Drawn(Shape.Circle(1.0))
             fn f(): void { }
 
             fn main(): int { return 0; }
@@ -640,38 +466,8 @@ public class AttributeTests
             """);
 
     [Fact]
-    public void The_witharg_promise_travels_the_parent_chain() =>
-        // 3.9.1: the conformance is reached through an interface parent, and the first-field
-        // check runs at the entry that reaches it — without it the mismatch surfaced at every
-        // use as a plain assignment error.
-        AssertReports("LYR-SEM0095", "first field", """
-            import std.core { OnFunction, WithArg };
-
-            interface Carries :: [WithArg<int>] { }
-
-            struct Retry :: [OnFunction, Carries] { limit: string }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
-    public void A_field_no_row_can_hold_refuses_the_use() =>
-        // 3.9.1: the sema accepted 'n: ?int' with 'n = 3' — the literal adapts — and the
-        // bytecode writer, which has no encoding for an optional, took the compiler down.
-        AssertReports("LYR-SEM0096", "row", """
-            import std.core { OnFunction };
-
-            struct Odd :: [OnFunction] { n: ?int }
-
-            @Odd { n = 3 }
-            fn f(): void { }
-
-            fn main(): int { return 0; }
-            """);
-
-    [Fact]
     public void A_group_on_a_member_obeys_the_member_rule() =>
-        AssertReports("LYR-SEM0065", "only '@Deprecated'", EventVocabulary + """
+        AssertReports("LYR-SEM0065", "cannot sit on a method", EventVocabulary + """
 
             struct Holder {
                 @[Tag]

@@ -13,32 +13,6 @@ namespace Lyric.Tests.Sema;
 /// </summary>
 public class OptionalEqualityAndRepeatTests
 {
-    private const string Core = """
-        module std.core;
-        pub interface Equatable { fn equals(o: Self): bool; }
-        pub interface Ordered :: [Equatable] { fn compare(o: Self): ?Ordering; }
-        pub enum Ordering { Less, Equal, Greater }
-        pub interface Clone { fn clone(): Self; }
-        pub interface Debug { fn debug(): string; }
-        extend int :: [Equatable, Clone, Debug] {
-            fn equals(o: int): bool { return true; }
-            fn clone(): int { return this; }
-            fn debug(): string { return ""; }
-        }
-        extend string :: [Equatable, Clone, Debug] {
-            fn equals(o: string): bool { return true; }
-            fn clone(): string { return this; }
-            fn debug(): string { return this; }
-        }
-        pub fn arrayOf<T>(n: int, f: fn(int) -> T): T[] { return []; }
-        pub fn equalOptionals<T :: [Equatable]>(a: ?T, b: ?T): bool { return true; }
-        pub fn repeatArray<T :: [Clone]>(xs: T[], n: int): T[] { return xs; }
-        pub fn cloneArray<T :: [Clone]>(xs: T[]): T[] { return xs; }
-        pub fn debugArray<T :: [Debug]>(xs: T[]): string { return ""; }
-        pub fn debugOptional<T :: [Debug]>(o: ?T): string { return ""; }
-
-        """;
-
     private const string Prelude = """
         struct P :: [Equatable] { x: int }
         struct NoEq { n: int }
@@ -54,9 +28,7 @@ public class OptionalEqualityAndRepeatTests
     {
         var sm = new SourceManager();
         var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de);
-        var core = sm.AddVirtual("core.lyr", Core);
-        comp.AddModule(new Parser(sm, core, de).ParseModule());
+        var comp = new Compilation(sm, de) { ModuleLoader = Library.Loader(sm, de) };
         var id = sm.AddVirtual("test.lyr", Prelude + body);
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -131,7 +103,6 @@ public class OptionalEqualityAndRepeatTests
         Rejected("fn f(w: Walker): int { let ws = [w] * 2; return ws.length(); }", "LYR-SEM0136");
 
     [Fact]
-    public void An_array_of_arrays_needs_clone_of_the_element() =>
-        // 'int[]' has no Clone conformance of its own yet (the shape conformance, M8a).
-        Rejected("fn f(): int { let xss = [[1, 2]] * 2; return xss.length(); }", "LYR-SEM0136");
+    public void An_array_of_arrays_repeats_through_the_elements_clone() =>
+        Allowed("fn f(): int { let xss = [[1, 2]] * 2; return xss.length(); }");
 }

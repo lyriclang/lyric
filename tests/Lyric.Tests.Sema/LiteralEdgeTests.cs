@@ -43,7 +43,7 @@ public class LiteralEdgeTests
     {
         // int64.max+1 held its BITS before the wave: the binding read -9223372036854775808.
         var de = Check("fn main(): int {\n    let x = 9223372036854775808;\n    let _ = x;\n    return 0;\n}\n");
-        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0001" && d.Message.Contains("does not fit 'int'"));
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0227" && d.Message.Contains("does not fit 'int'"));
     }
 
     [Fact]

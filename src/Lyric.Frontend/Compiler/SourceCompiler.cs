@@ -92,7 +92,6 @@ public static class SourceCompiler
         {
             var built = new Compilation(sources, diagnostics)
             {
-                Lyric5Modules = options.PackageRoots is not null,
                 Library = options.Library,
                 WarnNative = options.WarnDeps,
                 PackageDependencies = options.PackageDependencies,
@@ -142,7 +141,7 @@ public static class SourceCompiler
 
         // macros: every site is expanded before its module is checked; a program
         // without a site pays nothing
-        if (compilation.Lyric5Modules && !diagnostics.HasErrors && MacroExpander.Sites(compilation).Count > 0)
+        if (!diagnostics.HasErrors && MacroExpander.Sites(compilation).Count > 0)
         {
             report?.BeginPhase(Phase.Check, MacrosDetail);
             var expanded = MacroExpander.Expand(compilation, binding, diagnostics, sources, options, embed, trees =>
@@ -174,8 +173,7 @@ public static class SourceCompiler
 
         // 'comptime' sites: a lowering that hoists each into a function of its own
         // — the module's only roots, so it holds what the sites reach —, the IR interpreter over
-        // it, and the real lowering writes each site's value as a constant. Lyric 5's: the 4.x
-        // tools lower a site as its inner expression, as they did since their VM went.
+        // it, and the real lowering writes each site's value as a constant.
         types.SourcePlace = SourcePlaceFor(sources, options);
         if (types.ComptimeSites.Count > 0) report?.BeginPhase(Phase.Check, SitesDetail);
         var evaluated = EvaluateSites(compilation, binding, types, diagnostics, options, embed, out var comptime);
@@ -195,10 +193,10 @@ public static class SourceCompiler
         report?.BeginPhase(Phase.Lower);
         var timings = new LoweringTimings();
         var lowering = Stopwatch.StartNew();
-        // A Lyric 5 program roots in its entry's 'main': a 'pub'
-        // function nothing reaches is no part of the binary. The 4.x tools keep a library's roots.
+        // A program roots in its entry's 'main': a 'pub' function nothing reaches is no part of
+        // the binary.
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
-            optimize: options.Optimize, libraryRoots: !compilation.Lyric5Modules, passes: options.Passes,
+            optimize: options.Optimize, libraryRoots: false, passes: options.Passes,
             comptime: comptime, timings: timings);
         var lowered = lowering.Elapsed;
         if (ir is not null) report?.UpdateDetail(FunctionCount(ir));
@@ -208,23 +206,20 @@ public static class SourceCompiler
                 timings.Runs > 1 ? $"{FunctionCount(ir)}, {timings.Runs} runs" : FunctionCount(ir),
                 timings.Verification);
         // the lints' levels (16 §5), once every warning is in
-        if (compilation.Lyric5Modules)
-            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
+        LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
                 Written(options, sources));
         return new CompileResult(sources, diagnostics, ir, model)
             { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive };
     }
 
     /// <summary>
-    /// <c>@Deprecated</c> in Lyric 5: its uses warn with what its value says —
+    /// <c>@Deprecated</c>: its uses warn with what its value says —
     /// computed now, so <c>message</c> may be any string a <c>comptime</c> site makes —, and its
-    /// <c>until</c> comes due against the version the toolchain claims. The 4.x tools read the
-    /// literals in the warning pass itself.
+    /// <c>until</c> comes due against the version the toolchain claims.
     /// </summary>
     private static void WarnDeprecated(Compilation compilation, BindingResult binding, TypeResult types,
         DiagnosticEngine diagnostics, CompilerOptions options, ComptimeTable? comptime)
     {
-        if (!compilation.Lyric5Modules) return;
         new WarningAnalyzer(compilation, binding, types, diagnostics)
             .RunDeprecated(StringFieldsOf(types, comptime), options.ToolchainVersion ?? ToolchainVersion.Value);
     }
@@ -284,18 +279,18 @@ public static class SourceCompiler
     }
 
     /// <summary>
-    /// The 'comptime' sites of a Lyric 5 compilation evaluated: a
+    /// The 'comptime' sites of a compilation evaluated: a
     /// lowering that hoists each into a function of its own — the module's only roots, so it holds
     /// what the sites reach —, the IR interpreter over it. <paramref name="comptime"/> holds the
-    /// values the real lowering writes as constants; <c>null</c> where there is no site, or for
-    /// the 4.x tools, which lower a site as its inner expression. False after reporting.
+    /// values the real lowering writes as constants; <c>null</c> where there is no site. False after
+    /// reporting.
     /// </summary>
     private static bool EvaluateSites(Compilation compilation, BindingResult binding, TypeResult types,
         DiagnosticEngine diagnostics, CompilerOptions options, EmbedReader embed,
         out ComptimeTable? comptime)
     {
         comptime = null;
-        if (!compilation.Lyric5Modules || types.ComptimeSites.Count == 0) return true;
+        if (types.ComptimeSites.Count == 0) return true;
         var hoisting = new ComptimeTable { Hoist = true };
         var hoisted = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
             optimize: false, libraryRoots: false, passes: options.Passes, comptime: hoisting);
@@ -496,10 +491,9 @@ public static class SourceCompiler
     /// <summary>A compilation's source manager: the seed's fork where the options hold a seed of
     /// the library they read, a fresh one otherwise.</summary>
     private static SourceManager SourcesFor(CompilerOptions options) =>
-        SeedOf(options) is { } seed ? seed.Fork() : new SourceManager { Lyric5 = options.PackageRoots is not null };
+        SeedOf(options) is { } seed ? seed.Fork() : new SourceManager();
 
-    /// <summary>The options' seed, where it is a Lyric 5 compilation's of the library the options
-    /// read.</summary>
+    /// <summary>The options' seed, where it is one of the library the options read.</summary>
     private static StdlibSeed? SeedOf(CompilerOptions options) =>
         options.StdlibSeed is { } seed && options.PackageRoots is not null
         && seed.Serves(options.StdlibRoot ?? StdlibLoader.DefaultRoot()) ? seed : null;
@@ -510,8 +504,7 @@ public static class SourceCompiler
     private static CompileResult Unlowered(Compilation compilation, TypeResult types, DiagnosticEngine diagnostics,
         CompilerOptions options, SourceManager sources, SemanticModel model, EmbedReader embed, ComptimeTable? comptime)
     {
-        if (compilation.Lyric5Modules)
-            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
+        LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
                 Written(options, sources));
         return new CompileResult(sources, diagnostics, null, model)
             { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive };
@@ -550,7 +543,6 @@ public static class SourceCompiler
         var compilation = new Compilation(sources, diagnostics)
         {
             ModuleLoader = loader,
-            Lyric5Modules = options.PackageRoots is not null,
             WarnNative = options.WarnDeps,
             PackageDependencies = options.PackageDependencies,
             ModuleOnDisk = ModuleProbe(options),
@@ -569,7 +561,7 @@ public static class SourceCompiler
             // reloads the file and reports the mismatch (LYR-RES0006), the same way it would were
             // the file not a root.
             // Lyric 5's names its module by the path alone, a header or none
-            var name = parsed.Ast.Header is not null && !compilation.Lyric5Modules ? null : root.ModuleName;
+            var name = root.ModuleName;
 
             compilation.AddModule(parsed.Ast, name, documentation: parsed.Documentation);
             entry ??= parsed.Ast;
@@ -614,8 +606,7 @@ public static class SourceCompiler
             optimize: options.Optimize, libraryRoots: true, passes: options.Passes, comptime: comptime);
         times.Mark(PhaseClock.Lower);
         if (ir is null) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
-        if (compilation.Lyric5Modules)
-            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
+        LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
                 Written(options, sources));
         times.Mark(PhaseClock.Lint);
 
@@ -723,7 +714,7 @@ public sealed record CompilerOptions
 
     /// <summary>The standard library parsed once (<see cref="Parsing.StdlibSeed"/>): an editor's
     /// compilations follow each other and need not parse it again. Taken where it is the seed of
-    /// <see cref="StdlibRoot"/> and the compilation is Lyric 5's.</summary>
+    /// <see cref="StdlibRoot"/>.</summary>
     public Parsing.StdlibSeed? StdlibSeed { get; init; }
 
     /// <summary>An editor's cap on the budget of each <c>comptime</c> site, below the program's own
@@ -807,8 +798,7 @@ public sealed record CompilerOptions
     ///
     /// <para>Set, it is the whole of what a program reaches besides <c>std</c>: there is no lookup
     /// beside the entry file, and a single file — given none — imports only <c>std</c>. Every module
-    /// is named by its path then, and a <c>module</c> header is refused (LYR-RES0008). The 4.x
-    /// tools, the language server first, still read headers and leave this unset.</para>
+    /// is named by its path then, and a <c>module</c> header is refused (LYR-RES0008).</para>
     /// </summary>
     public IReadOnlyDictionary<string, string>? PackageRoots { get; init; }
 
@@ -823,8 +813,8 @@ public sealed record CompilerOptions
     public IReadOnlyList<(string From, string To)>? PlaceNames { get; init; }
 
     /// <summary>The version the toolchain claims, which a <c>@Deprecated</c>'s <c>until</c> comes
-    /// due against: <c>lyric5</c>'s own. Without, the 4.x tree's
-    /// (<see cref="Lyric.Core.ToolchainVersion.Value"/>).</summary>
+    /// due against: <c>lyric5</c>'s own. Without,
+    /// <see cref="Lyric.Core.ToolchainVersion.Value"/>.</summary>
     public string? ToolchainVersion { get; init; }
 
     /// <summary>Each package's lint levels (spec 16 §5), by name: its <c>[lints]</c>, the root's with the

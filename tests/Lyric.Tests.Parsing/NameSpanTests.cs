@@ -308,7 +308,7 @@ public sealed class NameSpanTests
     public static TheoryData<string> RealSources()
     {
         var data = new TheoryData<string>();
-        foreach (var directory in new[] { "stdlib", Path.Combine("tests", "corpus-4x") })
+        foreach (var directory in new[] { "stdlib5", "examples" })
             foreach (var file in Directory.EnumerateFiles(
                 Path.Combine(RepoRoot(), directory), "*.lyr", SearchOption.AllDirectories))
             {
@@ -341,7 +341,9 @@ public sealed class NameSpanTests
         Assert.False(de.HasErrors, $"{path} does not parse");
 
         var declarations = Named(module);
-        Assert.NotEmpty(declarations);
+
+        // std.prelude and std.meta pass on what other modules declare, and declare nothing.
+        if (Path.GetFileName(path) is not ("prelude.lyr" or "meta.lyr")) Assert.NotEmpty(declarations);
 
         foreach (var decl in declarations)
         {

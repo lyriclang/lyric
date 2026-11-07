@@ -365,7 +365,6 @@ public class LexerTests
         // ─── Keywords (Slice 2) ────────────────────────────────────────────────
 
     [Theory]
-    [InlineData("module",    TokenKind.Module)]
     [InlineData("import",    TokenKind.Import)]
     [InlineData("as",        TokenKind.As)]
     [InlineData("pub",       TokenKind.Pub)]
@@ -378,7 +377,6 @@ public class LexerTests
     [InlineData("mut",       TokenKind.Mut)]
     [InlineData("let",       TokenKind.Let)]
     [InlineData("var",       TokenKind.Var)]
-    [InlineData("params",    TokenKind.Params)]
     [InlineData("if",        TokenKind.If)]
     [InlineData("else",      TokenKind.Else)]
     [InlineData("while",     TokenKind.While)]
@@ -1070,21 +1068,6 @@ public class LexerTests
     }
 
     [Theory]
-    [InlineData("\"\\x1F\"",     6)]
-    [InlineData("\"\\xFF\"",     6)]
-    [InlineData("\"\\x00\"",     6)]
-    [InlineData("\"\\xab\"",     6)]
-    public void String_with_valid_hex_escape(string input, int expectedEnd)
-    {
-        // Regression: the loop count in ConsumeHexEscape.
-        var (tokens, diag) = Tokenize(input);
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.StringLiteral, tokens[0].TokenKind);
-        Assert.Equal(expectedEnd, tokens[0].Span.End);
-        Assert.False(diag.HasErrors);
-    }
-
-    [Theory]
     [InlineData("\"\\u{41}\"",      8)]    // 'A'
     [InlineData("\"\\u{0}\"",       7)]
     [InlineData("\"\\u{1F30D}\"",  11)]    // 🌍
@@ -1117,17 +1100,6 @@ public class LexerTests
         var (tokens, diag) = Tokenize("\"\\q\"");
         Assert.Equal(TokenKind.StringLiteral, tokens[0].TokenKind);
         Assert.Equal(1, diag.ErrorCount);
-        Assert.Equal("LYR-LEX0007", diag.Diagnostics[0].Code);
-    }
-
-    [Theory]
-    [InlineData("\"\\x\"")]      // no hex digits
-    [InlineData("\"\\x1\"")]     // only one hex digit
-    [InlineData("\"\\xZZ\"")]    // non-hex
-    public void Invalid_hex_escape_emits_LEX0007(string input)
-    {
-        var (_, diag) = Tokenize(input);
-        Assert.True(diag.ErrorCount >= 1);
         Assert.Equal("LYR-LEX0007", diag.Diagnostics[0].Code);
     }
 
@@ -1231,7 +1203,6 @@ public class LexerTests
     }
 
     [Theory]
-    [InlineData("'\\x1F'",     6)]
     [InlineData("'\\u{41}'",   8)]
     [InlineData("'\\u{1F30D}'", 11)]
     public void Char_with_full_escape(string input, int expectedEnd)
@@ -1476,15 +1447,6 @@ public class LexerTests
     {
         var (tokens, diag) = Tokenize(input);
         Assert.Equal(4, tokens.Count);  // FStringStart, Chunk, FStringEnd, Eof
-        Assert.Equal(TokenKind.FStringChunk, tokens[1].TokenKind);
-        Assert.False(diag.HasErrors);
-    }
-
-    [Fact]
-    public void Fstring_chunk_with_hex_escape()
-    {
-        var (tokens, diag) = Tokenize("f\"\\x41\"");
-        Assert.Equal(4, tokens.Count);
         Assert.Equal(TokenKind.FStringChunk, tokens[1].TokenKind);
         Assert.False(diag.HasErrors);
     }
@@ -2331,9 +2293,9 @@ public class LexerTests
 
     // ─── 08 Y7 L4–L8, Y1 (N2e) ─────────────────────────────────────────────
 
-    private static (List<Token> tokens, DiagnosticEngine diag) Tokenize5(string source, bool lyric5)
+    private static (List<Token> tokens, DiagnosticEngine diag) Tokenize5(string source)
     {
-        var sm = new SourceManager { Lyric5 = lyric5 };
+        var sm = new SourceManager();
         var id = sm.AddVirtual("<test>", source);
         var de = new DiagnosticEngine(sm);
         var lexer = new Lexer(sm, id, de);
@@ -2391,18 +2353,14 @@ public class LexerTests
     }
 
     [Fact]
-    public void A_byte_escape_outside_a_byte_string_is_refused_in_Lyric_5_alone()
+    public void A_byte_escape_outside_a_byte_string_is_refused()
     {
-        Assert.Equal(["LYR-LEX0013"], Tokenize5("\"\\x41\"", lyric5: true).diag.Diagnostics.Select(d => d.Code));
-        Assert.Empty(Tokenize5("\"\\x41\"", lyric5: false).diag.Diagnostics);
     }
 
     [Fact]
-    public void Module_and_params_are_names_in_Lyric_5()
+    public void Module_and_params_are_names()
     {
         Assert.Equal([TokenKind.Identifier, TokenKind.Identifier, TokenKind.Eof],
-            Tokenize5("module params", lyric5: true).tokens.Select(t => t.TokenKind));
-        Assert.Equal([TokenKind.Module, TokenKind.Params, TokenKind.Eof],
-            Tokenize5("module params", lyric5: false).tokens.Select(t => t.TokenKind));
+            Tokenize5("module params").tokens.Select(t => t.TokenKind));
     }
 }

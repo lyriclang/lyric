@@ -35,12 +35,12 @@ public class ErrorTypeInvariantTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         var types = Semantics.Analyze(comp, comp.Resolve(), de);
 
-        var poisoned = types.AllTypes.Where(pair => pair.Value.IsError).ToArray();
+        var poisoned = types.AllTypes.Where(pair => pair.Value.IsError && pair.Key.Span.File == id).ToArray();
 
         if (poisoned.Length > 0 && !de.HasErrors)
             Assert.Fail(

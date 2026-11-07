@@ -12,6 +12,7 @@ namespace Lyric.Tests.Sema;
 public class TypeTestTests
 {
     private const string Prelude = """
+        import std.core { Any };
         interface Shape { fn area(): int; }
         interface Named { fn name(): string; }
         interface Parse { static fn parse(s: string): Self; }
@@ -26,11 +27,9 @@ public class TypeTestTests
         var sm = new SourceManager();
         var id = sm.AddVirtual("test.lyr", Prelude + body);
         var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de);
+        var comp = new Compilation(sm, de) { ModuleLoader = Library.Loader(sm, de) };
         // 'Any' lives in std.core (03 T10), visible without an import: the seed of it, as the
         // tests of the attributes seed theirs.
-        var core = sm.AddVirtual("core.lyr", "module std.core;\npub interface Any { }\n");
-        comp.AddModule(new Parser(sm, core, de).ParseModule());
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
         return de;
@@ -78,7 +77,7 @@ public class TypeTestTests
 
     [Fact]
     public void A_type_never_behind_an_interface_is_refused() =>
-        Assert.Contains("never behind", Rejected("fn f(s: Shape): bool { return s is int; }", "LYR-SEM0131"));
+        Assert.Contains("never behind", Rejected("fn f(s: Shape): bool { return s is int[]; }", "LYR-SEM0131"));
 
     [Fact]
     public void A_type_parameter_is_no_test() =>
@@ -117,8 +116,8 @@ public class TypeTestTests
         Allowed("fn f(): int { let a: Any = Circle { r = 1 }; let b: Any = Rect { w = 2 }; let c: Any = Dir.Up; let xs: Any[] = [a, b, c]; return xs.length(); }");
 
     [Fact]
-    public void A_scalar_is_no_Any() =>
-        Rejected("fn f(): int { let a: Any = 5; return 0; }", "LYR-SEM0001");
+    public void A_scalar_is_an_Any() =>
+        Allowed("fn f(): int { let a: Any = 5; return if (a is int) 1 else 0; }");
 
     [Fact]
     public void Out_of_an_Any_through_is() =>

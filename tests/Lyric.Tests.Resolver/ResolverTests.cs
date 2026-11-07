@@ -78,7 +78,7 @@ public class ResolverTests
                                          + "internal fn c(): int { return 0; } private fn d(): int { return 0; }"));
         var m = comp.Modules[0];
         Assert.Equal(Visibility.Public, ((FunctionSymbol)m.Members.LookupLocal("a")!).Visibility);
-        Assert.Equal(Visibility.Private, ((FunctionSymbol)m.Members.LookupLocal("b")!).Visibility);
+        Assert.Equal(Visibility.Internal, ((FunctionSymbol)m.Members.LookupLocal("b")!).Visibility);
         Assert.Equal(Visibility.Internal, ((FunctionSymbol)m.Members.LookupLocal("c")!).Visibility);
         Assert.Equal(Visibility.Private, ((FunctionSymbol)m.Members.LookupLocal("d")!).Visibility);
     }
@@ -143,7 +143,7 @@ public class ResolverTests
         var (_, priv, _) = Resolve(
             ("lib", "fn secret(): int { return 0; }"),
             ("app", "import lib { secret };"));
-        Assert.Contains(priv.Diagnostics, d => d.Code == "LYR-RES0004");
+        Assert.Contains(priv.Diagnostics, d => d.Code == "LYR-RES0009");
     }
 
     [Fact]

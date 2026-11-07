@@ -59,7 +59,7 @@ public sealed class SemaRules
             _thisMut = saved;
         }
         CheckMain();
-        if (_comp.Lyric5Modules) CheckSurfaces();
+        CheckSurfaces();
     }
 
     // --- the surface rule ---
@@ -213,7 +213,6 @@ public sealed class SemaRules
     private TypeSymbol? Narrower(LyrType type, Visibility level) => type switch
     {
         NamedRef { Symbol: var s } when Narrower(s, level) => s,
-        OpaqueRef { Symbol: var s } when Narrower(s, level) => s,
         GenericInstance g => Narrower(g.Definition, level)
             ? g.Definition : g.Arguments.Select(a => Narrower(a, level)).FirstOrDefault(s => s is not null),
         Optional o => Narrower(o.Inner, level),
@@ -251,7 +250,7 @@ public sealed class SemaRules
     private void CheckNeverPositions(Node node, Node? parent)
     {
         if (node is NamedType { Path: ["never"], TypeArguments.Length: 0 } never && !IsReturnType(never, parent)
-            && !AnswersAnAssociatedType(never, parent) && !(_comp.Lyric5Modules && IsTypeArgument(never, parent)))
+            && !AnswersAnAssociatedType(never, parent) && !IsTypeArgument(never, parent))
             _de.Report("LYR-SEM0145", Severity.Error, never.Span,
                 "'never' stands only as a return type — no value of it can exist");
         foreach (var child in AstChildren.Of(node)) CheckNeverPositions(child, node);
@@ -313,11 +312,6 @@ public sealed class SemaRules
                 break;
             case InterfaceDecl i: foreach (var m in i.Members) { CheckSignature(m, true); RunBody(m); } break;
             case ExtendDecl x: foreach (var m in x.Methods) { CheckSignature(m, true); RunBody(m); } break;
-            // A generic alias is Lyric 5's; the 4.x grammar the shared parser also serves has none.
-            case TypeAliasDecl { Generics: [var first, ..] } a when !_comp.Lyric5Modules:
-                _de.Report("LYR-SEM0177", Severity.Error, first.Span,
-                    $"the type alias '{a.Name}' takes no type parameters — a generic alias is a form of Lyric 5");
-                break;
         }
     }
 
@@ -390,7 +384,7 @@ public sealed class SemaRules
             {
                 // Lyric 5 writes the variadic parameter 'nums: int...';
                 // 'params' is Lyric 4's word.
-                if (_comp.Lyric5Modules && !ps[i].IsEllipsis)
+                if (!ps[i].IsEllipsis)
                     _de.Report("LYR-SEM0024", Severity.Error, ps[i].Span,
                         $"'params' is Lyric 4's — the variadic parameter is written '{ps[i].Name}: T...'");
                 var what = ps[i].IsEllipsis ? $"the variadic parameter '{ps[i].Name}'" : "'params'";
@@ -412,41 +406,18 @@ public sealed class SemaRules
 
     private void CheckMain()
     {
-        // Lyric 5: the entry module's 'main' alone has a contract; a library checked as a
-        // workspace has no entry, and its 'main's are ordinary functions; nor has a library C
-        // links, whose root starts nothing.
-        if (_comp.Lyric5Modules)
-        {
-            if (_comp.Entry is { } entry && !_comp.Library) CheckEntry(entry);
-            return;
-        }
-
-        var mains = _comp.Modules
-            .SelectMany(m => _comp.AstOf(m).Declarations.OfType<FunctionDecl>())
-            .Where(f => f.Name == "main")
-            .ToList();
-
-        foreach (var main in mains)
-            if (!ValidMain(main))
-                _de.Report("LYR-SEM0021", Severity.Error, main.Span,
-                    "'main' must be 'fn main(): int' or 'fn main(): void', with or without 'args: string[]' "
-                    + "— and may declare 'throws'");
-
-        // One 'main' per EXECUTABLE. A workspace compilation holds several programs side by side,
-        // and there a second 'main' is the entry point of another script, not a duplicate.
-        if (!_singleProgram) return;
-
-        for (var i = 1; i < mains.Count; i++)
-            _de.Report("LYR-SEM0021", Severity.Error, mains[i].Span, "duplicate 'main' function");
+        // The entry module's 'main' alone has a contract; a library checked as a workspace has
+        // no entry, and its 'main's are ordinary functions; nor has a library C links, whose
+        // root starts nothing.
+        if (_comp.Entry is { } entry && !_comp.Library) CheckEntry(entry);
     }
 
     /// <summary>
-    /// Lyric 5's entry: the program starts at the <c>main</c> of
+    /// The entry: the program starts at the <c>main</c> of
     /// its entry module, which is <c>fn main(): void</c> or <c>fn main(): int</c>, may declare
     /// <c>throws</c>, and takes no parameters — the arguments come from the standard library. A
     /// <c>main</c> in any other module is an ordinary function: a module may be a library and a
-    /// program at once, and only the module a build starts from makes its <c>main</c> the root. The
-    /// 4.x rule, one <c>main</c> per compilation, was the VM's (one entry per <c>.lyrbc</c>).
+    /// program at once, and only the module a build starts from makes its <c>main</c> the root.
     /// </summary>
     private void CheckEntry(ModuleSymbol entry)
     {
@@ -915,17 +886,7 @@ public sealed class SemaRules
             $"cannot call 'mut fn {method.Name}' on this receiver — {reason}");
     }
 
-    /// <summary>An array, or a type satisfying <c>Indexable&lt;T&gt;</c>. Both are references, so the
-    /// element is writable: a <c>let</c> pins the name, not the object behind it.
-    ///
-    /// <para>The interface's <c>set</c> setter is a <c>mut fn</c>, which costs nothing here.</para>
-    /// </summary>
-    private bool IsIndexableTarget(LyrType type)
-    {
-        if (type is ArrayOf or SliceOf or ErrorType) return true;
-        if (_types.Indexable is not { } indexable) return false;
-
-        return TypeFacts.SymbolOf(type) is { } symbol
-               && Conformance.Implements(symbol, indexable, _binding);
-    }
+    /// <summary>An array or a view: both are references, so the element is writable — a <c>let</c>
+    /// pins the name, not the object behind it.</summary>
+    private static bool IsIndexableTarget(LyrType type) => type is ArrayOf or SliceOf or ErrorType;
 }

@@ -1,3 +1,4 @@
+using Lyric.Compiler;
 using Lyric.Core;
 using Lyric.Parsing;
 using Lyric.Resolver;
@@ -27,17 +28,9 @@ public class DeprecationPromiseTests
 
     private static DiagnosticEngine Check(string source)
     {
-        var sm = new SourceManager();
-        var id = sm.AddVirtual("test.lyr", source);
-        var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de)
-        {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
-        };
-
-        comp.AddModule(new Parser(sm, id, de).ParseModule());
-        Semantics.Analyze(comp, comp.Resolve(), de);
-        return de;
+        // The whole check: Lyric 5 reads '@Deprecated' from its value, computed after the types.
+        var options = new CompilerOptions { StdlibRoot = Path.Combine(RepoRoot(), "stdlib5") };
+        return SourceCompiler.Check(ScriptSource.FromBuffer(Path.Combine(RepoRoot(), "test.lyr"), source), options).Diagnostics;
     }
 
     /// <summary>One promise against one toolchain version, without a compilation around it.

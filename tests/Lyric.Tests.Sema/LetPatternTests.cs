@@ -16,17 +16,11 @@ namespace Lyric.Tests.Sema;
 public class LetPatternTests
 {
     // The root of what is thrown (design/v5/spec/05 E6 O1), for the one test that throws.
-    private const string Core = """
-        module std.core;
-        pub interface Error { fn message(): string; fn cause(): ?Error { return null; } }
-        """;
-
     private static DiagnosticEngine Check(string source)
     {
         var sm = new SourceManager();
         var de = new DiagnosticEngine(sm);
-        var comp = new Compilation(sm, de);
-        comp.AddModule(new Parser(sm, sm.AddVirtual("core.lyr", Core), de).ParseModule());
+        var comp = new Compilation(sm, de) { ModuleLoader = Library.Loader(sm, de) };
         var id = sm.AddVirtual("test.lyr", source);
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         var binding = comp.Resolve();

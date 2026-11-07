@@ -24,6 +24,13 @@ public class ArrayIndexTests
         return de;
     }
 
+    [Fact]
+    public void A_type_without_an_index_is_told_what_gives_it_one()
+    {
+        var de = Check("struct P { }\nfn f(p: P): int { return p[0]; }");
+        Assert.Contains(de.Diagnostics, d => d.Code == "LYR-SEM0007" && d.Message.Contains("'Index<K>' of 'P'"));
+    }
+
     private static void Allowed(string source)
     {
         var de = Check(source);

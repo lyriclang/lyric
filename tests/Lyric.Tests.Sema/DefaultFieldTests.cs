@@ -108,7 +108,7 @@ public class InferenceDiagnosticTests
     [Fact]
     public void An_explicit_type_argument_silences_it() =>
         Assert.Equal("", Diagnostics("""
-            pub fn leer<T>(n: int): int { return n; }
+            fn leer<T>(n: int): int { let none: ?T = null; return if (none == null) n else 0; }
             fn main(): int { return leer<int>(3); }
             """));
 
@@ -153,7 +153,7 @@ public class DiagnosticNoiseTests
     }
 
     private const string BlockLambda = """
-        pub fn anwenden<T, U>(v: T, f: fn(T) -> U): U { let g = f; return g(v); }
+        fn anwenden<T, U>(v: T, f: fn(T) -> U): U { let g = f; return g(v); }
         fn main(): int { let b = anwenden(3, (n: int) => { if (n < 0) { return "s"; } return n * 2; }); return 0; }
         """;
 
@@ -175,7 +175,7 @@ public class DiagnosticNoiseTests
     public void The_annotation_free_form_infers_and_compiles_cleanly() =>
         // v1.13: the fixture that used to be THE motivating error now just works.
         Assert.Empty(Codes("""
-            pub fn anwenden<T, U>(v: T, f: fn(T) -> U): U { let g = f; return g(v); }
+            fn anwenden<T, U>(v: T, f: fn(T) -> U): U { let g = f; return g(v); }
             fn main(): int { return anwenden(3, (n: int) => { return n * 2; }); }
             """));
 }

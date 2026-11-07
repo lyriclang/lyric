@@ -28,7 +28,7 @@ public class OperatorEqualityTests
         var comp = new Compilation(sm, de);
 
         if (withStdlib)
-            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de);
+            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de);
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -54,7 +54,7 @@ public class OperatorEqualityTests
     private const string ConformingPoint = """
         import std.core { Equatable };
 
-        struct Point :: [Equatable<Point>] {
+        struct Point :: [Equatable] {
             x: int,
             fn equals(other: Point): bool { return this.x == other.x; }
         }
@@ -81,7 +81,7 @@ public class OperatorEqualityTests
         AssertClean("""
             import std.core { Equatable };
 
-            fn same<T :: [Equatable<T>]>(a: T, b: T): bool { return a == b; }
+            fn same<T :: [Equatable]>(a: T, b: T): bool { return a == b; }
 
             fn main(): int { return if (same(1, 2)) 1 else 0; }
             """);
@@ -168,8 +168,8 @@ public class OperatorEqualityTests
         var de = Check("""
             import std.core { Equatable };
 
-            struct A :: [Equatable<A>] { x: int, fn equals(other: A): bool { return true; } }
-            struct B :: [Equatable<B>] { x: int, fn equals(other: B): bool { return true; } }
+            struct A :: [Equatable] { x: int, fn equals(other: A): bool { return true; } }
+            struct B :: [Equatable] { x: int, fn equals(other: B): bool { return true; } }
 
             fn main(): int {
                 let a = A { x = 1 };

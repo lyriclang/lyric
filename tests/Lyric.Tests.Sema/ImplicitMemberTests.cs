@@ -32,7 +32,7 @@ public class ImplicitMemberTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de);
         if (withStdlib)
-            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de);
+            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de);
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
         return de;
@@ -106,7 +106,7 @@ public class ImplicitMemberTests
     public void Either_side_of_an_equality_lends_its_type() =>
         Allowed("""
             import std.core { Equatable };
-            enum Light :: [Equatable<Light>] {
+            enum Light :: [Equatable] {
                 On, Off;
                 fn equals(other: Light): bool {
                     return match ((this, other)) { (.On, .On) => true, (.Off, .Off) => true, _ => false };

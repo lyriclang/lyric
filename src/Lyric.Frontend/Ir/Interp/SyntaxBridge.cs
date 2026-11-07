@@ -20,7 +20,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
 {
     /// <summary>Where the bridge parses into and locates in: the program's sources when it has
     /// them (an expansion), its own for a bridge of its own.</summary>
-    private readonly SourceManager _sources = sources ?? new() { Lyric5 = true };
+    private readonly SourceManager _sources = sources ?? new();
     private int _fresh;
     private readonly Dictionary<string, FileId> _fileIds = new(StringComparer.Ordinal);
     private int _indexed;

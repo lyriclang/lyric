@@ -20,7 +20,7 @@ public static class Highlighter
     /// <summary>The source as HTML, escaped, with the tokens in their spans.</summary>
     public static string Highlight(string source)
     {
-        var sources = new SourceManager { Lyric5 = true };
+        var sources = new SourceManager();
         var file = sources.AddVirtual("snippet.lyr", source);
         var diagnostics = new DiagnosticEngine(sources);
         var lexer = new Lexer(sources, file, diagnostics, collectTrivia: true);

@@ -697,8 +697,6 @@ internal sealed class TypeTable
             var fields = members.OfType<FieldDecl>().ToArray();
             var names = new string[fields.Length];
             var types = new IrType[fields.Length];
-            var opaque = new string[fields.Length];
-            var anyOpaque = false;
 
             for (var i = 0; i < fields.Length; i++)
             {
@@ -707,11 +705,6 @@ internal sealed class TypeTable
                 // Nothing of it stands in the bytecode.
                 names[i] = fields[i].Name;
                 types[i] = ValueOf(Lower(fields[i].Type, fields[i].Span));
-
-                // Read AFTER the type lowered, which means the name is resolvable and this cannot
-                // be the first to report a broken one.
-                opaque[i] = OpaqueNameOf(fields[i].Type) ?? "";
-                anyOpaque |= opaque[i].Length > 0;
             }
 
             _defs[id.Value] = new IrTypeDef(name, types, names)
@@ -720,9 +713,6 @@ internal sealed class TypeTable
                 IsClass = symbol.Kind == TypeSymbolKind.Class,
                 IsAddress = IsAddressType(symbol),
                 Module = ModuleNameOf(symbol),
-                // Empty unless something is actually opaque: a list of empty strings per type would
-                // be a section that says nothing in most modules.
-                FieldOpaqueNames = anyOpaque ? opaque : [],
             };
             return id;
         }
@@ -1013,42 +1003,6 @@ internal sealed class TypeTable
     }
 
     /// <summary>
-    /// The <c>opaque type</c> a written field type names, or <c>null</c> when it names none.
-    ///
-    /// <para>Over the SYNTAX rather than over the lowered type, and that is not laziness: the
-    /// lowering erases an opaque alias to its underlying type by design, and so does the sema's
-    /// resolution on this path. What is written is the last place the name still exists.</para>
-    ///
-    /// <para>Through <c>[]</c> and <c>?</c> to the leaf, because a list of handles is as
-    /// unsaveable as a handle and the field type already says which of the two it is. Through a
-    /// TRANSPARENT alias as well — <c>type Slot = Entity</c> names the opaque one and the answer
-    /// is <c>Entity</c>, the type that is actually distinct.</para>
-    ///
-    /// <para>A field of a type PARAMETER instantiated with an opaque type is NOT covered: the
-    /// substitution keys instances by the erased type, so <c>Box&lt;Entity&gt;</c> and
-    /// <c>Box&lt;int&gt;</c> are one entry and one answer for both. Naming one of them would be
-    /// wrong for the other.</para>
-    /// </summary>
-    private string? OpaqueNameOf(TypeNode node)
-    {
-        if (node is ArrayType array) return OpaqueNameOf(array.Element);
-        if (node is NullableType option) return OpaqueNameOf(option.Inner);
-        if (node is not NamedType { TypeArguments.Length: 0 } named) return null;
-
-        // A builtin name and a substituted type parameter are both decided before any binding is
-        // consulted, exactly as in Lower, and neither can be opaque.
-        if (_substitutions.Count > 0 && _substitutions.Peek().ContainsKey(named.Path[^1])) return null;
-        if (TypeFacts.FromBuiltinName(named.Path[^1]) is not null) return null;
-
-        var bound = _binding.Resolve(named);
-        if (bound is ImportBindingSymbol import) bound = import.Target;
-
-        return bound is TypeSymbol { Kind: TypeSymbolKind.Alias, Declaration: TypeAliasDecl alias }
-            ? alias.IsOpaque ? alias.Name : OpaqueNameOf(alias.Aliased)
-            : null;
-    }
-
-    /// <summary>
     /// The unit: what holds a value of type <c>void</c> where a place must hold one
     /// — a parameter, a local, a field, an element, the inside of an
     /// optional, in an instance whose type argument is <c>void</c>. A value of type <c>void</c> is
@@ -1078,13 +1032,6 @@ internal sealed class TypeTable
 
     private IrType LowerOnce(LyrType type, Core.Span span) => type switch
     {
-        // Host type BEFORE the ordinary class: an empty class in a native module is a reference to a host
-        // object rather than to a module layout. 'HostTypes' answers the question for both places where
-        // it arises.
-        NamedRef { Symbol.Kind: TypeSymbolKind.Class } h
-            when HostTypes.NameOf(h.Symbol, Compilation) is { } hostName
-            => new IrHostType(hostName),
-
         NamedRef { Symbol.Kind: TypeSymbolKind.Class } n => RefTo(n.Symbol),
         NamedRef { Symbol.Kind: TypeSymbolKind.Struct } n => StructOf(n.Symbol),
         NamedRef { Symbol.Kind: TypeSymbolKind.Enum } n => EnumOf(n.Symbol),
@@ -1093,11 +1040,6 @@ internal sealed class TypeTable
         // 'never' has no values, so a function returning it needs no return slot: at the machine
         // it is a void function that happens not to come back.
         NeverType => new IrScalarType(IrScalar.Void),
-
-        // An opaque alias IS its underlying at runtime; identity is the sema's business alone.
-        // This one line is why 'x as Entity' costs nothing and why the value crosses the native
-        // boundary unchanged.
-        Sema.OpaqueRef o => Lower(o.Underlying, span),
 
         // A function type carries its signature structurally and therefore needs no entry in this table,
         // unlike every named type. Lowered recursively, because parameters and the return may themselves

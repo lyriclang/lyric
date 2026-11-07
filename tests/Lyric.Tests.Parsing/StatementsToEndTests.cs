@@ -13,7 +13,7 @@ public class StatementsToEndTests
 {
     private static (Stmt[] Stmts, DiagnosticEngine De) Parse(string text)
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual("t.lyr", text);
         var de = new DiagnosticEngine(sm);
         return (new Parser(sm, id, de).ParseStatements(), de);

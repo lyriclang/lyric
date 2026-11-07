@@ -36,7 +36,7 @@ public class SilentSkipTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -58,7 +58,7 @@ public class SilentSkipTests
     // 'P(1, 2, 3)' stood here as the first case until Lyric 5 gave the form a meaning: a type name
     // in call position is the type's factory (ConstructionTests pins it).
     [InlineData("class P { hp: int }\nfn main(): int { let x = P; return x.quatsch; }")]
-    [InlineData("import std.io.console;\nfn main(): int { let x = console; return x.quatsch; }")]
+    [InlineData("import std.io;\nfn main(): int { let x = io; return x.quatsch; }")]
     public void A_type_or_module_in_value_position_is_reported(string source) =>
         AssertReports(source, "LYR-SEM0052");
 
@@ -67,7 +67,7 @@ public class SilentSkipTests
     /// "just report it at the producer" fails on.</summary>
     [Theory]
     [InlineData("class P {\n  hp: int,\n  static fn make(): P { return P { hp = 1 }; }\n}\nfn main(): int { return P.make().hp; }")]
-    [InlineData("import std.io.console;\nfn main(): int { console.println(\"hi\"); return 0; }")]
+    [InlineData("import std.io;\nfn main(): int { io.println(\"hi\"); return 0; }")]
     public void A_type_or_module_as_a_member_target_stays_legal(string source)
     {
         var de = Check(source);
@@ -104,7 +104,7 @@ public class SilentSkipTests
     /// that existed before: symbol yes, module no.</summary>
     [Fact]
     public void An_unknown_symbol_in_a_known_module_is_reported() =>
-        AssertReports("import std.io.console { printlnn };\nfn main(): int { return 0; }",
+        AssertReports("import std.io { printlnn };\nfn main(): int { return 0; }",
             "LYR-RES0004");
 
     // --- Attribute ---

@@ -27,7 +27,8 @@ public class ConformanceListTests
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de)
         {
-            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de),
+            Lints = false,
+            ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de),
         };
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
@@ -88,8 +89,8 @@ public class ConformanceListTests
     // ------------------------------------------------------------------ a list may not repeat itself
 
     [Theory]
-    [InlineData("pub struct S :: [Equatable<S>, Equatable<S>] { x: int, pub fn equals(other: S): bool { return this.x == other.x; } }")]
-    [InlineData("pub extend S2 :: [Equatable<S2>, Equatable<S2>] { pub fn equals(other: S2): bool { return true; } }")]
+    [InlineData("pub struct S :: [Equatable, Equatable] { x: int, pub fn equals(other: S): bool { return this.x == other.x; } }")]
+    [InlineData("pub extend S2 :: [Equatable, Equatable] { pub fn equals(other: S2): bool { return true; } }")]
     public void A_duplicate_entry_in_one_list_is_refused(string declaration)
     {
         // Through 3.5 the duplicate was deduplicated in silence — the 2.15 class of defect: a
@@ -126,18 +127,15 @@ public class ConformanceListTests
     [Fact]
     public void A_parent_written_beside_its_child_is_not_a_repetition()
     {
-        // The rule reads the ENTRIES, not their closures: 'Equatable<S>' is implied by
-        // 'Hashable<S>' and writing it out is documenting style, not a duplicate.
+        // The rule reads the ENTRIES, not their closures: 'Equatable' is implied by
+        // 'Hashable' and writing it out is documenting style, not a duplicate.
         var de = Check("""
             import std.core { Hashable, Equatable };
 
-            pub struct S :: [Hashable<S>, Equatable<S>] {
+            pub struct S :: [Hashable, Equatable] {
                 x: int,
                 pub fn equals(other: S): bool {
                     return this.x == other.x;
-                }
-                pub fn hash(): int {
-                    return this.x;
                 }
             }
 
@@ -157,14 +155,14 @@ public class ConformanceListTests
         var de = Check("""
             import std.core { Equatable };
 
-            pub struct S :: [Equatable<S>] {
+            pub struct S :: [Equatable] {
                 x: int,
                 pub fn equals(other: S): bool {
                     return this.x == other.x;
                 }
             }
 
-            pub extend S :: [Equatable<S>] { }
+            pub extend S :: [Equatable] { }
 
             fn main(): int {
                 return 0;
@@ -197,24 +195,6 @@ public class ConformanceListTests
         }
 
         """;
-
-    [Fact]
-    public void A_use_through_the_interface_warns()
-    {
-        var de = Check(Interface + """
-            fn viaInterface(s: Shape): float {
-                return s.area();
-            }
-
-            fn main(): int {
-                return if (viaInterface(Circle { }) > 0.0) 0 else 1;
-            }
-            """);
-
-        Assert.False(de.HasErrors);
-        var warning = Assert.Single(de.Diagnostics, d => d.Code == "LYR-SEM0076");
-        Assert.Contains("use area2", warning.Message, StringComparison.Ordinal);
-    }
 
     [Fact]
     public void Implementing_it_does_not_warn_and_neither_does_calling_the_concrete_method()

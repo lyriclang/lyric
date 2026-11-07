@@ -70,7 +70,7 @@ public class Lyric5CorpusTests
 
     private static Lexed Parse(string text, string name)
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual(name, text);
         var de = new DiagnosticEngine(sm);
         new Lyric.Parsing.Parser(sm, id, de).ParseModule();
@@ -114,14 +114,14 @@ public class Lyric5CorpusTests
 
     private static string? Format(string text, string name)
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual(name, text);
         return Formatter.Format(sm, id, new DiagnosticEngine(sm));
     }
 
     private static string FirstError(string text, string name)
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual(name, text);
         var de = new DiagnosticEngine(sm);
         new Lyric.Parsing.Parser(sm, id, de).ParseModule();

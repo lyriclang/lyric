@@ -25,7 +25,7 @@ public class SuggestionAndNoteTests
         var comp = new Compilation(sm, de);
 
         if (withStdlib)
-            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib"), sm, de);
+            comp.ModuleLoader = StdlibLoader.ForRoot(Path.Combine(RepoRoot(), "stdlib5"), sm, de);
 
         comp.AddModule(new Parser(sm, id, de).ParseModule());
         Semantics.Analyze(comp, comp.Resolve(), de);
@@ -124,7 +124,7 @@ public class SuggestionAndNoteTests
         var de = Check("fn main(): int {\n    var x = 1;\n    return x;\n}\n");
         Assert.False(de.HasErrors);
         var hint = Single(de, "LYR-SEM0075");
-        Assert.Equal(Severity.Hint, hint.Severity);
+        Assert.Equal(Severity.Warning, hint.Severity);
         Assert.Contains("'let' would do", hint.Message);
     }
 

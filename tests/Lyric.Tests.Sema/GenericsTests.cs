@@ -94,11 +94,11 @@ public class GenericsTests
     private static DiagnosticEngine CheckWithLibrary(string mainSource)
     {
         var sm = new SourceManager();
-        var libId = sm.AddVirtual("m.lyr", "module m;\n\npub fn ident<T>(x: T): T { return x; }\n");
+        var libId = sm.AddVirtual("m.lyr", "pub fn ident<T>(x: T): T { return x; }\n");
         var mainId = sm.AddVirtual("test.lyr", mainSource);
         var de = new DiagnosticEngine(sm);
         var comp = new Compilation(sm, de);
-        comp.AddModule(new Parser(sm, libId, de).ParseModule());
+        comp.AddModule(new Parser(sm, libId, de).ParseModule(), "m");
         comp.AddModule(new Parser(sm, mainId, de).ParseModule());
         var binding = comp.Resolve();
         new TypeChecker(comp, binding, de).Check();
