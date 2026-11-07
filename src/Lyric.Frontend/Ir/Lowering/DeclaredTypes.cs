@@ -22,7 +22,7 @@ internal static class DeclaredTypes
 {
     private static readonly IrType VoidType = new IrScalarType(IrScalar.Void);
 
-    public static IrType Lower(TypeNode? node, Func<TypeNode, string?>? hostType = null)
+    public static IrType Lower(TypeNode? node)
     {
         if (node is null) return VoidType; // a missing return type means void
 
@@ -33,11 +33,7 @@ internal static class DeclaredTypes
         // '?T' in a native signature: 'readText' yields '?string', and so does 'env'. A failure that is
         // an ordinary state of the world belongs in the return value rather than in an exception, and
         // for that the type has to be expressible.
-        if (node is NullableType option) return new IrOptionalType(Lower(option.Inner, hostType));
-
-        // A HOST type. It is the one kind of non-primitive a native signature may name, precisely
-        // because the host knows its layout and the module does not.
-        if (hostType?.Invoke(node) is { } name) return new IrHostType(name);
+        if (node is NullableType option) return new IrOptionalType(Lower(option.Inner));
 
         // 'T[]' in a native signature. The element type stays primitive: an array of objects would
         // require the host to know a module layout.

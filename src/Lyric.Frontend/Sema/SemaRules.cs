@@ -213,7 +213,6 @@ public sealed class SemaRules
     private TypeSymbol? Narrower(LyrType type, Visibility level) => type switch
     {
         NamedRef { Symbol: var s } when Narrower(s, level) => s,
-        OpaqueRef { Symbol: var s } when Narrower(s, level) => s,
         GenericInstance g => Narrower(g.Definition, level)
             ? g.Definition : g.Arguments.Select(a => Narrower(a, level)).FirstOrDefault(s => s is not null),
         Optional o => Narrower(o.Inner, level),

@@ -2521,3 +2521,5 @@ Der Abgleich jeder Bibliotheksfrage des Frontends gegen `stdlib5` zeigt mehr als
 
 `LYR-SEM0091` und `LYR-SEM0095` verlieren ihre Stelle und verlassen die Liste. Die Erklärung von `LYR-SEM0007` im Katalog nennt noch `Indexable<T>`; sie ändert sich mit S3c, weil der Spec-Anhang aus dem Katalog entsteht. Die Meldung selbst nennt ab S3b1 `Index<K>`: Sie verlangte ein Interface, das es in Lyric 5 nicht gibt.
 
+**S3b2, gebaut:** `opaque type` wird weiter geparst und mit `LYR-SEM0175` abgelehnt, liest sich danach aber als gewöhnlicher Alias: Die Mauer hinter der Ablehnung meldete nur Folgefehler. `TypeKind` verliert `Opaque` (Spec 11). `isOpaque` in `std.syntax` bleibt: Ein Makro, das eine Deklaration liest und zurückschreibt, darf die Ablehnung nicht verlieren. `FieldOpaqueNames` im IR geht mit, kein Backend las es. Die Host-Typen gehen ganz, mit `LYR-SEM0061` und dem Empfänger eines Importaufrufs.
+

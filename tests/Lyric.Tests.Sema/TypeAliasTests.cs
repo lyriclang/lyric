@@ -6,13 +6,8 @@ using Xunit;
 
 namespace Lyric.Tests.Sema;
 
-/// <summary>
-/// <c>opaque type</c> (v1.15): the alias keeps its identity — nothing converts implicitly, the
-/// explicit <c>as</c> to exactly the underlying and back is the one door, equality works within
-/// one alias, and everything else (arithmetic, ordering, constraints, f-strings) stays walled
-/// off. The wall is the point: a forged or leaked handle is a compile error, not a bug report.
-/// </summary>
-public class OpaqueTypeTests
+/// <summary>A type alias is the type it names, and <c>opaque type</c> is no form of the language.</summary>
+public class TypeAliasTests
 {
     private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string thisFile = "")
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", ".."));
@@ -32,12 +27,9 @@ public class OpaqueTypeTests
         return de;
     }
 
-    private const string Entity = "opaque type Entity = int;\n\n";
-
     [Fact]
     public void A_plain_alias_stays_transparent()
     {
-        // The counter-check: without 'opaque' nothing changed.
         var de = Check(
             """
             type Meters = int;
@@ -48,5 +40,21 @@ public class OpaqueTypeTests
             }
             """);
         Assert.False(de.HasErrors, string.Join("\n", de.Diagnostics));
+    }
+
+    [Fact]
+    public void An_opaque_type_is_refused_once_and_then_reads_as_an_alias()
+    {
+        var de = Check(
+            """
+            opaque type Entity = int;
+
+            fn main(): int {
+                let e: Entity = 42;
+                return e + 1;
+            }
+            """);
+        var error = Assert.Single(de.Diagnostics, d => d.Severity == Severity.Error);
+        Assert.Equal("LYR-SEM0175", error.Code);
     }
 }

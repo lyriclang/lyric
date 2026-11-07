@@ -22,10 +22,10 @@ internal static class NameMangling
         $"{module.FullName}.{functionName}";
 
     /// <summary>
-    /// An extern import: <c>&lt;abi&gt;:&lt;symbol&gt;</c> — <c>dotnet:System.Math::Cbrt</c>. The
+    /// An extern import: <c>&lt;abi&gt;:&lt;symbol&gt;</c> — <c>C:abs</c>. The
     /// ABI prefix is what the runtime's binder and the capability table key on
-    /// (<see cref="Core.CapabilityTable.RequiredForImport"/>); the symbol is the host's spelling,
-    /// never the module's, so two modules declaring the same host method share one import row.
+    /// (<see cref="Core.CapabilityTable.RequiredForImport"/>); the symbol is C's spelling,
+    /// never the module's, so two modules declaring the same function share one import row.
     /// </summary>
     public static string ForExtern(AST.ExternSpec spec, string functionName) =>
         $"{spec.Abi}:{spec.Symbol ?? functionName}";

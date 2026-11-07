@@ -7650,14 +7650,10 @@ internal sealed class FunctionLowerer
         if (TryFfiMemory(symbol, expr, out var memory)) return memory;
 
         // Natively backed, by the stdlib or the host: its own instruction type and its own index space.
-        //
-        // For a METHOD on a host type the import carries the receiver as parameter 0, the same convention
-        // as every other method. It stands in 'receiver', because the call 'e.damage(30)' does not have
-        // it in the argument list.
         if (_imports.IsNative(symbol))
         {
             var passed = WithDefaults(symbol, expr, out var quoted);
-            try { return LowerImportCall(_imports.Intern(symbol), passed, expr.Span, receiver); }
+            try { return LowerImportCall(_imports.Intern(symbol), passed, expr.Span); }
             finally { foreach (var text in quoted) _chainResults.Remove(text); }
         }
 
@@ -8062,8 +8058,6 @@ internal sealed class FunctionLowerer
 
     /// <summary>A call to a natively backed function. The signature comes from the import table rather
     /// than from a function: an import has no body.</summary>
-    /// <param name="receiver">For a method on a host type the receiver, which becomes parameter 0.
-    /// <c>null</c> for every free function.</param>
     /// <summary>
     /// <c>[first, ..rest]</c> — the elements the rest covers, copied into an array of their own.
     ///
@@ -8217,24 +8211,21 @@ internal sealed class FunctionLowerer
         return [.. all];
     }
 
-    private TempId? LowerImportCall(ImportId target, Expr[] arguments, Span span,
-        TempId? receiver = null)
+    private TempId? LowerImportCall(ImportId target, Expr[] arguments, Span span)
     {
         var import = _imports.Used[target.Value];
-        var offset = receiver is null ? 0 : 1;
 
         // The shape carries the DECLARED parameters; the import carries the flattened wire
         // signature. Without a shape — runtime helpers, generated host functions — the two
         // coincide.
         var shape = _imports.ShapeOf(target);
         var declared = shape?.Params.Length ?? import.ParamTypes.Length;
-        if (import.CVariadic ? arguments.Length + offset < declared : arguments.Length + offset != declared)
+        if (import.CVariadic ? arguments.Length < declared : arguments.Length != declared)
             throw NotSupported($"call to '{import.Name}' with default or variadic arguments", span);
 
         var args = new List<TempId>(import.ParamTypes.Length);
         // C's variadic arguments, after the parameters: each as it crosses, in the form it crosses in
         List<IrCForm>? variadic = import.CVariadic ? [] : null;
-        if (receiver is { } self) args.Add(self);
         for (var i = 0; i < arguments.Length; i++)
         {
             if (variadic is not null && args.Count >= import.ParamTypes.Length)
@@ -8256,7 +8247,7 @@ internal sealed class FunctionLowerer
                 args.Add(parameter is IrOptionalType ? Coerce(cstr, cstrType, parameter, span) : cstr);
                 continue;
             }
-            if (shape?.Params[i + offset] is not { Struct: { } structType } flat)
+            if (shape?.Params[i] is not { Struct: { } structType } flat)
             {
                 // A scalar argument is coerced to the wire type it lands in, as an argument to
                 // a Lyric function is: 'fromInt(x)' with 'x: int8' widens here, or the

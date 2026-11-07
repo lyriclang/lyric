@@ -48,10 +48,6 @@ namespace Lyric.Ir
                     return x.Type == y.Type;
                 case (IrStructType x, IrStructType y):
                     return x.Type == y.Type;
-                case (IrHostType x, IrHostType y):
-                    // By name, because there is no id. Two host types are the same when the host
-                    // registered them under the same name; the module knows nothing more about them.
-                    return string.Equals(x.Name, y.Name, StringComparison.Ordinal);
                 case (IrFunctionType x, IrFunctionType y):
                     // Structural, and it terminates: a function type can contain itself only through a
                     // named type, and that one compares by id.
@@ -155,22 +151,6 @@ public sealed record IrInterfaceType(TypeId Type) : IrType;
 /// format-neutral optimization (scalar replacement), not a prerequisite for correctness.</para>
 /// </summary>
 public sealed record IrStructType(TypeId Type) : IrType;
-
-/// <summary>
-/// A HOST OBJECT: a reference whose layout the HOST knows and the module does not.
-///
-/// <para>The contrast with <see cref="IrRefType"/> is the whole point. Both are references; with
-/// <c>IrRefType</c> the module knows the layout and the host stays out, here it is the other way
-/// round. This type therefore carries NO <c>TypeId</c> but a name: there is no type table entry,
-/// because there is no layout that could stand in it.</para>
-///
-/// <para>The promise "no <c>ldfld</c> is ever emitted against a host type" is thereby STRUCTURAL
-/// rather than checked: without a field list a field access is not even encodable.</para>
-///
-/// <para>At runtime it is an ordinary <c>LyrValue.Ref</c>, just like a <c>string</c>, which lives
-/// there without the VM ever looking inside.</para>
-/// </summary>
-public sealed record IrHostType(string Name) : IrType;
 
 /// <summary>
 /// A FUNCTION VALUE: what stands in <c>fn(int) -> bool</c>, and what a closure is.
