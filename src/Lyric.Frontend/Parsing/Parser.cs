@@ -209,7 +209,6 @@ public sealed partial class Parser
     /// end of the file. The 4.x tools, whose goldens hold them, keep the kind's name.</summary>
     private string Shown(Token token)
     {
-        if (!_sm.Lyric5) return token.TokenKind.ToString();
         if (token.TokenKind == TokenKind.Eof || token.Span.End <= token.Span.Start) return "the end of the file";
         var text = _sm.GetText(token.Span.File)[token.Span.Start..token.Span.End];
         return text.Length > 24 ? $"'{text[..21]}…'" : $"'{text}'";
@@ -508,7 +507,7 @@ public sealed partial class Parser
         {
             switch (_buffer.Current.TokenKind)
             {
-                case TokenKind.Dot when _sm.Lyric5 && _buffer.Peek(1).TokenKind == TokenKind.LBracket:
+                case TokenKind.Dot when _buffer.Peek(1).TokenKind == TokenKind.LBracket:
                 {
                     // 'e.[f]': the field a 'comptime for' over 'std.meta.fields' names;
                     // 'e.[v, p]' the payload field 'p' of the variant 'v'; 'E.[v]' the
@@ -766,7 +765,7 @@ public sealed partial class Parser
                     return ParseStructInitFields([text], [], span, name.Span, implicitMember: true);
                 return new ImplicitMemberExpr(text, span);
             }
-            case TokenKind.Identifier when _sm.Lyric5 && AtContextual("unsafe") && _buffer.Peek(1).TokenKind == TokenKind.LBrace:
+            case TokenKind.Identifier when AtContextual("unsafe") && _buffer.Peek(1).TokenKind == TokenKind.LBrace:
                 return ParseUnsafeAsValue();
             case TokenKind.Identifier:
                 // 'loop { … }' and 'outer: loop { … }' as an expression:
@@ -797,7 +796,7 @@ public sealed partial class Parser
                     return ParseMacroCall();
                 _buffer.Advance();
                 return new IdentifierExpr(_sm.Slice(cur.Span).ToString(), cur.Span);
-            case TokenKind.Quote when _sm.Lyric5:
+            case TokenKind.Quote:
                 return ParseQuote();
             case TokenKind.Hash when _quoteDepth > 0 && _buffer.Peek(1).TokenKind == TokenKind.LBrace:
                 return ParseSplice();
@@ -827,7 +826,7 @@ public sealed partial class Parser
                 return ParseMatchExpr();
             case TokenKind.LParen:
                 return ParseParenOrTupleOrLambda();
-            case TokenKind.Continue or TokenKind.Break or TokenKind.Return when _sm.Lyric5:
+            case TokenKind.Continue or TokenKind.Break or TokenKind.Return:
                 return ParseJumpAsBlock();
             default:
             {
@@ -1037,7 +1036,7 @@ public sealed partial class Parser
         // The body decides the rest. After type arguments one name alone is the shorthand too,
         // 'Box<int> { v }': nothing with arguments takes a trailing block.
         return _buffer.Peek(i).TokenKind == TokenKind.LBrace
-            && (InitializerBodyAhead(i) || _sm.Lyric5 && InfoInitializerAhead(i) || withArguments && _buffer.Peek(i + 1).TokenKind == TokenKind.Identifier
+            && (InitializerBodyAhead(i) || InfoInitializerAhead(i) || withArguments && _buffer.Peek(i + 1).TokenKind == TokenKind.Identifier
                 && _buffer.Peek(i + 2).TokenKind == TokenKind.RBrace);
     }
 
@@ -1071,7 +1070,7 @@ public sealed partial class Parser
                     && _buffer.Peek(at + 1).TokenKind is TokenKind.RBrace or TokenKind.Equal;
         }
         // 'S { x: 1 }' is an initializer written with a type's ':' — not a label, which a loop follows
-        var colon = _sm.Lyric5 && _buffer.Peek(open + 2).TokenKind == TokenKind.Colon
+        var colon = _buffer.Peek(open + 2).TokenKind == TokenKind.Colon
                     && _buffer.Peek(open + 3).TokenKind is not (TokenKind.While or TokenKind.Do or TokenKind.For) && !IsLoopAhead(open + 3);
         if (_buffer.Peek(open + 2).TokenKind != TokenKind.Equal && !colon) return false;
         var depth = 0;
@@ -1227,13 +1226,13 @@ public sealed partial class Parser
         var rounds = new List<StructInitRound>();
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
-            if (_sm.Lyric5 && _buffer.Check(TokenKind.LBracket))
+            if (_buffer.Check(TokenKind.LBracket))
             {
                 fields.Add(ParseInfoItem());
                 if (!_buffer.Match(TokenKind.Comma)) break;
                 continue;
             }
-            if (_sm.Lyric5 && _buffer.Check(TokenKind.Comptime) && _buffer.Peek(1).TokenKind == TokenKind.For)
+            if (_buffer.Check(TokenKind.Comptime) && _buffer.Peek(1).TokenKind == TokenKind.For)
             {
                 var kw = _buffer.Advance();
                 _buffer.Advance(); // for
@@ -1263,7 +1262,7 @@ public sealed partial class Parser
                 if (!_buffer.Match(TokenKind.Comma)) break;
                 continue;
             }
-            if (_sm.Lyric5 && _buffer.Check(TokenKind.Colon))
+            if (_buffer.Check(TokenKind.Colon))
             {
                 var colon = _buffer.Advance();
                 _de.Report(new Diagnostic("LYR-PAR0037", Severity.Error, colon.Span, "expected '=' in struct initializer (':' is only for types)",
@@ -1401,14 +1400,14 @@ public sealed partial class Parser
                 string? formatSpec = null;
                 if (_buffer.Check(TokenKind.FStringFormatSpec))
                     formatSpec = _sm.Slice(_buffer.Advance().Span).ToString();
-                if (_sm.Lyric5 && !_buffer.Check(TokenKind.FStringInterpEnd))
+                if (!_buffer.Check(TokenKind.FStringInterpEnd))
                 {
                     // what is left of the hole is the one mistake: skipped to its end, not parsed on
                     _de.Report("LYR-PAR0014", Severity.Error, _buffer.Current.Span, "expected '}' to close interpolation");
                     while (!_buffer.Check(TokenKind.FStringInterpEnd) && !_buffer.Check(TokenKind.FStringEnd) && !_buffer.Check(TokenKind.Eof))
                         _buffer.Advance();
                 }
-                var interpEnd = _sm.Lyric5 && !_buffer.Check(TokenKind.FStringInterpEnd) ? _buffer.Current
+                var interpEnd = !_buffer.Check(TokenKind.FStringInterpEnd) ? _buffer.Current
                     : _buffer.Expect(TokenKind.FStringInterpEnd, "LYR-PAR0014", "expected '}' to close interpolation");
                 segments.Add(new InterpHole(expr, formatSpec, Span.Union(t.Span, interpEnd.Span)));
                 continue;
@@ -1888,7 +1887,7 @@ public sealed partial class Parser
         var type = ParseTypeAtom(returned: !allowThrows);
 
         // 'Self.[f]' (Lyric 5): the type of the field a round's variable names
-        if (_sm.Lyric5 && type is NamedType && _buffer.Check(TokenKind.Dot) && _buffer.Peek(1).TokenKind == TokenKind.LBracket)
+        if (type is NamedType && _buffer.Check(TokenKind.Dot) && _buffer.Peek(1).TokenKind == TokenKind.LBracket)
         {
             _buffer.Advance();
             _buffer.Advance();
@@ -1973,7 +1972,7 @@ public sealed partial class Parser
                 var end = cur.Span;
                 var nameSpan = cur.Span;
                 // a '.[' ends the path: 'Self.[f]' is the type of a round's field
-                while (!(_sm.Lyric5 && _buffer.Check(TokenKind.Dot) && _buffer.Peek(1).TokenKind == TokenKind.LBracket)
+                while (!(_buffer.Check(TokenKind.Dot) && _buffer.Peek(1).TokenKind == TokenKind.LBracket)
                        && _buffer.Match(TokenKind.Dot))
                 {
                     var seg = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0011",

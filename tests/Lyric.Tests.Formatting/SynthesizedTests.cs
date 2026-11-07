@@ -13,7 +13,7 @@ public class SynthesizedTests
 {
     private static Module Parse(string text)
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual("t.lyr", text);
         var de = new DiagnosticEngine(sm);
         var module = new Parser(sm, id, de).ParseModule();

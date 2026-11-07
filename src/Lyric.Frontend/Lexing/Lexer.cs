@@ -139,10 +139,6 @@ public sealed class Lexer
         { "macro", TokenKind.Macro },
     };
 
-    /// <summary>The words Lyric 5 reserves for its compile-time forms: names in 4.x.</summary>
-    private static bool IsCompileTimeWord(TokenKind kind) =>
-        kind is TokenKind.Comptime or TokenKind.Inline or TokenKind.Quote or TokenKind.Macro;
-
     /// <summary>The reverse of <see cref="Keywords"/>: how a keyword kind was written, or null for
     /// every other kind. Built from the same table, because a second list of the words would be a
     /// second answer to one question and would drift the day a keyword is added.</summary>
@@ -160,7 +156,6 @@ public sealed class Lexer
 
     private static readonly HashSet<string> ValidFloatSuffixes =
         ["f32", "f64"];
-
 
     /// <param name="collectTrivia">Keep the comments <see cref="SkipTrivia"/> consumes, for a
     /// consumer that reproduces source rather than compiling it. Off by default: every token of
@@ -409,8 +404,7 @@ public sealed class Lexer
         // at the two places the words stood, to say what replaced them. It takes the compile-time
         // words, which stay names in 4.x.
         if (Keywords.TryGetValue(lexme, out var kind)
-            && !(_sources.Lyric5 && kind is TokenKind.Module or TokenKind.Params)
-            && !(!_sources.Lyric5 && IsCompileTimeWord(kind)))
+            && kind is not (TokenKind.Module or TokenKind.Params))
             return new Token(kind, new Span(_file, identifierStart, _pos));
 
         return new Token(TokenKind.Identifier, new Span(_file, identifierStart, _pos));
@@ -787,7 +781,7 @@ public sealed class Lexer
         if (Current is '\0' or '\n') return;
         // '\xNN' is a byte: a byte string's alone in Lyric 5. In a string or a character
         // it named a Latin-1 character by its byte, which reads like UTF-8 and is not.
-        if (Current == 'x' && !inBytes && _sources.Lyric5)
+        if (Current == 'x' && !inBytes)
             _diagnostics.Report(new Diagnostic("LYR-LEX0013", Severity.Error, new Span(_file, _pos - 1, _pos + 1),
                 "'\\x' writes a byte, for a byte string 'b\"…\"' — a character is '\\u{…}'"));
         switch (Current)

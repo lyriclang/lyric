@@ -31,7 +31,7 @@ public static class FmtRun
     /// then stand in <paramref name="diagnostics"/>.</summary>
     public static string? Format(string path, string text, out DiagnosticEngine diagnostics)
     {
-        var sources = new SourceManager { Lyric5 = true };
+        var sources = new SourceManager();
         var id = sources.AddVirtual(path, text);
         diagnostics = new DiagnosticEngine(sources);
         return Formatter.Format(sources, id, diagnostics)?.ReplaceLineEndings("\n");

@@ -11,7 +11,7 @@ public class Lyric5FormatterTests
 {
     private static string Format(string source)
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual("<test>", source);
         var de = new DiagnosticEngine(sm);
         var formatted = Formatter.Format(sm, id, de);
@@ -19,7 +19,7 @@ public class Lyric5FormatterTests
         Assert.False(de.HasErrors, "the test source did not parse");
         Assert.NotNull(formatted);
 
-        var sm2 = new SourceManager { Lyric5 = true };
+        var sm2 = new SourceManager();
         var id2 = sm2.AddVirtual("<test2>", formatted);
         Assert.Equal(formatted, Formatter.Format(sm2, id2, new DiagnosticEngine(sm2)));
         return formatted;

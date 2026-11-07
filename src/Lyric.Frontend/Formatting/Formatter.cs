@@ -27,9 +27,9 @@ public static class Formatter
         if (diagnostics.HasErrors) return null;
 
         var comments = CollectComments(sources, file);
-        // Lyric 5 keeps the parentheses the file wrote; 4.x derives them from precedence alone.
+        // the parentheses the file wrote stay
         return DocRenderer.Render(AstFormatter.Build(module, sources.GetText(file), comments,
-            sources.Lyric5 ? parser.Grouped : null));
+            parser.Grouped));
     }
 
     private static IReadOnlyList<Trivia> CollectComments(SourceManager sources, FileId file)

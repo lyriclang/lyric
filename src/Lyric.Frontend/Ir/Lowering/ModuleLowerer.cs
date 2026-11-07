@@ -607,7 +607,6 @@ public static class ModuleLowerer
             return null;
         }
 
-
         // ONE merge over both downstream batches, by id. A gap would shift every function after
         // it under a wrong id — the inliner and the vtable rows index the list by id — so a hole
         // is an internal error with a name, never a silent mis-splice.
@@ -645,25 +644,12 @@ public static class ModuleLowerer
             }
         }
 
-        // Types are collected after the lowering rather than before: the table contains only what was
-        // actually used — a declared but never instantiated class does not belong in the bytecode. The
-        // same rule as for the imports.
-        // Attribute rows AFTER the function lowering and BEFORE the module is assembled: function
-        // ids are final here, and the rows may still intern types — an attribute struct nobody
-        // constructs, or an attributed type nobody uses, enters the table exactly because the row
-        // references it. Lyric 5 writes none: an attribute is a value the
-        // build evaluates and its readers take from there, and an attributed function is no root
-        // — a test is reached from the program 'lyric test' writes, a benchmark from
-        // 'lyric bench''s.
-        var attributes = compilation.Lyric5Modules ? [] : CollectAttributes(compilation, types, ids, typeTable);
-
         var result = new IrModule(functions)
         {
             EntryFunction = entry, Imports = imports.Used, Types = typeTable.Defs,
             Globals = globals.Defs, GlobalInit = globalInit,
             Capabilities = RequiredCapabilities(compilation),
             Impls = impls,
-            Attributes = attributes,
             ExportRoots = exportRoots,
             Quotes = typeTable.Quotes,
             // the hoisting pass computes the sites alone, whose functions are its only roots
@@ -1056,186 +1042,6 @@ public static class ModuleLowerer
                     + $"'{symbol.Name}' is none — scalar and string fields only", node.Span);
 
         return new ImportParam(new IrStructType(type), type, layout.FieldTypes);
-    }
-
-    /// <summary>
-    /// What capabilities this program requires: the union over all loaded modules.
-    ///
-    /// <para>What counts is LOADED, not IMPORTED: a module importing <c>std.os</c> pulls it into the
-    /// compilation, and its requirement belongs to the program, even when the main file never names it.
-    /// Counting only the import lines of the root would leave a gap exactly one indirection deep.</para>
-    /// </summary>
-    /// <summary>
-    /// The attribute rows of every module, in module and declaration order.
-    ///
-    /// <para>The sema has resolved every attribute to its struct and checked completeness, so this
-    /// only EVALUATES: one value per field, the written literal or the field's literal default.
-    /// Anything unresolved here is an internal error, not a diagnostic.</para>
-    /// </summary>
-    private static List<IrAttribute> CollectAttributes(Compilation compilation, TypeResult types,
-        Dictionary<FunctionSymbol, FunctionId> ids, TypeTable typeTable)
-    {
-        // The canonical @Deprecated emits NO row: its consumer is the sema, and the promise is
-        // that it changes diagnostics and nothing else. A row would also make the pruner keep
-        // the deprecated declaration — every program importing the module would carry dead code
-        // exactly because it was marked for removal.
-        var deprecated = compilation.FindModule(["std", "core"])?.Members.LookupLocal("Deprecated");
-        bool EmitsRow(AttributeNode a) => !ReferenceEquals(types.RefOf(a), deprecated);
-
-        var rows = new List<IrAttribute>();
-        foreach (var module in compilation.Modules)
-        {
-            var ast = compilation.AstOf(module);
-            foreach (var attribute in ast.Attributes)
-                if (EmitsRow(attribute))
-                    rows.Add(BuildAttributeRow(attribute, IrAttributeTarget.Module, 0, types, typeTable));
-
-            foreach (var decl in ast.Declarations)
-            {
-                switch (decl)
-                {
-                    // A GENERIC declaration emits no row: there is one row and as many instances
-                    // as the program creates. The sema admits only the compiler-read @Deprecated
-                    // there, and its consumer is the sema itself — nothing downstream misses it.
-                    case FunctionDecl { Attributes.Length: > 0, Generics.Length: > 0 }:
-                    case StructDecl { Attributes.Length: > 0, Generics.Length: > 0 }:
-                    case ClassDecl { Attributes.Length: > 0, Generics.Length: > 0 }:
-                    case EnumDecl { Attributes.Length: > 0, Generics.Length: > 0 }:
-                        break;
-
-                    case FunctionDecl { Attributes.Length: > 0 } fn:
-                        if (!fn.Attributes.Any(EmitsRow)) break; // @Deprecated only: no row, no root
-                        if (module.Members.FunctionFor(fn.Name, fn) is not { } fs
-                            || !ids.TryGetValue(fs, out var fid))
-                            throw new InternalCompilationException(
-                                $"ir: attributed function '{fn.Name}' has no lowered id");
-                        foreach (var attribute in fn.Attributes)
-                            if (EmitsRow(attribute))
-                                rows.Add(BuildAttributeRow(attribute, IrAttributeTarget.Function,
-                                    fid.Value, types, typeTable));
-                        break;
-
-                    case StructDecl { Attributes.Length: > 0 } s:
-                        AddTypeRows(s.Name, s.Attributes);
-                        break;
-                    case ClassDecl { Attributes.Length: > 0 } c:
-                        AddTypeRows(c.Name, c.Attributes);
-                        break;
-                    case EnumDecl { Attributes.Length: > 0 } e:
-                        AddTypeRows(e.Name, e.Attributes);
-                        break;
-                }
-
-                void AddTypeRows(string name, AttributeNode[] attributes)
-                {
-                    if (!attributes.Any(EmitsRow)) return; // @Deprecated only: no row, no intern
-                    // Interned exactly because the row references it: an attributed type nobody
-                    // uses would otherwise be missing from the table, and the row would have no
-                    // index to point at.
-                    if (module.Members.LookupLocal(name) is not TypeSymbol target)
-                        throw new InternalCompilationException(
-                            $"ir: attributed type '{name}' has no symbol");
-                    var targetId = typeTable.Intern(target);
-                    foreach (var attribute in attributes)
-                        if (EmitsRow(attribute))
-                            rows.Add(BuildAttributeRow(attribute, IrAttributeTarget.Type,
-                                targetId.Value, types, typeTable));
-                }
-            }
-        }
-        return rows;
-    }
-
-    private static IrAttribute BuildAttributeRow(AttributeNode node, IrAttributeTarget kind,
-        int target, TypeResult types, TypeTable typeTable)
-    {
-        if (types.RefOf(node) is not TypeSymbol { Declaration: StructDecl decl } symbol)
-            throw new InternalCompilationException(
-                $"ir: attribute '@{string.Join('.', node.Path)}' was not resolved by the sema");
-
-        var typeId = typeTable.Intern(symbol);
-        var fieldTypes = typeTable.Defs[typeId.Value].FieldTypes;
-        var fields = decl.Members.OfType<FieldDecl>().ToArray();
-
-        // The row is complete by construction: the written value wins, the literal default fills
-        // the rest. The sema rejected every use where neither exists. A parenthesized value IS
-        // the first field's value (the WithArg promise, checked by the sema), which is why the
-        // row of a positional use is indistinguishable from its braces twin.
-        var values = new IrAttributeValue[fields.Length];
-        for (var i = 0; i < fields.Length; i++)
-        {
-            var written = node.Fields.FirstOrDefault(f => f.Name == fields[i].Name);
-            var expr = written?.Value
-                ?? (i == 0 ? node.Positional : null)
-                ?? fields[i].Default
-                ?? throw new InternalCompilationException(
-                    $"ir: attribute field '{fields[i].Name}' has neither a value nor a default");
-
-            // The written form may be a NAME bound to the literal; the sema resolved the same
-            // chain when it accepted the use, through the same walk.
-            var literal = AttributeValues.LiteralOf(expr, types)
-                ?? throw new InternalCompilationException(
-                    $"ir: attribute field '{fields[i].Name}' is no compile-time value, which the "
-                    + "sema accepts nowhere");
-            values[i] = EvaluateAttributeValue(fieldTypes[i], literal, typeTable);
-        }
-        return new IrAttribute(kind, target, typeId, values);
-    }
-
-    /// <summary>A literal, evaluated against the FIELD's type: an integer written into a float
-    /// field becomes that float, so the tag in the bytecode always matches the layout.</summary>
-    private static IrAttributeValue EvaluateAttributeValue(IrType fieldType, Expr literal,
-        TypeTable typeTable)
-    {
-        // An enum field takes the variant's TAG — its index in the enum's variant list, the same
-        // number slot 0 carries at runtime. The name is not written: the field's type names the
-        // enum, and the enum's entry names its variants, so a reader has both without a third
-        // copy that could disagree with them.
-        if (fieldType is IrEnumType enumType)
-        {
-            var name = literal switch
-            {
-                MemberExpr member => member.Member,
-                TypePathExpr path => path.Path[^1],
-                _ => throw new InternalCompilationException(
-                    $"ir: attribute value of kind {literal.GetType().Name} survived the sema"),
-            };
-            return new IrAttributeValue(fieldType,
-                (ulong)typeTable.TagOf(enumType.Type, name, literal.Span), null);
-        }
-
-        var negative = false;
-        if (literal is UnaryExpr { Operator: UnaryOp.Neg } neg)
-        {
-            negative = true;
-            literal = neg.Operand;
-        }
-
-        var isFloatField = fieldType is IrScalarType { Kind: IrScalar.F32 or IrScalar.F64 };
-        switch (literal)
-        {
-            case IntLiteralExpr i:
-            {
-                var value = negative ? -(long)i.Value : (long)i.Value;
-                return isFloatField
-                    ? new IrAttributeValue(fieldType, BitConverter.DoubleToUInt64Bits(value), null)
-                    : new IrAttributeValue(fieldType, (ulong)value, null);
-            }
-            case FloatLiteralExpr f:
-            {
-                var value = negative ? -f.Value : f.Value;
-                return new IrAttributeValue(fieldType, BitConverter.DoubleToUInt64Bits(value), null);
-            }
-            case CharLiteralExpr c:
-                return new IrAttributeValue(fieldType, (ulong)c.CodePoint, null);
-            case BoolLiteralExpr b:
-                return new IrAttributeValue(fieldType, b.Value ? 1UL : 0UL, null);
-            case StringLiteralExpr s:
-                return new IrAttributeValue(fieldType, 0, s.Value);
-            default:
-                throw new InternalCompilationException(
-                    $"ir: attribute value of kind {literal.GetType().Name} survived the sema");
-        }
     }
 
     private static Capability RequiredCapabilities(Compilation compilation)

@@ -37,7 +37,7 @@ public class AttributeParsingTests
     [Fact]
     public void A_type_through_an_info_is_its_own_node()
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual("test.lyr", "fn f(): void { let x: Self.[f] = e.[f]; let y: a.B.[g][] = []; }");
         var de = new DiagnosticEngine(sm);
         var module = new Parser(sm, id, de).ParseModule();
@@ -59,7 +59,7 @@ public class AttributeParsingTests
     [Fact]
     public void A_payload_field_takes_attributes()
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual("test.lyr", "enum Shape { Dot, Box { @Mark(\"w\") width: int, height: int } }");
         var de = new DiagnosticEngine(sm);
         var module = new Parser(sm, id, de).ParseModule();
