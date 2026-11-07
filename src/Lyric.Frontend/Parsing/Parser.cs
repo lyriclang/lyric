@@ -206,7 +206,7 @@ public sealed partial class Parser
     /// last (<see cref="TryReach"/>); <c>null</c> for an expression that has met none — nearly
     /// every one.</summary>
     /// <summary>A token as a message says it: as it is written — <c>';'</c>, <c>'while'</c> —, or the
-    /// end of the file. The 4.x tools, whose goldens hold them, keep the kind's name.</summary>
+    /// end of the file.</summary>
     private string Shown(Token token)
     {
         if (token.TokenKind == TokenKind.Eof || token.Span.End <= token.Span.Start) return "the end of the file";
@@ -412,7 +412,7 @@ public sealed partial class Parser
             var other = ParseSubExpr();
             return new ComptimeIfExpr(new ComptimeExpr(condition, condition.Span), then, other, Span.Union(kw.Span, Whole(other)));
         }
-        // 'comptime e' and 'comptime { … }': a word in Lyric 5, whose
+        // 'comptime e' and 'comptime { … }': a word, whose
         // block is a value block — its last expression the value.
         if (_buffer.Check(TokenKind.Comptime))
         {
@@ -420,16 +420,6 @@ public sealed partial class Parser
             Expr inner = _buffer.Check(TokenKind.LBrace) ? ParseValueBlock() : ParsePrefix();
             return new ComptimeExpr(inner, Span.Union(kw.Span, Whole(inner)));
         }
-        // 4.x's 'comptime e': contextual, a prefix in shape. It opens the prefix only when what
-        // follows can begin an expression, so an identifier 'comptime' before an operator, a
-        // comma or a closing bracket is still the name.
-        if (AtContextual("comptime") && BeginsExpression(_buffer.Peek(1).TokenKind))
-        {
-            var kw = _buffer.Advance();
-            var inner = ParsePrefix();
-            return new ComptimeExpr(inner, Span.Union(kw.Span, Whole(inner)));
-        }
-
         return ParsePostfix(ParsePrimary());
     }
 
@@ -686,14 +676,6 @@ public sealed partial class Parser
     // ---------------------------------------------------------------------
     // Primary (§6.2)
     // ---------------------------------------------------------------------
-
-    /// <summary>Can a token open an expression? The question a contextual prefix word asks of
-    /// its successor: 'comptime x' is the prefix, 'comptime + 1' is a name.</summary>
-    private static bool BeginsExpression(TokenKind kind) => kind is TokenKind.Identifier
-        or TokenKind.IntLiteral or TokenKind.FloatLiteral or TokenKind.StringLiteral
-        or TokenKind.ByteStringLiteral or TokenKind.CharLiteral or TokenKind.FStringStart or TokenKind.True or TokenKind.False
-        or TokenKind.LParen or TokenKind.LBracket or TokenKind.Minus or TokenKind.Exclamation
-        or TokenKind.Tilde or TokenKind.If or TokenKind.Match;
 
     private Expr ParsePrimary()
     {

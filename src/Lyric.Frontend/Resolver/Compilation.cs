@@ -78,7 +78,7 @@ public sealed class Compilation
 
     /// <summary>
     /// Whether a package of the program holds a module of this path — as a FILE, loaded or not.
-    /// <c>null</c> where modules are not files of packages (the 4.x tools, a host's modules).
+    /// <c>null</c> where modules are not files of packages (a host's modules).
     ///
     /// <para>For the one-namespace check: asked only of what a program loaded, the
     /// answer depended on the importer — a library declaring <c>shapes</c> beside its module
@@ -105,8 +105,7 @@ public sealed class Compilation
     /// <c>pub</c> declaration everywhere, an <c>internal</c> one in its own package, a
     /// <c>private</c> one in its own module, and an import only in the module that wrote it.
     /// THE check of every route a name takes out of its module — import, qualified path, type,
-    /// initializer, pattern — so a route cannot forget it. Always true for the 4.x tools, whose
-    /// one check was the selective import's.
+    /// initializer, pattern — so a route cannot forget it.
     /// </summary>
     public bool Visible(Symbol symbol, ModuleSymbol from)
     {

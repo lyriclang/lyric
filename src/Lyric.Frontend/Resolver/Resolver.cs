@@ -188,19 +188,12 @@ public sealed class Resolver
         // and that must not reach the loaded tree, which a rebuild after a macro round resolves
         // again
         var declarations = _comp.AstOf(module).Declarations.ToArray();
-        var coreHasDebug = _comp.Modules.Any(m => m.FullName == "std.core"
-            && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Debug" }));
-        // The form std.core's Hashable asks for: 'hash<H :: [Hasher]>(&h: H)' writes into a
-        // hasher; the 4.x library's 'hash(): int' answers a number, and keeps its form.
-        var streamsHash = _comp.Modules.Any(m => m.FullName == "std.core"
-            && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Hashable" } h
-                && h.Members.Any(f => f.Name == "hash" && f.Generics.Length == 1)));
-        var coreHasIdentity = _comp.Modules.Any(m => m.FullName == "std.core"
-            && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Identity" }));
+        // Without a library there is nothing a block could conform to: a check of the resolver alone.
+        var core = _comp.Modules.Any(m => m.FullName == "std.core");
         for (var k = 0; k < declarations.Length; k++)
         {
             var before = declarations[k];
-            declarations[k] = Synthesize(module, before, coreHasDebug, streamsHash, coreHasIdentity);
+            declarations[k] = core ? Synthesize(module, before) : before;
             if (!ReferenceEquals(declarations[k], before))
                 _comp.ReplaceAst(module, _comp.AstOf(module) with { Declarations = declarations });
             var decl = declarations[k];
@@ -253,9 +246,6 @@ public sealed class Resolver
 
     private void SynthesizeImplied(ModuleSymbol module)
     {
-        var streamsHash = _comp.Modules.Any(m => m.FullName == "std.core"
-            && _comp.AstOf(m).Declarations.Any(d => d is InterfaceDecl { Name: "Hashable" } h
-                && h.Members.Any(f => f.Name == "hash" && f.Generics.Length == 1)));
         foreach (var decl in _comp.AstOf(module).Declarations)
         {
             string name; GenericParam[] generics; TypeNode[] interfaces; FieldDecl[] fields; EnumVariant[]? variants; IEnumerable<FunctionDecl> methods;
@@ -275,7 +265,7 @@ public sealed class Resolver
             if (implied.Count == 0) continue;
             foreach (var request in Synthesis.ImpliedRequests(implied, interfaces, methods))
             {
-                var text = Synthesis.Block(request, name, generics, fields, variants, decl is ClassDecl, _sm, streamsHash, out var refusal);
+                var text = Synthesis.Block(request, name, generics, fields, variants, decl is ClassDecl, _sm, out var refusal);
                 if (text is null)
                 {
                     _de.Report("LYR-SEM0135", Severity.Error, request.Node?.Span ?? decl.Span,
@@ -319,7 +309,7 @@ public sealed class Resolver
     /// leaves the type's own list (one conformance per type and interface). The
     /// declaration comes back without those nodes; the AST holds the result.
     /// </summary>
-    private Decl Synthesize(ModuleSymbol module, Decl decl, bool coreHasDebug, bool streamsHash, bool coreHasIdentity)
+    private Decl Synthesize(ModuleSymbol module, Decl decl)
     {
         string name; GenericParam[] generics; TypeNode[] interfaces; FieldDecl[] fields; EnumVariant[]? variants; IEnumerable<FunctionDecl> methods;
         switch (decl)
@@ -329,7 +319,7 @@ public sealed class Resolver
             case EnumDecl e: (name, generics, interfaces, fields, variants, methods) = (e.Name, e.Generics, e.Interfaces, [], e.Variants, e.Methods); break;
             default: return decl;
         }
-        var requests = Synthesis.RequestsOf(interfaces, methods, coreHasDebug, coreHasIdentity, decl is ClassDecl);
+        var requests = Synthesis.RequestsOf(interfaces, methods, decl is ClassDecl);
         if (requests.Count == 0) return decl;
         // A declaration the parser could not read whole gets nothing synthesized: its fields are what
         // the recovery left — a ':' or a keyword taken as a name —, and a block written over them failed
@@ -341,7 +331,7 @@ public sealed class Resolver
         foreach (var request in requests)
         {
             _synthesized.Add((module, name, request.Interface));
-            var text = Synthesis.Block(request, name, generics, fields, variants, decl is ClassDecl, _sm, streamsHash, out var refusal);
+            var text = Synthesis.Block(request, name, generics, fields, variants, decl is ClassDecl, _sm, out var refusal);
             if (text is null)
             {
                 _de.Report("LYR-SEM0135", Severity.Error, request.Node?.Span ?? decl.Span,
@@ -484,7 +474,7 @@ public sealed class Resolver
     /// The word a method of an <c>extend</c> block has: in a conformance block, none
     /// that narrows the conformance — it is visible wherever its type and its interface are, its
     /// methods with it; in an inherent block its own, else the block's, which is the default of
-    /// the methods in it (<c>private extend Foo { … }</c>). The 4.x tools read the method's.
+    /// the methods in it (<c>private extend Foo { … }</c>).
     /// </summary>
     private VisibilityWord ExtensionWord(ExtendDecl block, FunctionDecl fn) => ExtensionWord(block, fn.Visibility);
 
@@ -993,7 +983,7 @@ public sealed class Resolver
         _comp.Builtins.LookupLocal(name) as TypeSymbol ?? ImplicitType(name, file);
 
     /// <summary>A type named without an import: the prelude's in a program's own code;
-    /// std.core's in what the compiler wrote, and for the 4.x tools.</summary>
+    /// std.core's in what the compiler wrote.</summary>
     private TypeSymbol? ImplicitType(string name, FileId file) =>
         !_comp.IsSynthesized(file) ? _comp.PreludeMember(name) as TypeSymbol : CoreType(name);
 
@@ -1005,8 +995,7 @@ public sealed class Resolver
 
     // --- Helpers ---
 
-    /// <summary>The word as a visibility: none means <c>internal</c> in Lyric 5, the
-    /// module's for the 4.x tools.</summary>
+    /// <summary>The word as a visibility: none means <c>internal</c>.</summary>
     private Visibility Vis(VisibilityWord word) => word switch
     {
         VisibilityWord.Pub => Visibility.Public,

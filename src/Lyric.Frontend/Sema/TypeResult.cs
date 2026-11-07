@@ -580,19 +580,10 @@ public sealed class TypeResult
     /// lowering a second lookup, and two lookups would be two opportunities to find different
     /// symbols.</para>
     /// </summary>
-    public TypeSymbol? IteratorInterface { get; set; }
-    public TypeSymbol? ArrayIterator { get; set; }
-    public TypeSymbol? RangeIterator { get; set; }
-    public TypeSymbol? InclusiveRangeIterator { get; set; }
-    public TypeSymbol? UnsignedRangeIterator { get; set; }
-    public TypeSymbol? InclusiveUnsignedRangeIterator { get; set; }
-    public TypeSymbol? StringIterator { get; set; }
 
     /// <summary>'Indexable&lt;T&gt;' from std.collections, what '[i]' dispatches to.</summary>
-    public TypeSymbol? Indexable { get; set; }
 
     /// <summary>'Iterable&lt;T&gt;' from std.iter, what 'for-in' asks first.</summary>
-    public TypeSymbol? Iterable { get; set; }
 
     /// <summary>Does this symbol live in a cell rather than in a frame slot? The lowering asks at
     /// EVERY access site, outside the closure too, because both sides have to see the same

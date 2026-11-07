@@ -242,7 +242,7 @@ internal static class Reachability
     /// value arises SOLELY through <c>mkiface</c>. What is never lifted can never be called
     /// virtually.</para>
     /// <para>Taking EVERY vtable row as a root would be safe and without effect:
-    /// <c>RangeIterator.next</c> would stay in every program, because <c>std.iter</c> is loaded.</para>
+    /// every conformer in a module the prelude loads would stay in every program.</para>
     /// <para>Returns whether something new was added: the outer loop then has to run once more, because
     /// a newly reachable method can lift further types itself.</para>
     /// </remarks>

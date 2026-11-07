@@ -1886,11 +1886,10 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// <c>for (x in e) { … }</c> — a loop over <c>next()</c>.
+    /// <c>for (x in e) { … }</c>: a range literal counts, an array, a view or an inline array walks by
+    /// index, anything else is a loop over <c>next()</c>.
     ///
-    /// <para>The body runs as long as <c>next()</c> yields a value; <c>null</c> ends the loop. That is
-    /// the entire protocol, and it is the same for a user-written iterator as for the built-in forms,
-    /// where the compiler obtains the iterator by building an adapter from <c>std.iter</c>.</para>
+    /// <para>The body runs as long as <c>next()</c> yields a value; <c>null</c> ends the loop.</para>
     ///
     /// <para>ONE CALL, NOT THREE. The alternative — check <c>hasNext()</c>, then fetch <c>next()</c> —
     /// asks the same question twice and can fall out of step between the two. Rust and Python use one
@@ -1920,70 +1919,7 @@ internal sealed class FunctionLowerer
         if (_types.IsIndexed(stmt))
             return LowerIndexed(stmt, loopVar);
 
-        var (iterator, iteratorType, owner, yieldOverride) = BuildIterator(stmt);
-        var elementType = LowerType(loopVar.Type, stmt.Span);
-        // What the iterator PRODUCES: the range adapters carry i64/u64 regardless of the
-        // range's width, and the value converts back to the element type below.
-        var yieldType = yieldOverride ?? elementType;
-
-        // The iterator lives in a slot: it is read on every pass and changes while doing so, and a temp
-        // would no longer be valid after the first block.
-        var slot = _slots.DeclareSynthetic("iter", iteratorType);
-        _b.Emit(new StoreLocal(slot, iterator, stmt.Span));
-
-        var condBlock = _b.NewBlock();
-        _b.Seal(new Branch(condBlock, stmt.Span));
-
-        _b.SwitchTo(condBlock);
-        var current = _slots.NewTemp(iteratorType);
-        _b.Emit(new LoadLocal(current, slot, iteratorType, stmt.Span));
-
-        var optional = new IrOptionalType(yieldType);
-        var produced = _slots.NewTemp(optional);
-        EmitNextCall(produced, current, iteratorType, owner, optional, stmt.Span);
-
-        var hasValue = _slots.NewTemp(BoolType);
-        _b.Emit(new OptIsSome(hasValue, produced, stmt.Span));
-
-        var bodyBlock = _b.NewBlock();
-        var exitBlock = _b.NewBlock(); // before the body: 'break' needs its target
-        _b.Seal(new CondBranch(hasValue, bodyBlock, exitBlock, stmt.Span));
-
-        _b.SwitchTo(bodyBlock);
-
-        // The 'optget' cannot panic: it stands behind the 'optissome' that carried the proof — the same
-        // division of labour as in flow narrowing.
-        var value = _slots.NewTemp(yieldType);
-        _b.Emit(new OptGet(value, produced, yieldType, stmt.Span));
-
-        // A range over a smaller width gets its values back at that width; the values fit by
-        // construction (the bounds came from the element type).
-        if (!yieldType.Equals(elementType))
-        {
-            var narrowed = _slots.NewTemp(elementType);
-            _b.Emit(new Lyric.Ir.Convert(narrowed, yieldType, elementType, value, stmt.Span));
-            value = narrowed;
-        }
-
-        var variable = _slots.DeclareFor(loopVar, elementType);
-        _b.Emit(new StoreLocal(variable, value, stmt.Span));
-
-        // 'for ((k, v) in …)': the element is taken apart at the top of every iteration. The
-        // checker proved the pattern cannot fail, so no failure path is ever asked for.
-        if (stmt.Pattern is { } pattern)
-            LowerPattern(pattern, value, elementType,
-                () => throw Bug("an irrefutable loop pattern asked for a failure path"), assumeMatch: true);
-
-        _loops.Push(new LoopScope(_b, condBlock, exitBlock)
-            { DeferDepth = _defers.Count, Label = stmt.Label });
-        // Through LowerScope, not LowerStatements: the loop body is a SCOPE, and a defer in it
-        // runs at every iteration's end (§7.5) — registered into the enclosing function it ran
-        // once, with the last iteration's values (the 2.0.1 bug).
-        if (LowerScope(stmt.Body)) _b.Seal(new Branch(condBlock, stmt.Body.Span));
-        _loops.Pop();
-
-        _b.SwitchTo(exitBlock);
-        return true;
+        throw Bug($"for-in at {stmt.Span} has no walk from the type checker");
     }
 
     /// <summary>
@@ -2236,196 +2172,6 @@ internal sealed class FunctionLowerer
 
         _b.SwitchTo(exitBlock);
         return true;
-    }
-
-    /// <summary>
-    /// Obtains the iterator for a <c>for-in</c> head.
-    ///
-    /// <para>A value that satisfies <c>Iterator&lt;T&gt;</c> itself is used directly. The built-in forms
-    /// get an adapter from <c>std.iter</c>: they have no declaration a conformance could hang on.</para>
-    /// </summary>
-    // 'Yield' is what the ITERATOR produces when that differs from the loop variable's element
-    // type — the range adapters carry i64/u64 while the range may be over a smaller width; the
-    // loop converts at the edges. Null everywhere else.
-    private (TempId Value, IrType Type, GenericInstance? Owner, IrType? Yield) BuildIterator(ForInStmt stmt)
-    {
-        // Substituted, because a 'for-in' can stand in a monomorphized instance:
-        // 'fn total<T :: [P]>(xs: T[]) { for (x in xs) … }'. Without the substitution the ArrayIterator
-        // would be interned with the type PARAMETER, and the type table would look for a class named 'T'.
-        var source = SubstituteType(_types.TypeOf(stmt.Iterable));
-
-        // 'Iterable<T>' first: the container SAYS how to walk it and yields a fresh cursor on every call.
-        // Two loops over the same list therefore do not disturb each other — if the list were its own
-        // iterator, they would.
-        //
-        // The return type is 'Iterator<T>', so an INTERFACE, and 'next()' therefore goes through
-        // callvirt. That is the price of the decoupling and the same route an iterator takes that is
-        // available through its interface.
-        if (_types.Iterable is { } iterable
-            && TypeFacts.SymbolOf(source) is { } carrier
-            && Conformance.Implements(carrier, iterable, _typeTable.Binding)
-            && carrier.Members.LookupLocal("iter") is FunctionSymbol iterMethod
-            && iterMethod.Declaration is FunctionDecl iterDecl)
-        {
-            var target = source is GenericInstance owning
-                ? _instances.RequestMethod(iterMethod, iterDecl, owning, stmt.Span)
-                : TryResolveFunction(iterMethod, out var direct)
-                    ? direct
-                    : throw NotSupported($"'{carrier.Name}.iter' was not lowered", stmt.Span);
-
-            // 'Iterator<T>' with the CONCRETE element type rather than the definition: a generic instance
-            // has its own slot table, and 'callvirt' reads the index from it. Where the element type
-            // comes from is long known to the sema — it stands on the symbol of the loop variable, and
-            // deriving it again here would be a second truth.
-            var element = _types.RefOf(stmt) is LocalSymbol bound
-                ? SubstituteType(bound.Type)
-                : throw Bug($"for-in at {stmt.Span} has no bound loop variable");
-
-            var iteratorDefinition = _types.IteratorInterface ?? throw Refused(LoweringDiagnostics.StdMissing, 
-                "iterating (std.iter is not on the module path)", stmt.Span);
-
-            var cursorType = new IrInterfaceType(
-                _typeTable.Intern(iteratorDefinition, [element]));
-
-            var cursor = _slots.NewTemp(cursorType);
-            _b.Emit(new Call(cursor, target, [LowerExpr(stmt.Iterable)], stmt.Span));
-            return (cursor, cursorType, null, null);
-        }
-
-        if (source is ArrayOf array)
-        {
-            var owner = new GenericInstance(
-                _types.ArrayIterator ?? throw Refused(LoweringDiagnostics.StdMissing, 
-                    "iterating an array (std.iter is not on the module path)", stmt.Span),
-                [array.Element]);
-
-            var type = _typeTable.Intern(owner.Definition, owner.Arguments);
-            var instance = _slots.NewTemp(new IrRefType(type));
-            _b.Emit(new NewObject(instance, type, new IrRefType(type), stmt.Span));
-            _b.Emit(new StoreField(instance, type, new FieldId(0), LowerExpr(stmt.Iterable), stmt.Span));
-            _b.Emit(new StoreField(instance, type, new FieldId(1), IntConstant(0, stmt.Span), stmt.Span));
-            return (instance, new IrRefType(type), owner, null);
-        }
-
-        // A string is walked over its code points, since a 'char' IS a code point. The adapter gets them
-        // as an array: 'toChars' extracts them ONCE. An iterator calling 'charAt' instead would have to
-        // count from the front on every step and would make the loop quadratic; that is not visible in a
-        // 'for (c in s)'.
-        if (source is PrimitiveType { Kind: PrimitiveKind.String })
-        {
-            var symbol = _types.StringIterator ?? throw Refused(LoweringDiagnostics.StdMissing, 
-                "iterating a string (std.iter is not on the module path)", stmt.Span);
-
-            var type = _typeTable.Intern(symbol);
-            // The compiler-bound edge behind 'for (c in s)'. Bound to the private twin since 2.0:
-            // the deprecated pub form went with the cut, the native stayed.
-            var chars = CallHelper("std.string.rawToChars", stmt.Span, LowerExpr(stmt.Iterable));
-
-            var instance = _slots.NewTemp(new IrRefType(type));
-            _b.Emit(new NewObject(instance, type, new IrRefType(type), stmt.Span));
-            _b.Emit(new StoreField(instance, type, new FieldId(0), chars, stmt.Span));
-            _b.Emit(new StoreField(instance, type, new FieldId(1), IntConstant(0, stmt.Span),
-                stmt.Span));
-            return (instance, new IrRefType(type), null, null);
-        }
-
-        if (source is RangeOf ro && stmt.Iterable is RangeExpr range)
-        {
-            // Four adapters, not one. Folding 'a..=b' into 'a..b+1' was the 2.0.1 bug — at the
-            // type's maximum the '+1' wraps and the loop runs zero times (§7.2); the inclusive
-            // adapters carry a done flag instead of arithmetic on the bound. And a full-width
-            // uint range cannot ride the SIGNED adapters — a bound beyond 2^63 reinterprets
-            // and the comparison calls a range crossing the sign bit empty — so uint has its
-            // own pair. Smaller widths embed into the carrier order-preserving; the loop head
-            // converts the yielded value back (Yield below).
-            var unsigned = ro.Element is PrimitiveType { Kind: PrimitiveKind.Uint };
-            var symbol = (range.IsInclusive, unsigned) switch
-            {
-                (false, false) => _types.RangeIterator,
-                (true, false) => _types.InclusiveRangeIterator,
-                (false, true) => _types.UnsignedRangeIterator,
-                (true, true) => _types.InclusiveUnsignedRangeIterator,
-            } ?? throw Refused(LoweringDiagnostics.StdMissing, "iterating a range (std.iter is not on the module path)", stmt.Span);
-
-            var type = _typeTable.Intern(symbol);
-            var carrierType = new IrScalarType(unsigned ? IrScalar.U64 : IrScalar.I64);
-            var boundType = LowerType(ro.Element, stmt.Span);
-
-            TempId Bound(Expr e)
-            {
-                var raw = LowerExprAs(e, boundType);
-                if (boundType.Equals(carrierType)) return raw;
-                var widened = _slots.NewTemp(carrierType);
-                _b.Emit(new Lyric.Ir.Convert(widened, boundType, carrierType, raw, stmt.Span));
-                return widened;
-            }
-
-            var low = Bound(range.Low);
-            var high = Bound(range.High);
-
-            var instance = _slots.NewTemp(new IrRefType(type));
-            _b.Emit(new NewObject(instance, type, new IrRefType(type), stmt.Span));
-            _b.Emit(new StoreField(instance, type, new FieldId(0), low, stmt.Span));
-            _b.Emit(new StoreField(instance, type, new FieldId(1), high, stmt.Span));
-            if (range.IsInclusive)
-            {
-                var notDone = _slots.NewTemp(BoolType);
-                _b.Emit(new Const(notDone, BoolType, new BoolConst(false), stmt.Span));
-                _b.Emit(new StoreField(instance, type, new FieldId(2), notDone, stmt.Span));
-            }
-            return (instance, new IrRefType(type), null, carrierType);
-        }
-
-        if (source is PrimitiveType { Kind: PrimitiveKind.String })
-            throw NotSupported(
-                "iterating a string (std.iter has no adapter for it yet — a string has no "
-                + "'length' to walk with)", stmt.Span);
-
-        // A user-written iterator is used directly.
-        var own = LowerType(source, stmt.Span);
-        return (LowerExpr(stmt.Iterable), own,
-            SubstituteType(source) as GenericInstance, null);
-    }
-
-    /// <summary>The <c>next()</c> call: virtual when the iterator is available through its interface,
-    /// otherwise directly on the instance.</summary>
-    private void EmitNextCall(TempId dest, TempId iterator, IrType iteratorType,
-        GenericInstance? owner, IrType returns, Core.Span span)
-    {
-        // When the iterator is available through its interface, only the runtime decides which
-        // implementation runs — the one case in which 'for-in' dispatches dynamically.
-        if (iteratorType is IrInterfaceType iface)
-        {
-            var slots = _typeTable.MethodSlotsOf(iface.Type);
-            _b.Emit(new CallVirt(dest, iface.Type, Array.IndexOf(slots, "next"), [iterator],
-                returns, span));
-            return;
-        }
-
-        var declaring = owner?.Definition ?? IteratorSymbolOf(iteratorType, span);
-        if (declaring.Members.LookupLocal("next") is not FunctionSymbol method
-            || method.Declaration is not FunctionDecl decl)
-            throw NotSupported($"'{declaring.Name}' has no 'next' to iterate with", span);
-
-        // A concrete iterator is called directly: which function runs is settled, and a callvirt would
-        // only consult a table whose answer the compiler already knows.
-        var target = owner is not null
-            ? _instances.RequestMethod(method, decl, owner, span)
-            : TryResolveFunction(method, out var direct)
-                ? direct
-                : throw NotSupported($"'{declaring.Name}.next' was not lowered", span);
-
-        _b.Emit(new Call(dest, target, [iterator], span));
-    }
-
-    /// <summary>The symbol behind a non-generic iterator value.</summary>
-    private TypeSymbol IteratorSymbolOf(IrType type, Core.Span span)
-    {
-        if (type is IrRefType reference)
-            foreach (var (symbol, id) in _typeTable.Interned)
-                if (id == reference.Type) return symbol;
-
-        throw NotSupported("iterating a value that is not an object", span);
     }
 
     private TempId IntConstant(long value, Core.Span span)
@@ -3116,14 +2862,13 @@ internal sealed class FunctionLowerer
             return built;
         }
 
-        // '+' and '*' are overloaded for string; that is built-in semantics but NO BinOp — the add opcode
-        // would otherwise be polymorphic and would have to dispatch on the type at runtime. It lowers to
-        // a call in std.string, exactly as the f-string lowering assembles its parts.
+        // '+' is overloaded for string; that is built-in semantics but NO BinOp — the add opcode
+        // would otherwise be polymorphic and would have to dispatch on the type at runtime. It lowers
+        // to a call in std.string.
         if (!kind.IsComparison() && type is IrScalarType { Kind: IrScalar.String })
             return kind switch
             {
                 IrBinKind.Add => CallHelper("std.string.concat", span, lhs, rhs),
-                IrBinKind.Mul => CallHelper("std.string.repeat", span, lhs, rhs),
                 _ => throw NotSupported($"'{IrNames.Bin(kind)}' on strings", span),
             };
 
@@ -6606,12 +6351,6 @@ internal sealed class FunctionLowerer
         return result;
     }
 
-    /// <summary>The member a call names, where it is the default of a non-generic interface —
-    /// what <see cref="LowerDefaultCall"/> instantiates per conformer. <c>null</c> for anything
-    /// else: an own member, an abstract one, a default of a generic interface — and, in the 4.x
-    /// path, a generic default, which is lowered for the interface's value there
-    /// (<see cref="LowerGenericInterfaceMethod"/>). In Lyric 5 a generic default is one instance
-    /// per conformer and argument list: its interface has no value.</summary>
     /// <summary>A static default of an interface the member is bound to, or
     /// nothing: the static twin of <see cref="DirectDefault"/>.</summary>
     private (FunctionSymbol Default, FunctionDecl Decl, TypeSymbol Iface)? StaticDefault(MemberExpr member) =>
@@ -8790,12 +8529,9 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// An f-string runs the checker's plan where there is one: the builder's local
-    /// made, the pieces appended in order, the text taken — the calls the checker wrote and
-    /// checked. Without one — the 4.x tools, whose stdlib has no builder, or a text without a hole —
-    /// it becomes a chain of <c>concat</c> and the <c>fromXxx</c> converters. No arrays and no
-    /// varargs — the IR can do neither, and this way it does not need to. Roslyn does the same for
-    /// <c>$"…"</c> without a format spec.
+    /// An f-string runs the checker's plan: the builder's local made, the pieces appended in order,
+    /// the text taken — the calls the checker wrote and checked. A text without a hole has no plan
+    /// and is a constant.
     /// </summary>
     private TempId LowerInterpolatedString(InterpolatedStringExpr expr)
     {
@@ -8808,152 +8544,13 @@ internal sealed class FunctionLowerer
             return LowerCall(plan.Finish) ?? throw Bug("an f-string's builder gave no text");
         }
 
-        var stringType = new IrScalarType(IrScalar.String);
-        var parts = new List<TempId>();
-        var pendingText = new System.Text.StringBuilder();
-
-        void FlushText(Span span)
-        {
-            if (pendingText.Length == 0) return;
-            parts.Add(EmitConst(new StringConst(pendingText.ToString()), stringType, span));
-            pendingText.Clear();
-        }
-
+        // The parser decoded the text (InterpText.Value): the doubled braces folded, the escapes
+        // resolved — not in a raw f-string —, a multi-line one's indentation off.
+        var whole = new System.Text.StringBuilder();
         foreach (var segment in expr.Segments)
-        {
-            switch (segment)
-            {
-                case InterpText text:
-                    // The parser decoded the text (InterpText.Value): the doubled braces folded, the
-                    // escapes resolved — not in a raw f-string —, a multi-line one's indentation off.
-                    // Adjacent pieces collect into one constant.
-                    pendingText.Append(text.Value);
-                    break;
-
-                case InterpHole hole:
-                    FlushText(hole.Span);
-                    // A hole the sema routed through 'Display' IS the 'show()' call it stored —
-                    // the same seam as the operators; the value lowers once, as its receiver.
-                    if (_types.OperatorCallOf(hole) is { } shown)
-                        parts.Add(LowerCall(shown) ?? throw Bug("'show()' returned no value"));
-                    else
-                        parts.Add(hole.FormatSpec is { } spec
-                            ? FormattedValue(hole.Expr, spec)
-                            : ToStringValue(hole.Expr));
-                    break;
-
-                default:
-                    throw Bug($"unhandled interpolation segment {segment.GetType().Name}");
-            }
-        }
-        FlushText(expr.Span);
-
-        if (parts.Count == 0) return EmitConst(new StringConst(string.Empty), stringType, expr.Span);
-
-        var result = parts[0];
-        for (var i = 1; i < parts.Count; i++)
-            result = CallHelper("std.string.concat", expr.Span, result, parts[i]);
-        return result;
-    }
-
-    /// <summary>A hole with a format spec: <c>{avg:N2}</c> becomes <c>std.fmt.formatFloat(avg, "N2")</c>.
-    ///
-    /// <para>The spec is a LITERAL and is passed as a constant rather than as part of the function name.
-    /// Otherwise every spec would need its own import declaration, and <c>{x:N2}</c> and <c>{x:N3}</c>
-    /// would be two different functions.</para>
-    ///
-    /// <para>Without a spec the <c>fromXxx</c> converters remain: a format call that only rebuilds the
-    /// default would be a second route to the same result.</para></summary>
-    private TempId FormattedValue(Expr expr, string spec)
-    {
-        var value = LowerExpr(expr);
-        var type = TypeOfExpr(expr);
-        if (type is not IrScalarType scalar)
-            throw NotSupported("formatting a non-scalar value", expr.Span);
-
-        var stringType = new IrScalarType(IrScalar.String);
-        var specValue = EmitConst(new StringConst(spec), stringType, expr.Span);
-
-        var helper = scalar.Kind switch
-        {
-            IrScalar.String => "std.fmt.formatString",
-            IrScalar.Bool => "std.fmt.formatBool",
-            IrScalar.Char => "std.fmt.formatChar",
-            IrScalar.F32 or IrScalar.F64 => "std.fmt.formatFloat",
-            _ when IsUnsignedScalar(scalar.Kind) => "std.fmt.formatUint",
-            _ when IsIntegerScalar(scalar.Kind) => "std.fmt.formatInt",
-            _ => throw NotSupported("formatting a non-scalar value", expr.Span),
-        };
-
-        return CallHelper(helper, expr.Span, WidenForHelper(value, scalar.Kind, expr.Span), specValue);
-    }
-
-    /// <summary>A hole in an f-string as a string. Strings stay as they are; everything else goes through
-    /// the matching converter — the names distinguish by source type, because Lyric has no
-    /// Overloading hat.</summary>
-    private TempId ToStringValue(Expr expr)
-    {
-        var value = LowerExpr(expr);
-        var type = TypeOfExpr(expr);
-        if (type is not IrScalarType scalar)
-            throw NotSupported($"interpolating a non-scalar value", expr.Span);
-
-        return scalar.Kind switch
-        {
-            IrScalar.String => value,
-            IrScalar.Bool => CallHelper("std.string.fromBool", expr.Span, value),
-            IrScalar.Char => CallHelper("std.string.fromChar", expr.Span, value),
-            // A float32 has a converter of its own: its shortest text is not
-            // the double's — '0.1', where the widened value reads '0.10000000149011612'.
-            IrScalar.F32 => CallHelper("std.string.fromFloat32", expr.Span, value),
-            IrScalar.F64 => CallHelper("std.string.fromFloat", expr.Span, value),
-            // Unsigned first: 'fromInt' reinterprets a large uint as a negative number. Measured,
-            // f"{u}" with u = uint64.MaxValue previously yielded "-1".
-            _ when IsUnsignedScalar(scalar.Kind) => CallHelper("std.string.fromUint", expr.Span,
-                WidenForHelper(value, scalar.Kind, expr.Span)),
-            _ when IsIntegerScalar(scalar.Kind) => CallHelper("std.string.fromInt", expr.Span,
-                WidenForHelper(value, scalar.Kind, expr.Span)),
-            _ => throw NotSupported($"interpolating a non-scalar value", expr.Span),
-        };
-    }
-
-    /// <summary>
-    /// Widens a scalar to the signature of its converter: integers to <c>i64</c>, <c>f32</c> to
-    /// <c>f64</c>.
-    ///
-    /// <para>The converters in <c>std.string</c> and <c>std.fmt</c> are called <c>fromInt</c> and
-    /// <c>fromFloat</c>, singular, because Lyric has no overloading. There is therefore exactly ONE
-    /// signature per kind, and it takes the widest type. Whoever passes an <c>int8</c> has to widen it
-    /// first. The exception is <c>float32</c> in a hole: <c>fromFloat32</c> is its own, since its
-    /// shortest text is not the double's.</para>
-    ///
-    /// <para>Without this step <c>f"{x}"</c> with <c>x: int8</c> crashes the compiler in the IR verifier
-    /// ("arg 0 is i8, expected i64") — with a stack trace instead of a diagnostic, and for every type
-    /// except <c>int</c> and <c>float</c>.</para>
-    ///
-    /// <para>KNOWN LIMIT: a <c>uint</c> beyond <c>int64.MaxValue</c> is printed as a negative number, the
-    /// bit-pattern cast to <c>i64</c> reinterpreting it. That is not a crash but wrong output, and the fix
-    /// would be a <c>fromUint</c> of its own.</para>
-    /// </summary>
-    private TempId WidenForHelper(TempId value, IrScalar kind, Span span)
-    {
-        var widened = kind switch
-        {
-            IrScalar.F32 => IrScalar.F64,
-            // A uint8 becomes u64 rather than i64: the intermediate step through a signed type would
-            // reinterpret the top bit.
-            _ when IsUnsignedScalar(kind) => IrScalar.U64,
-            _ when IsIntegerScalar(kind) => IrScalar.I64,
-            _ => kind,
-        };
-
-        if (widened == kind) return value;
-
-        var from = new IrScalarType(kind);
-        var to = new IrScalarType(widened);
-        var dest = _slots.NewTemp(to);
-        _b.Emit(new Lyric.Ir.Convert(dest, from, to, value, span));
-        return dest;
+            whole.Append(segment is InterpText text ? text.Value
+                : throw Refused(LoweringDiagnostics.StdMissing, "an f-string's builder (is the standard library on the module path?)", expr.Span));
+        return EmitConst(new StringConst(whole.ToString()), new IrScalarType(IrScalar.String), expr.Span);
     }
 
     // ------------------------------------------------------------------ helpers
@@ -9009,12 +8606,6 @@ internal sealed class FunctionLowerer
         IrScalarType s when IsIntegerScalar(s.Kind) => new IntConst(1),
         _ => throw NotSupported("increment/decrement on a non-numeric type", span)
     };
-
-    /// <summary>Unsigned: decides which converter turns a value into text.</summary>
-    /// <remarks>Without this distinction every integer goes through <c>fromInt</c>, and a <c>uint</c>
-    /// beyond <c>int64.MaxValue</c> appears as a negative number. Not a crash but wrong output.</remarks>
-    private static bool IsUnsignedScalar(IrScalar kind) => kind is
-        IrScalar.U8 or IrScalar.U16 or IrScalar.U32 or IrScalar.U64;
 
     private static bool IsIntegerScalar(IrScalar kind) => kind is
         IrScalar.I8 or IrScalar.I16 or IrScalar.I32 or IrScalar.I64 or

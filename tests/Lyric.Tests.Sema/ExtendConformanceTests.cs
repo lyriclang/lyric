@@ -103,7 +103,7 @@ public class ExtendConformanceTests
         // The root lives in std.core (design/v5/spec/05 E6 O1): the bare 'throws' of the member is
         // 'Error', and 'Boom' is one.
         AssertClean(Check(
-            ("std.core", "pub interface Error { fn message(): string; fn cause(): ?Error { return null; } }\n"),
+            ("std.core", "pub interface Error { fn message(): string; fn cause(): ?Error { return null; } }\npub interface Debug { fn debug(): string; }\n"),
             ("main", """
                 import std.core { Error };
                 class Boom :: [Error] { fn message(): string { return "b"; } }
