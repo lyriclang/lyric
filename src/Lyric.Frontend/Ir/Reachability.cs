@@ -3,17 +3,17 @@ namespace Lyric.Ir;
 /// <summary>
 /// Removes from a lowered module whatever is not reachable from any root.
 ///
-/// <para>A Lyric body reaches the bytecode as soon as its module is loaded, even when nobody calls
+/// <para>A Lyric body reaches the program as soon as its module is loaded, even when nobody calls
 /// it. With `std.string` written in Lyric, its natives (`concat`, `charAt`, `substring`, …) end up in
 /// the import table of every program.</para>
 ///
 /// <para>ON THE IR RATHER THAN BEFORE IT. An analysis before the lowering would have to rebuild the
 /// call graph at AST level, with overload resolution, extensions and monomorphization — a second
 /// compiler beside the first. Here the calls already stand as instructions. The price is that dead
-/// functions are lowered and then discarded: that costs compile time, but not bytecode, and bytecode
-/// is what every start pays for.</para>
+/// functions are lowered and then discarded: that costs compile time, but not code, and code
+/// is what every build and every start pays for.</para>
 ///
-/// <para>FORMAT-NEUTRAL: omitting what nobody calls changes nothing about `.lyrbc` and nothing about
+/// <para>Omitting what nobody calls changes nothing about
 /// any Lyric program.</para>
 /// </summary>
 internal static class Reachability
@@ -32,7 +32,7 @@ internal static class Reachability
         var erreichbar = Collect(module);
 
         // Old id to new id. The order is preserved, so a diff of two builds stays readable and the
-        // names in the bytecode do not get mixed up.
+        // names in the C do not get mixed up.
         var neueId = new Dictionary<int, int>();
         var behalten = new List<IrFunction>();
 
@@ -188,8 +188,8 @@ internal static class Reachability
         }
         foreach (var export in module.ExportRoots) Wurzel(export);
 
-        // An attributed function is a root: the row in section 11 is a promise to the host that
-        // this function exists, and the host calls it by that index — a caller this analysis
+        // An attributed function is a root: the row is a promise that this
+        // function exists — to a caller this analysis
         // cannot see, exactly like the entry point.
         foreach (var attribute in module.Attributes)
             if (attribute.TargetKind == IrAttributeTarget.Function)

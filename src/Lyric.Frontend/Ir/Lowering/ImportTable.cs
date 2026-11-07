@@ -7,9 +7,9 @@ namespace Lyric.Ir.Lowering;
 /// How one DECLARED parameter of a native crosses the boundary.
 ///
 /// <para>A struct parameter is FLATTENED: the import's wire signature carries its fields as
-/// scalars, in field order, and the call site emits one field load per slot. The bytecode format
-/// and the binder never see a struct — which is exactly why this costs no format change — and
-/// the .lyr declaration stays the typed façade the script is checked against.</para>
+/// scalars, in field order, and the call site emits one field load per slot. The emitted call
+/// never sees a struct, and the .lyr declaration stays the typed façade a program is checked
+/// against.</para>
 /// </summary>
 /// <param name="Declared">The parameter as declared, for diagnostics and the plain case.</param>
 /// <param name="Struct">The interned struct type when flattened, else <c>null</c>.</param>
@@ -18,7 +18,7 @@ internal readonly record struct ImportParam(IrType Declared, TypeId? Struct, IrT
 
 /// <summary>
 /// A struct RETURN. The wire form is void plus a trailing out-parameter: a hidden module global
-/// holds one instance of the struct, the call passes it last, the host fills its slots, and the
+/// holds one instance of the struct, the call passes it last, the native fills its slots, and the
 /// call site copies the value out — a copy the scalarizer dissolves when it never escapes. The
 /// language's value semantics are what make the shared buffer safe: any binding copies.
 /// </summary>
@@ -67,7 +67,7 @@ internal sealed class ImportTable
     }
 
     /// <summary>The declared shape of an interned import, or <c>null</c> where none was recorded
-    /// — runtime helpers and generated host functions, whose parameters are all plain.</summary>
+    /// — runtime helpers, whose parameters are all plain.</summary>
     public ImportShape? ShapeOf(ImportId id) =>
         _shapes.TryGetValue(_used[id.Value].Name, out var shape) ? shape : null;
 
@@ -90,8 +90,8 @@ internal sealed class ImportTable
     /// A GENERIC native: the declaration, kept as a template rather than as a row.
     ///
     /// <para>A native binds by name, and <see cref="Intern(IrImport)"/> keys by name AND
-    /// signature, so one name may stand over several rows — the runtime binds each of them
-    /// independently against the one host function. That is how <c>coroutineIsDone</c> already
+    /// signature, so one name may stand over several rows, each answered by the one
+    /// runtime function. That is how <c>coroutineIsDone</c> already
     /// serves every coroutine signature. A generic native is the same shape written down: the
     /// call site substitutes its type arguments into the declared signature and interns the
     /// result, and two call sites at one type argument tuple share a row.</para>

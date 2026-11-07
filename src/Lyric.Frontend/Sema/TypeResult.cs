@@ -573,18 +573,6 @@ public sealed class TypeResult
     public LyrType[] TypeArgumentsOf(Node call) =>
         _typeArguments.TryGetValue(call, out var args) ? args : [];
 
-    /// <summary>
-    /// The types from <c>std.iter</c> that <c>for-in</c> needs.
-    ///
-    /// <para>The TypeChecker looks them up anyway to check the loop head; storing them here saves the
-    /// lowering a second lookup, and two lookups would be two opportunities to find different
-    /// symbols.</para>
-    /// </summary>
-
-    /// <summary>'Indexable&lt;T&gt;' from std.collections, what '[i]' dispatches to.</summary>
-
-    /// <summary>'Iterable&lt;T&gt;' from std.iter, what 'for-in' asks first.</summary>
-
     /// <summary>Does this symbol live in a cell rather than in a frame slot? The lowering asks at
     /// EVERY access site, outside the closure too, because both sides have to see the same
     /// cell.</summary>

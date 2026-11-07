@@ -30,7 +30,7 @@ public enum Phase
     /// <c>--verbose</c> run.</summary>
     Verify,
 
-/// <summary>IR to <c>.lyrbc</c> bytes.</summary>
+/// <summary>IR to C.</summary>
     Emit,
 }
 

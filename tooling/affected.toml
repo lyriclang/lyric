@@ -6,8 +6,8 @@
 # A path is a prefix of a repository path (forward slashes). Every rule whose prefix matches
 # adds its tests and its cases; a path no rule names selects EVERYTHING (the table is extended,
 # not guessed around). `tests` are Lyric5.Tests class names, a class of another project named whole
-# ("Lyric.Tests.Formatting.Lyric5CorpusTests"), or "4x" (the Lyric.Tests.* projects
-# of the 4.x front end), or "all5" (every Lyric5.Tests class). `cases` are prefixes of the
+# ("Lyric.Tests.Formatting.Lyric5CorpusTests"), or "frontend" (the Lyric.Tests.* projects
+# of the front end), or "all5" (every Lyric5.Tests class). `cases` are prefixes of the
 # conformance labels ("12-"), or "all", or "imports": the cases that name the touched std module
 # (`std.string`); a module the prelude imports reaches every case.
 
@@ -40,20 +40,20 @@ cases = ["06-", "10-", "12-", "13-"]
 # What a link in documentation names: the broken-doc-link lint and the pages read it alike. Before
 # the front end's rule, which would name everything; 4.x runs the same lint.
 paths = ["src/Lyric.Frontend/Sema/DocLinks.cs"]
-tests = ["4x", "DocLinkTests", "DocCommandTests", "SiteTests"]
+tests = ["frontend", "DocLinkTests", "DocCommandTests", "SiteTests"]
 cases = []
 
 [[rule]]
 # The text of the language: lexing, parsing, the tree, the formatter.
 paths = ["src/Lyric.Frontend/Lexing/", "src/Lyric.Frontend/Parsing/", "src/Lyric.Frontend/AST/", "src/Lyric.Frontend/Formatting/"]
-tests = ["4x", "InterpolationTests", "UnicodeTests", "TrailingBlockCallTests", "ShiftCountTests", "ManifestTests",
+tests = ["frontend", "InterpolationTests", "UnicodeTests", "TrailingBlockCallTests", "ShiftCountTests", "ManifestTests",
          "SiteTests", "FormatterProofTests", "FmtCommandTests"]
 cases = ["01-", "07-", "08-", "09-"]
 
 [[rule]]
 # The meaning: resolver, checker, lowering. Shared with 4.x (memory: the front end still serves 4.x).
 paths = ["src/Lyric.Frontend/"]
-tests = ["4x", "all5"]
+tests = ["frontend", "all5"]
 cases = ["03-", "04-", "05-", "06-", "07-", "08-", "09-", "11-"]
 
 [[rule]]
@@ -75,12 +75,12 @@ cases = ["13-", "15-"]
 [[rule]]
 # The diagnostic catalog: its reader, its entries, the pages the site makes of them.
 paths = ["src/Lyric.Core/diagnostics.toml", "src/Lyric.Core/DiagnosticCatalog.cs"]
-tests = ["4x", "CatalogTests", "LintTests", "CatalogPageTests"]
+tests = ["frontend", "CatalogTests", "LintTests", "CatalogPageTests"]
 cases = []
 
 [[rule]]
 paths = ["src/Lyric.Core/", "src/Lyric.Lsp/", "tests/Lyric.Tests."]
-tests = ["4x"]
+tests = ["frontend"]
 cases = []
 
 [[rule]]

@@ -47,7 +47,7 @@ public sealed record UnaryExpr(UnaryOp Operator, Expr Operand, Span Span) : Expr
 /// <summary>
 /// <c>comptime e</c>: the value of <c>e</c>, computed by the compiler. Semantically the same
 /// value <c>e</c> has at run time — the prefix says WHEN it is computed and what <c>e</c> may
-/// therefore reach: no local, no parameter, no <c>this</c>, no capability. The lowering replaces
+/// therefore reach: no local, no parameter, no <c>this</c>. The lowering replaces
 /// the expression by the literal the evaluator produced.
 /// </summary>
 public sealed record ComptimeExpr(Expr Inner, Span Span) : Expr(Span);
@@ -228,15 +228,14 @@ public sealed record LambdaExpr(LambdaParam[] Parameters, TypeNode? ReturnType, 
 
 public enum LambdaForm { Parenthesized, Bare, Trailing }
 
-/// <summary>A lambda parameter: a name, or an irrefutable pattern (<c>((k, v)) =&gt; …</c>), in
-/// which case <see cref="Name"/> is <c>_</c> and the pattern binds the names. A trailing lambda's
-/// implicit <c>it</c> is a parameter with <see cref="Implicit"/> set; the checker drops it when
-/// the expected function type takes nothing.</summary>
-
 /// <summary><c>let Pattern = Expr</c> as the condition of an <c>if</c> or a <c>while</c>: true
 /// when the pattern matches, and the names it binds are in scope in the branch or the body.
 /// Only there — anywhere else it is <c>LYR-SEM0098</c>.</summary>
 public sealed record LetCondExpr(Pattern Pattern, Expr Initializer, Span Span) : Expr(Span);
+/// <summary>A lambda parameter: a name, or an irrefutable pattern (<c>((k, v)) =&gt; …</c>), in
+/// which case <see cref="Name"/> is <c>_</c> and the pattern binds the names. A trailing lambda's
+/// implicit <c>it</c> is a parameter with <see cref="Implicit"/> set; the checker drops it when
+/// the expected function type takes nothing.</summary>
 public sealed record LambdaParam(string Name, TypeNode? Type, Span Span) : Node(Span), INamedDecl
 {
     public required Span NameSpan { get; init; }

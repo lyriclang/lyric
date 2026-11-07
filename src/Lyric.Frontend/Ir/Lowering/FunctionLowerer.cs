@@ -19,8 +19,8 @@ namespace Lyric.Ir.Lowering;
 /// <para>VALUES CROSSING BLOCK BOUNDARIES TRAVEL THROUGH LOCALS, NOT THROUGH TEMPS. A temp is defined
 /// exactly once and therefore cannot carry "the result from two branches". An if expression and
 /// <c>&amp;&amp;</c>/<c>||</c> therefore create a synthetic local, write into it in both branches and
-/// read it in the merge block. That is why this IR needs no <c>Phi</c>: the target is a stack VM with
-/// local slots, and a phi would have to become store/load again at emission.</para>
+/// read it in the merge block. That is why this IR needs no <c>Phi</c>: the target is C with its
+/// local variables, and a phi would have to become store/load again at emission.</para>
 ///
 /// <para>A construct the IR cannot express is valid Lyric and therefore a DIAGNOSTIC
 /// (<c>LYR-ICE0002</c>) with file, line and column rather than a crash — see
@@ -80,14 +80,6 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// Temps holding a FRESHLY BUILT value: the result of a <c>newobj</c> or of a call.
-    ///
-    /// <para>Relevant for structs only, and there the line between correct and wasteful: a value nobody
-    /// else holds does not have to be copied when bound. Without this distinction every
-    /// <c>let p = P { … };</c> would get a <c>structcopy</c> directly behind its <c>newobj</c> — correct,
-    /// but obviously pointless and visible in every disassembly.</para>
-    /// </summary>
-    /// <summary>
     /// What a call in a <c>?.</c> chain sees differently, and nothing else.
     ///
     /// <para><c>_chainReceivers</c> maps the RECEIVER expression to the already unwrapped value:
@@ -107,6 +99,14 @@ internal sealed class FunctionLowerer
     private readonly Dictionary<Expr, IrType> _chainResults =
         new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>
+    /// Temps holding a FRESHLY BUILT value: the result of a <c>newobj</c> or of a call.
+    ///
+    /// <para>Relevant for structs only, and there the line between correct and wasteful: a value nobody
+    /// else holds does not have to be copied when bound. Without this distinction every
+    /// <c>let p = P { … };</c> would get a <c>structcopy</c> directly behind its <c>newobj</c> — correct,
+    /// but obviously pointless and visible in every disassembly.</para>
+    /// </summary>
     private readonly HashSet<TempId> _fresh = new();
 
     /// <summary>The lifted lambdas of the module. A lambda in the body registers here and gets its id
@@ -207,7 +207,7 @@ internal sealed class FunctionLowerer
         _returnType = CoroutineType?.Result ?? returnTypeOverride ?? LowerDeclaredReturnType();
 
         // The receiver is parameter 0 and is allocated BEFORE the declared parameters: the IR's parameter
-        // convention is positional, and a later slot would be a wrong-slot read in the VM. CIL takes the
+        // convention is positional, and a later slot would be the wrong slot at every call. CIL takes the
         // same route with 'this'.
         // A static default set in place for a conformer brings the conformer as its receiver
         // type for 'Self', and has no 'this'.
@@ -332,7 +332,7 @@ internal sealed class FunctionLowerer
         }
 
         // The environment is parameter 0, the same position 'this' occupies on a method. A closure call
-        // is therefore an ordinary call, and the VM needs no second frame setup for 'callind'.
+        // is therefore an ordinary call, and 'callind' needs no second frame setup.
         if (environmentType is IrRefType env)
         {
             _envType = env.Type;
@@ -410,19 +410,6 @@ internal sealed class FunctionLowerer
 
     // ------------------------------------------------------------------ closures
 
-    /// <summary>
-    /// A lambda: build the environment, register the function, produce the fat pointer.
-    ///
-    /// <para>The lifted function is NOT lowered here — it is only registered and gets its id immediately.
-    /// That is the condition for a recursive or nested lambda to work at all: its <c>mkclosure</c> is
-    /// settled before its body exists.</para>
-    /// </summary>
-    /// <summary>
-    /// <c>(1, "a")</c> — an object with one field per element.
-    ///
-    /// <para>The same sequence as for a struct initializer, except that the fields go by position rather
-    /// than by name. An opcode of its own would be a second way to build an object.</para>
-    /// </summary>
     /// <summary><c>a..b</c> as a value: the std.core struct holding its bounds, a
     /// fresh value like a tuple. In a <c>for</c> head the literal never gets here.</summary>
     private TempId LowerRangeValue(RangeExpr expr)
@@ -469,6 +456,12 @@ internal sealed class FunctionLowerer
         return copy;
     }
 
+    /// <summary>
+    /// <c>(1, "a")</c> — an object with one field per element.
+    ///
+    /// <para>The same sequence as for a struct initializer, except that the fields go by position rather
+    /// than by name. An opcode of its own would be a second way to build an object.</para>
+    /// </summary>
     private TempId LowerTupleLiteral(TupleLitExpr expr)
     {
         if (LowerType(_types.TypeOf(expr), expr.Span) is not IrStructType type)
@@ -489,6 +482,13 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    /// <summary>
+    /// A lambda: build the environment, register the function, produce the fat pointer.
+    ///
+    /// <para>The lifted function is NOT lowered here — it is only registered and gets its id immediately.
+    /// That is the condition for a recursive or nested lambda to work at all: its <c>mkclosure</c> is
+    /// settled before its body exists.</para>
+    /// </summary>
     private TempId LowerLambda(LambdaExpr lambda)
     {
         // a lambda an inline call sets in place is no closure: its 'return' is not its own
@@ -1215,10 +1215,6 @@ internal sealed class FunctionLowerer
         return null;
     }
 
-    /// <summary>An unexpanded site, met only in the hoisting pass of an expansion
-    /// round: a global's initializer of the calling module holds one, and that pass runs no
-    /// initializer. A trap, so the function stays well-formed; the expander replaces the site
-    /// before the module is lowered for real.</summary>
     /// <summary><c>quote { ... }</c>: a call of the native <c>std.syntax.quote#i</c>
     /// with the splices' values, which builds the tree from the quote's content; the content is
     /// in the module's table, by the import's index.</summary>
@@ -1239,6 +1235,10 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    /// <summary>An unexpanded site, met only in the hoisting pass of an expansion
+    /// round: a global's initializer of the calling module holds one, and that pass runs no
+    /// initializer. A trap, so the function stays well-formed; the expander replaces the site
+    /// before the module is lowered for real.</summary>
     private TempId? LowerMacroSite(MacroCallExpr site)
     {
         _b.Seal(new Unreachable(site.Span));
@@ -2482,7 +2482,7 @@ internal sealed class FunctionLowerer
         var type = TypeOfExpr(expr);
         // f32 has to be narrowed here: a const of type f32 whose value is no f32 value would be
         // malformed, and the verifier reports it. The narrowing belongs in the lowering, so the value in
-        // the bytecode is deterministically the same.
+        // the C is deterministically the same.
         var value = type is IrScalarType { Kind: IrScalar.F32 } ? (float)expr.Value : expr.Value;
         return EmitConst(new FloatConst(value), type, expr.Span);
     }
@@ -2536,8 +2536,7 @@ internal sealed class FunctionLowerer
             // 'map(o, (n: int) => double(n))'.
             //
             // It is a closure without an environment, nothing more. 'MakeClosure' takes its environment
-            // optionally — the common case '(x) => x > 0' captures nothing — and the VM decides from the
-            // 'HasEnvironment' bit whether slot 0 is occupied.
+            // optionally: the common case '(x) => x > 0' captures nothing.
             //
             // 'Reachability' already knows 'MakeClosure' as a root, so a function referenced only this
             // way does not fall victim to the reachability analysis.
@@ -2840,7 +2839,7 @@ internal sealed class FunctionLowerer
     /// <para>THE ONLY PLACE THAT DECIDES WHAT AN OPERATOR BECOMES. <c>a + b</c> and <c>a += b</c> are the
     /// same operator on the same types and have to reach the same instruction; when the compound paths
     /// emitted their own <c>BinOp</c>, <c>s += "x"</c> produced <c>add string</c>, which no release build
-    /// rejects and the VM evaluates as an integer addition of two references.</para>
+    /// rejects and which adds two references as integers.</para>
     ///
     /// <para><paramref name="type"/> is the type of the RESULT, which for a comparison is <c>bool</c>
     /// while the operands are not — hence the comparison guard on the string branch.</para>
@@ -3416,13 +3415,6 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// <c>xs[i] = v</c> and <c>xs[i] += v</c>.
-    ///
-    /// <para>Array AND index are evaluated exactly once — for <c>+=</c> that is the difference between
-    /// right and wrong as soon as either has side effects: <c>xs[next()] += 1</c> must not call
-    /// <c>next()</c> twice.</para>
-    /// </summary>
-    /// <summary>
     /// The place an index of a type's own names: <c>x.index(k)</c> reads it —
     /// the call the sema stored on the index expression — and <c>x.setIndex(k, …)</c> writes it,
     /// the call stored on the node that writes. The receiver and the key are evaluated HERE,
@@ -3525,24 +3517,15 @@ internal sealed class FunctionLowerer
         return result;
     }
 
+    /// <summary>
+    /// <c>xs[i] = v</c> and <c>xs[i] += v</c>.
+    ///
+    /// <para>Array AND index are evaluated exactly once — for <c>+=</c> that is the difference between
+    /// right and wrong as soon as either has side effects: <c>xs[next()] += 1</c> must not call
+    /// <c>next()</c> twice.</para>
+    /// </summary>
     private TempId LowerElementAssign(IndexExpr indexed, AssignExpr expr)
     {
-        // 'xs[i] = v' on a container is 'Indexable<T>.set(i, v)'. A compound assignment ('xs[i] += 1') is
-        // NOT covered here and reports as a scope boundary: it would need a read and a write with the
-        // same index, and whether the index may be evaluated twice is a language question the spec does
-        // not answer.
-        if (TypeOfExpr(indexed.Target) is not (IrArrayType or IrSliceType or IrInlineArrayType))
-        {
-            if (expr.Operator is not null)
-                throw NotSupported("compound assignment on a container (only on arrays)",
-                    expr.Span);
-
-            var stored = LowerExpr(expr.Value);
-            if (LowerIndexableCall(indexed, "set", stored) is null)
-                ResolveIndexAccess(indexed); // reports the scope boundary with the type name
-            return stored;
-        }
-
         var (array, index, element) = ResolveIndexAccess(indexed);
 
         if (expr.Operator is null)
@@ -3993,7 +3976,7 @@ internal sealed class FunctionLowerer
                 for (var i = 0; i < tuple.Elements.Length; i++)
                 {
                     // '_' binds nothing, so the field is not even read: an 'ldfld' whose result
-                    // nobody uses would be dead code in the bytecode.
+                    // nobody uses would be dead code in the C.
                     if (tuple.Elements[i] is WildcardPattern) continue;
 
                     var fieldType = layout.FieldTypes[i];
@@ -4606,13 +4589,6 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// <c>a?.b</c> — a field access that does not happen when there is no value.
-    ///
-    /// <para>The result is always an optional: when <c>a</c> has no value it is <c>optnone</c>, otherwise
-    /// the unwrapped field in <c>optsome</c>. That too is a branch — the field access must NOT run on an
-    /// empty reference, and an opcode could not express that without branching itself.</para>
-    /// </summary>
-    /// <summary>
     /// <c>b?.get()</c> — the receiver is optional, so the result is too.
     ///
     /// <para>THE CALL RUNS THROUGH THE SAME RESOLUTION AS ANY OTHER, only with an already unwrapped
@@ -4706,6 +4682,13 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
+    /// <summary>
+    /// <c>a?.b</c> — a field access that does not happen when there is no value.
+    ///
+    /// <para>The result is always an optional: when <c>a</c> has no value it is <c>optnone</c>, otherwise
+    /// the unwrapped field in <c>optsome</c>. That too is a branch — the field access must NOT run on an
+    /// empty reference, and an opcode could not express that without branching itself.</para>
+    /// </summary>
     private TempId LowerOptionalMember(MemberExpr expr)
     {
         var resultType = TypeOfExpr(expr);
@@ -4779,8 +4762,6 @@ internal sealed class FunctionLowerer
 
     // ------------------------------------------------------------------ arrays
 
-    /// <summary><c>[a, b, c]</c> — one instruction rather than three stores. The values lie on the stack
-    /// in source order at the <c>newarr</c>.</summary>
     /// <summary><c>b"…"</c>: a new <c>uint8[]</c> of its bytes, as an array literal of them is.</summary>
     private TempId LowerByteString(ByteStringExpr expr)
     {
@@ -4825,6 +4806,7 @@ internal sealed class FunctionLowerer
         return result;
     }
 
+    /// <summary><c>[a, b, c]</c> — one instruction rather than three stores.</summary>
     private TempId LowerArrayLiteral(ArrayLitExpr expr)
     {
         // '[a, b, c]' as a 'T[3]': the inline array, a fresh value.
@@ -4905,10 +4887,6 @@ internal sealed class FunctionLowerer
         // A range on a type that gives a view: the range of 'x.asSlice()', as checked.
         if (_types.RangeThroughViewOf(expr) is { Index: SliceRangeExpr viewRange } throughView)
             return LowerSlice(throughView, viewRange);
-        // A container from std.collections goes through 'Indexable<T>.get(i)' — the same division of
-        // labour as for 'for-in': the compiler knows ONE built-in form, the array, and everything else
-        // runs through the interface.
-        if (LowerIndexableCall(expr, "get", null) is { } viaInterface) return viaInterface;
         if (expr.Index is SliceRangeExpr range) return LowerSlice(expr, range);
 
         var (array, index, element) = ResolveIndexAccess(expr);
@@ -4917,57 +4895,13 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
-    /// <summary>
-    /// <c>xs[i]</c> and <c>xs[i] = v</c> on a type satisfying <c>Indexable&lt;T&gt;</c>, as a call to
-    /// <c>get</c> or <c>set</c>. Returns <c>null</c> when the carrier is an array; the built-in route
-    /// through <c>ldelem</c> and <c>stelem</c> then applies.
-    ///
-    /// <para>The call goes DIRECTLY rather than virtually: the receiver type is statically settled, and
-    /// for a generic instance the monomorphization has produced the method anyway. That is the same gain
-    /// as in constraint dispatch — an interface does not automatically mean a vtable.</para>
-    /// </summary>
-    private TempId? LowerIndexableCall(IndexExpr expr, string method, TempId? value)
-    {
-        if (TypeOfExpr(expr.Target) is IrArrayType or IrSliceType or IrInlineArrayType) return null;
-
-        var carrier = SubstituteType(_types.TypeOf(expr.Target));
-        if (TypeFacts.SymbolOf(carrier) is not { } owner) return null;
-        if (owner.Members.LookupLocal(method) is not FunctionSymbol symbol) return null;
-        if (symbol.Declaration is not FunctionDecl declaration) return null;
-
-        var target = carrier is GenericInstance instance
-            ? _instances.RequestMethod(symbol, declaration, instance, expr.Span)
-            : TryResolveFunction(symbol, out var direct)
-                ? direct
-                : throw NotSupported($"'{owner.Name}.{method}' was not lowered", expr.Span);
-
-        var receiver = LowerExpr(expr.Target);
-        var index = LowerExprAs(expr.Index, new IrScalarType(IrScalar.I64));
-
-        var arguments = value is { } stored
-            ? new[] { receiver, index, stored }
-            : new[] { receiver, index };
-
-        // 'set' yields void, 'get' the element type.
-        if (value is { } assigned)
-        {
-            _b.Emit(new Call(null, target, arguments, expr.Span));
-            return assigned;
-        }
-
-        var dest = _slots.NewTemp(TypeOfExpr(expr));
-        _b.Emit(new Call(dest, target, arguments, expr.Span));
-        _fresh.Add(dest);
-        return dest;
-    }
-
-    /// <summary>The shared part of reading and writing. <c>[i]</c> is built in on <c>T[]</c> only;
-    /// everything else goes through the <c>Indexable&lt;T&gt;</c> interface.</summary>
+    /// <summary>The shared part of reading and writing. <c>[i]</c> is built in on arrays and views;
+    /// a type's own goes through <c>Index&lt;K&gt;</c>, as the checker desugared it.</summary>
     private (TempId Array, TempId Index, IrType Element) ResolveIndexAccess(IndexExpr expr)
     {
         if (ElementOf(TypeOfExpr(expr.Target)) is not { } element)
             throw NotSupported($"indexing a '{TypeFacts.Display(_types.TypeOf(expr.Target))}' " +
-                               "(only arrays; other containers need the Indexable interface)",
+                               "(built in on arrays and views; a type has its own through 'Index')",
                 expr.Span);
 
         var target = LowerExpr(expr.Target);
@@ -5083,7 +5017,7 @@ internal sealed class FunctionLowerer
     /// field.
     ///
     /// <para>WRITING HAPPENS IN DECLARATION ORDER, NOT IN WRITE ORDER. The initializers may stand in any
-    /// order in the source, but the layout is the declaration, and only a fixed order makes the bytecode
+    /// order in the source, but the layout is the declaration, and only a fixed order makes the C
     /// deterministic. The values are nevertheless evaluated in SOURCE order — with side effects that is
     /// the order the reader expects.</para>
     /// </summary>
@@ -5259,7 +5193,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>A global slot: a module <c>let</c> or a <c>static let</c>. Both are the same in the
-    /// bytecode; the difference is only where the name is visible.</summary>
+    /// C; the difference is only where the name is visible.</summary>
     /// <param name="through">The type the read names the constant on, where it names one —
     /// <c>Crate&lt;int&gt;.empty</c>, the type a constraint's parameter stands for —, in this
     /// instance's terms. <c>null</c> for a bare name: inside the constant's own type, where
@@ -5582,14 +5516,15 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
-    /// <summary>
-    /// A call through a FUNCTION VALUE: <c>f(1)</c>, where <c>f</c> is a closure.
-    ///
-    /// <para>No default argument and no <c>params</c>: both are call-site transformations needing the
-    /// DECLARATION of the callee, and a function value has none. The type <c>fn(int) -&gt; int</c> says
-    /// "one argument", and there is nothing more to know. C# draws the same line at delegates, for the
-    /// same reason.</para>
-    /// </summary>
+    /// <summary>The base name of a generic function's instance where no receiver holds it: a
+    /// block's member by the block's target, a static of a type's body by the type, a free
+    /// function by itself. The name is the instance table's key
+    /// (<see cref="InstanceTable.Request"/>), so it tells apart what the program tells apart.</summary>
+    private string StaticBaseName(FunctionSymbol symbol, string calleeName) =>
+        _typeTable.BlockOf(symbol) is { Target: { } blockTarget } ? $"<extend>.{blockTarget.Name}.{calleeName}"
+        : TypeTable.TypeDeclaring(symbol) is { } declaring ? $"{declaring.Name}.{calleeName}"
+        : calleeName;
+
     /// <summary>
     /// A generic method of an interface, monomorphized: <c>Iterator&lt;int&gt;.map&lt;string&gt;</c>.
     ///
@@ -5603,15 +5538,6 @@ internal sealed class FunctionLowerer
     /// bought with it is chaining — <c>xs.iter().map(f).take(3)</c> — and what is paid is that such
     /// a method can never be dispatched dynamically.</para>
     /// </summary>
-    /// <summary>The base name of a generic function's instance where no receiver holds it: a
-    /// block's member by the block's target, a static of a type's body by the type, a free
-    /// function by itself. The name is the instance table's key
-    /// (<see cref="InstanceTable.Request"/>), so it tells apart what the program tells apart.</summary>
-    private string StaticBaseName(FunctionSymbol symbol, string calleeName) =>
-        _typeTable.BlockOf(symbol) is { Target: { } blockTarget } ? $"<extend>.{blockTarget.Name}.{calleeName}"
-        : TypeTable.TypeDeclaring(symbol) is { } declaring ? $"{declaring.Name}.{calleeName}"
-        : calleeName;
-
     private TempId? LowerGenericInterfaceMethod(MemberExpr member, CallExpr expr, TypeSymbol iface,
         FunctionSymbol method, TypeId interfaceId, TempId receiver)
     {
@@ -5664,14 +5590,6 @@ internal sealed class FunctionLowerer
         return result;
     }
 
-    /// <summary>
-    /// A method call on an instance of a generic type.
-    ///
-    /// <para>The method is monomorphized PER TYPE INSTANCE: <c>Box&lt;int&gt;.get</c> and
-    /// <c>Box&lt;string&gt;.get</c> are two functions. The substitution comes from the TYPE rather than
-    /// from the call — <c>get()</c> has no type parameters of its own, its <c>T</c> is that of
-    /// <c>Box</c>.</para>
-    /// </summary>
     /// <summary>
     /// What the instance makes of its definition's type parameters, by name.
     ///
@@ -5743,6 +5661,14 @@ internal sealed class FunctionLowerer
         return closure;
     }
 
+    /// <summary>
+    /// A method call on an instance of a generic type.
+    ///
+    /// <para>The method is monomorphized PER TYPE INSTANCE: <c>Box&lt;int&gt;.get</c> and
+    /// <c>Box&lt;string&gt;.get</c> are two functions. The substitution comes from the TYPE rather than
+    /// from the call — <c>get()</c> has no type parameters of its own, its <c>T</c> is that of
+    /// <c>Box</c>.</para>
+    /// </summary>
     private TempId? LowerGenericMethodCall(MemberExpr member, GenericInstance owner, CallExpr expr)
     {
         if (_types.RefOf(member) is not FunctionSymbol method)
@@ -5958,18 +5884,6 @@ internal sealed class FunctionLowerer
         return mapping;
     }
 
-    /// <summary>
-    /// A method call on a TYPE PARAMETER WITH A CONSTRAINT.
-    ///
-    /// <para>The sema binds <c>x.price()</c> to the interface declaration — that is all it knows in a
-    /// generic function. In an INSTANCE the substituted type is settled and with it the method that
-    /// really runs: the dynamic dispatch becomes a direct call.</para>
-    ///
-    /// <para>That is the gain of monomorphization, which Rust and C++ collect the same way, and the
-    /// reason a constraint needs no vtable here. A value available through its interface
-    /// (<c>let p: P = item;</c>) still goes through <c>callvirt</c>; those are two different questions
-    /// and therefore two paths.</para>
-    /// </summary>
     /// <summary>The interface entry an instance of a generic type is lifted into, as the type
     /// DECLARES it: for <c>ArrayIterator&lt;T&gt; :: [Iterator&lt;T&gt;]</c> and the instance
     /// <c>ArrayIterator&lt;string&gt;</c>, the entry of <c>Iterator&lt;string&gt;</c>. The written
@@ -6505,6 +6419,18 @@ internal sealed class FunctionLowerer
         return result;
     }
 
+    /// <summary>
+    /// A method call on a TYPE PARAMETER WITH A CONSTRAINT.
+    ///
+    /// <para>The sema binds <c>x.price()</c> to the interface declaration — that is all it knows in a
+    /// generic function. In an INSTANCE the substituted type is settled and with it the method that
+    /// really runs: the dynamic dispatch becomes a direct call.</para>
+    ///
+    /// <para>That is the gain of monomorphization, which Rust and C++ collect the same way, and the
+    /// reason a constraint needs no vtable here. A value available through its interface
+    /// (<c>let p: P = item;</c>) still goes through <c>callvirt</c>; those are two different questions
+    /// and therefore two paths.</para>
+    /// </summary>
     private TempId? LowerConstraintCall(MemberExpr member, LyrType concrete, CallExpr expr)
     {
         // An interface's private helper is never overridden: a conformer's method of its
@@ -6709,7 +6635,6 @@ internal sealed class FunctionLowerer
 
     // ------------------------------------------------------------------ std.meta
 
-    /// <summary><c>e.[f]</c>, in its round, is the member access the checker made of it.</summary>
     /// <summary><c>e.[v, p]</c>: the tag tested against the variant's — a panic where it
     /// is another —, the value narrowed, the payload field read by its place in the layout.</summary>
     private TempId LowerPayloadByInfo(PayloadByInfoExpr access)
@@ -6814,6 +6739,7 @@ internal sealed class FunctionLowerer
         throw Bug($"the initializer at {span} omits the payload field '{fieldName}', which has no default");
     }
 
+    /// <summary><c>e.[f]</c>, in its round, is the member access the checker made of it.</summary>
     private MemberExpr MemberOfInfo(FieldByInfoExpr access) =>
         _types.FieldMemberOf(access) ?? throw Bug($"'e.[f]' at {access.Span} reached the lowering outside a round");
 
@@ -7188,6 +7114,14 @@ internal sealed class FunctionLowerer
         return false;
     }
 
+    /// <summary>
+    /// A call through a FUNCTION VALUE: <c>f(1)</c>, where <c>f</c> is a closure.
+    ///
+    /// <para>No default argument and no <c>params</c>: both are call-site transformations needing the
+    /// DECLARATION of the callee, and a function value has none. The type <c>fn(int) -&gt; int</c> says
+    /// "one argument", and there is nothing more to know. C# draws the same line at delegates, for the
+    /// same reason.</para>
+    /// </summary>
     private TempId? LowerIndirectCall(CallExpr expr)
     {
         if (_types.TypeOf(expr.Callee) is FnType { IsC: true } cFunction) return LowerCPointerCall(expr, cFunction);
@@ -7649,7 +7583,7 @@ internal sealed class FunctionLowerer
         // where an array's or a slice's elements begin
         if (TryFfiMemory(symbol, expr, out var memory)) return memory;
 
-        // Natively backed, by the stdlib or the host: its own instruction type and its own index space.
+        // Natively backed: its own instruction type and its own index space.
         if (_imports.IsNative(symbol))
         {
             var passed = WithDefaults(symbol, expr, out var quoted);
@@ -7766,16 +7700,6 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
-    /// <summary>
-    /// The argument list as the callee expects it: exactly one value per declared parameter.
-    ///
-    /// <para>Here the two forms arise that look different at the source than in the IR: a <c>params</c>
-    /// array and an omitted default.</para>
-    ///
-    /// <para>The default expression is evaluated AT THE CALL SITE rather than once at the callee, the
-    /// same choice as in C#. Otherwise it would have to be lowered in a context where the caller's
-    /// arguments are not visible.</para>
-    /// </summary>
     /// <summary>The arguments of a call in parameter order: as the sema arranged them when the call
     /// names some, as written otherwise.</summary>
     private Expr?[] ArgumentsOf(CallExpr expr)
@@ -7866,13 +7790,6 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>
-    /// An argument adapted to the DECLARED parameter type.
-    ///
-    /// <para>Without this step a class stays a class even when the parameter is an interface, and the
-    /// callee gets a bare reference instead of a fat pointer. The verifier catches that, but as a type
-    /// mismatch deep in the callee rather than as what it is: a missing coercion at the call site.</para>
-    /// </summary>
-    /// <summary>
     /// The argument for parameter <paramref name="i"/> where the call leaves it out:
     /// the text the call wrote for the parameter <c>@callerExpr</c> names, the call's place for
     /// <c>@callerLine</c> and <c>@callerFile</c>, else the parameter's default — lowered per call,
@@ -7918,6 +7835,13 @@ internal sealed class FunctionLowerer
         finally { foreach (var symbol in bound) _argumentOverrides.Remove(symbol); }
     }
 
+    /// <summary>
+    /// An argument adapted to the DECLARED parameter type.
+    ///
+    /// <para>Without this step a class stays a class even when the parameter is an interface, and the
+    /// callee gets a bare reference instead of a fat pointer. The verifier catches that, but as a type
+    /// mismatch deep in the callee rather than as what it is: a missing coercion at the call site.</para>
+    /// </summary>
     private TempId LowerArgument(Expr argument, Param parameter,
         IReadOnlyDictionary<string, LyrType>? calleeSubstitution = null)
     {
@@ -8056,19 +7980,6 @@ internal sealed class FunctionLowerer
         return dest;
     }
 
-    /// <summary>A call to a natively backed function. The signature comes from the import table rather
-    /// than from a function: an import has no body.</summary>
-    /// <summary>
-    /// <c>[first, ..rest]</c> — the elements the rest covers, copied into an array of their own.
-    ///
-    /// <para>A copy, not a view: the language has no slice, and a view would alias the array the
-    /// pattern matched. Python's <c>case [x, *rest]</c> copies for the same reason; Rust's
-    /// <c>rest @ ..</c> does not, because it has slices.</para>
-    ///
-    /// <para>The length is known only at runtime, so the array comes from
-    /// <c>std.core.rawArrayAlloc</c>, whose slots are unwritten until the loop below fills every
-    /// one of them. That the native is generic is what makes this work at any element type.</para>
-    /// </summary>
     /// <summary><c>..rest</c> binds a view of the elements between the fixed ones — from
     /// <c>before</c> to <c>length - after</c> — sharing them, no copy.</summary>
     private void BindNamedRest(RestPattern rest, TempId value, IrType elementType, TempId length,
@@ -8096,7 +8007,7 @@ internal sealed class FunctionLowerer
     ///
     /// <para>No instance is built. A native has no body to monomorphize — what varies is only what
     /// the runtime is told the signature is, and the import table has keyed by name AND signature
-    /// since coroutines. The binder compares TAGS, so one host implementation answers every
+    /// since coroutines. One runtime function answers every
     /// instantiation whose shape it can serve.</para>
     /// </summary>
     private TempId? LowerGenericImportCall(FunctionSymbol symbol, CallExpr expr, string calleeName)
@@ -8136,7 +8047,7 @@ internal sealed class FunctionLowerer
     }
 
     /// <summary>A written type of a native's signature, lowered with the call's type arguments put
-    /// in for the declaration's own parameter names. Past what a host binds by layout, a generic
+    /// in for the declaration's own parameter names. Past the primitives, a generic
     /// native — only the standard library declares one — takes what its non-generic natives take
     /// (ModuleLowerer.NativeType): a type the runtime holds without knowing its layout, an object
     /// such as <c>Atomic&lt;T&gt;</c>, lowered through the table under the same substitution.</summary>
@@ -8211,12 +8122,14 @@ internal sealed class FunctionLowerer
         return [.. all];
     }
 
+    /// <summary>A call to a natively backed function. The signature comes from the import table rather
+    /// than from a function: an import has no body.</summary>
     private TempId? LowerImportCall(ImportId target, Expr[] arguments, Span span)
     {
         var import = _imports.Used[target.Value];
 
         // The shape carries the DECLARED parameters; the import carries the flattened wire
-        // signature. Without a shape — runtime helpers, generated host functions — the two
+        // signature. Without a shape — runtime helpers — the two
         // coincide.
         var shape = _imports.ShapeOf(target);
         var declared = shape?.Params.Length ?? import.ParamTypes.Length;
@@ -8270,7 +8183,7 @@ internal sealed class FunctionLowerer
             }
         }
 
-        // A struct RETURN: the hidden buffer goes in as the trailing argument, the host fills
+        // A struct RETURN: the hidden buffer goes in as the trailing argument, the native fills
         // its slots, and the expression's value is a fresh COPY of the buffer — value semantics
         // is what makes the shared buffer safe (any binding copies), and the scalarizer is what
         // makes the copy free when it never escapes.
@@ -8621,6 +8534,12 @@ internal sealed class FunctionLowerer
             ? option.Inner
             : _types.TypeOf(target);
 
+    /// <summary>The type of a place that holds a value of the type — a parameter, a local: the
+    /// <see cref="TypeTable.Unit"/> for <c>void</c>, which an instance binds a type parameter to
+    /// (03 §9.1).</summary>
+    private IrType LowerValueType(LyrType type, Span span) =>
+        SubstituteType(type) is PrimitiveType { Kind: PrimitiveKind.Void } ? TypeTable.Unit : LowerType(type, span);
+
     /// <summary>
     /// A sema type to an IR type. The substitution hook of the monomorphization sits here and nothing
     /// else: the mapping itself lives in <see cref="TypeTable.Lower(Sema.LyrType, Core.Span)"/>.
@@ -8631,12 +8550,6 @@ internal sealed class FunctionLowerer
     /// array untranslatable while the same expression worked inside a function. The difference is now the
     /// substitution alone.</para>
     /// </summary>
-    /// <summary>The type of a place that holds a value of the type — a parameter, a local: the
-    /// <see cref="TypeTable.Unit"/> for <c>void</c>, which an instance binds a type parameter to
-    /// (03 §9.1).</summary>
-    private IrType LowerValueType(LyrType type, Span span) =>
-        SubstituteType(type) is PrimitiveType { Kind: PrimitiveKind.Void } ? TypeTable.Unit : LowerType(type, span);
-
     private IrType LowerType(LyrType type, Span span)
     {
         // Substitute first, then map. Recursively, so 'Box<T>', '?T' and 'T[]' see the instance's
@@ -8651,20 +8564,6 @@ internal sealed class FunctionLowerer
         return _typeTable.Lower(concrete, span);
     }
 
-    /// <summary>The return type comes from the syntactic <see cref="TypeNode"/>, because the sema does
-    /// not put it into <see cref="TypeResult"/>. The resolution lives in the <see cref="TypeTable"/>, the
-    /// same place that resolves field and parameter types, so a factory <c>static fn new(): P</c> yields
-    /// the same type as a field of type <c>P</c>.</summary>
-    /// <summary>Substitutes the type arguments of this instance into a type, recursively, because an
-    /// argument may itself be composite (<c>Box&lt;T[]&gt;</c>).</summary>
-    /// <summary>
-    /// The id under which a function is callable. Two sources, and the order matters: written functions
-    /// have their id from pass 1, an extension method gets it ONLY HERE, at its first call.
-    ///
-    /// <para>That is the point: an extension that is never called does not reach the bytecode. Without
-    /// the distinction every program carries the five Display extensions from <c>std.core</c>, because
-    /// that module is always loaded.</para>
-    /// </summary>
     /// <summary>
     /// Did the sema bind this member to a visible EXTENSION method?
     ///
@@ -8678,6 +8577,14 @@ internal sealed class FunctionLowerer
         _types.RefOf(member) is FunctionSymbol bound
         && _typeTable.ExtensionOwnerOf(bound) is not null;
 
+    /// <summary>
+    /// The id under which a function is callable. Two sources, and the order matters: written functions
+    /// have their id from pass 1, an extension method gets it ONLY HERE, at its first call.
+    ///
+    /// <para>That is the point: an extension that is never called does not reach the program. Without
+    /// the distinction every program carries the five Display extensions from <c>std.core</c>, because
+    /// that module is always loaded.</para>
+    /// </summary>
     private bool TryResolveFunction(FunctionSymbol symbol, out FunctionId id)
     {
         if (_functions.TryGetValue(symbol, out id)) return true;
@@ -8733,6 +8640,10 @@ internal sealed class FunctionLowerer
 
     private static Core.Span SpanOfDecl(FunctionDecl decl) => decl.Span;
 
+    /// <summary>The return type comes from the syntactic <see cref="TypeNode"/>, because the sema does
+    /// not put it into <see cref="TypeResult"/>. The resolution lives in the <see cref="TypeTable"/>, the
+    /// same place that resolves field and parameter types, so a factory <c>static fn new(): P</c> yields
+    /// the same type as a field of type <c>P</c>.</summary>
     private IrType LowerDeclaredReturnType()
     {
         if (_decl!.ReturnType is null) return VoidType;

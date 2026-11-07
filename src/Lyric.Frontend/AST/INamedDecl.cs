@@ -25,8 +25,6 @@ public interface INamedDecl
     /// <summary>The declared name.</summary>
     string Name { get; }
 
-    /// <summary>Where <see cref="Name"/> is written. Empty and carrying an invalid
-    /// <see cref="FileId"/> for a synthesised declaration that stands in no file.</summary>
     /// <summary>Where the name stands. EMPTY when the source names nothing — the element of
     /// <c>for ((k, v) in …)</c> and the parameter of <c>((k, v)) =&gt; …</c> have a slot but no
     /// name of their own, and the pattern binds what there is. A consumer that highlights or

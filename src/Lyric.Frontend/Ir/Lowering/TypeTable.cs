@@ -8,7 +8,7 @@ namespace Lyric.Ir.Lowering;
 /// Assigns a <see cref="TypeId"/> to every lowered <c>class</c> and builds its layout.
 ///
 /// <para>INTERNED ON DEMAND, as in <see cref="ImportTable"/>: a declared but never used class does not
-/// belong in the bytecode's type table. The order follows the lowering order and is therefore
+/// belong in the module's type table. The order follows the lowering order and is therefore
 /// deterministic.</para>
 ///
 /// <para>THE ID IS ASSIGNED BEFORE THE LAYOUT. That is the whole trick making
@@ -27,7 +27,7 @@ internal sealed class TypeTable
     private readonly List<IrTypeDef> _defs = new();
     private readonly Dictionary<TypeSymbol, UnsupportedConstructException> _failed =
         new(ReferenceEqualityComparer.Instance);
-    /// <summary>The variant names per enum entry, for the lowering only; the bytecode holds the index.
+    /// <summary>The variant names per enum entry, for the lowering only; the IR holds the index.
     /// </summary>
     private readonly Dictionary<int, string[]> _variantNames = new();
     private readonly BindingResult _binding;
@@ -37,12 +37,12 @@ internal sealed class TypeTable
     /// second truth about visibility and shadowing.</param>
     public TypeTable(BindingResult binding) => _binding = binding;
 
-    /// <summary>The compilation, when the lowerer passes it through. Needed for two questions that
-    /// cannot be answered without it: which symbol a builtin type has, and which <c>extend</c> blocks are
-    /// visible.</summary>
     /// <summary>The name binding, for the conformance questions the lowering asks.</summary>
     public BindingResult Binding => _binding;
 
+    /// <summary>The compilation, when the lowerer passes it through. Needed for two questions that
+    /// cannot be answered without it: which symbol a builtin type has, and which <c>extend</c> blocks are
+    /// visible.</summary>
     public Compilation? Compilation { get; init; }
 
     /// <summary>How <c>comptime</c> sites lower in this run; <c>null</c> for a check. Carried
@@ -179,8 +179,6 @@ internal sealed class TypeTable
         return null;
     }
 
-    /// <summary>An extension method of this name on this type, across all visible <c>extend</c> blocks.
-    /// </summary>
     /// <summary>The block a method was declared in, or <c>null</c> for an ordinary function.</summary>
     public ExtensionBlock? BlockOf(FunctionSymbol method) => Compilation?.Extensions.BlockOf(method);
 
@@ -199,6 +197,8 @@ internal sealed class TypeTable
         return null;
     }
 
+    /// <summary>An extension method of this name on this type, across all visible <c>extend</c> blocks.
+    /// </summary>
     public FunctionSymbol? ExtensionMethod(TypeSymbol target, string member)
     {
         if (Compilation is not { } comp) return null;
@@ -217,12 +217,6 @@ internal sealed class TypeTable
     /// binding lives here.</summary>
     public TypeSymbol? ConstraintInterface(TypeNode node) => Conformance.InterfaceOf(node, _binding);
 
-    /// <summary>The interface among <paramref name="concrete"/>'s conformances — its own list and
-    /// every extend block, parents included — that declares <paramref name="member"/> itself, or
-    /// <c>null</c>: the sema bound a call to an interface's member on a concrete receiver (the
-    /// qualified form, a delegated member), and the call goes through that interface's table.</summary>
-    /// <summary>The interface that declares <paramref name="member"/> among its own members;
-    /// <c>null</c> for a member of anything else.</summary>
     /// <summary>The struct, class or enum that declares <paramref name="member"/> in its BODY;
     /// <c>null</c> for a free function, a block's member and an interface's.</summary>
     public static TypeSymbol? TypeDeclaring(FunctionSymbol member) =>
@@ -230,10 +224,16 @@ internal sealed class TypeTable
             .FirstOrDefault(t => t.Kind is TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum
                                  && t.Members.Symbols.Contains(member));
 
+    /// <summary>The interface that declares <paramref name="member"/> among its own members;
+    /// <c>null</c> for a member of anything else.</summary>
     public static TypeSymbol? InterfaceOwning(FunctionSymbol member) =>
         member.Home?.Members.Symbols.OfType<TypeSymbol>()
             .FirstOrDefault(t => t.Kind == TypeSymbolKind.Interface && t.Members.Symbols.Contains(member));
 
+    /// <summary>The interface among <paramref name="concrete"/>'s conformances — its own list and
+    /// every extend block, parents included — that declares <paramref name="member"/> itself, or
+    /// <c>null</c>: the sema bound a call to an interface's member on a concrete receiver (the
+    /// qualified form, a delegated member), and the call goes through that interface's table.</summary>
     public TypeSymbol? InterfaceDeclaring(TypeSymbol concrete, FunctionSymbol member)
     {
         IEnumerable<TypeSymbol> declared = Conformance.DeclaredInterfaces(concrete, _binding);
@@ -264,14 +264,6 @@ internal sealed class TypeTable
         return null;
     }
 
-    /// <summary>The same question one step further in: which interface of <paramref name="iface"/>'s
-    /// own CHAIN declares <paramref name="member"/>. A constraint names one interface, and the member
-    /// it promises may be its parent's — abstract or default alike.
-    ///
-    /// <para>The answer is the interface the receiver is lifted to, so it is the DECLARING one rather
-    /// than the constrained one: its slot index and its default's <c>this</c> then agree, which is what
-    /// keeps the lifted value usable for both the dispatch and, afterwards, the devirtualizer.</para>
-    /// </summary>
     /// <summary>Does this type name one interface SEVERAL times in its conformances — its own
     /// <c>::</c> list and every visible <c>extend</c> block together?
     ///
@@ -305,6 +297,14 @@ internal sealed class TypeTable
         _ => [],
     };
 
+    /// <summary>The same question one step further in: which interface of <paramref name="iface"/>'s
+    /// own CHAIN declares <paramref name="member"/>. A constraint names one interface, and the member
+    /// it promises may be its parent's — abstract or default alike.
+    ///
+    /// <para>The answer is the interface the receiver is lifted to, so it is the DECLARING one rather
+    /// than the constrained one: its slot index and its default's <c>this</c> then agree, which is what
+    /// keeps the lifted value usable for both the dispatch and, afterwards, the devirtualizer.</para>
+    /// </summary>
     public TypeSymbol? InterfaceInChainProviding(TypeSymbol iface, string member)
     {
         foreach (var candidate in Conformance.WithParents(iface, _binding))
@@ -325,8 +325,6 @@ internal sealed class TypeTable
     /// </summary>
     private readonly Dictionary<string, TypeId> _instances = new(StringComparer.Ordinal);
 
-    /// <summary>The symbol and id of every instance, for the impl table, which has to know which class
-    /// satisfies which interface even when both are instances.</summary>
     /// <summary>Every interned generic instance with its type arguments.
     ///
     /// <para>The arguments stand there because the impl table needs them: a vtable row for
@@ -352,7 +350,7 @@ internal sealed class TypeTable
     ///
     /// <para>No IR type and no opcode of its own, the same decision as for cells and closure
     /// environments. A tuple IS an object with N fields, so <c>newobj</c> and <c>ldfld</c> do it; the
-    /// verifier checks it like any other object, and the bytecode format stays unchanged.</para>
+    /// verifier checks it like any other object.</para>
     ///
     /// <para>A VALUE, a struct with positional fields: inline where it lies, copied at a binding
     /// point. The layout is the one C gives an anonymous struct, which the ABI hands over by
@@ -386,8 +384,8 @@ internal sealed class TypeTable
     /// The type a captured <c>var</c> lives in: an object with ONE field.
     ///
     /// <para>Deliberately no IR type and no opcode of its own. A cell is an object, so <c>newobj</c>,
-    /// <c>ldfld 0</c> and <c>stfld 0</c> do it — the verifier checks it like any other object, the
-    /// disassembler shows it without a special case, and the bytecode format stays unchanged. A
+    /// <c>ldfld 0</c> and <c>stfld 0</c> do it — the verifier checks it like any other object and the
+    /// IR printer shows it without a special case. A
     /// <c>newcell</c>/<c>ldcell</c>/<c>stcell</c> trio would be a second mechanism for "field of an
     /// object".</para>
     ///
@@ -509,7 +507,7 @@ internal sealed class TypeTable
     public string[] MethodSlotsOf(TypeId id) => _defs[id.Value].MethodSlots;
 
     /// <summary>All types interned so far with their symbol, the basis of the impl table. Only what was
-    /// interned stands in the bytecode, and only that needs vtable rows.</summary>
+    /// interned stands in the program, and only that needs vtable rows.</summary>
     public IEnumerable<(TypeSymbol Symbol, TypeId Id)> Interned =>
         _assigned.Select(pair => (pair.Key, pair.Value))
             .Concat(_instanceSymbols.Select(entry => (entry.Symbol, entry.Id)));
@@ -565,8 +563,8 @@ internal sealed class TypeTable
     /// arguments.
     ///
     /// <para><c>Box&lt;int&gt;</c> and <c>Box&lt;string&gt;</c> get different entries with their own
-    /// layout. That is the same monomorphization as for functions and for the same reason: the VM knows
-    /// no types at runtime, so a field layout has to be settled at compile time.</para>
+    /// layout. That is the same monomorphization as for functions and for the same reason: C knows
+    /// no generics, so a field layout has to be settled at compile time.</para>
     /// </summary>
     public TypeId Intern(TypeSymbol symbol, IReadOnlyList<LyrType> typeArguments)
     {
@@ -702,7 +700,6 @@ internal sealed class TypeTable
             {
                 // A field default does NOT belong in the layout: it is an expression rather than a type
                 // and is evaluated at the construction site, where the explicitly given values arise too.
-                // Nothing of it stands in the bytecode.
                 names[i] = fields[i].Name;
                 types[i] = ValueOf(Lower(fields[i].Type, fields[i].Span));
             }
@@ -989,7 +986,7 @@ internal sealed class TypeTable
         return id;
     }
 
-    /// <summary>Finds the field index. The name exists here and in diagnostics only; the bytecode holds
+    /// <summary>Finds the field index. The name exists here and in diagnostics only; the IR holds
     /// the position alone.</summary>
     public FieldId FieldOf(TypeSymbol symbol, string name, Core.Span span)
     {
@@ -1247,15 +1244,6 @@ internal sealed class TypeTable
                 : "a type this lowering cannot resolve", node.Span);
     }
 
-    /// <summary>
-    /// A written type argument as a <see cref="LyrType"/>, which is what <see cref="Intern"/> needs as a
-    /// key.
-    ///
-    /// <para>Not through <see cref="Lower(TypeNode)"/>: that yields an IR type, and the sema type cannot
-    /// be recovered from it. The name of an instance has to be formed from sema types, or
-    /// <c>Box&lt;int&gt;</c> and <c>Box&lt;int64&gt;</c> would be named differently although they are the
-    /// same.</para>
-    /// </summary>
     /// <summary>The IR type of an instance: a reference, a value, an enum or an interface, depending on
     /// what the definition is.</summary>
     public IrType InstanceType(GenericInstance instance, Core.Span span)
@@ -1273,15 +1261,6 @@ internal sealed class TypeTable
         };
     }
 
-    /// <summary>
-    /// Pushes a substitution onto the stack for the lifetime of the returned scope — the same one
-    /// <see cref="Intern"/> uses while lowering the members of a generic instance.
-    ///
-    /// <para>Needed by the <see cref="FunctionLowerer"/>: a monomorphized FUNCTION, not method, knows its
-    /// type arguments, but the type table otherwise learns nothing of them. Without this,
-    /// <c>fn make&lt;T&gt;(x: T): Box&lt;T&gt;</c> is not lowerable — the return type gets resolved without
-    /// a substitution and <c>T</c> finds nothing.</para>
-    /// </summary>
     /// <summary>The generic alias a written name is bound to — not a type parameter of the
     /// substitution that shares its name, which is asked first everywhere else too.</summary>
     private TypeSymbol? GenericAliasOf(NamedType named)
@@ -1317,6 +1296,15 @@ internal sealed class TypeTable
     /// none.</summary>
     public IReadOnlyDictionary<string, LyrType>? CurrentSubstitution => _substitutions.Count > 0 ? _substitutions.Peek() : null;
 
+    /// <summary>
+    /// Pushes a substitution onto the stack for the lifetime of the returned scope — the same one
+    /// <see cref="Intern"/> uses while lowering the members of a generic instance.
+    ///
+    /// <para>Needed by the <see cref="FunctionLowerer"/>: a monomorphized FUNCTION, not method, knows its
+    /// type arguments, but the type table otherwise learns nothing of them. Without this,
+    /// <c>fn make&lt;T&gt;(x: T): Box&lt;T&gt;</c> is not lowerable — the return type gets resolved without
+    /// a substitution and <c>T</c> finds nothing.</para>
+    /// </summary>
     public IDisposable PushSubstitution(IReadOnlyDictionary<string, LyrType> mapping)
     {
         _substitutions.Push(mapping);

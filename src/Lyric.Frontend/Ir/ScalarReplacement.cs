@@ -184,8 +184,6 @@ internal static class ScalarReplacement
         public bool Viable = true;
     }
 
-    /// <summary>The locals whose place an <c>addr</c> takes: no longer frame-private,
-    /// since whoever holds the place reads and writes them.</summary>
     /// <summary>A type whose temps are places, not values: a struct, an enum, an inline array, an
     /// optional — the emitter names where the value lies, and a store copies it (CEmitter's
     /// IsAggregate; an optional of a reference is a value there, which this counts as a place
@@ -224,6 +222,8 @@ internal static class ScalarReplacement
         return true;
     }
 
+    /// <summary>The locals whose place an <c>addr</c> takes: no longer frame-private,
+    /// since whoever holds the place reads and writes them.</summary>
     private static HashSet<int> Addressed(IrFunction function) =>
         function.Blocks.SelectMany(b => b.Insts).OfType<AddrLocal>().Select(a => a.Local.Value).ToHashSet();
 

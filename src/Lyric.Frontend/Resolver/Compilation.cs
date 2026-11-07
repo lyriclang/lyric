@@ -223,9 +223,6 @@ public sealed class Compilation
         return _preludeSources = found;
     }
 
-    /// <summary>Does module <paramref name="from"/> see declarations from <paramref name="to"/>?
-    /// The same module, or an import of <paramref name="to"/> other than those in
-    /// <paramref name="without"/> — the answer the module would get with them taken out.</summary>
     /// <summary>
     /// Whether a block reaches the code of <paramref name="from"/> (spec 04 rule
     /// 10): a conformance block — <c>extend T :: [I] { … }</c>, the
@@ -243,6 +240,9 @@ public sealed class Compilation
     public bool Reaches(ModuleSymbol? from, ExtensionMethod method) =>
         method.InConformanceBlock || from is null || Sees(from, method.Module);
 
+    /// <summary>Does module <paramref name="from"/> see declarations from <paramref name="to"/>?
+    /// The same module, or an import of <paramref name="to"/> other than those in
+    /// <paramref name="without"/> — the answer the module would get with them taken out.</summary>
     public bool Sees(ModuleSymbol from, ModuleSymbol to, IReadOnlySet<ImportDecl>? without = null)
     {
         if (ReferenceEquals(from, to)) return true;
@@ -329,16 +329,6 @@ public sealed class Compilation
     }
 
     /// <summary>
-    /// Loads everything an <c>import</c> requires and that is not there yet, transitively.
-    ///
-    /// <para>It runs BEFORE resolution rather than during it, or the module list would grow while
-    /// the resolver iterates over it. The loop is index-based because <c>_modules</c> grows in its
-    /// body.</para>
-    ///
-    /// <para>A cycle terminates by itself: only what <see cref="FindModule"/> does not yet know is
-    /// loaded, and registration happens before a module's own imports are examined.</para>
-    /// </summary>
-    /// <summary>
     /// Modules the COMPILER itself needs, regardless of what the user imports: the f-string
     /// lowering calls <c>std.string.concat</c> and the <c>fromXxx</c> converters.
     /// </summary>
@@ -353,6 +343,16 @@ public sealed class Compilation
     /// </summary>
     private static readonly string[] CancelledHome = ["std", "task"];
 
+    /// <summary>
+    /// Loads everything an <c>import</c> requires and that is not there yet, transitively.
+    ///
+    /// <para>It runs BEFORE resolution rather than during it, or the module list would grow while
+    /// the resolver iterates over it. The loop is index-based because <c>_modules</c> grows in its
+    /// body.</para>
+    ///
+    /// <para>A cycle terminates by itself: only what <see cref="FindModule"/> does not yet know is
+    /// loaded, and registration happens before a module's own imports are examined.</para>
+    /// </summary>
     private void LoadImportedModules()
     {
         if (ModuleLoader is null) return;
@@ -450,7 +450,7 @@ public sealed class Compilation
     /// through.</para>
     ///
     /// <para>Deterministic: the walk follows this list and each module's declarations, so the same
-    /// input yields the same order and therefore the same bytecode.</para>
+    /// input yields the same order and therefore the same C.</para>
     /// </summary>
     public IReadOnlyList<ModuleSymbol> InitializationOrder()
     {
