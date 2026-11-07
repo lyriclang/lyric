@@ -8,8 +8,8 @@ namespace Lyric.Ir.Lowering;
 ///
 /// <para>The density of the tables (<c>Locals[i].Id.Value == i</c>) is STRUCTURALLY guaranteed here
 /// rather than checked: the id is formed from <c>Count</c> and the entry appended immediately after.
-/// The id is the slot index in the later bytecode, and a gap would be a wrong-slot read in the
-/// VM.</para>
+/// The id is the index into its table, and a gap would be a read of the wrong
+/// slot.</para>
 ///
 /// <para>Temps are NEVER reused; every expression gets a fresh one. That is the single-definition
 /// promise of the IR, on which the verifier's dominance argument rests. The table therefore grows

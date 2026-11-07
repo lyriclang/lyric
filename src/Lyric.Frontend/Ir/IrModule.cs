@@ -26,8 +26,8 @@ public class IrBlock(BlockId Id, List<IrOp> Insts)
 /// <c>Call</c> is not type-checkable — the verifier fetches the expected argument types exactly
 /// there.</item>
 /// <item>DENSE ID TABLES: <c>Locals[i].Id.Value == i</c>, likewise for <see cref="Temps"/> and
-/// <see cref="Blocks"/>. The id is the slot or jump index in the later bytecode; a gap or a
-/// permutation shows up as a wrong-slot read in the VM.</item>
+/// <see cref="Blocks"/>. The id is the index into its table; a gap or a
+/// permutation shows up as a read of the wrong slot.</item>
 /// <item><see cref="Entry"/> is <c>Blocks[0].Id</c> and has no predecessors — it is the only place
 /// for parameter setup, and a jump back into it would repeat that.</item>
 /// <item>Every temp is defined EXACTLY ONCE (SSA-light). On that rests the equivalence of
@@ -93,7 +93,7 @@ public enum IrHints
 }
 
 /// <summary>A natively backed function: the signature is declared in Lyric, the implementation lives
-/// in the host and is bound by <see cref="Name"/> at load time.</summary>
+/// in the runtime or in C, under <see cref="Name"/>.</summary>
 public record struct IrImport(string Name, IrType[] ParamTypes, IrType ReturnType)
 {
     /// <summary>For a C function: how each parameter crosses into C, in their order; <c>null</c>
@@ -158,8 +158,8 @@ public sealed record IrCForm(IrCKind Kind, string? Integer = null, int Variants 
 }
 
 /// <summary>
-/// The layout of a composite type. <see cref="FieldNames"/> is diagnostics only — only the types
-/// reach the bytecode, and the field index IS the position in <see cref="FieldTypes"/>.
+/// The layout of a composite type. <see cref="FieldNames"/> says what they are called;
+/// the field index IS the position in <see cref="FieldTypes"/>.
 ///
 /// <para>Both lists have the same length; the verifier enforces that, because a divergence would
 /// otherwise only surface in the printer as an index exception.</para>
@@ -235,8 +235,8 @@ public record struct IrTypeDef(string Name, IrType[] FieldTypes, string[] FieldN
 /// </summary>
 public record struct IrImpl(TypeId Type, TypeId Interface, FunctionId[] Methods);
 
-/// <summary>A global slot. <paramref name="Name"/> is diagnostics only — only the type reaches the
-/// bytecode, and the index is the identity.</summary>
+/// <summary>A global slot. The index is the identity; <paramref name="Name"/> says what it
+/// is called.</summary>
 public record struct IrGlobal(string Name, IrType Type)
 {
     /// <summary>The full name of the module that declares the global, empty for a slot no
@@ -245,7 +245,7 @@ public record struct IrGlobal(string Name, IrType Type)
     public string Module { get; init; } = "";
 }
 
-/// <summary>What an attribute row describes. The numeric values are the bytecode encoding.</summary>
+/// <summary>What an attribute row describes.</summary>
 public enum IrAttributeTarget : byte { Function = 0, Type = 1, Module = 2 }
 
 /// <summary>
@@ -279,14 +279,6 @@ public class IrModule(List<IrFunction> Functions)
     /// <summary>The native functions this module calls, only the ones actually used.
     /// <c>CallImport</c> references them by index.</summary>
     public List<IrImport> Imports { get; init; } = new();
-
-    /// <summary>Which capabilities this module REQUIRES. What is granted is decided by the runtime at
-    /// load time; the compiler writes only the requirement.
-    ///
-    /// <para>It stands IN the module rather than beside it, because a '.lyrbc' can come from elsewhere:
-    /// a host loading foreign bytecode has to know without the compiler what the program wants to touch.
-    /// </para></summary>
-    public Capability Capabilities { get; set; } = Capability.None;
 
     /// <summary>The layouts of the composite types. <see cref="IrRefType"/>, <c>NewObject</c>,
     /// <c>LoadField</c> and <c>StoreField</c> reference them by <see cref="TypeId"/>; densely indexed
@@ -326,22 +318,20 @@ public class IrModule(List<IrFunction> Functions)
     /// </summary>
     public IrEmbedding? Embedding { get; set; }
 
-    /// <summary>The vtable rows. They land as the Impls section in the bytecode; the runtime builds its
-    /// dispatch table from them at load time, so <c>callvirt</c> is a lookup rather than a
+    /// <summary>The vtable rows. The emitted C holds them as its dispatch
+    /// tables, so <c>callvirt</c> is a lookup rather than a
     /// search.</summary>
     public List<IrImpl> Impls { get; init; } = new();
 
     /// <summary>Call targets reference the index into this list by <see cref="FunctionId"/>. Names have
-    /// to be unique: they become the symbol names in the bytecode.</summary>
+    /// to be unique: the emitted C is named after them.</summary>
     public List<IrFunction> Functions { get; init; } = Functions;
 
-    /// <summary>The entry point (<c>main</c>), or <c>null</c> for a pure library module. It moves into
-    /// the bytecode as the Start section; without it a runtime would have to guess the entry from a
-    /// naming convention.</summary>
+    /// <summary>The entry point (<c>main</c>), or <c>null</c> for a pure library module. The emitted
+    /// program starts it.</summary>
     public FunctionId? EntryFunction { get; set; }
 
-    /// <summary>The attribute rows, in declaration order. They land as section 11; the types they
-    /// reference additionally get their field names into section 12.</summary>
+    /// <summary>The attribute rows, in declaration order.</summary>
     public List<IrAttribute> Attributes { get; init; } = new();
 
     /// <summary>
@@ -350,7 +340,7 @@ public class IrModule(List<IrFunction> Functions)
     /// decides its contents (§4.6 of the specification).
     ///
     /// <para>COMPILE-INTERNAL: the list feeds <see cref="Reachability"/> and never reaches the
-    /// bytecode — the format has no section for it and needs none. Left empty by callers that lower
+    /// C. Left empty by callers that lower
     /// bare snippets (tests), whose functions would otherwise vanish.</para>
     /// </summary>
     public List<FunctionId> ExportRoots { get; init; } = new();

@@ -14,8 +14,7 @@ namespace Lyric.Ir.Lowering;
 /// <item><b>Hoist</b> (the evaluation pass): the inner expression is lowered in place as above,
 /// AND every site becomes a parameterless function <c>&lt;comptime:i&gt;</c> that returns it.
 /// Those functions are the module's only roots, so what reaches the evaluator is exactly what
-/// the sites need — and the capability bits are computed from that rather than from the whole
-/// program.</item>
+/// the sites need.</item>
 /// <item><b>Values</b> (the real pass): the site is replaced by the literal the evaluator
 /// produced for it. A missing value is a compiler bug, not a diagnostic.</item>
 /// </list>

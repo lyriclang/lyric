@@ -3,9 +3,7 @@ namespace Lyric.Core;
 /// <summary>
 /// What a <c>char</c> may be.
 ///
-/// <para>The rule is needed in two assemblies that cannot reference each other: the sema checks a
-/// <c>char</c> literal while compiling, the VM checks every computed result while running.
-/// <c>Lyric.Core</c> is the only project both see, so the bound exists once.</para>
+/// <para>What the verifier asks of a <c>char</c> constant; the bound exists once.</para>
 /// </summary>
 public static class Unicode
 {

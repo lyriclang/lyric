@@ -24,7 +24,7 @@ namespace Lyric.Ir;
 /// function on a fundamental error, while the next one is checked normally. The same principle as
 /// <c>ErrorType</c> as poison in the sema: no follow-up errors.</para>
 ///
-/// <para>The verifier runs after the lowering and before bytecode emission; always in tests and debug
+/// <para>The verifier runs after the lowering and before the C is emitted; always in tests and debug
 /// builds, in release behind a flag, as LLVM's verifier does in assert builds.</para>
 /// </summary>
 public static class IrVerifier
@@ -40,7 +40,7 @@ public static class IrVerifier
         VerifyTypes(module, findings);
         VerifyImpls(module, findings);
 
-        // Attribute rows become section 11. An index into nothing would only show at load time,
+        // An attribute row's index into nothing would only show in the emitter,
         // the same reason the entry point is checked here; the value count against the layout is
         // the contract that lets a consumer read values by field position.
         foreach (var attribute in module.Attributes)
@@ -75,7 +75,7 @@ public static class IrVerifier
         }
 
         // The init function is called by the runtime before the entry point; an index into nothing
-        // would only show at load time.
+        // would only show in the emitter.
         if (module.GlobalInit is { } init
             && (init.Value < 0 || init.Value >= module.Functions.Count))
             findings.Add($"global initializer {init} is out of range " +
@@ -101,7 +101,7 @@ public static class IrVerifier
 
         foreach (var function in module.Functions)
         {
-            // Names are the symbol names in the bytecode. A collision is the canary for the
+            // The emitted C is named after them. A collision is the canary for the
             // monomorphization: two instances falling onto the same mangled name would be a silent
             // wrong call.
             if (!seenNames.Add(function.Name))
@@ -110,8 +110,8 @@ public static class IrVerifier
             new FunctionVerifier(module, function, findings).Run();
         }
 
-        // The entry point becomes the Start section in the bytecode. An index into nothing would only
-        // show at load time, so it is checked here, where it arises.
+        // The emitted program starts here. An index into nothing would only
+        // show in the emitter, so it is checked here, where it arises.
         if (module.EntryFunction is { } entry)
         {
             if (entry.Value < 0 || entry.Value >= module.Functions.Count)
@@ -225,7 +225,7 @@ public static class IrVerifier
     /// the row has exactly as many entries as the interface has slots, every target function exists and
     /// takes a receiver, and no pair appears twice.
     ///
-    /// <para>These rows become the vtable in the bytecode. An error in them is a call of the wrong
+    /// <para>These rows become the vtable in the C. An error in them is a call of the wrong
     /// function with the right arguments — the kind of bug that shows far from its cause.</para>
     /// </summary>
     private static void VerifyImpls(IrModule module, List<string> findings)
@@ -358,8 +358,8 @@ public static class IrVerifier
         {
             var ok = true;
 
-            // Dense tables are not cosmetic: the id IS the slot index in the bytecode. A gap or a
-            // permutation shows up as a wrong-slot read in the VM.
+            // Dense tables are not cosmetic: the id IS the index into its table. A gap or a
+            // permutation shows up as a read of the wrong slot.
             for (var i = 0; i < _fn.Locals.Count; i++)
             {
                 var local = _fn.Locals[i];
@@ -426,7 +426,7 @@ public static class IrVerifier
                 }
             }
 
-            // A declared but never defined temp reserves a VM slot for nothing. The reverse case —
+            // A declared but never defined temp reserves a slot for nothing. The reverse case —
             // defined but never used — is legal: a discarded call result such as `foo();` for
             // `foo(): int`.
             foreach (var temp in _fn.Temps)
@@ -1167,9 +1167,6 @@ public static class IrVerifier
                                  $"'{import.Name}' returns {Show(import.ReturnType)}");
     }
 
-    /// <summary>Resolves a <see cref="TypeId"/> against the module table. <c>null</c> means the index
-    /// points into nothing and was already reported; the caller then stops rather than continuing with a
-    /// substitute layout and producing follow-up findings.</summary>
     /// <summary>
     /// <c>mkiface</c>: the source is a class or enum reference, the target an interface entry, and THERE
     /// IS A VTABLE ROW FOR EXACTLY THIS PAIR.
@@ -1262,15 +1259,6 @@ public static class IrVerifier
         RequireDestType(m.Dest, new IrInterfaceType(m.Interface), "mkiface", block, index);
     }
 
-    /// <summary>
-    /// <c>callvirt</c>: the receiver (argument 0) is a value of exactly this interface, and the slot lies
-    /// within its method list.
-    ///
-    /// <para>The argument types are NOT checked against a target function, because there is none: which
-    /// one runs is decided at runtime. The signature stands on the interface, and that all
-    /// implementations satisfy it was checked by the sema. What the verifier holds here is the shape;
-    /// the congruence of the vtable rows is checked by <see cref="CheckImpls"/>.</para>
-    /// </summary>
     /// <summary>
     /// <c>mkclosure</c>: the fat pointer of target function and environment.
     ///
@@ -1396,6 +1384,15 @@ public static class IrVerifier
                                  "suspension carries its value");
     }
 
+    /// <summary>
+    /// <c>callvirt</c>: the receiver (argument 0) is a value of exactly this interface, and the slot lies
+    /// within its method list.
+    ///
+    /// <para>The argument types are NOT checked against a target function, because there is none: which
+    /// one runs is decided at runtime. The signature stands on the interface, and that all
+    /// implementations satisfy it was checked by the sema. What the verifier holds here is the shape;
+    /// the congruence of the vtable rows is checked by <see cref="CheckImpls"/>.</para>
+    /// </summary>
     private void CheckCallVirt(CallVirt c, BlockId block, int index)
     {
         if (c.Args.Length == 0)
@@ -1574,6 +1571,9 @@ public static class IrVerifier
         return null;
     }
 
+    /// <summary>Resolves a <see cref="TypeId"/> against the module table. <c>null</c> means the index
+    /// points into nothing and was already reported; the caller then stops rather than continuing with a
+    /// substitute layout and producing follow-up findings.</summary>
     private IrTypeDef? ResolveType(TypeId type, string what, BlockId block, int index)
     {
         if (type.Value >= 0 && type.Value < _module.Types.Count) return _module.Types[type.Value];
@@ -1603,11 +1603,6 @@ public static class IrVerifier
         return null;
     }
 
-    /// <summary>The object operand has to be a reference to EXACTLY the type the instruction names.
-    /// Carrying both is deliberate: the type in the instruction stream makes the field index check
-    /// possible at load time without data-flow analysis. That is why the verifier has to enforce here
-    /// that the two do not drift apart, or the bytecode reader later checks against the wrong
-    /// layout.</summary>
     /// <summary>
     /// The operand holds an object of this layout — a class OR a struct.
     ///
@@ -2045,14 +2040,14 @@ public static class IrVerifier
             IrScalar.I64 or IrScalar.U64 => true,
 
             // An IntConst with char type arises from 'c + 1': the untyped literal IS a char, so it stands
-            // in the bytecode as an integer constant with char type. Its bound is not that of a machine
+            // in the IR as an integer constant with char type. Its bound is not that of a machine
             // word but that of Unicode.
             IrScalar.Char => value <= long.MaxValue && Core.Unicode.IsCodepoint((long)value),
 
             _ => false
         };
 
-        // The code point rule lives in Lyric.Core, where sema, verifier and VM see it together.
+        // The code point rule lives in Lyric.Core.
         private static bool IsUnicodeScalarValue(int codePoint) => Core.Unicode.IsCodepoint(codePoint);
 
         private static bool ConstKindMatches(IrConstValue value, IrScalar kind) => value switch

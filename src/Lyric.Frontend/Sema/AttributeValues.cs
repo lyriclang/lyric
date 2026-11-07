@@ -20,7 +20,7 @@ namespace Lyric.Sema;
 /// the variant's tag — with the name resolved beside it.</para>
 ///
 /// <para>NOT constant folding, and deliberately not: Lyric has no such pass anywhere, and a
-/// <c>let</c> is an ordinary global slot filled at load time. What this reads is the one shape
+/// <c>let</c> is an ordinary global slot filled when the program starts. What this reads is the one shape
 /// whose value is already written in the source — a binding whose initializer IS a literal,
 /// possibly through a chain of them. Everything else stays a runtime expression, including
 /// <c>1 + 2</c>, which the compiler could compute but has nowhere to put.</para>

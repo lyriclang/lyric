@@ -12,8 +12,8 @@ namespace Lyric.Ir.Lowering;
 /// (<see cref="IrModule.GlobalInit"/>) and in the promise that a runtime calls it BEFORE the entry
 /// point.</para>
 ///
-/// <para>A FUNCTION RATHER THAN VALUES IN THE SECTION. A <c>static let ZERO: Vector3 =
-/// Vector3 { … }</c> is an expression, not a literal — as a value in the bytecode it would be
+/// <para>A FUNCTION RATHER THAN VALUES. A <c>static let ZERO: Vector3 =
+/// Vector3 { … }</c> is an expression, not a literal — as a value in a table it would be
 /// representable for scalars only, and the rest would need code anyway. A function can do everything
 /// the lowering can do, and the instruction set gets no special case. CIL solves it the same way with
 /// <c>.cctor</c>.</para>
@@ -24,7 +24,7 @@ namespace Lyric.Ir.Lowering;
 /// </summary>
 internal static class GlobalInitializer
 {
-    /// <summary>The name appears in the bytecode and must therefore be unable to collide with any Lyric
+    /// <summary>The name appears in the IR and must therefore be unable to collide with any Lyric
     /// identifier: <c>&lt;</c> is not allowed in an identifier.</summary>
     public const string Name = "<globals>";
 

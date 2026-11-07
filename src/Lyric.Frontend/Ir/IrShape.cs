@@ -7,7 +7,7 @@ namespace Lyric.Ir;
 /// branch.
 ///
 /// <para>A class of its own, because several stages ask the same question — the verifier for def/use
-/// and reachability, the bytecode emitter for stack scheduling. Two copies of these <c>switch</c>
+/// and reachability, the passes for what an instruction reads and writes. Two copies of these <c>switch</c>
 /// blocks would be a drift risk of the worst kind: a new instruction missing from one copy leads to
 /// silently wrong code rather than to an error.</para>
 ///
@@ -28,9 +28,7 @@ public static class IrShape
         CallImport k => k.Args,
         NewObject => Array.Empty<TempId>(),
         LoadField f => new[] { f.Object },
-        // The order is a contract, not taste: the stack scheduler places the operands in exactly this
-        // sequence, and the format fixes that for stfld the reference lies below the value. Swapping
-        // here means swapped arguments in the VM.
+        // The object first, then the value: the order the instruction's own fields have.
         StoreField f => new[] { f.Object, f.Value },
 
         NewArray a => a.Elements,

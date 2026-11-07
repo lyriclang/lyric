@@ -130,19 +130,19 @@ def main():
     for reason in reasons:
         print(reason)
 
-    if everything or "all5" in tests and "4x" in tests:
+    if everything or "all5" in tests and "frontend" in tests:
         (args.out / "tests.filter").write_text("", encoding="utf-8")
         print("tests: everything")
     else:
         parts = []
-        if "4x" in tests:
+        if "frontend" in tests:
             parts.append("FullyQualifiedName~Lyric.Tests.")
         if "all5" in tests:
             parts.append("FullyQualifiedName~Lyric5.Tests.")
         else:
-            parts += [f"FullyQualifiedName~Lyric5.Tests.{cls}." for cls in sorted(t for t in tests if t not in ("4x", "all5") and "." not in t)]
+            parts += [f"FullyQualifiedName~Lyric5.Tests.{cls}." for cls in sorted(t for t in tests if t not in ("frontend", "all5") and "." not in t)]
         # a name with a dot is a class of its own project, named whole (Lyric.Tests.Formatting.X)
-        if "4x" not in tests:
+        if "frontend" not in tests:
             parts += [f"FullyQualifiedName~{cls}." for cls in sorted(t for t in tests if "." in t)]
         (args.out / "tests.filter").write_text("|".join(parts), encoding="utf-8")
         print(f"tests: {len(parts)} filters")

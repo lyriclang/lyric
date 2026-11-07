@@ -2191,9 +2191,6 @@ public sealed partial class CEmitter
         { } d => $"{Temp(d)} = {call};",
     };
 
-    /// <summary>The arguments of a call: values, except the receiver of a struct method, which
-    /// goes as the place its temp aliases — so a <c>mut fn</c> writes the caller's
-    /// value and not a copy of it.</summary>
     /// <summary>A value of a variant: the tag, and the payload under its name in the union. The
     /// rest of the union stays zero, so a word no variant wrote is never a stray pointer.</summary>
     private string Variant(NewVariant v)

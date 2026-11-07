@@ -184,12 +184,6 @@ internal sealed partial class WarningAnalyzer
         _ => null,
     };
 
-    /// <summary>
-    /// A name a program declares or imports that hides one of the prelude's:
-    /// legal — the program's own wins in its module —, and said, because a reader of
-    /// 'assert(x)' takes it for the one every module has. The standard library, which declares
-    /// them, is not warned.
-    /// </summary>
     /// <summary>Whether the import binds the very symbol the prelude passes on under the name — it
     /// hides nothing then (04 §4 rule 5).</summary>
     private bool SameAsPrelude(ImportDecl import, ImportSelective selective, int i)
@@ -199,6 +193,12 @@ internal sealed partial class WarningAnalyzer
         return ReferenceEquals(imported, _comp.PreludeMember(selective.BoundName(i)));
     }
 
+    /// <summary>
+    /// A name a program declares or imports that hides one of the prelude's:
+    /// legal — the program's own wins in its module —, and said, because a reader of
+    /// 'assert(x)' takes it for the one every module has. The standard library, which declares
+    /// them, is not warned.
+    /// </summary>
     private void WarnPreludeShadowing()
     {
         if (_comp.Prelude is not { } prelude) return;

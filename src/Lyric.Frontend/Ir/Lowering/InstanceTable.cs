@@ -9,7 +9,7 @@ namespace Lyric.Ir.Lowering;
 ///
 /// <para>One <see cref="IrFunction"/> per concrete type argument tuple: <c>id&lt;int&gt;</c> and
 /// <c>id&lt;string&gt;</c> are two functions, not one with a type parameter. The IR therefore stays
-/// FULLY MONOMORPHIC — the verifier, the bytecode format and the VM learn nothing about generics, they
+/// FULLY MONOMORPHIC — the verifier and the C emitter learn nothing about generics, they
 /// only see more functions.</para>
 ///
 /// <para>MONOMORPHIC RATHER THAN GENERIC AT RUNTIME. C# reifies generics and needs a JIT that produces
@@ -345,13 +345,6 @@ internal sealed partial class InstanceTable
         });
 
     /// <summary>
-    /// Requests a METHOD OF A TYPE INSTANCE: <c>Box&lt;int&gt;.get</c>.
-    ///
-    /// <para>The substitution comes from the type rather than from the call — <c>get()</c> has no type
-    /// parameters of its own, its <c>T</c> is that of <c>Box</c>. Hence a separate request rather than
-    /// the same one as for generic functions.</para>
-    /// </summary>
-    /// <summary>
     /// A member of a generic <c>extend</c> block for one receiver: the block's
     /// parameters as the receiver bound them, 'this' the receiver's instance. Keyed by the
     /// receiver, as a method of a generic type is.
@@ -410,6 +403,13 @@ internal sealed partial class InstanceTable
         return id;
     }
 
+    /// <summary>
+    /// Requests a METHOD OF A TYPE INSTANCE: <c>Box&lt;int&gt;.get</c>.
+    ///
+    /// <para>The substitution comes from the type rather than from the call — <c>get()</c> has no type
+    /// parameters of its own, its <c>T</c> is that of <c>Box</c>. Hence a separate request rather than
+    /// the same one as for generic functions.</para>
+    /// </summary>
     public FunctionId RequestMethod(FunctionSymbol method, FunctionDecl decl,
         GenericInstance owner, Core.Span span)
     {
