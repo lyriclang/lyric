@@ -92,7 +92,6 @@ public static class SourceCompiler
         {
             var built = new Compilation(sources, diagnostics)
             {
-                Lyric5Modules = true,
                 Library = options.Library,
                 WarnNative = options.WarnDeps,
                 PackageDependencies = options.PackageDependencies,
@@ -142,7 +141,7 @@ public static class SourceCompiler
 
         // macros: every site is expanded before its module is checked; a program
         // without a site pays nothing
-        if (compilation.Lyric5Modules && !diagnostics.HasErrors && MacroExpander.Sites(compilation).Count > 0)
+        if (!diagnostics.HasErrors && MacroExpander.Sites(compilation).Count > 0)
         {
             report?.BeginPhase(Phase.Check, MacrosDetail);
             var expanded = MacroExpander.Expand(compilation, binding, diagnostics, sources, options, embed, trees =>
@@ -198,7 +197,7 @@ public static class SourceCompiler
         // A Lyric 5 program roots in its entry's 'main': a 'pub'
         // function nothing reaches is no part of the binary. The 4.x tools keep a library's roots.
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
-            optimize: options.Optimize, libraryRoots: !compilation.Lyric5Modules, passes: options.Passes,
+            optimize: options.Optimize, libraryRoots: false, passes: options.Passes,
             comptime: comptime, timings: timings);
         var lowered = lowering.Elapsed;
         if (ir is not null) report?.UpdateDetail(FunctionCount(ir));
@@ -208,8 +207,7 @@ public static class SourceCompiler
                 timings.Runs > 1 ? $"{FunctionCount(ir)}, {timings.Runs} runs" : FunctionCount(ir),
                 timings.Verification);
         // the lints' levels (16 §5), once every warning is in
-        if (compilation.Lyric5Modules)
-            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
+        LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
                 Written(options, sources));
         return new CompileResult(sources, diagnostics, ir, model)
             { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive };
@@ -224,7 +222,6 @@ public static class SourceCompiler
     private static void WarnDeprecated(Compilation compilation, BindingResult binding, TypeResult types,
         DiagnosticEngine diagnostics, CompilerOptions options, ComptimeTable? comptime)
     {
-        if (!compilation.Lyric5Modules) return;
         new WarningAnalyzer(compilation, binding, types, diagnostics)
             .RunDeprecated(StringFieldsOf(types, comptime), options.ToolchainVersion ?? ToolchainVersion.Value);
     }
@@ -295,7 +292,7 @@ public static class SourceCompiler
         out ComptimeTable? comptime)
     {
         comptime = null;
-        if (!compilation.Lyric5Modules || types.ComptimeSites.Count == 0) return true;
+        if (types.ComptimeSites.Count == 0) return true;
         var hoisting = new ComptimeTable { Hoist = true };
         var hoisted = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
             optimize: false, libraryRoots: false, passes: options.Passes, comptime: hoisting);
@@ -510,8 +507,7 @@ public static class SourceCompiler
     private static CompileResult Unlowered(Compilation compilation, TypeResult types, DiagnosticEngine diagnostics,
         CompilerOptions options, SourceManager sources, SemanticModel model, EmbedReader embed, ComptimeTable? comptime)
     {
-        if (compilation.Lyric5Modules)
-            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
+        LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
                 Written(options, sources));
         return new CompileResult(sources, diagnostics, null, model)
             { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive };
@@ -550,7 +546,6 @@ public static class SourceCompiler
         var compilation = new Compilation(sources, diagnostics)
         {
             ModuleLoader = loader,
-            Lyric5Modules = true,
             WarnNative = options.WarnDeps,
             PackageDependencies = options.PackageDependencies,
             ModuleOnDisk = ModuleProbe(options),
@@ -569,7 +564,7 @@ public static class SourceCompiler
             // reloads the file and reports the mismatch (LYR-RES0006), the same way it would were
             // the file not a root.
             // Lyric 5's names its module by the path alone, a header or none
-            var name = parsed.Ast.Header is not null && !compilation.Lyric5Modules ? null : root.ModuleName;
+            var name = root.ModuleName;
 
             compilation.AddModule(parsed.Ast, name, documentation: parsed.Documentation);
             entry ??= parsed.Ast;
@@ -614,8 +609,7 @@ public static class SourceCompiler
             optimize: options.Optimize, libraryRoots: true, passes: options.Passes, comptime: comptime);
         times.Mark(PhaseClock.Lower);
         if (ir is null) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
-        if (compilation.Lyric5Modules)
-            LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
+        LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
                 Written(options, sources));
         times.Mark(PhaseClock.Lint);
 

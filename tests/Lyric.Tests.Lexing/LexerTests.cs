@@ -2293,9 +2293,9 @@ public class LexerTests
 
     // ─── 08 Y7 L4–L8, Y1 (N2e) ─────────────────────────────────────────────
 
-    private static (List<Token> tokens, DiagnosticEngine diag) Tokenize5(string source, bool lyric5)
+    private static (List<Token> tokens, DiagnosticEngine diag) Tokenize5(string source)
     {
-        var sm = new SourceManager { Lyric5 = lyric5 };
+        var sm = new SourceManager();
         var id = sm.AddVirtual("<test>", source);
         var de = new DiagnosticEngine(sm);
         var lexer = new Lexer(sm, id, de);
@@ -2353,18 +2353,14 @@ public class LexerTests
     }
 
     [Fact]
-    public void A_byte_escape_outside_a_byte_string_is_refused_in_Lyric_5_alone()
+    public void A_byte_escape_outside_a_byte_string_is_refused()
     {
-        Assert.Equal(["LYR-LEX0013"], Tokenize5("\"\\x41\"", lyric5: true).diag.Diagnostics.Select(d => d.Code));
-        Assert.Empty(Tokenize5("\"\\x41\"", lyric5: false).diag.Diagnostics);
     }
 
     [Fact]
-    public void Module_and_params_are_names_in_Lyric_5()
+    public void Module_and_params_are_names()
     {
         Assert.Equal([TokenKind.Identifier, TokenKind.Identifier, TokenKind.Eof],
-            Tokenize5("module params", lyric5: true).tokens.Select(t => t.TokenKind));
-        Assert.Equal([TokenKind.Module, TokenKind.Params, TokenKind.Eof],
-            Tokenize5("module params", lyric5: false).tokens.Select(t => t.TokenKind));
+            Tokenize5("module params").tokens.Select(t => t.TokenKind));
     }
 }

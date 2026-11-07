@@ -56,7 +56,7 @@ public class Lyric5ProofTests
 
     private static string? Format(string text, string name)
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual(name, text);
         return Formatter.Format(sm, id, new DiagnosticEngine(sm));
     }
@@ -64,7 +64,7 @@ public class Lyric5ProofTests
     /// <summary>The module's tree as text, without spans; <c>null</c> where it does not parse.</summary>
     public static string? Dump(string text, string name)
     {
-        var sm = new SourceManager { Lyric5 = true };
+        var sm = new SourceManager();
         var id = sm.AddVirtual(name, text);
         var de = new DiagnosticEngine(sm);
         var module = new Lyric.Parsing.Parser(sm, id, de).ParseModule();

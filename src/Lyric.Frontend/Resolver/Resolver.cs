@@ -43,7 +43,7 @@ public sealed class Resolver
         foreach (var module in _comp.Modules) DeclareModule(module);
         SynthesizeInlineArrays();
         foreach (var module in _comp.Modules) ResolveImports(module);
-        if (_comp.Lyric5Modules) CheckOneNamespace();
+        CheckOneNamespace();
         DetectImportCycles();
         foreach (var module in _comp.Modules) SynthesizeImplied(module);
         foreach (var module in _comp.Modules) BindTypeNames(module);
@@ -64,7 +64,6 @@ public sealed class Resolver
     /// </summary>
     private void SynthesizeInlineArrays()
     {
-        if (!_comp.Lyric5Modules) return;
         var core = _comp.Modules.FirstOrDefault(m => m.FullName == "std.core");
         if (core is null) return;
         var declared = _comp.AstOf(core).Declarations.OfType<InterfaceDecl>().Select(i => i.Name).ToHashSet(StringComparer.Ordinal);
@@ -471,11 +470,11 @@ public sealed class Resolver
         // its module's: the interface's defaults call it, nothing else does.
         foreach (var fn in i.Members)
             DeclareMember(module, scope,
-                Fn(fn, !_comp.Lyric5Modules || fn.IsPrivateHelper ? fn.Visibility : i.Visibility), fn);
+                Fn(fn, fn.IsPrivateHelper ? fn.Visibility : i.Visibility), fn);
         foreach (var t in i.Types) DeclareMember(module, scope, new AssociatedTypeSymbol(t.Name, t) { Owner = ts }, t);
         // Its constants as visible as the interface, like its members.
         foreach (var sb in i.Statics)
-            DeclareMember(module, scope, new GlobalSymbol(sb.Binding.Name, Vis(_comp.Lyric5Modules ? i.Visibility : sb.Visibility), sb), sb);
+            DeclareMember(module, scope, new GlobalSymbol(sb.Binding.Name, Vis(i.Visibility), sb), sb);
     }
 
     private FunctionSymbol Fn(FunctionDecl fn, VisibilityWord word) =>
@@ -490,8 +489,7 @@ public sealed class Resolver
     private VisibilityWord ExtensionWord(ExtendDecl block, FunctionDecl fn) => ExtensionWord(block, fn.Visibility);
 
     private VisibilityWord ExtensionWord(ExtendDecl block, VisibilityWord written) =>
-        !_comp.Lyric5Modules ? written
-        : block.Interfaces.Length > 0 ? VisibilityWord.Pub
+        block.Interfaces.Length > 0 ? VisibilityWord.Pub
         : written != VisibilityWord.None ? written
         : block.Visibility;
 
@@ -516,7 +514,7 @@ public sealed class Resolver
         sym.Home = module;
         // A builtin type's name is no declaration's: 'struct int' would
         // make 'int' mean two things, one of them the language's own.
-        if (_comp.Lyric5Modules && _comp.Builtins.LookupLocal(sym.Name) is TypeSymbol)
+        if (_comp.Builtins.LookupLocal(sym.Name) is TypeSymbol)
         {
             _de.Report("LYR-RES0011", Severity.Error, decl.Span,
                 $"'{sym.Name}' is a builtin type — no declaration takes its name");
@@ -575,7 +573,7 @@ public sealed class Resolver
         if (target is null)
         {
             // 'geo.lib' is what the root module's file looks like and what it is not called.
-            if (_comp.Lyric5Modules && imp.Path is [var package, Compilation.RootModuleFile])
+            if (imp.Path is [var package, Compilation.RootModuleFile])
                 _de.Report("LYR-RES0003", Severity.Error, imp.Span,
                     $"cannot find module '{string.Join('.', imp.Path)}'",
                     new DiagnosticNote($"a package's 'src/{Compilation.RootModuleFile}.lyr' is the module "
@@ -587,7 +585,7 @@ public sealed class Resolver
                 var text = _sm.GetText(imp.Span.File);
                 var at = text.IndexOf(written, imp.Span.Start, imp.Span.End - imp.Span.Start, StringComparison.Ordinal);
                 var near = Lyric.Sema.NameSuggestion.For(written, _comp.Modules.Where(m => m.Path.Length > 0).Select(m => m.FullName));
-                if (_comp.Lyric5Modules && near is not null && at >= 0)
+                if (near is not null && at >= 0)
                     _de.Report("LYR-RES0003", Severity.Error, imp.Span, $"cannot find module '{written}'",
                         DiagnosticNote.Suggest($"did you mean '{near}'?",
                             new Replacement(new Span(imp.Span.File, at, at + written.Length), near, Applicability.NeedsReview)));
@@ -596,7 +594,7 @@ public sealed class Resolver
             }
         }
         // A package imports what its manifest declares — not what those depend on.
-        else if (_comp.Lyric5Modules && _comp.PackageDependencies is { } declared)
+        else if (_comp.PackageDependencies is { } declared)
         {
             var from = Compilation.PackageOf(module);
             var to = Compilation.PackageOf(target);
@@ -650,7 +648,7 @@ public sealed class Resolver
 
         // Another module's own import is no name of it (04 §3 rule 4): what it imported is imported
         // from where it is declared, unless a 'pub import' passed it on.
-        if (_comp.Lyric5Modules && found is ImportBindingSymbol or ExternalSymbol && !_comp.Visible(found, module))
+        if (found is ImportBindingSymbol or ExternalSymbol && !_comp.Visible(found, module))
         {
             _de.Report("LYR-RES0009", Severity.Error, at, _comp.Hidden(found));
             return [new ErrorSymbol(name)];
@@ -659,22 +657,17 @@ public sealed class Resolver
         // Lyric 5: the import asks the question every route asks. Of an overload set
         // only the visible functions come along — a private overload beside a 'pub' one is not
         // imported, and none visible is the one error. Bound all the same, as recovery.
-        if (_comp.Lyric5Modules)
-        {
-            var set = target.Members.OverloadsLocal(name);
-            var visible = set.Where(f => _comp.Visible(f, module)).ToArray();
-            if (visible.Length > 0 && visible.Length < set.Count)
-                return visible.Select(Symbol (fn) => new ImportBindingSymbol(bound, fn, imp)).ToArray();
-            if (visible.Length == 0 && !_comp.Visible(found, module))
-                _de.Report("LYR-RES0009", Severity.Error, at, _comp.Hidden(found));
-            // A re-export passes on what is 'pub' and nothing narrower: what the
-            // module may name itself is not therefore every package's.
-            else if (imp.IsPublic && !_comp.Exported(found))
-                _de.Report("LYR-RES0010", Severity.Error, at,
-                    $"'{name}' is not pub, and 'pub import' passes on what is pub — mark it 'pub' where it is declared");
-        }
-        else if (!IsPublic(found))
-            _de.Report("LYR-RES0004", Severity.Error, imp.Span, $"'{name}' is not public in '{target.FullName}'");
+        var set = target.Members.OverloadsLocal(name);
+        var visible = set.Where(f => _comp.Visible(f, module)).ToArray();
+        if (visible.Length > 0 && visible.Length < set.Count)
+            return visible.Select(Symbol (fn) => new ImportBindingSymbol(bound, fn, imp)).ToArray();
+        if (visible.Length == 0 && !_comp.Visible(found, module))
+            _de.Report("LYR-RES0009", Severity.Error, at, _comp.Hidden(found));
+        // A re-export passes on what is 'pub' and nothing narrower: what the
+        // module may name itself is not therefore every package's.
+        else if (imp.IsPublic && !_comp.Exported(found))
+            _de.Report("LYR-RES0010", Severity.Error, at,
+                $"'{name}' is not pub, and 'pub import' passes on what is pub — mark it 'pub' where it is declared");
 
         var overloads = target.Members.OverloadsLocal(name);
         if (overloads.Count < 2)
@@ -696,7 +689,7 @@ public sealed class Resolver
     private void DeclareImport(ModuleSymbol module, Symbol sym, ImportDecl imp)
     {
         sym.Home = module;
-        if (sym is ImportBindingSymbol binding) binding.Reexported = imp.IsPublic && _comp.Lyric5Modules;
+        if (sym is ImportBindingSymbol binding) binding.Reexported = imp.IsPublic;
         if (!module.Members.TryDeclare(sym))
             _de.Report("LYR-RES0001", Severity.Error, imp.Span,
                 $"'{sym.Name}' is already declared in this module",
@@ -1002,7 +995,7 @@ public sealed class Resolver
     /// <summary>A type named without an import: the prelude's in a program's own code;
     /// std.core's in what the compiler wrote, and for the 4.x tools.</summary>
     private TypeSymbol? ImplicitType(string name, FileId file) =>
-        _comp.Lyric5Modules && !_comp.IsSynthesized(file) ? _comp.PreludeMember(name) as TypeSymbol : CoreType(name);
+        !_comp.IsSynthesized(file) ? _comp.PreludeMember(name) as TypeSymbol : CoreType(name);
 
     /// <summary>A public type of <c>std.core</c>, visible without an import
     /// (<c>Any</c> among them): the last answer for a bare type name, after the scope
@@ -1019,7 +1012,7 @@ public sealed class Resolver
         VisibilityWord.Pub => Visibility.Public,
         VisibilityWord.Internal => Visibility.Internal,
         VisibilityWord.Private => Visibility.Private,
-        _ => _comp.Lyric5Modules ? Visibility.Internal : Visibility.Private,
+        _ => Visibility.Internal,
     };
 
     private static bool IsPublic(Symbol s) => s switch

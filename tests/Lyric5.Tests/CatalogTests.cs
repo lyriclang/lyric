@@ -105,15 +105,11 @@ public partial class CatalogTests
     private static readonly Dictionary<string, string> StillInTheSharedFrontend = new(StringComparer.Ordinal)
     {
         ["LYR-PAR0001"] = "the single-item parse of std.syntax and a macro's read-back reports into its own engine",
-        ["LYR-RES0006"] = "a module header that disagrees with its path: behind !Lyric5Modules",
         ["LYR-SEM0061"] = "constructing a host type: the 4.x native modules",
-        ["LYR-SEM0066"] = "an attribute value that is not a literal: the 4.x attribute rows",
-        ["LYR-SEM0069"] = "an attribute field without a value: the 4.x attribute rows",
         ["LYR-SEM0090"] = "a range value without std.core: lyric5 always loads it",
         ["LYR-SEM0091"] = "walking optional elements without the protocol: lyric5's std.core has the protocol",
         ["LYR-SEM0093"] = "making an opaque type's value by 'as': refused first by SEM0175 in Lyric 5",
         ["LYR-SEM0095"] = "'WithArg': the 4.x stdlib's",
-        ["LYR-SEM0096"] = "an attribute that cannot form a row: the 4.x attribute rows",
         ["LYR-CLI0010"] = "a lyric.json that cannot be read: the 4.x project file the Sema suite's corpus reads",
         ["LYR-CLI0018"] = "a lyric.json that asks for a newer toolchain: the same",
     };

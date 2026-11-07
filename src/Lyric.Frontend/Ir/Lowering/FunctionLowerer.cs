@@ -408,7 +408,6 @@ internal sealed class FunctionLowerer
 
     private bool InCoroutine => _coroutineYield is not null;
 
-
     // ------------------------------------------------------------------ closures
 
     /// <summary>
@@ -999,7 +998,6 @@ internal sealed class FunctionLowerer
             default: throw Bug($"unhandled statement {stmt.GetType().Name}");
         }
     }
-
 
     // ------------------------------------------------------------------ exceptions and defer
 
@@ -3219,7 +3217,6 @@ internal sealed class FunctionLowerer
         }
     }
 
-
     /// <summary>
     /// A value block as an expression: its statements in a scope of their own — its
     /// defers run at its end — and its tail into a slot, which is the block's value. A block
@@ -3921,15 +3918,6 @@ internal sealed class FunctionLowerer
         var dest = _slots.NewTemp(enumType);
         _b.Emit(new NewVariant(dest, variant, enumType.Type, fields, expr.Span));
         return dest;
-    }
-
-    private TypeSymbol RefEnumSymbol(Expr target, Span span)
-    {
-        var bound = _types.RefOf(target);
-        if (bound is ImportBindingSymbol import) bound = import.Target;
-        if (bound is TypeSymbol { Kind: TypeSymbolKind.Enum } symbol) return symbol;
-
-        throw NotSupported("variant construction on something that is not an enum", span);
     }
 
     /// <summary>Whether the last lowered <c>match</c> continues behind itself. A return value would be
@@ -4870,40 +4858,6 @@ internal sealed class FunctionLowerer
         var dest = _slots.NewTemp(type);
         _b.Emit(new LoadLocal(dest, slot, type, expr.Span));
         return dest;
-    }
-
-    /// <summary>
-    /// <c>x ??= v</c> — assigns only when <c>x</c> has no value.
-    ///
-    /// <para>Like <c>??</c> a branch rather than an opcode: the right side is evaluated only then, and an
-    /// unevaluated expression cannot be transported on a stack machine. The only difference from
-    /// <c>??</c> is that the result goes back into the existing slot rather than into a new one.</para>
-    /// </summary>
-    private TempId LowerCoalesceAssign(LocalId slot, AssignExpr expr)
-    {
-        var type = _slots.TypeOfLocal(slot);
-        if (type is not IrOptionalType option)
-            throw NotSupported("'??=' on a non-optional target", expr.Span, LoweringDiagnostics.NeverNull);
-
-        var current = _slots.NewTemp(type);
-        _b.Emit(new LoadLocal(current, slot, type, expr.Target.Span));
-
-        var test = _slots.NewTemp(BoolType);
-        _b.Emit(new OptIsSome(test, current, expr.Span));
-
-        var whenNone = _b.NewBlock();
-        var merge = _b.NewBlock();
-        // When there is already a value, the slot stays untouched, and the right side does not run.
-        _b.Seal(new CondBranch(test, merge, whenNone, expr.Span));
-
-        _b.SwitchTo(whenNone);
-        if (ComesOut(() => _b.Emit(new StoreLocal(slot, LowerExprAs(expr.Value, type), expr.Span))))
-            _b.Seal(new Branch(merge, expr.Span));
-
-        _b.SwitchTo(merge);
-        var result = _slots.NewTemp(type);
-        _b.Emit(new LoadLocal(result, slot, type, expr.Span));
-        return result;
     }
 
     /// <summary>
@@ -6692,7 +6646,6 @@ internal sealed class FunctionLowerer
 
     private (FunctionSymbol Default, FunctionDecl Decl, TypeSymbol Iface)? DirectDefault(MemberExpr member) =>
         _types.RefOf(member) is FunctionSymbol { IsStatic: false } promised
-        && (promised.Generics.Length == 0 || _types.Lyric5Modules)
         && promised.Declaration is FunctionDecl { Body: not null } decl
         && TypeTable.InterfaceOwning(promised) is { Generics.Length: 0 } iface
             ? (promised, decl, iface)
@@ -6746,8 +6699,7 @@ internal sealed class FunctionLowerer
     /// Lyric 5, a member of the contract of a non-generic interface. The checker lets
     /// one be written exactly there (<c>LYR-SEM0082</c> elsewhere).</summary>
     private bool Replaceable(FunctionSymbol promised) =>
-        _types.Lyric5Modules
-        && promised.Declaration is FunctionDecl { Body: not null, IsPrivateHelper: false }
+        promised.Declaration is FunctionDecl { Body: not null, IsPrivateHelper: false }
         && TypeTable.InterfaceOwning(promised) is { Generics.Length: 0 };
 
     /// <summary>

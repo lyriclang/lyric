@@ -102,7 +102,7 @@ public static class DiagnosticStore
         if (!File.Exists(path)) return;
         using var document = JsonDocument.Parse(File.ReadAllBytes(path));
         var root = document.RootElement;
-        var sources = new SourceManager { Lyric5 = true };
+        var sources = new SourceManager();
         var ids = new List<FileId>();
         foreach (var file in root.GetProperty("files").EnumerateArray())
         {

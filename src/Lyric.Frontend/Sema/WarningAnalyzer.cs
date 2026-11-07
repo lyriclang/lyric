@@ -75,21 +75,15 @@ internal sealed partial class WarningAnalyzer
 
         WarnUnusedLocals();
         WarnNeverClosed();
-        if (_comp.Lyric5Modules) WarnMustUse();
+        WarnMustUse();
         HintNeverReassigned();
-        if (_comp.Lyric5Modules) WarnNamedVoid();
+        WarnNamedVoid();
         WarnUnusedImports();
         WarnBuiltinShadowingImports();
-        if (_comp.Lyric5Modules) WarnMembersMoreVisibleThanTheirType();
-        if (_comp.Lyric5Modules) WarnPreludeShadowing();
-        if (_comp.Lyric5Modules && _comp.Lints) RunLints();
-        if (_comp.Lyric5Modules && _comp.Lints) RunGroupLints();
-
-        // Lyric 5 reads '@Deprecated' from its value, which the compiler computes after this
-        // (RunDeprecated); the 4.x tools from the literals the attribute writes
-        if (_comp.Lyric5Modules) return;
-        CollectDeprecated();
-        WarnDeprecatedUses();
+        WarnMembersMoreVisibleThanTheirType();
+        WarnPreludeShadowing();
+        if (_comp.Lints) RunLints();
+        if (_comp.Lints) RunGroupLints();
     }
 
     /// <summary>
@@ -549,7 +543,7 @@ internal sealed partial class WarningAnalyzer
                     break;
                 // 'BufWriter.new(File.create(p))': the handle inside has no name, and the wrapper's
                 // close() leaves it open
-                case CallExpr wrapper when _comp.Lyric5Modules && IsCloseable(_types.TypeOf(wrapper)) && !ClosesItsFields(_types.TypeOf(wrapper)):
+                case CallExpr wrapper when IsCloseable(_types.TypeOf(wrapper)) && !ClosesItsFields(_types.TypeOf(wrapper)):
                     foreach (var argument in wrapper.Arguments)
                         if (TypeChecker.Unmarked(argument) is CallExpr inner && IsCloseable(_types.TypeOf(inner)))
                             _de.Report("LYR-SEM0144", Severity.Warning, inner.Span,
@@ -672,7 +666,7 @@ internal sealed partial class WarningAnalyzer
             DiagnosticNote[] fix = binding.Span.Start + 3 <= source.Length && source.AsSpan(binding.Span.Start, 3) is "var"
                 ? [DiagnosticNote.Suggest("write 'let'", new Replacement(keyword, "let", Applicability.Safe))]
                 : [];
-            _de.Report("LYR-SEM0075", _comp.Lyric5Modules ? Severity.Warning : Severity.Hint, binding.NameSpan,
+            _de.Report("LYR-SEM0075", Severity.Warning, binding.NameSpan,
                 $"'{local.Name}' is never reassigned — 'let' would do", fix);
         }
     }
@@ -729,7 +723,7 @@ internal sealed partial class WarningAnalyzer
                     case ImportAlias alias:
                         WarnIfUnusedImport(module, alias.Alias, alias.Span, inFile, WholeImport(import));
                         break;
-                    case null when _comp.Lyric5Modules && import.Path.Length > 0:
+                    case null when import.Path.Length > 0:
                         WarnIfUnusedImport(module, import.Path[^1], import.Span, inFile, WholeImport(import));
                         break;
                 }
@@ -738,7 +732,7 @@ internal sealed partial class WarningAnalyzer
     }
 
     private Replacement? WholeImport(ImportDecl import) =>
-        _comp.Lyric5Modules ? SourceEdits.DeleteStatement(_comp.Sources, import.Span) : null;
+        SourceEdits.DeleteStatement(_comp.Sources, import.Span);
 
     /// <summary>The first by name of the members the file calls that would be gone with this import
     /// — <c>x.toBytesBE()</c> through <c>import std.encoding { Hex };</c> —, a block of the imported
@@ -787,7 +781,7 @@ internal sealed partial class WarningAnalyzer
     /// in sight.</summary>
     private Replacement? ModuleAlone(ImportDecl import)
     {
-        if (!_comp.Lyric5Modules || import.Clause is not { } clause) return null;
+        if (import.Clause is not { } clause) return null;
         var text = _comp.Sources.GetText(clause.Span.File);
         var start = clause.Span.Start;
         while (start > 0 && text[start - 1] is ' ' or '\t') start--;
@@ -798,7 +792,7 @@ internal sealed partial class WarningAnalyzer
     /// renamed one (<c>f as g</c>) is left to the hand.</summary>
     private Replacement? NameOutOf(ImportSelective selective, int i)
     {
-        if (!_comp.Lyric5Modules || selective.Renames is { } renames && renames.Any(r => r is not null)) return null;
+        if (selective.Renames is { } renames && renames.Any(r => r is not null)) return null;
         var spans = selective.NameSpans;
         var file = spans[i].File;
         return selective.Names.Length == 1 ? null
@@ -844,8 +838,7 @@ internal sealed partial class WarningAnalyzer
 
         // And when it brings conformances: 'import std.iter;' brings the blocks that make every
         // iterator one, for the whole program, and no name of the module appears for that.
-        if (target is ModuleSymbol brings && _comp.Lyric5Modules
-            && _comp.AstOf(brings).Declarations.Any(d => d is ExtendDecl { Interfaces.Length: > 0 }))
+        if (target is ModuleSymbol brings && _comp.AstOf(brings).Declarations.Any(d => d is ExtendDecl { Interfaces.Length: > 0 }))
             return false;
 
         return true;
@@ -906,7 +899,7 @@ internal sealed partial class WarningAnalyzer
     /// </summary>
     private void WarnMutGenerator(FunctionDecl fn)
     {
-        if (!_comp.Lyric5Modules || !fn.IsMut || fn.IsStatic || !CoroutineShape.IsCoroutine(fn)) return;
+        if (!fn.IsMut || fn.IsStatic || !CoroutineShape.IsCoroutine(fn)) return;
         _de.Report("LYR-SEM0172", Severity.Warning, fn.NameSpan,
             $"this generator changes a copy of 'this' — a generator holds its receiver as a call holds an argument, "
             + "and a value is copied into it: what '" + fn.Name + "' writes, the caller does not see. "
@@ -1127,7 +1120,7 @@ internal sealed partial class WarningAnalyzer
         if (lit.Suffix is not null) return;
         if (_types.TypeOf(lit) is not PrimitiveType { Kind: PrimitiveKind.Int }) return;
         if (TypeFacts.IntLiteralFits(negative, lit.Value, PrimitiveKind.Int)) return;
-        _de.Report(_comp.Lyric5Modules ? "LYR-SEM0227" : "LYR-SEM0001", Severity.Error, lit.Span,
+        _de.Report("LYR-SEM0227", Severity.Error, lit.Span,
             "integer literal does not fit 'int' — annotate the uint type that holds it");
     }
 }

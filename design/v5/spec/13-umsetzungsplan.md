@@ -2492,3 +2492,19 @@ Die letzten 35 Marken sind weg (Ir 14, Formatting 7, Lexing 6, Parsing 5, Resolv
 
 13 Snapshots sind neu geschrieben und einzeln gelesen. Geändert haben sich nur die Quellen des Lexer-Falls, Tokens in den Meldungen des Parsers (`'*'` statt `Star`), `[internal]` in den Symbolen des Resolvers und die Attribute im neuen Fall.
 
+## Nachtrag 2026-11-07 — M17 S3 geschnitten, S3a: der Schalter
+
+Die 123 Weichen aus dem Plan sind nur ein Teil. Die Messung vor dem Ausbau zeigt drei Arten von Rest, und jede bekommt ihren PR:
+
+| Slice | Inhalt |
+|---|---|
+| **S3a** | der Schalter: `SourceManager.Lyric5`, `Compilation.Lyric5Modules`, `TypeResult.Lyric5Modules`, jede Weiche darüber und der Code, der nur hinter ihr lag |
+| **S3b** | die 4.x-Pfade ohne Schalter: Zweige, die fragen, ob die Bibliothek eine Deklaration hat (`_coreFormat`, `_fstringBuilder`, `hash(): int`), und was nur `stdlib/` brauchte. Rund 40 Stellen laut Kommentar |
+| **S3c** | `stdlib/`, `tests/corpus-4x/`, Version 4.6.0, die `retired`-Sätze im Katalog samt Spec-Anhang, `docs/guide`, `Grammar`, `Bytecode`, `Pack` ins Archiv, CLAUDE.md und CONTRIBUTING |
+
+**S3a** faltet den Schalter auf Lyric 5. Das Verhalten eines `lyric5`-Programms ändert sich nicht: Der Schalter stand dort überall schon auf wahr. 16 private Methoden hatten danach keinen Aufrufer mehr und sind weg, darunter die Attributzeilen des Bytecode-Formats (`CollectAttributes`, `BuildAttributeRow`).
+
+Zwei Tests sind gestrichen, sie prüften nur den 4.x-Pfad (`GenericMemberTests`). Zwei Lexer-Tests verlieren ihre 4.x-Zeile. `LYR-RES0006`, `SEM0066`, `SEM0069` und `SEM0096` stehen nicht mehr auf der Liste der Codes, deren Stelle im geteilten Frontend überlebte: Ihre Stelle ist weg. Sie waren schon `retired`; die Sätze dort nennen teils noch den 4.x-Pfad und werden mit S3c korrigiert, weil der Spec-Anhang aus ihnen entsteht.
+
+**Lokal gilt ab hier zig 0.16.0 ausdrücklich.** Das WSL-System steht seit dem 2026-11-06 auf 0.17.0, die CI und das Book auf 0.16.0. Unter 0.17 sind die Bindgen- und Link-Tests rot, ohne dass ein Slice etwas dafür kann. Der Umstieg auf 0.17 ist eine eigene Frage und nicht Teil von M17.
+

@@ -87,16 +87,6 @@ public sealed class Compilation
     /// </summary>
     public Func<string[], bool>? ModuleOnDisk { get; set; }
 
-    /// <summary>
-    /// Lyric 5's module rules: a module is named by its path alone and a
-    /// <c>module</c> header is refused (LYR-RES0008) — it said again what the path says,
-    /// or something else; the entry module's <c>main</c> starts the program; a name is
-    /// visible by its word — <c>private</c>, <c>internal</c>, the default, or <c>pub</c> — at every
-    /// route that reaches it. Off for the 4.x tools that still read headers, the language
-    /// server first.
-    /// </summary>
-    public bool Lyric5Modules { get; init; } = true;
-
     /// <summary>Whether the analysis reports what it finds about style and about use. A check of one
     /// rule says no, so that a function nothing calls does not answer in its place.</summary>
     public bool Lints { get; init; } = true;
@@ -120,7 +110,7 @@ public sealed class Compilation
     /// </summary>
     public bool Visible(Symbol symbol, ModuleSymbol from)
     {
-        if (!Lyric5Modules || symbol.Home is not { } home || ReferenceEquals(home, from)) return true;
+        if (symbol.Home is not { } home || ReferenceEquals(home, from)) return true;
         if (symbol is ImportBindingSymbol { Reexported: true }) return true; // passed on
         if (symbol is ImportBindingSymbol or ExternalSymbol) return false;
         return VisibilityOf(symbol) switch
@@ -309,12 +299,11 @@ public sealed class Compilation
         DocumentationTable? documentation = null)
     {
         // a header that names nothing is Lyric 5's: where the module's attributes stand
-        if (Lyric5Modules && ast.Header is { Segments.Length: > 0 } header)
+        if (ast.Header is { Segments.Length: > 0 } header)
             _de.Report("LYR-RES0008", Severity.Error, header.Span,
                 "a module is named by its path: the 'module' header is gone");
 
         var path = name is not null ? name.Split('.')
-                 : ast.Header is not null && !Lyric5Modules ? ast.Header.Segments
                  : ["main"];
 
         // Two files claiming one module name: everything downstream assumes a name means ONE
@@ -422,10 +411,6 @@ public sealed class Compilation
                 // module registers under the name its header claims, the import that pulled it in
                 // still finds nothing, and the message says "cannot find" about a file that was
                 // just read — and a second importer loads it a second time.
-                if (!Lyric5Modules && loaded.Ast.Header is { } header && !header.Segments.SequenceEqual(import.Path))
-                    _de.Report("LYR-RES0006", Severity.Error, header.Span,
-                        $"this file was loaded as '{name}' but declares module "
-                        + $"'{string.Join('.', header.Segments)}'");
 
                 AddModule(loaded.Ast, name, loaded.IsNative, loaded.Documentation);
             }

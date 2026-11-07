@@ -57,12 +57,11 @@ public sealed partial class Parser
         // statement here — no ';' after its block — and an expression anywhere else.
         TokenKind.Identifier when IsLoopAhead(0) => LoopStatement(ParseLoop(null, default)),
         // 'unsafe { … }': contextual as 'loop' is; a statement, and the block it stands before
-        TokenKind.Identifier when AtContextual("unsafe") && _buffer.Peek(1).TokenKind == TokenKind.LBrace
-            && _sm.Lyric5 => ParseUnsafe(),
+        TokenKind.Identifier when AtContextual("unsafe") && _buffer.Peek(1).TokenKind == TokenKind.LBrace => ParseUnsafe(),
         TokenKind.LBrace => ParseBlock(),
         TokenKind.Let or TokenKind.Var => ParseBinding(),
-        // a local 'fn': Lyric 5's; the 4.x grammar has none
-        TokenKind.Fn when _sm.Lyric5 && _buffer.Peek(1).TokenKind == TokenKind.Identifier => ParseLocalFunction(),
+        // a local 'fn'
+        TokenKind.Fn when _buffer.Peek(1).TokenKind == TokenKind.Identifier => ParseLocalFunction(),
         // 'comptime if' and 'comptime for'; 'comptime e;' is an
         // expression statement, as any other expression.
         TokenKind.Comptime when _buffer.Peek(1).TokenKind is TokenKind.If or TokenKind.For => ParseComptimeStatement(),
@@ -776,7 +775,6 @@ public sealed partial class Parser
         var semi = ExpectSemicolon();
         return new ExprStmt(expr, Span.Union(expr.Span, semi.Span));
     }
-
 
     private Token ExpectSemicolon() =>
         _buffer.Expect(TokenKind.Semicolon, "LYR-PAR0016", "expected ';'");
