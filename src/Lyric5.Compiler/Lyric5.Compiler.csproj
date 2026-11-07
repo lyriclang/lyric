@@ -6,7 +6,6 @@
     Until the front end has moved to the 5 language, the subset gate says which IR it accepts.
   -->
   <PropertyGroup>
-    <Version>5.0.0</Version>
     <AssemblyName>lyric5.compiler</AssemblyName>
     <RootNamespace>Lyric5.Compiler</RootNamespace>
     <IsAotCompatible>true</IsAotCompatible>

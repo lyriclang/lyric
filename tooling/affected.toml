@@ -18,7 +18,7 @@ full = [".github/workflows/ci.yml", ".github/workflows/dev.yml", ".github/action
         "Directory.Build.targets", "Lyric.slnx", "tests/Lyric5.Tests/Lyric5.Tests.csproj", "tests/Directory.Build.props"]
 
 # Text no test reads. spec.pin is read apart: the cases the pin moved over always run.
-ignore = ["tooling/textmate/", "docs/Bytecode.md", "docs/Grammar.md", "docs/Pack.md", "docs/archive/", "docs/guide/", "design/", "bench/",
+ignore = ["tooling/textmate/", "docs/archive/", "design/", "bench/",
           "STATUS.md", "CHANGELOG.md", "README.md", "CONTRIBUTING.md", "LICENSE", "spec.pin", ".gitignore", ".gitattributes"]
 
 [regression]
@@ -79,7 +79,7 @@ tests = ["4x", "CatalogTests", "LintTests", "CatalogPageTests"]
 cases = []
 
 [[rule]]
-paths = ["src/Lyric.Core/", "src/Lyric.Lsp/", "stdlib/", "tests/Lyric.Tests."]
+paths = ["src/Lyric.Core/", "src/Lyric.Lsp/", "tests/Lyric.Tests."]
 tests = ["4x"]
 cases = []
 

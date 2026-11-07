@@ -11,13 +11,10 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 - **Last Lyric 4 release: v4.5.0.** 4.6 was cut but never released; the 4.x line continues as
   [lyriclang/lyric-script](https://github.com/lyriclang/lyric-script) (the 4.6 cut without the
   Lyric 5 migration warnings), on its own roadmap toward `lyric-script 1.0.0`.
-- **`main` is Lyric 5 in development**, no promise of any kind. Of the 4.x toolchain the tree
-  keeps the front end (lexer, parser, resolver, sema, IR) the Lyric 5 compiler grows out of
-  (13, M2), the language server (`Lyric.Lsp`, Lyric 5's since M13b: `lyric lsp`, `lyric dap`), the standard library source (until M8a) and, for the 4.x suites, the mixed examples in
-  `tests/corpus-4x/` (both go with M17); the VM, the tools, the bytecode format and their tests went with
-  M2 S0 and live on in `lyric-script`. The 4.x code says **4.6.0**. Beside it grows **`lyric5`**
-  (`src/Lyric5`), the Lyric 5 command line as one NativeAOT binary, at **5.0.0** (`dev` builds:
-  `5.0.0-dev.<date>+<sha>`).
+- **`main` is Lyric 5 in development**, no promise of any kind. The tree says **5.0.0** (`dev` builds:
+  `5.0.0-dev.<date>+<sha>`). `src/Lyric5` is the command line, one NativeAOT binary; of Lyric 4 only
+  `src/Lyric4.Frontend` stays, frozen, for `lyric fix --from-4`. The 4.x guide and references are in
+  `docs/archive/4.x/`; the VM and the tools live on in `lyric-script`.
 - **Specification**: `lyriclang/lyric-spec` — `main` is the Lyric 5.0 text, written milestone by
   milestone; branch `script` holds the 4.x text, which checks `lyric-script`, not this tree: the
   milestones move the language away from it, so the 4.x conformance gate ended with M2 S0.

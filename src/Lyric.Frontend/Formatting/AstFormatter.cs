@@ -12,7 +12,7 @@ namespace Lyric.Formatting;
 /// <c>IntLiteralExpr</c> holds a <c>ulong</c>, not the <c>0xFF</c> or <c>1_000</c> someone
 /// wrote — so every literal (f-strings included) is printed from its source span, verbatim.
 /// And there are NO parenthesis nodes: <c>(a + b) * c</c> is plain nesting, so the printer
-/// re-derives parentheses from the precedence table of Grammar.md §6.1. A group whose written
+/// re-derives parentheses from the precedence table of spec 08 §4. A group whose written
 /// parentheses were redundant loses them; one that needs them gets them back — the reparse
 /// invariant of the test suite is what holds that honest.</para>
 ///
@@ -971,7 +971,7 @@ public sealed class AstFormatter
 
     // ------------------------------------------------------------------ expressions
 
-    // The levels of Grammar.md §6.1; smaller binds tighter. An expression printed where at most
+    // The levels of spec 08 §4; smaller binds tighter. An expression printed where at most
     // 'maxLevel' is allowed gets parentheses when its own level exceeds it.
     private const int Primary = 0;
     private const int Postfix = 1;

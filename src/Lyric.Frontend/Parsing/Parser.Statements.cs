@@ -388,7 +388,7 @@ public sealed partial class Parser
     }
 
     /// <summary>
-    /// <c>let (a, b) = pair;</c> — see <c>docs/Grammar.md</c> §5.
+    /// <c>let (a, b) = pair;</c>
     ///
     /// <para>The pattern is parsed as an ordinary tuple pattern — the same one a
     /// <c>match</c> arm uses. Whatever holds there holds here: nested

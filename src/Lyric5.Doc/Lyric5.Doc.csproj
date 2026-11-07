@@ -6,7 +6,6 @@
     website with it, and `lyric doc` a package's reference.
   -->
   <PropertyGroup>
-    <Version>5.0.0</Version>
     <AssemblyName>Lyric5.Doc</AssemblyName>
     <RootNamespace>Lyric5.Doc</RootNamespace>
     <IsAotCompatible>true</IsAotCompatible>

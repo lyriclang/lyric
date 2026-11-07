@@ -69,7 +69,7 @@ public class ErrorTypeInvariantTests
     {
         // An error-free program must carry no ErrorType at all; this is where a lookup that silently gives
         // up shows.
-        var source = File.ReadAllText(Path.Combine(RepoRoot(), "tests", "corpus-4x", example), Encoding.UTF8);
+        var source = File.ReadAllText(Path.Combine(RepoRoot(), "examples", example), Encoding.UTF8);
         Holds(source, example);
     }
 

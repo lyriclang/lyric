@@ -6,7 +6,7 @@
 
   "_comment": [
     "Die Keywords stammen aus src/Lyric.Frontend/Lexing/Lexer.cs, die Literal-Formen aus",
-    "docs/Grammar.md §1.2-1.5 — nicht aus dem Gedaechtnis. Ein Test in tests/Lyric.Tests.Cli",
+    "Spec 01 — nicht aus dem Gedaechtnis. Ein Test in tests/Lyric5.Tests",
     "vergleicht die Keyword-Liste hier mit der des Lexers; driftet eine, faellt er.",
     "",
     "Was hier NICHT versucht wird: semantische Faerbung. Ob ein Bezeichner ein Typ oder eine",

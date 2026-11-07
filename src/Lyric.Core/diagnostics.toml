@@ -349,7 +349,7 @@ title = "the external runtime could not be started"
 severity = "error"
 area = "14-cli"
 summary = "Reported by the 4.x drivers when the bytecode VM or another tool they started as a separate process could not be launched."
-retired = "Lyric 5: lyric5 builds native binaries and starts no VM; only the 4.x launcher in Lyric.Core reports it, and the error for a profile that denies warnings is LYR-CLI0016"
+retired = "Lyric 5: lyric5 builds native binaries and starts no VM"
 
 [LYR-CLI0007]
 title = "several programs and none named"
@@ -414,7 +414,7 @@ title = "a `lyric.json` that cannot be understood"
 severity = "error"
 area = "14-cli"
 summary = "Reported by the 4.x toolchain when a `lyric.json` project file was found and could not be read."
-retired = "Lyric 5: the manifest is lyric.toml, refused with LYR-PKG0001–0003; only the 4.x lyric.json reader (Lyric.Core ProjectFile, read by the front end's 4.x suites) reports it"
+retired = "Lyric 5: the manifest is lyric.toml, refused with LYR-PKG0001–0003"
 
 [LYR-CLI0011]
 title = "no `build.lyr` in the directory a build was pointed at"
@@ -470,7 +470,7 @@ title = "a `lyric.json` asks for a newer toolchain"
 severity = "error"
 area = "14-cli"
 summary = "Reported by the 4.x toolchain when a `lyric.json` named a minimum toolchain version above its own."
-retired = "Lyric 5: a toolchain pin in lyric.toml is LYR-PKG0009; only the 4.x lyric.json reader (Lyric.Core ProjectFile) reports it"
+retired = "Lyric 5: a toolchain pin in lyric.toml is LYR-PKG0009"
 
 [LYR-CLI0019]
 title = "`--only` named an artifact the build script did not declare"
@@ -1569,7 +1569,7 @@ A conformance to `Indexable<T>` becomes `IndexSet<int>` with `type Output = T;`,
 `Iterable<T>` or `Indexable<T>` as the type of a parameter or a field is left as written: take an `Iterator<Item = T>`, the concrete type, or a type parameter with the interface as its bound.
 '''
 example = '''
-proposal[LYR-MIG0211] main.lyr:16:13: 'Indexable<int>' as a type has no counterpart: Lyric 5's 'Indexable' names its element by an associated type — take the concrete type, or a type parameter with '[IndexSet<int>]'
+proposal[LYR-MIG0211] main.lyr:16:13: 'Indexable<int>' as a type has no counterpart: Lyric 5's 'IndexSet' names its element by an associated type — take the concrete type, or a type parameter with '[IndexSet<int>]'
 '''
 
 [LYR-MIG0301]
@@ -5079,7 +5079,7 @@ severity = "error"
 area = "03-types"
 summary = "An index whose type is not `int` (or an integer type that widens to it), an index or range on a type that provides none, or a `for` over a value that is not an `Iterable`."
 explanation = '''
-`a[i]` works on arrays, slices, inline arrays and types conforming to `Indexable<T>`; the index is an `int`. A range `a[i..j]` takes a view of an array, a slice, a string, a `StringView` or a type with `AsSlice<T>`. `for` walks an `Iterable`, and every `Iterator` is one.
+`a[i]` works on arrays, slices and inline arrays, whose index is an `int`, and on types conforming to `Index<K>`, whose index is a `K`. A range `a[i..j]` takes a view of an array, a slice, a string, a `StringView` or a type with `AsSlice<T>`. `for` walks an `Iterable`, and every `Iterator` is one.
 
 Convert the index with `as int`, or give the type the conformance it is used through.
 '''
@@ -6431,7 +6431,7 @@ title = "a host type constructed in the program"
 severity = "error"
 area = "03-types"
 summary = "An initializer builds a host type — a field-less class of a native module — which only the host can create."
-retired = "Lyric 5 has no host types; no native module of lyric5 declares a field-less class, so the check never fires"
+retired = "Lyric 5 has no host types"
 
 [LYR-SEM0062]
 title = "'?.' calling a field that holds a function"
@@ -6571,7 +6571,7 @@ title = "an attribute argument that is not a compile-time value"
 severity = "error"
 area = "11-metaprogramming"
 summary = "A field of an attribute is set to an expression that is not a literal, a unit variant or a constant."
-retired = "A Lyric 5 attribute's value is computed while the program compiles; the literal-only check is left to the 4.x path"
+retired = "A Lyric 5 attribute's value is computed while the program compiles"
 
 [LYR-SEM0067]
 title = "an attribute on a generic declaration"
@@ -6663,7 +6663,7 @@ title = "an attribute field left without a compile-time value"
 severity = "error"
 area = "11-metaprogramming"
 summary = "An attribute use leaves a field unset whose declaration has no literal default."
-retired = "A Lyric 5 attribute is checked as the struct initializer it writes, and a missing field is LYR-SEM0106 there; only the 4.x path reports this code"
+retired = "A Lyric 5 attribute is checked as the struct initializer it writes, and a missing field is LYR-SEM0106 there"
 
 [LYR-SEM0070]
 title = "a field written twice in one initializer or 'with'"
@@ -7294,7 +7294,7 @@ title = "a loop over optional elements without the iterator protocol"
 severity = "error"
 area = "07-statements"
 summary = "A `for` loop walks elements of an optional type through a path where the end of the walk is signalled by null."
-retired = "Lyric 5's protocol has '??T' and walks arrays by index; only the 4.x path could reach this check"
+retired = "Lyric 5's protocol has '??T' and walks arrays by index"
 
 [LYR-SEM0092]
 title = "inference through a type that conforms twice"
@@ -7419,7 +7419,7 @@ title = "an attribute with a field a metadata row cannot hold"
 severity = "error"
 area = "11-metaprogramming"
 summary = "An attribute's struct has a field whose type is not a number, string, char, bool or unit enum."
-retired = "A Lyric 5 attribute's value is a struct computed at compile time, not a metadata row; only the 4.x path checks the field types"
+retired = "A Lyric 5 attribute's value is a struct computed at compile time, not a metadata row"
 
 [LYR-SEM0097]
 title = "a name bound twice in one pattern"

@@ -113,7 +113,7 @@ made on impulse (e.g. "I just thought of something better") are forbidden.
 | Topic | Convention |
 |---|---|
 | Naming (C# code) | Standard .NET: `PascalCase` types/methods, `_camelCase` private fields, `camelCase` parameters |
-| Naming (Lyric stdlib code in `.lyr`) | `PascalCase` types, `camelCase` everything else (see `docs/Grammar.md`) |
+| Naming (Lyric stdlib code in `.lyr`) | `PascalCase` types, `camelCase` everything else |
 | Indentation | 4 spaces, no tabs |
 | Line length | Soft 100, hard 120 |
 | Trailing commas | Allowed in multi-line lists/blocks |

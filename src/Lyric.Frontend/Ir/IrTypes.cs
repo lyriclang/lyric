@@ -117,7 +117,7 @@ namespace Lyric.Ir
     /// (<c>enum Tree { Leaf, Node(Tree, Tree) }</c>).
     ///
     /// <para>At runtime a value of this type is an instance of ONE variant; which one stands in its
-    /// slot 0. Every variant has its own layout — see <c>docs/Bytecode.md</c>.</para>
+    /// slot 0. Every variant has its own layout.</para>
     /// </summary>
     public sealed record IrEnumType(TypeId Type) : IrType;
 

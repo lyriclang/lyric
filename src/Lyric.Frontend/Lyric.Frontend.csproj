@@ -11,11 +11,6 @@
     <ProjectReference Include="..\Lyric.Core\Lyric.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- The stdlib is source and has to lie next to the binary; this survives dotnet publish. -->
-    <Content Include="..\..\stdlib\**\*.lyr" Link="stdlib\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
   <!--
     Eight areas in one assembly: Lexing, AST, Parsing, Resolver, Sema, Ir, Emit, Compiler.
 
