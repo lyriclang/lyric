@@ -694,8 +694,6 @@ public sealed class AstFormatter
         return Doc.From(variant.Name);
     }
 
-    /// <summary>A body holding methods and associated types — interface, extend and the enum's
-    /// second half share the shape. The two lists are parsed apart; the source order is theirs.</summary>
     /// <summary>A body's members as the source wrote them: the lists the parser keeps apart —
     /// associated types, constants, methods — merged back by position.</summary>
     private static Decl[] InOrder(AssociatedTypeDecl[] types, FunctionDecl[] methods, StaticBindingDecl[]? statics = null) =>
@@ -703,6 +701,8 @@ public sealed class AstFormatter
             ? methods
             : types.Cast<Decl>().Concat(statics ?? []).Concat(methods).OrderBy(m => m.Span.Start).ToArray();
 
+    /// <summary>A body holding methods and associated types — interface, extend and the enum's
+    /// second half share the shape. The two lists are parsed apart; the source order is theirs.</summary>
     private Doc MethodBodyDoc(Doc head, Decl[] members, Span whole)
     {
         var closing = whole.End - 1;

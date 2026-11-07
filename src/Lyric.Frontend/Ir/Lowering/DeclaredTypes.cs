@@ -14,7 +14,7 @@ namespace Lyric.Ir.Lowering;
 ///
 /// <para>Builtins are <see cref="NamedType"/> with a single-element path. On top of that comes
 /// <c>T[]</c> over a primitive — <c>split</c> yields <c>string[]</c>, <c>toChars</c> yields
-/// <c>char[]</c>. The line stays sharp: unlike a class, an array has NO LAYOUT the host would have to
+/// <c>char[]</c>. The line stays sharp: unlike a class, an array has NO LAYOUT the runtime would have to
 /// know. Everything else reports as a scope boundary rather than silently yielding something
 /// wrong.</para>
 /// </summary>
@@ -36,7 +36,7 @@ internal static class DeclaredTypes
         if (node is NullableType option) return new IrOptionalType(Lower(option.Inner));
 
         // 'T[]' in a native signature. The element type stays primitive: an array of objects would
-        // require the host to know a module layout.
+        // require the runtime to know a module layout.
         if (node is ArrayType array
             && array.Element is NamedType { Path.Length: 1, TypeArguments.Length: 0 } element
             && TypeFacts.FromBuiltinName(element.Path[0]) is { } elementPrimitive)

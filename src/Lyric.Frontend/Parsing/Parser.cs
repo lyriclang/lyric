@@ -202,9 +202,6 @@ public sealed partial class Parser
         }
     }
 
-    /// <summary>The marks to the right of an operator in each expression being read, innermost
-    /// last (<see cref="TryReach"/>); <c>null</c> for an expression that has met none — nearly
-    /// every one.</summary>
     /// <summary>A token as a message says it: as it is written — <c>';'</c>, <c>'while'</c> —, or the
     /// end of the file.</summary>
     private string Shown(Token token)
@@ -214,6 +211,9 @@ public sealed partial class Parser
         return text.Length > 24 ? $"'{text[..21]}…'" : $"'{text}'";
     }
 
+    /// <summary>The marks to the right of an operator in each expression being read, innermost
+    /// last (<see cref="TryReach"/>); <c>null</c> for an expression that has met none — nearly
+    /// every one.</summary>
     private readonly List<List<TryReach>?> _marks = new();
 
     private Expr ParseExprInner(int minBp)
@@ -955,10 +955,6 @@ public sealed partial class Parser
     }
 
     /// <summary>
-    /// Parses an expression inside a delimiter (parenthesis, argument, index, array, hole): a
-    /// struct initializer is always allowed there, whatever the ambient flag says outside.
-    /// </summary>
-    /// <summary>
     /// What stands between <c>[</c> and <c>]</c>: an index, or a range that takes a view of the
     /// indexed value — <c>a..b</c>, <c>a..=b</c>, <c>..b</c>, <c>a..</c>, <c>..</c>,
     /// with either bound left open. A closed range arrives as the ordinary range node and is
@@ -978,6 +974,10 @@ public sealed partial class Parser
         return index is RangeExpr r ? new SliceRangeExpr(r.Low, r.High, r.IsInclusive, r.Span) : index;
     }
 
+    /// <summary>
+    /// Parses an expression inside a delimiter (parenthesis, argument, index, array, hole): a
+    /// struct initializer is always allowed there, whatever the ambient flag says outside.
+    /// </summary>
     private Expr ParseSubExpr(int minBindingPower = 0)
     {
         var saved = _allowStructInit;
@@ -1551,12 +1551,6 @@ public sealed partial class Parser
             _ => false,
         };
 
-    /// <summary>
-    /// <c>{ it * 2 }</c> or <c>{ println(it); }</c>: a trailing lambda's body. Without a ';' at
-    /// the block's own level the braces hold ONE expression and the lambda yields it; with one
-    /// they hold statements, exactly as '=> { … }' does — a value block, whose tail is the
-    /// lambda's result: <c>{ let d = it * 2; d + 1 }</c>.
-    /// </summary>
     /// <summary>A macro's expansion site: the name, its '!', then '(args)', a block, or
     /// both. The arguments are expressions as written; the block is a value block, so its last
     /// expression may stand without ';' ('retry!(3) { try fetch(url) }').</summary>
@@ -1658,6 +1652,12 @@ public sealed partial class Parser
         return new SpliceExpr(index, inner, Span.Union(hash.Span, close.Span));
     }
 
+    /// <summary>
+    /// <c>{ it * 2 }</c> or <c>{ println(it); }</c>: a trailing lambda's body. Without a ';' at
+    /// the block's own level the braces hold ONE expression and the lambda yields it; with one
+    /// they hold statements, exactly as '=> { … }' does — a value block, whose tail is the
+    /// lambda's result: <c>{ let d = it * 2; d + 1 }</c>.
+    /// </summary>
     private LambdaExpr ParseTrailingLambda()
     {
         var open = _buffer.Current; // '{'
@@ -1991,7 +1991,7 @@ public sealed partial class Parser
             {
                 places.Add(_buffer.Match(TokenKind.Amp));
                 parameters.Add(ParseType());
-            } while (_buffer.Match(TokenKind.Comma));
+            } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RParen));
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' in function type");
         _buffer.Expect(TokenKind.Arrow, "LYR-PAR0015",
             $"expected '->' in function type, got {Shown(_buffer.Current)}");
@@ -2109,7 +2109,8 @@ public sealed partial class Parser
             args.Add(ParseType());
             if (name is not null) written ??= new List<string?>(Enumerable.Repeat<string?>(null, args.Count - 1));
             written?.Add(name);
-        } while (_buffer.Match(TokenKind.Comma));
+        } while (_buffer.Match(TokenKind.Comma)
+                 && _buffer.Current.TokenKind is not (TokenKind.Greater or TokenKind.Shr or TokenKind.GreaterEqual or TokenKind.ShrEqual));
         names = written?.ToArray();
 
         // Nested generics: split '>>', '>=' and '>>=' into single '>' tokens.

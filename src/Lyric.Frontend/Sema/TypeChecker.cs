@@ -166,9 +166,9 @@ public sealed class TypeChecker
             && coreMembers.LookupLocal("Error") is TypeSymbol { Kind: TypeSymbolKind.Interface } errorRoot)
             JoinRoots.AddOrUpdate(join, errorRoot);
 
-        // 'Indexable<T>' lives in std.collections and is to '[i]' what 'Iterator<T>' is to 'for-in':
-        // the compiler knows ONE built-in form, the array, and binds everything else to an interface
-        // from the stdlib.
+        // 'Index<K>' and 'IndexSet<K>' live in std.core and are to '[i]' what 'Iterator' is to 'for-in':
+        // the compiler knows one built-in form, the array and its view, and binds everything else to
+        // an interface from the library.
         _coreIndex = comp.FindModule(["std", "core"])?.Members.LookupLocal("Index")
             is TypeSymbol { Kind: TypeSymbolKind.Interface } coreIndex ? coreIndex : null;
         _coreIndexSet = comp.FindModule(["std", "core"])?.Members.LookupLocal("IndexSet")
@@ -224,12 +224,6 @@ public sealed class TypeChecker
 
     /// <inheritdoc cref="_onModule"/>
     private readonly TypeSymbol? _onFunction;
-
-    /// <summary>The positional-argument conformance (3.9), under the same rules: an attribute
-    /// declaring <c>WithArg&lt;T&gt;</c> takes one parenthesized value, filling its first
-    /// field.</summary>
-
-    /// <summary>What a non-numeric <c>as</c> converts through, under the same rules.</summary>
 
     /// <summary>The rest of the operator interfaces, on the same footing
     /// as <see cref="_add"/>: present where <c>std.core</c> declares them.</summary>
@@ -650,7 +644,7 @@ public sealed class TypeChecker
 
     /// <summary>
     /// A bodyless function is a NATIVE DECLARATION: the signature is written in Lyric, the
-    /// implementation lives in the host and is bound by name at load time. Reserved for the stdlib —
+    /// implementation lives in the runtime, under that name. Reserved for the stdlib —
     /// in user code nothing could supply the body.
     /// </summary>
     /// <remarks>Interfaces are exempt: there, bodyless means abstract, and conformance checks that.
@@ -4563,11 +4557,6 @@ public sealed class TypeChecker
     // Only the forms that need it use it — an empty array literal, a contextual enum variant
     // construction; everything else ignores it.
     /// <summary>
-    /// An expression in VALUE POSITION. If it names a type or a module instead, that is an error here
-    /// — exactly once, at the place where the value is needed. From there on <see cref="ErrorType"/>
-    /// applies, and with it the ordinary "already reported" rule.
-    /// </summary>
-    /// <summary>
     /// How deeply a type or an expression may nest before the CHECK refuses (§12.4).
     ///
     /// <para>A separate bound from the parser's, and it has to be: the parse can accept what this
@@ -5625,11 +5614,11 @@ public sealed class TypeChecker
         return type;
     }
 
-    /// <summary>The forms that read the type they belong to from their position.</summary>
     /// <summary>A side of <c>==</c> that is typed by the other: an implicit member, an
     /// array literal — <c>[]</c> fixes no type of its own.</summary>
     private static bool TakesTheOtherSidesType(Expr e) => IsImplicitForm(e) || e is ArrayLitExpr;
 
+    /// <summary>The forms that read the type they belong to from their position.</summary>
     private static bool IsImplicitForm(Expr e) =>
         e is ImplicitMemberExpr or CallExpr { Callee: ImplicitMemberExpr } or StructInitExpr { IsImplicit: true };
 
@@ -8851,8 +8840,6 @@ public sealed class TypeChecker
         }
     }
 
-    /// <summary>The associated types of a type parameter's constraint, fixed at the constraint
-    /// (<c>T :: [Iterator&lt;Item = int&gt;]</c>): <c>T.Item</c> is <c>int</c> wherever it stands.</summary>
     /// <summary>Whether an associated type stands anywhere in the type.</summary>
     private static bool MentionsAssoc(LyrType type) => type switch
     {
@@ -8898,6 +8885,8 @@ public sealed class TypeChecker
         return null;
     }
 
+    /// <summary>The associated types of a type parameter's constraint, fixed at the constraint
+    /// (<c>T :: [Iterator&lt;Item = int&gt;]</c>): <c>T.Item</c> is <c>int</c> wherever it stands.</summary>
     private static LyrType ApplyFixations(LyrType type, GenericParamSymbol gp,
         (AssociatedTypeSymbol Member, LyrType Type)[] fixations)
     {
@@ -9875,16 +9864,6 @@ public sealed class TypeChecker
         return true;
     }
 
-    /// <summary>
-    /// For the lowering: the block a call through a constraint reaches on a concrete type where
-    /// no symbol of the type holds the conformance (05 §13 rules 6, 8) — a shape's block or a
-    /// blanket block, as <see cref="BlockConforms"/> finds it: matching the type, its constraints
-    /// holding there, its chain declaring <paramref name="promised"/>. With the block's method of
-    /// that name, <c>null</c> where the interface's default stands in for it. <c>null</c>
-    /// altogether where the type conforms on its own — its list, a block on it —, which
-    /// <see cref="Satisfies"/> asks first as well. Asked again rather than read from a record:
-    /// a generic body records its parameters, not what an instance made of them.
-    /// </summary>
     /// <summary>The conformance question at an instance the lowering reached:
     /// asked outside every module, as <see cref="ConformanceBlockFor"/> is.</summary>
     private bool SatisfiesAt(LyrType concrete, TypeSymbol iface)
@@ -9895,6 +9874,16 @@ public sealed class TypeChecker
         finally { _currentModule = saved; }
     }
 
+    /// <summary>
+    /// For the lowering: the block a call through a constraint reaches on a concrete type where
+    /// no symbol of the type holds the conformance (05 §13 rules 6, 8) — a shape's block or a
+    /// blanket block, as <see cref="BlockConforms"/> finds it: matching the type, its constraints
+    /// holding there, its chain declaring <paramref name="promised"/>. With the block's method of
+    /// that name, <c>null</c> where the interface's default stands in for it. <c>null</c>
+    /// altogether where the type conforms on its own — its list, a block on it —, which
+    /// <see cref="Satisfies"/> asks first as well. Asked again rather than read from a record:
+    /// a generic body records its parameters, not what an instance made of them.
+    /// </summary>
     private (ExtensionBlock Block, FunctionSymbol? Method, IReadOnlyDictionary<GenericParamSymbol, LyrType> Open)? ConformanceBlockFor(
         LyrType concrete, FunctionSymbol promised, LyrType? wanted)
     {
@@ -10188,13 +10177,6 @@ public sealed class TypeChecker
         return (LyrType.Error, null);
     }
 
-    /// <summary>A visible extension method of this name, meaning the declaring module is the
-    /// current one or is imported. The first one wins.
-    ///
-    /// <para>Several of a name are an OVERLOAD SET since 3.0, not an ambiguity: the call site
-    /// chooses among them by its arguments, and reports for itself when they do not separate.
-    /// What stays ambiguous here is two extensions offering the same member with the SAME
-    /// parameters — nothing could ever tell those apart (LYR-SEM0044).</para></summary>
     /// <summary>The receiver a member is looked up on, for a generic block's signature.</summary>
     private LyrType? _memberReceiver;
 
@@ -10219,6 +10201,13 @@ public sealed class TypeChecker
             + $"which '{TypeFacts.Display(receiver)}' does not satisfy");
     }
 
+    /// <summary>A visible extension method of this name, meaning the declaring module is the
+    /// current one or is imported. The first one wins.
+    ///
+    /// <para>Several of a name are an OVERLOAD SET since 3.0, not an ambiguity: the call site
+    /// chooses among them by its arguments, and reports for itself when they do not separate.
+    /// What stays ambiguous here is two extensions offering the same member with the SAME
+    /// parameters — nothing could ever tell those apart (LYR-SEM0044).</para></summary>
     private FunctionSymbol? ExtensionMember(TypeSymbol ts, string member, Span span)
     {
         List<ExtensionMethod> visible = new();
@@ -10623,7 +10612,7 @@ public sealed class TypeChecker
     /// <para>An attribute IS a struct: the name resolves like any type name, the arguments are
     /// checked as its initializer, and where it may sit is the marker interface it declares —
     /// conformance, not the name, the same nominal rule the operators follow. What ends up in the
-    /// bytecode has to be a value at compile time, hence the literal rule; and because the
+    /// program has to be a value at compile time, hence the literal rule; and because the
     /// emitted row carries EVERY field, a field the use does not write needs a literal default.
     /// </para>
     /// </summary>
@@ -13209,9 +13198,6 @@ public sealed class TypeChecker
             || _result.KnownParamOf(local) is not null || _metaPendingEver.Contains(local))
             ? local : null;
 
-    /// <summary>The five of 05 §14 and <c>TotalOrder</c>: their defaults in
-    /// std.core ask with the conformer's module, and what is wrong in them is said at the
-    /// conformer's entry (05 §14 rule 6).</summary>
     /// <summary>The family's member being set in place, while it is (05 §14 rule 6): a shape its
     /// synthesis has no form for is refused as such.</summary>
     private string? _familyExpanding;
@@ -13224,6 +13210,9 @@ public sealed class TypeChecker
         _ => null,
     };
 
+    /// <summary>The five of 05 §14 and <c>TotalOrder</c>: their defaults in
+    /// std.core ask with the conformer's module, and what is wrong in them is said at the
+    /// conformer's entry (05 §14 rule 6).</summary>
     private static bool IsFamily(TypeSymbol iface) =>
         (iface.Home is { FullName: "std.core" }
          && iface.Name is "Equatable" or "Hashable" or "Ordered" or "TotalOrder" or "Clone" or "VariantName" or "Variants")
@@ -14539,26 +14528,6 @@ public sealed class TypeChecker
     };
 
     /// <summary>
-    /// Nominal subtyping: a value may stand wherever one of its declared interfaces is expected.
-    ///
-    /// <para>In THIS direction only. The way back — an interface to a class — would be a downcast, and
-    /// the language has none: <c>as</c> converts between numeric types only. An interface value
-    /// therefore needs no runtime type check.</para>
-    ///
-    /// <para>The question itself is answered by <see cref="Conformance"/>, the same place the
-    /// conformance check and the IR lowering ask.</para>
-    /// </summary>
-    /// <summary>
-    /// Whether an interface can be the type of a VALUE: not when a member
-    /// names <c>Self</c> outside the receiver, is static, or is generic — a table slot holds one
-    /// function for every conformer, and such a member has no one function. Such an interface is
-    /// a constraint, and the diagnostic says so where a value of it would arise.
-    /// <para>An interface with associated types is a value's type where <paramref name="instance"/>
-    /// answers every one of them — fixed, <c>Iterator&lt;Item = int&gt;</c>, or by the interface's
-    /// default, its <c>Error</c> —; a member typed by <c>Self.Item</c> then has one
-    /// signature for every value.</para>
-    /// </summary>
-    /// <summary>
     /// A type written for a value — a binding's, a parameter's, a return — that is an interface no
     /// value of arises, or an optional of one (05 §7 rule 3): said once where it is written
     /// (<c>LYR-SEM0126</c>), and the error type from there on, so its uses and its calls say nothing
@@ -14618,6 +14587,16 @@ public sealed class TypeChecker
     /// <summary>The interfaces <see cref="ValueTypeAt"/> is asking about.</summary>
     private readonly HashSet<TypeSymbol> _askedForValue = new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>
+    /// Whether an interface can be the type of a VALUE: not when a member
+    /// names <c>Self</c> outside the receiver, is static, or is generic — a table slot holds one
+    /// function for every conformer, and such a member has no one function. Such an interface is
+    /// a constraint, and the diagnostic says so where a value of it would arise.
+    /// <para>An interface with associated types is a value's type where <paramref name="instance"/>
+    /// answers every one of them — fixed, <c>Iterator&lt;Item = int&gt;</c>, or by the interface's
+    /// default, its <c>Error</c> —; a member typed by <c>Self.Item</c> then has one
+    /// signature for every value.</para>
+    /// </summary>
     private bool ValueUsable(TypeSymbol iface, out string reason, LyrType? instance = null)
     {
         foreach (var part in Conformance.WithParents(iface, _binding))
@@ -14714,6 +14693,16 @@ public sealed class TypeChecker
         return null;
     }
 
+    /// <summary>
+    /// Nominal subtyping: a value may stand wherever one of its declared interfaces is expected.
+    ///
+    /// <para>In THIS direction only. The way back — an interface to a class — would be a downcast, and
+    /// the language has none: <c>as</c> converts between numeric types only. An interface value
+    /// therefore needs no runtime type check.</para>
+    ///
+    /// <para>The question itself is answered by <see cref="Conformance"/>, the same place the
+    /// conformance check and the IR lowering ask.</para>
+    /// </summary>
     private bool ImplementsInterface(LyrType from, LyrType to)
     {
         // The target may be a generic interface ('Src<int>'), in which case it is a GenericInstance

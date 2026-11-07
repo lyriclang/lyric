@@ -940,7 +940,7 @@ public sealed partial class Parser
             _buffer.Advance();
             var fields = new List<TypeNode>();
             if (!_buffer.Check(TokenKind.RParen))
-                do { fields.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma));
+                do { fields.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RParen));
             var close = _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' to close tuple variant");
             return new EnumVariant(name, fields.ToArray(), null, Span.Union(nameTok.Span, close.Span))
                 { NameSpan = nameTok.Span };
@@ -1100,7 +1100,7 @@ public sealed partial class Parser
             if (_buffer.Match(TokenKind.LBracket))
             {
                 var list = new List<TypeNode>();
-                do { list.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma));
+                do { list.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RBracket));
                 _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close the bound");
                 bounds = list.ToArray();
             }
@@ -1174,7 +1174,7 @@ public sealed partial class Parser
                 if (_buffer.Match(TokenKind.LBracket))
                 {
                     var cs = new List<TypeNode>();
-                    do { cs.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma));
+                    do { cs.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RBracket));
                     end = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close constraint list").Span;
                     constraints = cs.ToArray();
                 }
@@ -1196,7 +1196,7 @@ public sealed partial class Parser
             }
             parameters.Add(new GenericParam(_sm.Slice(nameTok.Span).ToString(), constraints,
                 Span.Union(nameTok.Span, end)) { NameSpan = nameTok.Span, Default = fallback, ConstraintsBracketed = constraintsBracketed });
-        } while (_buffer.Match(TokenKind.Comma));
+        } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.Greater) && !_buffer.Check(TokenKind.GreaterEqual));
         // A generic parameter list closes with a plain '>', never a '>>' — but an alias's may meet
         // its '=' unspaced, 'type Pair<T>= (T, T);', and the lexer reads that '>='.
         if (_buffer.Current.TokenKind == TokenKind.GreaterEqual) _buffer.SplitCurrentGreater();

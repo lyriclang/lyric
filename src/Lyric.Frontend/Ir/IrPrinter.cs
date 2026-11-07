@@ -231,8 +231,8 @@ public static class IrPrinter
         _ => throw new InternalCompilationException($"ir-printer: unhandled op {op.GetType().Name}")
     };
 
-    /// <summary>Shows the interface and the slot rather than a method name: the slot is what stands in
-    /// the bytecode.</summary>
+    /// <summary>Shows the interface and the slot rather than a method name: the slot is what the call
+    /// goes through.</summary>
     private static string CallVirtStr(CallVirt c)
     {
         var args = string.Join(", ", c.Args);
@@ -252,7 +252,7 @@ public static class IrPrinter
         return $"{dest}: {(ret is null ? "?" : TypeStr(ret))} = call {target}({args})";
     }
 
-    /// <summary>Native calls show the SYMBOLIC NAME: it is what gets bound at load time.</summary>
+    /// <summary>Native calls show the SYMBOLIC NAME: it is what the C calls.</summary>
     private static string CallImportStr(CallImport k, CallContext ctx)
     {
         var args = string.Join(", ", k.Args);

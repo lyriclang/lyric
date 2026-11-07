@@ -82,14 +82,8 @@ public static class ModuleLowerer
     /// 30 ms, without it 2.8 ms. The check is therefore 90% of the total time, most of it in the
     /// availability data flow, which allocates hash sets per block and iterates to a fixed point.</para>
     ///
-    /// <para>The risk is bounded by what the bytecode reader validates at load time
-    /// (<c>LYR-BC####</c>), and only by that. This paragraph used to claim the reader checks
-    /// EVERYTHING, so a lowering bug in a release build could never reach a user as silently wrong
-    /// code. It did: the reader checked indices but never the type tag of an arithmetic opcode, so a
-    /// compound assignment that emitted <c>add string</c> passed every release tool and evaluated to
-    /// the empty string. The reader now checks the tags too. The general rule stands nonetheless —
-    /// what the reader does not check, a release build does not catch, so a new invariant belongs in
-    /// BOTH places or in the reader alone.</para>
+    /// <para>What a build without it gets wrong, nothing later catches: the C compiler sees only what
+    /// is left of the mistake. A new invariant belongs in the verifier, and the CI always runs it.</para>
     ///
     /// <para>The condition itself lives in <see cref="Pipeline.VerifiesIr"/>: it also decides which
     /// phases <c>--verbose</c> lists, and the tooling tests ask that question too.</para>
@@ -138,7 +132,7 @@ public static class ModuleLowerer
         var exports = new List<IrExport>();
 
         // Pass 1: the function table. The order is module order then declaration order and therefore
-        // deterministic; FunctionIds land as indices in the bytecode.
+        // deterministic; FunctionIds index the list the C is emitted from.
         // what the build leaves out gets no id, no body and no slot
         bool Built(Decl decl) => comptime?.Inactive is not { } inactive || !inactive.IsInactive(decl);
 
@@ -151,7 +145,7 @@ public static class ModuleLowerer
                 // A GENERIC native is a template rather than a row: one import per type argument
                 // tuple a call site asks for, built there and interned by name AND signature —
                 // which the import table has distinguished since coroutines, whose 'isDone' is
-                // emitted once per coroutine signature and bound by one host function.
+                // emitted once per coroutine signature and answered by one runtime function.
                 if (function.Generics.Length > 0)
                 {
                     if (function.Body is null && compilation.IsNative(module)
@@ -164,13 +158,12 @@ public static class ModuleLowerer
                 if (module.Members.FunctionFor(function.Name, function) is not { } symbol) continue;
 
                 // Bodyless in a stdlib module means a native declaration. The signature is in Lyric, the
-                // implementation lives in the host and is bound by name at load time. In user code the
+                // implementation lives in the runtime, under that name. In user code the
                 // sema already rejected this as LYR-SEM0051.
                 if (function.Body is null)
                 {
                     // An 'extern' declaration is a native the PROGRAM declares: the import is
-                    // named after the ABI and the symbol rather than after the module, so the
-                    // binder knows which side answers for it — 'C:abs'.
+                    // named after the ABI and the symbol rather than after the module — 'C:abs'.
                     if (!compilation.IsNative(module) && function.Extern is null) continue;
 
                     // Caught rather than thrown: a native signature with a type the lowering does not
@@ -211,14 +204,12 @@ public static class ModuleLowerer
                         var returned = NativeStructParameter(module, returnNode, typeTable, binding);
                         var wireReturn = returned is { } r
                             ? new IrScalarType(IrScalar.Void)
-                            : NativeType(returnNode, typeTable, function);
+                            : NativeType(returnNode, typeTable);
                         if (returned is { } outParam)
                             flattened = [.. flattened, outParam.Declared];
 
                         imports.Declare(symbol, new IrImport(
-                            function.Extern is { } spec
-                                ? NameMangling.ForExtern(spec, function.Name)
-                                : NameMangling.ForFunction(module, function.Name),
+                            NameMangling.ForFunction(module, function.Name),
                             flattened, wireReturn),
                             new ImportShape(parameters, returned is { } ret
                                 ? new ImportReturn(ret.Struct!.Value, ret.Fields)
@@ -282,8 +273,7 @@ public static class ModuleLowerer
                 if (function.Parameters.Length == 0) { entry = id; continue; }
 
                 // There are two forms: 'fn main(): int' and 'fn main(args: string[]): int'. The second
-                // gets its array from the runtime, which reads the form from the entry's signature; the
-                // function table carries it anyway, so the format needs no flag for it.
+                // gets its array from the runtime, which reads the form from the entry's signature.
                 if (function.Parameters is [{ Type: ArrayType { Element: NamedType arg } }]
                     && arg.Path[^1] == "string")
                 {
@@ -341,7 +331,7 @@ public static class ModuleLowerer
 
         // extend blocks get NO ids here. An extension method is requested at its first call
         // (ExtensionTable), the same worklist shape as for lambdas and monomorphized instances and for
-        // the same reason: only what is used should stand in the bytecode.
+        // the same reason: only what is used should stand in the program.
 
         // Globals are collected BEFORE the bodies: a function may read a constant that stands further
         // down in the source. The same two-phase shape as for the FunctionIds.
@@ -366,8 +356,7 @@ public static class ModuleLowerer
         // initializer then landed on an id the extension already held.
         // The evaluation pass: every comptime site becomes a parameterless function returning its
         // expression, and those functions are the module's ONLY roots. The pruning then keeps
-        // exactly what the sites reach, and the capability bits are read off that — so a site
-        // that needs no capability evaluates even in a program that, elsewhere, reads files.
+        // exactly what the sites reach.
         var comptimeReturns = new Dictionary<FunctionDecl, IrType>(ReferenceEqualityComparer.Instance);
         // The hoisting pass keeps the program's own roots aside: a module
         // binding's site is evaluated only where the program reaches the binding.
@@ -622,7 +611,6 @@ public static class ModuleLowerer
         {
             EntryFunction = entry, Imports = imports.Used, Types = typeTable.Defs,
             Globals = globals.Defs, GlobalInit = globalInit,
-            Capabilities = RequiredCapabilities(compilation),
             Impls = impls,
             ExportRoots = exportRoots,
             Quotes = typeTable.Quotes,
@@ -733,8 +721,7 @@ public static class ModuleLowerer
         }
 
         // The pruning still runs before the second verification, and this saving is the one that may
-        // stay: deleting a whole function cannot make another one malformed, and a dangling function
-        // id is among the few things the bytecode reader really does check. What the saving used to
+        // stay: deleting a whole function cannot make another one malformed. What the saving used to
         // cover up — a malformed body nobody calls — the first verification has already seen.
         Reachability.Prune(result);
 
@@ -753,16 +740,6 @@ public static class ModuleLowerer
             if (calls.Count > 0) return null;
         }
 
-        // The evaluation module requires what its retained imports require — nothing more. The
-        // whole-program bits would refuse a pure site in a program that also touches the disk.
-        if (comptime is { Hoist: true })
-        {
-            var needed = Capability.None;
-            foreach (var import in result.Imports)
-                needed |= CapabilityTable.RequiredForImport(import.Name);
-            result.Capabilities = needed;
-        }
-
         // THE SECOND VERIFICATION, and it names the other culprit. Only when something changed the
         // module: otherwise it is what the first run already accepted, and a second pass over it
         // would buy nothing for 90% of the lowering time. A program's debug build changes it too,
@@ -773,9 +750,6 @@ public static class ModuleLowerer
         return result;
     }
 
-    /// <summary>Runs the action and adds its duration to the tally. The verifier is 90% of the
-    /// lowering time, so <c>--verbose</c> showing it as part of 'lower' would misname the bill; ONE
-    /// tally for both runs, because the table reports a pipeline stage, not a number of calls.</summary>
     /// <summary>std.task's four functions of the embedding, each lowered, or null.</summary>
     private static IrEmbedding? EmbeddingOf(ModuleSymbol task, Dictionary<FunctionSymbol, FunctionId> ids)
     {
@@ -787,6 +761,9 @@ public static class ModuleLowerer
             : null;
     }
 
+    /// <summary>Runs the action and adds its duration to the tally. The verifier is 90% of the
+    /// lowering time, so <c>--verbose</c> showing it as part of 'lower' would misname the bill; ONE
+    /// tally for both runs, because the table reports a pipeline stage, not a number of calls.</summary>
     private static void Timed(LoweringTimings? timings, Action action)
     {
         if (timings is null)
@@ -801,14 +778,6 @@ public static class ModuleLowerer
         timings.Runs++;
     }
 
-    /// <summary>
-    /// The parameters of a native declaration: the flattened wire types plus the declared shape.
-    ///
-    /// <para>A struct parameter — declared in the SAME native module, which is where an SDK's
-    /// value types live — is flattened to its fields, so the import table, the bytecode and the
-    /// binder see scalars and nothing changes below the compiler. The call site emits one field
-    /// load per slot; the shape is what tells it to.</para>
-    /// </summary>
     /// <summary>The module-local type aliases, for resolving native signatures on the syntax
     /// level: <c>type Entity = int</c> beside <c>fn destroy(e: Entity);</c>. The wire carries
     /// the layout.</summary>
@@ -905,6 +874,13 @@ public static class ModuleLowerer
         return IrCForm.Value;
     }
 
+    /// <summary>
+    /// The parameters of a native declaration: the flattened wire types plus the declared shape.
+    ///
+    /// <para>A struct parameter — declared in the SAME native module — is flattened to its fields, so
+    /// the import table sees scalars. The call site emits one field
+    /// load per slot; the shape is what tells it to.</para>
+    /// </summary>
     private static (IrType[] Flattened, ImportParam[] Shape) LowerNativeParameters(
         ModuleSymbol module, FunctionDecl function,
         TypeTable typeTable, Dictionary<string, TypeNode> aliases, BindingResult binding)
@@ -922,11 +898,10 @@ public static class ModuleLowerer
             }
             else
             {
-                var lowered = NativeType(node, typeTable, function);
+                var lowered = NativeType(node, typeTable);
                 // A place parameter of one of the library's own natives (03 §2.3a) is the place
-                // itself on the wire. An 'extern' takes none this way: what a place is to the C
-                // ABI, 13 does not say.
-                if (function.Parameters[i].IsPlace && function.Extern is null)
+                // itself on the wire.
+                if (function.Parameters[i].IsPlace)
                     lowered = new IrPlaceType(lowered);
                 shape[i] = new ImportParam(lowered, null, []);
                 flattened.Add(lowered);
@@ -937,20 +912,18 @@ public static class ModuleLowerer
     }
 
     /// <summary>
-    /// A type in a native's signature: what a host binds by layout — a primitive, an optional,
-    /// an array of primitives — as <see cref="DeclaredTypes"/> has it. Beyond that, for
-    /// the standard library's own natives only, what the runtime holds without knowing a layout:
-    /// a reference — an object, a coroutine — or a function value, whose two words the runtime's
-    /// ABI fixes. An 'extern' keeps the host's set.
+    /// A type in the signature of one of the library's own natives: a primitive, an optional, an
+    /// array of primitives — as <see cref="DeclaredTypes"/> has it —, or what the runtime holds
+    /// without knowing a layout: a reference — an object, a coroutine — or a function value, whose
+    /// two words the runtime's ABI fixes.
     /// </summary>
-    private static IrType NativeType(TypeNode? node, TypeTable typeTable,
-        FunctionDecl function)
+    private static IrType NativeType(TypeNode? node, TypeTable typeTable)
     {
         try
         {
             return DeclaredTypes.Lower(node);
         }
-        catch (UnsupportedConstructException) when (function.Extern is null && node is not null)
+        catch (UnsupportedConstructException) when (node is not null)
         {
             return typeTable.Lower(node);
         }
@@ -974,15 +947,15 @@ public static class ModuleLowerer
     /// <summary>A value struct used as a parameter of a native declaration, or <c>null</c> when
     /// the node is anything else.
     ///
-    /// <para>The struct may come from ANOTHER module: an SDK of several files declares <c>Vec2</c>
+    /// <para>The struct may come from ANOTHER module: a library of several files declares <c>Vec2</c>
     /// once and names it wherever a native takes or returns one, selectively imported or
     /// module-qualified. What crosses the wire is the LAYOUT, and a layout belongs to the program
     /// rather than to the file that declared it — the same reason an imported alias resolves here
-    /// (§3.5). The host agreeing about that layout is checked at load time, as it always was.</para>
+    /// (§3.5).</para>
     /// </summary>
     /// <exception cref="UnsupportedConstructException">The struct has a field that cannot be
     /// flattened. Scalars and strings only: an array or object field would put a module layout
-    /// into the host's hands, which is the boundary this design keeps closed.</exception>
+    /// into the runtime's hands.</exception>
     private static ImportParam? NativeStructParameter(ModuleSymbol module, TypeNode? node,
         TypeTable typeTable, BindingResult binding)
     {
@@ -1009,37 +982,6 @@ public static class ModuleLowerer
         return new ImportParam(new IrStructType(type), type, layout.FieldTypes);
     }
 
-    private static Capability RequiredCapabilities(Compilation compilation)
-    {
-        var needed = Capability.None;
-        foreach (var module in compilation.Modules)
-        {
-            needed |= CapabilityTable.RequiredForImport(module.FullName);
-
-            // An extern declaration is a gated import the module itself writes: the bit follows
-            // the ABI, exactly as it follows the module name for 'std.io.file'. Recorded whether
-            // or not the program calls it — the same rule as for an import nobody uses.
-            foreach (var decl in compilation.AstOf(module).Declarations)
-                if (decl is FunctionDecl { Extern: { } spec, Name: var name })
-                    needed |= CapabilityTable.RequiredForImport(NameMangling.ForExtern(spec, name));
-        }
-        return needed;
-    }
-
-    /// <summary>
-    /// The vtable rows: for every interned class and every interned interface it implements, the target
-    /// function slot by slot.
-    ///
-    /// <para>AFTER the lowering, because only then is it settled which types reach the bytecode at all —
-    /// the same rule as for types and imports. Interfaces are already interned by then, because every
-    /// <c>mkiface</c> and <c>callvirt</c> needed their id while lowering.</para>
-    ///
-    /// <para>THE RESOLUTION ORDER IS DECIDED HERE, NOT AT RUNTIME: own member before interface default.
-    /// The dispatch therefore finds a finished function index and has to search for nothing.</para>
-    ///
-    /// <para>Sorted deterministically: the rows land as a section in the bytecode, and the same input
-    /// has to give byte-identical output. The enumeration order of a dictionary does not do that.</para>
-    /// </summary>
     /// <summary>The instance of a default set in place for <paramref name="type"/> that fills
     /// its row, or none.</summary>
     private static FunctionId? ExpandedDefault(TypeSymbol type, LyrType conformer, TypeSymbol iface, string slot,
@@ -1052,6 +994,20 @@ public static class ModuleLowerer
         return null;
     }
 
+    /// <summary>
+    /// The vtable rows: for every interned class and every interned interface it implements, the target
+    /// function slot by slot.
+    ///
+    /// <para>AFTER the lowering, because only then is it settled which types reach the program at all —
+    /// the same rule as for types and imports. Interfaces are already interned by then, because every
+    /// <c>mkiface</c> and <c>callvirt</c> needed their id while lowering.</para>
+    ///
+    /// <para>THE RESOLUTION ORDER IS DECIDED HERE, NOT AT RUNTIME: own member before interface default.
+    /// The dispatch therefore finds a finished function index and has to search for nothing.</para>
+    ///
+    /// <para>Sorted deterministically: the rows land in the emitted C, and the same input
+    /// has to give byte-identical output. The enumeration order of a dictionary does not do that.</para>
+    /// </summary>
     private static List<IrImpl> BuildImpls(TypeTable typeTable, BindingResult binding,
         Compilation compilation, Dictionary<FunctionSymbol, FunctionId> ids,
         ExtensionTable extensions, InstanceTable instances, TypeResult types,
@@ -1350,15 +1306,10 @@ public static class ModuleLowerer
             ? named
             : null;
 
-    /// <summary>The visible <c>extend T :: [I]</c> blocks that establish exactly this conformance. Empty
-    /// means that if it holds at all, it is declared.</summary>
     /// <summary>One place a conformance to an interface was written: a node in the type's own
     /// <c>::</c> list, or one in an <c>extend</c> block together with that block.</summary>
     private readonly record struct ConformanceSite(TypeNode Node, ExtensionBlock? Block);
 
-    /// <summary>Every site that names this interface DIRECTLY, in declaration order — the type's
-    /// own list first, then the extend blocks. A conformance reached through a parent is not one:
-    /// its instance stands on the child, and the row for it resolves through the chain.</summary>
     /// <summary>The suffix that separates one declaration from its overloads, empty when the name
     /// is declared once. The ordinal is the declaration's position among them, used only when the
     /// written parameter types are not enough to tell two apart.</summary>
@@ -1380,6 +1331,9 @@ public static class ModuleLowerer
         return NameMangling.OverloadSuffix(function.Parameters, ordinal);
     }
 
+    /// <summary>Every site that names this interface DIRECTLY, in declaration order — the type's
+    /// own list first, then the extend blocks. A conformance reached through a parent is not one:
+    /// its instance stands on the child, and the row for it resolves through the chain.</summary>
     private static List<ConformanceSite> ConformanceSites(Compilation compilation, TypeSymbol type,
         TypeSymbol iface, BindingResult binding)
     {
@@ -1539,6 +1493,8 @@ public static class ModuleLowerer
         };
     }
 
+    /// <summary>The visible <c>extend T :: [I]</c> blocks that establish exactly this conformance. Empty
+    /// means that if it holds at all, it is declared.</summary>
     private static List<ExtensionBlock> ExtendBlocksFor(Compilation compilation, TypeSymbol type,
         TypeSymbol iface, BindingResult binding)
     {

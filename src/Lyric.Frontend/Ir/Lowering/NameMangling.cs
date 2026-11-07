@@ -4,8 +4,8 @@ using Lyric.Resolver;
 namespace Lyric.Ir.Lowering;
 
 /// <summary>
-/// Produces the names under which functions stand in the IR. They are not cosmetic: they become the
-/// symbol names in the bytecode, and the verifier rejects collisions, because two functions under the
+/// Produces the names under which functions stand in the IR. They are not cosmetic: they name the
+/// emitted C functions, and the verifier rejects collisions, because two functions under the
 /// same name would be a silent wrong call.
 ///
 /// <para>The scheme is <c>&lt;module path&gt;.&lt;function&gt;</c>, so <c>main.add</c>. The module path
@@ -23,8 +23,7 @@ internal static class NameMangling
 
     /// <summary>
     /// An extern import: <c>&lt;abi&gt;:&lt;symbol&gt;</c> — <c>C:abs</c>. The
-    /// ABI prefix is what the runtime's binder and the capability table key on
-    /// (<see cref="Core.CapabilityTable.RequiredForImport"/>); the symbol is C's spelling,
+    /// symbol is C's spelling,
     /// never the module's, so two modules declaring the same function share one import row.
     /// </summary>
     public static string ForExtern(AST.ExternSpec spec, string functionName) =>

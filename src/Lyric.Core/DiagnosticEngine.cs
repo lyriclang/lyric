@@ -133,8 +133,6 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
         }
     }
 
-    /// <summary>Takes back the warnings, notes and hints <paramref name="allowed"/> says yes to
-    /// (<c>@Allow</c>, <c>[lints] allow</c>); an error stays.</summary>
     /// <summary>Adds <paramref name="note"/> to the first diagnostic reported since the count was
     /// <paramref name="from"/> that <paramref name="which"/> takes: what the reporter could not see —
     /// the expression around a failed lookup — said by the caller that can.</summary>
@@ -149,6 +147,8 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
             }
     }
 
+    /// <summary>Takes back the warnings, notes and hints <paramref name="allowed"/> says yes to
+    /// (<c>@Allow</c>, <c>[lints] allow</c>); an error stays.</summary>
     public void Suppress(Func<Diagnostic, bool> allowed) =>
         _diagnostics.RemoveAll(d => d.Severity != Severity.Error && allowed(d));
 

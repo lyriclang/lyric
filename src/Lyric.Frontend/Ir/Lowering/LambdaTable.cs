@@ -9,15 +9,15 @@ namespace Lyric.Ir.Lowering;
 ///
 /// <para>A lambda becomes an ORDINARY <see cref="IrFunction"/>: parameter 0 is its environment,
 /// followed by the written parameters. A closure call is therefore the same mechanism as a method call
-/// with a receiver rather than a second one beside it, and the VM needs no separate frame setup for
-/// <c>callind</c>.</para>
+/// with a receiver rather than a second one beside it, and <c>callind</c> needs no separate frame
+/// setup.</para>
 ///
 /// <para>A TABLE WITH A WORKLIST RATHER THAN RECURSION. The ModuleLowerer assigns all FunctionIds in
 /// pass 1, before any body is lowered, but a lambda only appears in pass 2. It therefore gets its id
 /// at REGISTRATION and is lowered afterwards, and while being lowered it may register further lambdas
 /// that grow at the end. Direct recursion would have achieved the same but would have made the order
-/// in the function list depend on the call nesting, and that list is index-bearing in the
-/// bytecode.</para>
+/// in the function list depend on the call nesting, and that list orders the
+/// emitted C.</para>
 /// </summary>
 internal sealed class LambdaTable
 {
@@ -91,8 +91,6 @@ internal sealed class LambdaTable
         }
     }
 
-    /// <summary>The first id a lambda may take: behind all written functions and behind the global
-    /// initializer.</summary>
     /// <summary>How far the lowering has come. The table is drained SEVERAL times — an instance can
     /// request a lambda, a lambda an instance — and without this mark everything would arise anew on
     /// every pass.</summary>
@@ -118,7 +116,7 @@ internal sealed class LambdaTable
     {
         var id = _ids.Next();
 
-        // The name lands in the bytecode and in every diagnostic. '<' cannot occur in any Lyric
+        // The name lands in the IR and in every diagnostic. '<' cannot occur in any Lyric
         // identifier, so it collides with nothing; the running number keeps two lambdas of the same
         // function apart.
         var name = $"{enclosing}.<lambda{_pending.Count}>";

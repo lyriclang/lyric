@@ -12,7 +12,6 @@ namespace Lyric.Parsing;
 /// </summary>
 public sealed partial class Parser
 {
-    /// <summary>Entry point for exactly ONE statement; a block covers sequences.</summary>
     /// <summary>Every statement of the text, to its end, as a block body would hold them — what
     /// <c>std.syntax</c>'s <c>parseStmts</c> reads. A last expression without its <c>;</c>
     /// is the tail, as in a value block.</summary>
@@ -26,6 +25,7 @@ public sealed partial class Parser
         _tailAtEnd = true;
         while (!_buffer.AtEnd)
         {
+            if (_buffer.Match(TokenKind.Semicolon)) continue; // an empty statement says nothing
             var before = _buffer.Position;
             stmts.Add(ParseStmt());
             if (_buffer.Position == before && !_buffer.AtEnd) _buffer.Advance();
@@ -36,6 +36,7 @@ public sealed partial class Parser
         return stmts.ToArray();
     }
 
+    /// <summary>Entry point for exactly ONE statement; a block covers sequences.</summary>
     public Stmt ParseStatement()
     {
         var stmt = ParseStmt();
@@ -215,12 +216,6 @@ public sealed partial class Parser
         return AtTail() ? new TailExprStmt(new MatchExpr(scrutinee, arms, span), span) : new MatchStmt(scrutinee, arms, span);
     }
 
-    /// <summary>A block; with <paramref name="valueBlock"/> one in value position — a match arm,
-    /// a lambda body, a clause of a 'try' expression, a branch of an 'if' expression, the right
-    /// of '??' — whose last statement may be a tail without ';': an expression, or an 'if', a
-    /// 'match' or a 'loop'. The flag holds for the block's OWN statements only: a
-    /// nested statement block resets it, so a tail can stand exactly where its value has
-    /// somewhere to go.</summary>
     /// <summary>
     /// The body of <c>if</c>, <c>else</c>, <c>while</c>, <c>do</c> and <c>for</c>: a block,
     /// always. A statement written without the braces is refused once, with the form, and read as
@@ -236,6 +231,12 @@ public sealed partial class Parser
         return new Block([single], Span.Union(at, single.Span));
     }
 
+    /// <summary>A block; with <paramref name="valueBlock"/> one in value position — a match arm,
+    /// a lambda body, a clause of a 'try' expression, a branch of an 'if' expression, the right
+    /// of '??' — whose last statement may be a tail without ';': an expression, or an 'if', a
+    /// 'match' or a 'loop'. The flag holds for the block's OWN statements only: a
+    /// nested statement block resets it, so a tail can stand exactly where its value has
+    /// somewhere to go.</summary>
     private Block ParseBlock(bool valueBlock = false)
     {
         var open = _buffer.Expect(TokenKind.LBrace, "LYR-PAR0017", "expected '{' to open block");
@@ -256,6 +257,8 @@ public sealed partial class Parser
         _allowStructInit = true;
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
+            // An empty statement: allowed, and nothing is kept of it, so the formatter drops it.
+            if (_buffer.Match(TokenKind.Semicolon)) continue;
             var before = _buffer.Position;
             stmts.Add(ParseStmt());
             if (_buffer.Position == before && !_buffer.AtEnd)

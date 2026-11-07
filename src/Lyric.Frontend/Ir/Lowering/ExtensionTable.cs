@@ -14,13 +14,13 @@ namespace Lyric.Ir.Lowering;
 /// <c>hello.lyr</c> that touches none of them.</para>
 ///
 /// <para>The same rule applies here as for types and imports: ONLY WHAT IS ACTUALLY USED GOES INTO
-/// THE BYTECODE. A declared but never called extension belongs in it as little as a declared but never
+/// THE PROGRAM. A declared but never called extension belongs in it as little as a declared but never
 /// instantiated class.</para>
 ///
 /// <para>WORKLIST RATHER THAN RECURSION, the same reasoning as in <see cref="LambdaTable"/>: the id is
 /// assigned at REGISTRATION, so the caller can write its <c>call</c> immediately; lowering happens
 /// afterwards, and the body may request further extensions. Recursion would have made the order in the
-/// function list depend on the call nesting, and that list is index-bearing in the bytecode.</para>
+/// function list depend on the call nesting, and that list orders the emitted C.</para>
 /// </summary>
 internal sealed class ExtensionTable
 {

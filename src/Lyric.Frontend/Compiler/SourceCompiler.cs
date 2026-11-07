@@ -11,7 +11,7 @@ using Lyric.Sema;
 namespace Lyric.Compiler;
 
 /// <summary>
-/// The pipeline source to AST to symbols to types to IR to <c>.lyrbc</c> bytes, as a library.
+/// The pipeline source to AST to symbols to types to IR, as a library.
 ///
 /// <para>One front end for the whole toolchain. With a copy of the preamble per command, only one
 /// of them wired up the <see cref="Compilation.ModuleLoader"/>, and <c>check</c> silently treated
@@ -358,14 +358,6 @@ public static class SourceCompiler
         return found;
     }
 
-    /// <summary>
-    /// The module loader every run uses: 'std' from the standard library, a segment the host
-    /// claimed from one of its native roots, everything else from the program's directory.
-    ///
-    /// <para>The split is by module path rather than by trying one root and then the other. A
-    /// precedence rule would let a file at '&lt;program&gt;/std/io/console.lyr' shadow the standard
-    /// library silently, and silently is the part that makes it a trap.</para>
-    /// </summary>
     /// <summary>Whether a file is one the toolchain wrote from a header: no lint looks at it.</summary>
     private static Func<FileId, bool>? Written(CompilerOptions options, SourceManager sources)
     {
@@ -375,6 +367,14 @@ public static class SourceCompiler
                        && prefixes.Any(p => Path.GetFullPath(path).StartsWith(p, StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// The module loader every run uses: 'std' from the standard library, a package's from its
+    /// roots, everything else from the program's directory.
+    ///
+    /// <para>The split is by module path rather than by trying one root and then the other. A
+    /// precedence rule would let a file at '&lt;program&gt;/std/io/console.lyr' shadow the standard
+    /// library silently, and silently is the part that makes it a trap.</para>
+    /// </summary>
     private static Func<string[], LoadedModule?> BuildModuleLoader(
         SourceManager sources, DiagnosticEngine diagnostics, CompilerOptions options,
         string fallbackSourceRoot)
@@ -384,22 +384,6 @@ public static class SourceCompiler
             sources, diagnostics, options.SourceOverlay, SeedOf(options));
         var fromProject = StdlibLoader.ForProject(
             options.SourceRoot ?? fallbackSourceRoot, sources, diagnostics, options.SourceOverlay);
-
-        // Roots the host declares native, keyed by the segment they own. An SDK ships its
-        // declarations as .lyr files and says which prefix they live under.
-        var nativeRoots = options.NativeRoots?.ToDictionary(
-            entry => entry.Key,
-            entry => StdlibLoader.ForRoot(entry.Value, sources, diagnostics, options.SourceOverlay),
-            StringComparer.Ordinal);
-
-        // Other projects this one stands on, keyed the same way. Their modules are NOT native:
-        // a dependency is somebody's ordinary Lyric, and a body it forgot is an error there as
-        // it is here. Its own native roots arrive through the table above, which the project
-        // file has already merged.
-        var dependencyRoots = options.DependencyRoots?.ToDictionary(
-            entry => entry.Key,
-            entry => StdlibLoader.ForProject(entry.Value, sources, diagnostics, options.SourceOverlay),
-            StringComparer.Ordinal);
 
         // Packages: the name in front, the file under the source root without it, its name
         // exactly as the module path writes it on every platform.
@@ -457,33 +441,8 @@ public static class SourceCompiler
                 return NamedExactly(package.Root, file) ? package.Load(file) : null;
             }
 
-            if (nativeRoots is not null && modulePath.Length > 0
-                && nativeRoots.TryGetValue(modulePath[0], out var native))
-                return native(modulePath);
-
-            if (dependencyRoots is not null && modulePath.Length > 0
-                && dependencyRoots.TryGetValue(modulePath[0], out var dependency))
-                return dependency(modulePath);
-
             return fromProject(modulePath);
         };
-
-        // Supplied modules first, then disk. Chained rather than a second loader mechanism:
-        // 'Compilation' knows exactly one delegate.
-        var provided = options.NativeModules;
-        if (provided is { Count: > 0 })
-        {
-            var fromDisk = loader;
-            loader = modulePath =>
-            {
-                var name = string.Join('.', modulePath);
-                if (!provided.TryGetValue(name, out var text)) return fromDisk(modulePath);
-
-                var id = sources.AddVirtual(name, text);
-                var parsed = ParsedModule.Parse(sources, id, diagnostics);
-                return new LoadedModule(parsed.Ast, IsNative: true, parsed.Documentation);
-            };
-        }
 
         return loader;
     }
@@ -677,11 +636,6 @@ public static class SourceCompiler
 }
 
 /// <summary>
-/// What a compiler run needs besides the source file.
-///
-/// <para>A record rather than a growing parameter list.</para>
-/// </summary>
-/// <summary>
 /// The front end's answer about a program, as opposed to its output.
 ///
 /// <para>The three tables belong together and are useless apart: a symbol from
@@ -705,6 +659,11 @@ public sealed record SemanticModel(
     public DocumentationTable Documentation => Compilation.Documentation;
 }
 
+/// <summary>
+/// What a compiler run needs besides the source file.
+///
+/// <para>A record rather than a growing parameter list.</para>
+/// </summary>
 public sealed record CompilerOptions
 {
     /// <summary>Where the standard library lives. <c>null</c> means
@@ -736,59 +695,19 @@ public sealed record CompilerOptions
     public CancellationToken Cancellation { get; init; }
 
     /// <summary>Where phase reports go. <c>null</c> means nobody is listening, and the compiler
-    /// then runs with no output dependency at all, which is what the embedding API needs.
-    /// benutzbar haelt.</summary>
+    /// then runs with no output dependency at all.</summary>
     public ICompilerProgress? Progress { get; init; }
-
-    /// <summary>
-    /// Additional NATIVE modules that do not live on disk, by module path.
-    ///
-    /// <para>Used by <c>LangVm.RegisterFunction</c>: a host function needs a DECLARATION for the
-    /// compiler to know its signature, exactly like every standard library native, which stands as
-    /// a bodyless <c>pub fn</c> in a <c>.lyr</c> file. The only difference is that this file lives
-    /// in memory.</para>
-    ///
-    /// <para>They are consulted BEFORE the standard library, so a host module hides one of the same name
-    /// on disk rather than the other way round: the host decides what its script sees.</para>
-    /// </summary>
-    public IReadOnlyDictionary<string, string>? NativeModules { get; init; }
-
-    /// <summary>
-    /// Directories whose modules may declare functions WITHOUT A BODY, keyed by the module path
-    /// segment they own: <c>["engine"] = "…/sdk"</c> makes <c>engine.input</c> read
-    /// <c>…/sdk/engine/input.lyr</c> and treats what it finds as native declarations.
-    ///
-    /// <para>For an SDK that ships its surface as <c>.lyr</c> files rather than as generated
-    /// strings. The host still supplies the implementations, under the same qualified names.</para>
-    ///
-    /// <para>A ROOT is declared native, never a file: <c>Compilation.IsNative</c> follows the origin
-    /// of a module and not its content, or naming a file well enough would be a way into the host.
-    /// The segment a root owns is taken out of the program's own directory, which is what makes the
-    /// answer unambiguous instead of a matter of precedence.</para>
-    /// </summary>
-    public IReadOnlyDictionary<string, string>? NativeRoots { get; init; }
 
     /// <summary>
     /// Where the program's own modules are looked up. <c>null</c> means the directory of the entry
     /// file, which is what a program without a project file gets.
     ///
     /// <para>Filled from the manifest by the tools that read one.
-    /// Deliberately not discovered here: a script being compiled must not be able to widen what
+    /// Deliberately not discovered here: a program being compiled must not be able to widen what
     /// the compiler looks at by placing a file beside itself, so the decision belongs to the
     /// caller.</para>
     /// </summary>
     public string? SourceRoot { get; init; }
-
-    /// <summary>
-    /// Other projects this one imports from, keyed by the module path segment each owns and
-    /// naming that project's SOURCE ROOT: <c>["geometry"] = "…/geometry/src"</c> makes
-    /// <c>import geometry.shapes</c> read <c>…/geometry/src/geometry/shapes.lyr</c>.
-    ///
-    /// <para>The flattened closure of a project's dependencies, native roots
-    /// already taken out into <see cref="NativeRoots"/>. A segment named here is taken out of
-    /// <see cref="SourceRoot"/>, as a native segment is.</para>
-    /// </summary>
-    public IReadOnlyDictionary<string, string>? DependencyRoots { get; init; }
 
     /// <summary>
     /// Lyric 5's packages, by name, each naming its source root:

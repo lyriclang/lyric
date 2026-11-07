@@ -38,8 +38,7 @@ public sealed record Call(TempId? Dest, FunctionId Target, TempId[] Args, Span S
 
 // A call to a natively backed function from the stdlib. Its own instruction rather than a shared
 // index space with Call: in the IR these are two different things — one has a body, the other does
-// not — and the verifier checks each against its own table. The index arithmetic belongs where the
-// convention lives: in the bytecode writer.
+// not — and the verifier checks each against its own table.
 public sealed record CallImport(TempId? Dest, ImportId Target, TempId[] Args, Span Span) : IrOp(Span)
 {
     /// <summary>For a C function's variadic arguments, the ones after its parameters: how each
@@ -51,8 +50,7 @@ public sealed record CallImport(TempId? Dest, ImportId Target, TempId[] Args, Sp
 // has no monkey patching, so the index is fixed at compile time. A name lookup with an inline cache,
 // as in CPython or Ruby, solves a problem this language does not have.
 // The type stands on each of the three instructions although the object knows it: only that way can
-// the bytecode reader check the field index against a layout at load time, without data-flow
-// analysis.
+// the verifier check the field index against a layout without data-flow analysis.
 /// <param name="Result">Whether this type is bound as a reference or as a value. A copy for the
 /// printer; the temp table stays the authority. Without it the dump prints <c>&amp;ty0</c> for a
 /// struct instead of <c>val ty0</c> — a line claiming something other than what is executed.</param>
@@ -60,10 +58,10 @@ public sealed record NewObject(TempId Dest, TypeId Type, IrType Result, Span Spa
 public sealed record LoadField(TempId Dest, TempId Object, TypeId Type, FieldId Field, IrType FieldType, Span Span) : IrOp(Span);
 public sealed record StoreField(TempId Object, TypeId Type, FieldId Field, TempId Value, Span Span) : IrOp(Span);
 
-// Arrays. An element index is a RUNTIME VALUE; unlike field and type indices it is not checkable at
-// load time. A violation is therefore a panic rather than a load error: "the program miscalculated"
-// is something other than "the compiler produced nonsense", and only the second belongs in load-time
-// validation.
+// Arrays. An element index is a RUNTIME VALUE; unlike field and type indices it is not checkable while
+// compiling. A violation is therefore a panic rather than a diagnostic: "the program miscalculated"
+// is something other than "the compiler produced nonsense", and only the second belongs in the
+// verifier.
 public sealed record NewArray(TempId Dest, IrType Element, TempId[] Elements, Span Span) : IrOp(Span);
 public sealed record LoadElem(TempId Dest, TempId Array, TempId Index, IrType Element, Span Span) : IrOp(Span);
 public sealed record StoreElem(TempId Array, TempId Index, TempId Value, Span Span) : IrOp(Span);
@@ -339,12 +337,6 @@ public sealed record SizeOf(TempId Dest, IrType Type, Span Span) : IrOp(Span);
 /// and returns its result in the <paramref name="Return"/> form.</summary>
 public sealed record CCallback(TempId Dest, FunctionId Function, IrCForm[] Params, IrCForm Return, Span Span) : IrOp(Span);
 
-/// <summary>A call through a C function's pointer, <paramref name="Callee"/> a <c>uint</c>: each
-/// argument of <paramref name="ParamTypes"/> in its form, the result back from its own — as a call
-/// of an <c>extern "C"</c> function is.</summary>
-/// <summary><c>Callback&lt;C&gt;.new</c>'s state: the closure's code and environment in an object a
-/// root keeps alive; <paramref name="Dest"/> is the root's address, a <c>uint</c>, which is the
-/// userdata C hands back.</summary>
 /// <summary><c>GcHandle.pin</c>: <paramref name="Value"/>, an object, held by a root the collector
 /// keeps; <paramref name="Dest"/> is the root's address, a <c>uint</c>.</summary>
 public sealed record RootObject(TempId Dest, TempId Value, Span Span) : IrOp(Span);
@@ -353,6 +345,9 @@ public sealed record RootObject(TempId Dest, TempId Value, Span Span) : IrOp(Spa
 /// the root holds another class's, as a pointer from C may say.</summary>
 public sealed record RootedObject(TempId Dest, TempId Root, IrRefType Type, Span Span) : IrOp(Span);
 
+/// <summary><c>Callback&lt;C&gt;.new</c>'s state: the closure's code and environment in an object a
+/// root keeps alive; <paramref name="Dest"/> is the root's address, a <c>uint</c>, which is the
+/// userdata C hands back.</summary>
 public sealed record RootClosure(TempId Dest, TempId Closure, Span Span) : IrOp(Span);
 
 /// <summary><c>Callback&lt;C&gt;.new</c>'s function: the address of a trampoline of C's type —
@@ -361,6 +356,9 @@ public sealed record RootClosure(TempId Dest, TempId Closure, Span Span) : IrOp(
 public sealed record CClosureCallback(TempId Dest, IrFunctionType Closure, int Userdata, IrType[] ParamTypes,
     IrType ReturnType, IrCForm[] Params, IrCForm Return, Span Span) : IrOp(Span);
 
+/// <summary>A call through a C function's pointer, <paramref name="Callee"/> a <c>uint</c>: each
+/// argument of <paramref name="ParamTypes"/> in its form, the result back from its own — as a call
+/// of an <c>extern "C"</c> function is.</summary>
 public sealed record CallCPointer(TempId? Dest, TempId Callee, TempId[] Args, IrType[] ParamTypes, IrType ReturnType,
     IrCForm[] Params, IrCForm Return, Span Span) : IrOp(Span);
 
