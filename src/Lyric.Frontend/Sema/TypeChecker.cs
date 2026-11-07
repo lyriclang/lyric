@@ -4715,6 +4715,8 @@ public sealed class TypeChecker
             {
                 var before = _de.Count;
                 var type = CheckMember(mem, scope, expected);
+                if (!_calleePosition.Contains(mem) && !type.IsError && _result.RefOf(mem) is FunctionSymbol named)
+                    type = CheckMethodValue(mem, named, type, scope);
                 // a local that hides a module or a prelude name, where the member is the hidden one's
                 if (type is ErrorType && _de.Count > before && ShadowNote(mem) is { } shadow)
                     _de.AddNote(before, d => d.Severity == Severity.Error && d.Span.Start >= mem.Span.Start && d.Span.End <= mem.Span.End, shadow);
@@ -8282,6 +8284,59 @@ public sealed class TypeChecker
         return Report(mem.Span, "LYR-SEM0012", $"'{TypeFacts.Display(targetType)}' has no member '{mem.Member}'",
             (TypeFacts.SymbolOf(targetType) is { } owner ? HiddenCandidate(owner, mem.Member) : null)
                 ?? HiddenBlockMember(baseType, mem.Member));
+    }
+
+    /// <summary>
+    /// A method named without a call. A function value is monomorphic (03 §9.4), so a generic
+    /// method is no value, nor is a block's member with a parameter only a call binds: nothing
+    /// here says what stands for it (<c>LYR-SEM0052</c>).
+    /// <para>Any other instance method is a closure bound to its receiver (03 §8.4), and that
+    /// closure is written here as the lambda it is: the receiver held in a local, the body the
+    /// call. What runs is decided as a call decides it, per instance of a generic body: a type's
+    /// own member, a block's, an interface's slot or default.</para>
+    /// </summary>
+    private LyrType CheckMethodValue(MemberExpr mem, FunctionSymbol method, LyrType type, SymbolTable scope)
+    {
+        var receiver = _result.TypeOf(mem.Target);
+        if (receiver is NonValueType { Symbol: ModuleSymbol }) return type;
+        if (method.Generics.Length > 0)
+            return Report(mem.Span, "LYR-SEM0052",
+                $"generic method '{method.Name}' is not a value — a function value is monomorphic; "
+                + "call it, or write a lambda that calls it");
+        if (receiver is NonValueType || method.IsStatic) return type;
+        if (mem.IsOptional && receiver is Optional held) receiver = held.Inner;
+        if (_comp.Extensions.BlockOf(method) is { Generics.Length: > 0 } block
+            && BlockSubstitution(block, receiver, open: true) is { } bound
+            && OpenParametersOf(block).Any(open => !bound.ContainsKey(open)))
+            return Report(mem.Span, "LYR-SEM0052",
+                $"'{method.Name}' is not a value — a parameter of its block is bound by a call, and a function "
+                + "value is monomorphic; call it, or write a lambda that calls it");
+        if (method.Declaration is not FunctionDecl { IsInline: false } declaration
+            || (mem.IsOptional && type is Optional inner ? inner.Inner : type) is not FnType signature)
+            return type;
+
+        var span = mem.Span;
+        var holder = new LocalSymbol("$receiver", receiver, false, null);
+        var holding = new SymbolTable(scope);
+        holding.TryDeclare(holder);
+        var parameters = new LambdaParam[signature.Parameters.Length];
+        var arguments = new Expr[parameters.Length];
+        for (var i = 0; i < parameters.Length; i++)
+        {
+            parameters[i] = new LambdaParam($"$p{i}", null, span) { NameSpan = span, IsPlace = signature.PlaceAt(i) };
+            Expr argument = new IdentifierExpr(parameters[i].Name, span);
+            arguments[i] = parameters[i].IsPlace ? new UnaryExpr(UnaryOp.Place, argument, span) : argument;
+        }
+        var call = new CallExpr(new MemberExpr(new IdentifierExpr(holder.Name, span), mem.Member, IsOptional: false, span) { MemberSpan = default },
+            arguments, span)
+        {
+            // the rest is one array in the value's type, and handed on as it stands
+            Spreads = declaration.Parameters is [.., { IsParams: true }] ? [(arguments[^1], span)] : null,
+        };
+        var lambda = new LambdaExpr(parameters, null, signature.Throws.Length > 0 ? new TryExpr(call, span) { KeywordSpan = span } : call, span);
+        CheckExpr(lambda, holding, signature);
+        _result.SetMethodValue(mem, lambda, holder);
+        return type;
     }
 
     /// <summary>The clause binding this member is asked of, in its clause and not in a lambda there
