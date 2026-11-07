@@ -6359,7 +6359,7 @@ pub enum Visibility :: [Equatable, Debug] {
 /// The kind of a type, for decisions while compiling: `comptime if (f.type.kind == .Optional)`.
 ///
 /// A struct, a class, an enum, an interface; `Primitive` for the built-in scalars and `string`;
-/// `Opaque` for an opaque alias; the shapes `?T`, `T[]`, `T[N]`, a view, a tuple, a function; a
+/// the shapes `?T`, `T[]`, `T[N]`, a view, a tuple, a function; a
 /// type parameter in a generic body; `Other` for what none of these names.
 pub enum TypeKind :: [Equatable, Debug] {
     Primitive,
@@ -6367,7 +6367,6 @@ pub enum TypeKind :: [Equatable, Debug] {
     Class,
     Enum,
     Interface,
-    Opaque,
     Optional,
     Array,
     InlineArray,

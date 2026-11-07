@@ -294,7 +294,7 @@ public sealed partial class Parser
             default:
                 if (AtContextual("type"))
                     return Attach(ParseTypeAlias(isPublic, isOpaque: false, start), attributes, "a type alias");
-                // 'extern "dotnet" fn f(x: int): int = "System.Math::Abs";' — contextual like
+                // 'extern "C" fn f(x: int): int = "abs";' — contextual like
                 // 'type': the word stays an identifier everywhere else, so no program that names
                 // something 'extern' loses that name.
                 if (AtContextual("extern") && _buffer.Peek(1).TokenKind == TokenKind.StringLiteral)

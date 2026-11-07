@@ -358,8 +358,7 @@ public sealed class TypeChecker
     private void ComputeGlobals(ModuleSymbol module)
     {
         // This pass runs before the declaration walk, so the module context is set here as
-        // well: an initializer's expression check reads it — extension visibility, and which
-        // module an inward opaque cast stands in. Null would mean "bare snippet" for every
+        // well: an initializer's expression check reads it — extension visibility. Null would mean "bare snippet" for every
         // global of a real module.
         _currentModule = module;
 
@@ -661,8 +660,7 @@ public sealed class TypeChecker
         if (fn.Body is not null || _comp.IsNative(module)) return;
 
         // An 'extern' declaration is the one bodyless form user code may write: the body lives
-        // in the host, the runtime binds it by symbol, and the capability the ABI needs is
-        // recorded in the module (hostAccess for "dotnet").
+        // in C, and the linker binds it by symbol.
         if (fn.Extern is { } spec)
         {
             CheckExtern(fn, spec, module);
@@ -5970,14 +5968,6 @@ public sealed class TypeChecker
         }
         if (l is PrimitiveType or ErrorType) return;
 
-        // Two values of the SAME opaque alias compare like their underlying — a handle must be
-        // able to find itself. Everything else about the alias stays walled off: mixed-type
-        // equality already failed the Equal test before this method, arithmetic and ordering
-        // never reach an opcode, and the lowering sees the underlying scalar here.
-        if (l is OpaqueRef lo && r is OpaqueRef && LyrType.Equal(l, r)
-            && lo.Underlying is PrimitiveType)
-            return;
-
         var op = b.Operator is BinaryOp.Eq ? "==" : "!=";
 
         // NO unwrapping of '?T': comparing two optionals is not implemented in the backend, where
@@ -6913,30 +6903,6 @@ public sealed class TypeChecker
             return target;
         }
 
-        // An opaque alias converts to EXACTLY its underlying and back — the one door in its
-        // wall, and it is explicit by construction: this cast is the only way through. At
-        // runtime the value is untouched; the lowering emits nothing for it.
-        if (op is OpaqueRef from && LyrType.Equal(from.Underlying, target)) return target;
-        if (target is OpaqueRef to && LyrType.Equal(op, to.Underlying))
-        {
-            // Making one is the declaring module's privilege (§3.5): elsewhere the inward cast
-            // forges a handle the alias exists to protect. An ERROR since 4.0 — 3.8 announced
-            // it as a warning, the LYR-SEM0074 path, and this is the clock coming due. The
-            // outward cast above stays free everywhere: reading the number breaks no promise.
-            // A null module is a bare snippet, which has no module line to cross.
-            if (_currentModule is { } here && !DeclaredInModule(to.Symbol, here))
-            {
-                var owner = _comp.Modules.FirstOrDefault(
-                    m => ReferenceEquals(m.Members.LookupLocal(to.Symbol.Name), to.Symbol));
-                var ownerName = owner?.FullName ?? "its declaring module";
-                _de.Report("LYR-SEM0093", Severity.Error, c.Span,
-                    $"making a '{to.Symbol.Name}' is '{ownerName}''s privilege — a handle is "
-                    + $"issued, not assembled; let '{ownerName}' offer a constructor for values "
-                    + "rebuilt from a stored number");
-            }
-            return target;
-        }
-
         // 'as' converts numbers only (03 §1.4); a conversion is a method.
         return Report(c.Span, "LYR-SEM0006",
             $"cannot cast '{TypeFacts.Display(op)}' to '{TypeFacts.Display(target)}' — 'as' converts numbers only; "
@@ -7120,21 +7086,10 @@ public sealed class TypeChecker
         return LyrType.String;
     }
 
-    /// <summary>An opaque value does not render: the converter would print the underlying and leak
-    /// exactly what the wall hides. The way through is explicit, like every other crossing.</summary>
-    private bool OpaqueRefused(InterpHole hole, LyrType type)
-    {
-        if (type is not OpaqueRef opaque) return false;
-        _de.Report("LYR-SEM0006", Severity.Error, hole.Expr.Span,
-            $"'{TypeFacts.Display(type)}' is opaque and does not render in an f-string — convert explicitly: "
-            + $"'{{value as {TypeFacts.Display(opaque.Underlying)}}}'");
-        return true;
-    }
-
     /// <summary>What a hole appends: by its value's kind, through its spec, or refused.</summary>
     private CallExpr? HolePiece(InterpHole hole, LyrType type, Func<Expr> output)
     {
-        if (type.IsError || OpaqueRefused(hole, type)) return null;
+        if (type.IsError) return null;
         if (_coreFormat is { } format && hole.FormatSpec is not null) return FormattedPiece(hole, type, format, output);
         if (type is PrimitiveType primitive)
         {
@@ -9456,7 +9411,6 @@ public sealed class TypeChecker
     {
         AssocOf a => ContainsError(a.Base),
         ErrorType => true,
-        OpaqueRef oq => ContainsError(oq.Underlying),
         Optional o => ContainsError(o.Inner),
         ArrayOf a => ContainsError(a.Element),
         SliceOf s => ContainsError(s.Element),
@@ -9618,11 +9572,6 @@ public sealed class TypeChecker
         // A shape conforms through a block that names the interface, and no other way (05 §13
         // rule 6): what passed every constraint here before failed in the lowering.
         ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType => BlockConforms(arg, iface, wanted, shapes: true),
-
-        // An OPAQUE alias satisfies nothing: it has no conformance list, and falling into the
-        // permissive default below would let 'Map<Entity, V>' compile against members the type
-        // walled off. Convert to the underlying where a constraint is needed.
-        OpaqueRef => false,
 
         // 'null' alone is no type a constraint could hold for: bound as a type argument it passed
         // every one and failed in the lowering. A name that is no value is reported
@@ -10910,19 +10859,6 @@ public sealed class TypeChecker
         if (HiddenField(ts) is { } hidden)
             _de.Report("LYR-RES0009", Severity.Error, si.Span,
                 $"'{ts.Name}' cannot be built here: {_comp.Hidden(hidden)} — its factory builds it");
-
-        // A HOST type cannot be constructed. It has no layout this module knows: the host creates it
-        // and the script passes it on. Without this diagnostic it is a compiler crash — the lowering
-        // allocates an object after the empty class declaration while the variable carries the host
-        // type, and the verifier reports 'cannot compare IrHostType with IrRefType'.
-        if (Ir.Lowering.HostTypes.NameOf(ts, _comp) is { } hostName)
-        {
-            _de.Report("LYR-SEM0061", Severity.Error, si.Span,
-                $"'{hostName}' is a host type — only the host can create one; a script receives "
-                + "it and passes it on");
-            foreach (var f in si.Fields) CheckExpr(f.Value, scope);
-            return LyrType.Error;
-        }
 
         // A generic type takes its type arguments from what is WRITTEN, else from the context,
         // else from the FIELD VALUES, as a call takes them from its arguments:
@@ -15048,14 +14984,7 @@ public sealed class TypeChecker
                 // the alias's right side is checked as the use spells it: 'Table<NoHash>' is the use's error
                 if (use is not null && _boundsChecked.Add(use)) CheckInstanceBounds(underlying, span);
             }
-            if (!decl.IsOpaque) return underlying;
-            if (underlying.IsError) return LyrType.Error;
-
-            // An OPAQUE alias (v1.15) keeps its identity instead of expanding: the underlying
-            // travels along for the layout and for 'as', but nothing else looks through. An
-            // opaque over an opaque flattens to the innermost layout under THIS identity.
-            var layout = underlying is OpaqueRef o ? o.Underlying : underlying;
-            return new OpaqueRef(alias, layout);
+            return underlying;
         }
         finally { _expanding.Remove(alias); }
     }

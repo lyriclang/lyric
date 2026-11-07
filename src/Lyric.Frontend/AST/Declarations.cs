@@ -162,7 +162,7 @@ public sealed record FunctionDecl(
 /// <summary>
 /// The foreign side of an <c>extern</c> declaration: which ABI binds it and under which symbol.
 /// </summary>
-/// <param name="Abi">The ABI string — <c>"dotnet"</c> is the one this compiler knows.</param>
+/// <param name="Abi">The ABI string — <c>"C"</c> is the one this compiler knows.</param>
 /// <param name="Symbol">The symbol named after <c>=</c>, or <c>null</c> when the function's own
 /// name is the symbol.</param>
 public sealed record ExternSpec(string Abi, string? Symbol, Span Span) : Node(Span)

@@ -170,7 +170,7 @@ public static class ModuleLowerer
                 {
                     // An 'extern' declaration is a native the PROGRAM declares: the import is
                     // named after the ABI and the symbol rather than after the module, so the
-                    // binder knows which side answers for it — 'dotnet:System.Math::Cbrt'.
+                    // binder knows which side answers for it — 'C:abs'.
                     if (!compilation.IsNative(module) && function.Extern is null) continue;
 
                     // Caught rather than thrown: a native signature with a type the lowering does not
@@ -201,9 +201,8 @@ public static class ModuleLowerer
                             continue;
                         }
 
-                        var host = HostTypeResolver(module, compilation);
                         var (flattened, parameters) = LowerNativeParameters(module, function,
-                            host, typeTable, aliases, binding);
+                            typeTable, aliases, binding);
 
                         // A struct RETURN wires as void plus a trailing out-parameter of the
                         // struct's type; the call site passes a hidden buffer and copies the
@@ -212,7 +211,7 @@ public static class ModuleLowerer
                         var returned = NativeStructParameter(module, returnNode, typeTable, binding);
                         var wireReturn = returned is { } r
                             ? new IrScalarType(IrScalar.Void)
-                            : NativeType(returnNode, host, typeTable, function);
+                            : NativeType(returnNode, typeTable, function);
                         if (returned is { } outParam)
                             flattened = [.. flattened, outParam.Declared];
 
@@ -330,32 +329,7 @@ public static class ModuleLowerer
                     if (method.Generics.Length > 0) continue;
                     if (type.Members.FunctionFor(method.Name, method) is not { } symbol) continue;
 
-                    // A bodyless method on a HOST type is a native with the receiver as parameter 0, the
-                    // same convention as for every other method, except that the implementation lives at
-                    // the host. Without this case it would be silently skipped here and the call in the
-                    // script would find no id.
-                    if (method.Body is null)
-                    {
-                        if (HostTypes.NameOf(type, compilation) is not { } owner) continue;
-
-                        try
-                        {
-                            var host = HostTypeResolver(module, compilation);
-                            var receiver = new IrHostType(owner);
-                            imports.Declare(symbol, new IrImport(
-                                NameMangling.ForMethod(module, typeName, method.Name),
-                                [receiver, .. method.Parameters
-                                    .Select(p => DeclaredTypes.Lower(p.Type, host))],
-                                DeclaredTypes.Lower(method.ReturnType, host)));
-                        }
-                        catch (UnsupportedConstructException ex)
-                        {
-                            LoweringDiagnostics.ReportUnsupported(de, ex);
-                            failed = true;
-                        }
-
-                        continue;
-                    }
+                    if (method.Body is null) continue;
 
                     ids[symbol] = new FunctionId(pending.Count);
                     pending.Add((method, NameMangling.ForMethod(module, typeName, method.Name)
@@ -827,14 +801,6 @@ public static class ModuleLowerer
         timings.Runs++;
     }
 
-    /// <summary>Recognises a host type in the signature of a native declaration; the rule itself lives
-    /// in <see cref="HostTypes"/>, because the same question is asked at the call site.</summary>
-    private static Func<TypeNode, string?> HostTypeResolver(ModuleSymbol module,
-        Compilation compilation) => node =>
-        node is NamedType { Path.Length: 1, TypeArguments.Length: 0 } named
-            ? HostTypes.NameOf(module.Members.LookupLocal(named.Path[0]) as TypeSymbol, compilation)
-            : null;
-
     /// <summary>
     /// The parameters of a native declaration: the flattened wire types plus the declared shape.
     ///
@@ -844,9 +810,8 @@ public static class ModuleLowerer
     /// load per slot; the shape is what tells it to.</para>
     /// </summary>
     /// <summary>The module-local type aliases, for resolving native signatures on the syntax
-    /// level: <c>type Entity = int</c> beside <c>fn destroy(e: Entity);</c> is the whole point
-    /// of an opaque handle (v1.15). The wire carries the LAYOUT; identity is the sema's
-    /// business, so plain and opaque aliases resolve alike here.</summary>
+    /// level: <c>type Entity = int</c> beside <c>fn destroy(e: Entity);</c>. The wire carries
+    /// the layout.</summary>
     private static Dictionary<string, TypeNode> LocalAliases(Compilation compilation,
         ModuleSymbol module) =>
         compilation.AstOf(module).Declarations.OfType<TypeAliasDecl>()
@@ -941,7 +906,7 @@ public static class ModuleLowerer
     }
 
     private static (IrType[] Flattened, ImportParam[] Shape) LowerNativeParameters(
-        ModuleSymbol module, FunctionDecl function, Func<TypeNode, string?> host,
+        ModuleSymbol module, FunctionDecl function,
         TypeTable typeTable, Dictionary<string, TypeNode> aliases, BindingResult binding)
     {
         var flattened = new List<IrType>(function.Parameters.Length);
@@ -957,7 +922,7 @@ public static class ModuleLowerer
             }
             else
             {
-                var lowered = NativeType(node, host, typeTable, function);
+                var lowered = NativeType(node, typeTable, function);
                 // A place parameter of one of the library's own natives (03 §2.3a) is the place
                 // itself on the wire. An 'extern' takes none this way: what a place is to the C
                 // ABI, 13 does not say.
@@ -972,18 +937,18 @@ public static class ModuleLowerer
     }
 
     /// <summary>
-    /// A type in a native's signature: what a host binds by layout — a primitive, an optional, a
-    /// host type, an array of primitives — as <see cref="DeclaredTypes"/> has it. Beyond that, for
+    /// A type in a native's signature: what a host binds by layout — a primitive, an optional,
+    /// an array of primitives — as <see cref="DeclaredTypes"/> has it. Beyond that, for
     /// the standard library's own natives only, what the runtime holds without knowing a layout:
     /// a reference — an object, a coroutine — or a function value, whose two words the runtime's
     /// ABI fixes. An 'extern' keeps the host's set.
     /// </summary>
-    private static IrType NativeType(TypeNode? node, Func<TypeNode, string?> host, TypeTable typeTable,
+    private static IrType NativeType(TypeNode? node, TypeTable typeTable,
         FunctionDecl function)
     {
         try
         {
-            return DeclaredTypes.Lower(node, host);
+            return DeclaredTypes.Lower(node);
         }
         catch (UnsupportedConstructException) when (function.Extern is null && node is not null)
         {
