@@ -1135,7 +1135,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/03-types/">03-types</a></td>
 <td>a host type constructed in the program <em>(retired)</em></td>
-<td>An initializer builds a host type — a field-less class of a native module — which only the host can create. Retired: Lyric 5 has no host types; no native module of lyric5 declares a field-less class, so the check never fires</td>
+<td>An initializer builds a host type — a field-less class of a native module — which only the host can create. Retired: Lyric 5 has no host types</td>
 </tr>
 <tr>
 <td>LYR-SEM0062</td>
@@ -1170,7 +1170,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
 <td>an attribute argument that is not a compile-time value <em>(retired)</em></td>
-<td>A field of an attribute is set to an expression that is not a literal, a unit variant or a constant. Retired: A Lyric 5 attribute's value is computed while the program compiles; the literal-only check is left to the 4.x path</td>
+<td>A field of an attribute is set to an expression that is not a literal, a unit variant or a constant. Retired: A Lyric 5 attribute's value is computed while the program compiles</td>
 </tr>
 <tr>
 <td>LYR-SEM0067</td>
@@ -1191,7 +1191,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
 <td>an attribute field left without a compile-time value <em>(retired)</em></td>
-<td>An attribute use leaves a field unset whose declaration has no literal default. Retired: A Lyric 5 attribute is checked as the struct initializer it writes, and a missing field is LYR-SEM0106 there; only the 4.x path reports this code</td>
+<td>An attribute use leaves a field unset whose declaration has no literal default. Retired: A Lyric 5 attribute is checked as the struct initializer it writes, and a missing field is LYR-SEM0106 there</td>
 </tr>
 <tr>
 <td>LYR-SEM0070</td>
@@ -1338,7 +1338,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/07-statements/">07-statements</a></td>
 <td>a loop over optional elements without the iterator protocol <em>(retired)</em></td>
-<td>A <code>for</code> loop walks elements of an optional type through a path where the end of the walk is signalled by null. Retired: Lyric 5's protocol has '??T' and walks arrays by index; only the 4.x path could reach this check</td>
+<td>A <code>for</code> loop walks elements of an optional type through a path where the end of the walk is signalled by null. Retired: Lyric 5's protocol has '??T' and walks arrays by index</td>
 </tr>
 <tr>
 <td>LYR-SEM0092</td>
@@ -1373,7 +1373,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
 <td>an attribute with a field a metadata row cannot hold <em>(retired)</em></td>
-<td>An attribute's struct has a field whose type is not a number, string, char, bool or unit enum. Retired: A Lyric 5 attribute's value is a struct computed at compile time, not a metadata row; only the 4.x path checks the field types</td>
+<td>An attribute's struct has a field whose type is not a number, string, char, bool or unit enum. Retired: A Lyric 5 attribute's value is a struct computed at compile time, not a metadata row</td>
 </tr>
 <tr>
 <td>LYR-SEM0097</td>
@@ -2921,7 +2921,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/14-cli/">14-cli</a></td>
 <td>the external runtime could not be started <em>(retired)</em></td>
-<td>Reported by the 4.x drivers when the bytecode VM or another tool they started as a separate process could not be launched. Retired: Lyric 5: lyric5 builds native binaries and starts no VM; only the 4.x launcher in Lyric.Core reports it, and the error for a profile that denies warnings is LYR-CLI0016</td>
+<td>Reported by the 4.x drivers when the bytecode VM or another tool they started as a separate process could not be launched. Retired: Lyric 5: lyric5 builds native binaries and starts no VM</td>
 </tr>
 <tr>
 <td>LYR-CLI0007</td>
@@ -2949,7 +2949,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/14-cli/">14-cli</a></td>
 <td>a <code>lyric.json</code> that cannot be understood <em>(retired)</em></td>
-<td>Reported by the 4.x toolchain when a <code>lyric.json</code> project file was found and could not be read. Retired: Lyric 5: the manifest is lyric.toml, refused with LYR-PKG0001–0003; only the 4.x lyric.json reader (Lyric.Core ProjectFile, read by the front end's 4.x suites) reports it</td>
+<td>Reported by the 4.x toolchain when a <code>lyric.json</code> project file was found and could not be read. Retired: Lyric 5: the manifest is lyric.toml, refused with LYR-PKG0001–0003</td>
 </tr>
 <tr>
 <td>LYR-CLI0011</td>
@@ -3005,7 +3005,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/14-cli/">14-cli</a></td>
 <td>a <code>lyric.json</code> asks for a newer toolchain <em>(retired)</em></td>
-<td>Reported by the 4.x toolchain when a <code>lyric.json</code> named a minimum toolchain version above its own. Retired: Lyric 5: a toolchain pin in lyric.toml is LYR-PKG0009; only the 4.x lyric.json reader (Lyric.Core ProjectFile) reports it</td>
+<td>Reported by the 4.x toolchain when a <code>lyric.json</code> named a minimum toolchain version above its own. Retired: Lyric 5: a toolchain pin in lyric.toml is LYR-PKG0009</td>
 </tr>
 <tr>
 <td>LYR-CLI0019</td>

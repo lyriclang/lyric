@@ -248,7 +248,7 @@
 <p class="meta">error · <a href="../../spec/03-types/">spec 03-types</a></p>
 <p>An index whose type is not <code>int</code> (or an integer type that widens to it), an index or range on a type that provides none, or a <code>for</code> over a value that is not an <code>Iterable</code>.</p>
 <h2 id="explanation">Explanation</h2>
-<p><code>a[i]</code> works on arrays, slices, inline arrays and types conforming to <code>Indexable&lt;T&gt;</code>; the index is an <code>int</code>. A range <code>a[i..j]</code> takes a view of an array, a slice, a string, a <code>StringView</code> or a type with <code>AsSlice&lt;T&gt;</code>. <code>for</code> walks an <code>Iterable</code>, and every <code>Iterator</code> is one.</p>
+<p><code>a[i]</code> works on arrays, slices and inline arrays, whose index is an <code>int</code>, and on types conforming to <code>Index&lt;K&gt;</code>, whose index is a <code>K</code>. A range <code>a[i..j]</code> takes a view of an array, a slice, a string, a <code>StringView</code> or a type with <code>AsSlice&lt;T&gt;</code>. <code>for</code> walks an <code>Iterable</code>, and every <code>Iterator</code> is one.</p>
 <p>Convert the index with <code>as int</code>, or give the type the conformance it is used through.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">fn</span> main(): <span class="ty">void</span> {

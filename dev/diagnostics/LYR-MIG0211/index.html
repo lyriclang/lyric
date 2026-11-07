@@ -67,7 +67,7 @@
 <p>A conformance to <code>Indexable&lt;T&gt;</code> becomes <code>IndexSet&lt;int&gt;</code> with <code>type Output = T;</code>, and the migration adds <code>index</code> and <code>setIndex</code>, which <code>x[i]</code> and <code>x[i] = v</code> call, forwarding to the <code>get</code> and <code>set</code> the type had. Fold them together where nothing else calls <code>get</code> and <code>set</code>.</p>
 <p><code>Iterable&lt;T&gt;</code> or <code>Indexable&lt;T&gt;</code> as the type of a parameter or a field is left as written: take an <code>Iterator&lt;Item = T&gt;</code>, the concrete type, or a type parameter with the interface as its bound.</p>
 <h2 id="example">Example</h2>
-<pre><code>proposal[LYR-MIG0211] main.lyr:16:13: 'Indexable&lt;int&gt;' as a type has no counterpart: Lyric 5's 'Indexable' names its element by an associated type — take the concrete type, or a type parameter with '[IndexSet&lt;int&gt;]'</code></pre>
+<pre><code>proposal[LYR-MIG0211] main.lyr:16:13: 'Indexable&lt;int&gt;' as a type has no counterpart: Lyric 5's 'IndexSet' names its element by an associated type — take the concrete type, or a type parameter with '[IndexSet&lt;int&gt;]'</code></pre>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
