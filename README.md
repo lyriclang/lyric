@@ -21,11 +21,11 @@ Source files use `.lyr`.
   the object model, strings, arrays, panics with backtraces. Built for every Tier 1 target.
 - **`src/Lyric5`** and **`src/Lyric5.Toolchain`** — the Lyric 5 command line as one NativeAOT
   binary (`lyric5` is its working name until M18) and the C build driver behind it.
-- **`src/Lyric.Frontend`** — the 4.x front end (lexer, parser, resolver, sema, IR), which the
-  Lyric 5 compiler grows out of milestone by milestone. The 4.x VM, tools and bytecode format are
-  gone from this tree; they live on in `lyric-script`.
+- **`src/Lyric.Frontend`** — the front end: lexer, parser, resolver, checker, IR.
+- **`src/Lyric4.Frontend`** — Lyric 4.6's front end, frozen; `lyric fix --from-4` reads a Lyric 4
+  program with it. The 4.x line lives on in `lyric-script`.
 
-The tree says **4.6.0** for the 4.x code it still carries and **5.0.0-dev** for `lyric5`.
+The tree says **5.0.0**; `dev` builds say `5.0.0-dev.<date>+<sha>`.
 
 ## Example
 
@@ -89,16 +89,16 @@ lyric/
 │   ├── Lyric5/           → lyric5        the Lyric 5 command line, NativeAOT
 │   ├── Lyric5.Toolchain/ → the C side: compiler, targets, profiles, cached C builds of the runtime
 │   ├── Lyric.Core/       → lyrcore.dll   diagnostics, source manager, shared tool basics
-│   ├── Lyric.Frontend/   → lyrfe.dll     lexer, parser, resolver, sema, IR (4.x, the basis of 5)
+│   ├── Lyric.Frontend/   → lyrfe.dll     lexer, parser, resolver, sema, IR
 │   └── Lyric.Lsp/        → Lyric.Lsp.dll the language server behind `lyric5 lsp`: protocol and analysis
-├── stdlib/               the 4.x standard library in Lyric (the front-end tests import it; M8a)
+├── stdlib5/              the standard library in Lyric
 ├── tests/                xUnit test projects
-├── examples/             22 example programs (4.x; the input of M16)
+├── examples/             example programs
 ├── design/v5/            the Lyric 5 design round: corpus and decisions (spec/00–14)
 ├── tooling/              zig-version and c-smoke/ — the C toolchain; valgrind/ — memcheck locally;
 │                         textmate/ — the editor grammar, pinned against the lexer by the tests
 ├── tools/                Site, the website: home, Book, spec, diagnostics, releases
-└── docs/                 guide and 4.x references; archive/4.x/ — 4.x planning
+└── docs/                 book/ — the Book; archive/4.x/ — the 4.x guide, references and planning
 ```
 
 ## Documentation
@@ -107,8 +107,8 @@ lyric/
 |---|---|
 | [`design/v5/spec/`](design/v5/spec/) | The Lyric 5 decisions, one document per area, and the plan (13) |
 | [`STATUS.md`](STATUS.md) | The open milestone, what was learned on the way |
-| [`docs/guide/`](docs/guide/) | The 4.x user guide (M17's Book takes its place) |
-| [`docs/Grammar.md`](docs/Grammar.md), [`docs/Bytecode.md`](docs/Bytecode.md), [`docs/Pack.md`](docs/Pack.md) | The 4.x references, frozen at the 4.6 cut |
+| [`docs/book/`](docs/book/) | The Book |
+| [`docs/archive/4.x/`](docs/archive/4.x/) | The 4.x guide, grammar, bytecode and pack references, frozen at the 4.6 cut |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | The three rules and the process |
 | [`CHANGELOG.md`](CHANGELOG.md) | What changed per release, from v1.0.0 on |
 
@@ -117,7 +117,7 @@ The normative specification lives in [lyriclang/lyric-spec](https://github.com/l
 
 `tools/Site` renders the website — the home page, the Book (`docs/book/`), the specification at
 `spec.pin`, the diagnostic catalog and the releases — into one directory per version; the `Site`
-workflow publishes `dev` from `main`. The 4.x guide under `docs/guide/` is no longer rendered.
+workflow publishes `dev` from `main`.
 
 ```bash
 dotnet run --project tools/Site -- --out artifacts/site --version dev --spec ../lyric-spec

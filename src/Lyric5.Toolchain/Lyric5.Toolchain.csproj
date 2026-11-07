@@ -7,7 +7,6 @@
     program the compiler emits.
   -->
   <PropertyGroup>
-    <Version>5.0.0</Version>
     <AssemblyName>Lyric5.Toolchain</AssemblyName>
     <RootNamespace>Lyric5.Toolchain</RootNamespace>
     <IsAotCompatible>true</IsAotCompatible>

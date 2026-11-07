@@ -387,7 +387,7 @@ internal sealed class GenericInterfaces : IRule
                         break;
                     case "Iterable" or "Indexable":
                         context.Note(Id, "LYR-MIG0211", NoteKind.Review, named.Span,
-                            $"'{Text(text, named)}' as a type has no counterpart: Lyric 5's '{named.Path[^1]}' names its element by an associated type",
+                            $"'{Text(text, named)}' as a type has no counterpart: Lyric 5's '{(named.Path[^1] == "Indexable" ? "IndexSet" : named.Path[^1])}' names its element by an associated type",
                             named.Path[^1] == "Iterable"
                                 ? $"take an 'Iterator<Item = {Text(text, element)}>', or a type parameter '<I :: [Iterable]>'"
                                 : "take the concrete type, or a type parameter with '[IndexSet<int>]'");

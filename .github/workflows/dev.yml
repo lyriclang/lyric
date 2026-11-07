@@ -152,7 +152,6 @@ jobs:
           test -f "$trial/toolchain/LICENSE" || { echo "the archive holds no LICENSE"; exit 1; }
           test -f "$trial/toolchain/runtime/include/lyric.h" || { echo "the archive holds no lyric.h"; exit 1; }
           test -d "$trial/toolchain/stdlib5" || { echo "the archive holds no stdlib5"; exit 1; }
-          if [ -e "$trial/toolchain/stdlib" ]; then echo "the archive holds the 4.x stdlib"; exit 1; fi
           printf '[package]\nname = "hello"\nversion = "0.1.0"\n' > "$trial/hello/lyric.toml"
           printf 'import std.io { println };\n\nfn main(): void {\n    println("hello from the dev archive");\n}\n' > "$trial/hello/src/main.lyr"
           # A cold cache: the build takes the archive's runtime and compiles none of its own.

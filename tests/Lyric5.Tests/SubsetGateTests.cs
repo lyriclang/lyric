@@ -5,10 +5,8 @@ using Lyric5.Toolchain;
 namespace Lyric5.Tests;
 
 /// <summary>
-/// The subset gate: what of the 4.x front end's IR the Lyric 5 compiler takes, and what it
-/// refuses. Programs compile against <c>stdlib5/</c>,
-/// the seed of the Lyric 5 standard library, never against the 4.x <c>stdlib/</c> — the copy
-/// beside the tests, which carries the test-only <c>std.notyet</c>: the gate takes every
+/// The subset gate: what of the front end's IR the compiler takes, and what it refuses. Programs
+/// compile against <c>stdlib5/</c> — the copy beside the tests, which carries the test-only <c>std.notyet</c>: the gate takes every
 /// instruction, and a native without an intrinsic is the refusal left to show — one that stays,
 /// since a program reaches C through <c>extern "C"</c>.
 /// </summary>

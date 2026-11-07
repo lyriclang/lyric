@@ -8,8 +8,8 @@ namespace Lyric.Tests.Core;
 ///
 /// <para>A message points at the code the reader is looking at, never at a document. A citation ages
 /// in two ways at once — the file gets renamed and the section gets renumbered — and both had
-/// happened: five messages named <c>Sprache.md</c>, which has been <c>docs/Grammar.md</c> for a
-/// while, and cited sections §10 and §11 of a document that has seven. Someone following either was
+/// happened: five messages named <c>Sprache.md</c>, which had long been renamed,
+/// and cited sections §10 and §11 of a document that has seven. Someone following either was
 /// sent nowhere twice.</para>
 ///
 /// <para>Checked over the SOURCE rather than over emitted messages, because there is no way to make a

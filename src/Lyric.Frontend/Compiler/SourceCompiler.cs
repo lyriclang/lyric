@@ -772,7 +772,7 @@ public sealed record CompilerOptions
     /// Where the program's own modules are looked up. <c>null</c> means the directory of the entry
     /// file, which is what a program without a project file gets.
     ///
-    /// <para>Filled from <see cref="Lyric.Core.ProjectFile"/> by the tools that read one.
+    /// <para>Filled from the manifest by the tools that read one.
     /// Deliberately not discovered here: a script being compiled must not be able to widen what
     /// the compiler looks at by placing a file beside itself, so the decision belongs to the
     /// caller.</para>
@@ -784,7 +784,7 @@ public sealed record CompilerOptions
     /// naming that project's SOURCE ROOT: <c>["geometry"] = "…/geometry/src"</c> makes
     /// <c>import geometry.shapes</c> read <c>…/geometry/src/geometry/shapes.lyr</c>.
     ///
-    /// <para>The flattened closure a <see cref="Lyric.Core.ProjectFile"/> computes, native roots
+    /// <para>The flattened closure of a project's dependencies, native roots
     /// already taken out into <see cref="NativeRoots"/>. A segment named here is taken out of
     /// <see cref="SourceRoot"/>, as a native segment is.</para>
     /// </summary>

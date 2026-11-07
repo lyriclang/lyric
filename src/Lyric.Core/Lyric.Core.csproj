@@ -8,8 +8,7 @@
 
   <!--
     What the compiler and every tool on it share: diagnostics, the SourceManager, exit codes, CLI
-    options. The reading side of the 4.x bytecode format lived here too; it went with the VM
-    (design/v5/spec/01 L7). This assembly depends on NOTHING: an edge from here to Lyric.Frontend
+    options. This assembly depends on NOTHING: an edge from here to Lyric.Frontend
     breaks the split.
   -->
 
