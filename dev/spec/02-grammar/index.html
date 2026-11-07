@@ -41,18 +41,521 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
 <h1>Grammar</h1>
-<blockquote>
-<p><strong>Skeleton.</strong> Written with milestone <strong>M2–M9b</strong> of the Lyric 5 plan, spec-first: each rule lands
-here with its conformance case before or with its implementation. Source of the decisions:
+<p>The syntax of Lyric 5 as one EBNF: what a file may hold, token by token. Source of the decisions:
 <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/08-syntax.md">08 Syntax</a>.</p>
-</blockquote>
 <h2 id="scope">Scope</h2>
-<p>The canonical EBNF of Lyric 5 and the rules around it, including the list rule: one element — brackets optional; several — brackets required.</p>
+<p>The canonical EBNF of Lyric 5 and the rules around it: the notation, the declarations, types,
+statements, expressions and patterns, the choices the parser makes where the grammar leaves two
+readings, and how the grammar is checked against the suite.</p>
+<h2 id="1-notation-and-reading">1. Notation and reading</h2>
+<ol>
+<li>The grammar is EBNF. <code>Rule = … .</code> defines a rule; <code>'x'</code> is a terminal; <code>A B</code> is a sequence,
+<code>A | B</code> a choice, <code>[ A ]</code> an option, <code>{ A }</code> any number of <code>A</code>, <code>( … )</code> a group; <code>(* … *)</code> is
+a note. A rule's name begins with a capital; a name in capitals is a class of tokens of
+<a href="../../spec/01-lexical/">01</a>.</li>
+<li>A quoted <strong>word</strong> is the reserved word, or, for a contextual word (01 §3 rule 3), a name
+spelled that way: <code>'type'</code> is <code>IDENTIFIER</code> written <code>type</code>. Everywhere an <code>IDENTIFIER</code> stands, a
+contextual word may stand too; a reserved word never does.</li>
+<li>A quoted <strong>sign</strong> is the token of <a href="../../spec/01-lexical/#5-punctuation-and-operators">01 §5</a>. The
+signs <code>'&gt;&gt;'</code>, <code>'&gt;='</code> and <code>'&gt;&gt;='</code> are also the <code>'&gt;'</code> that closes a list of type arguments or
+type parameters followed by the rest, written against it (01 §1 rule 2): <code>List&lt;List&lt;int&gt;&gt;</code>
+closes two lists, <code>type Pair&lt;T&gt;= (T, T);</code> closes one before its <code>=</code>.</li>
+<li>The grammar takes a superset of the programs a compiler accepts. A program it takes may still
+be refused by a rule beside it — a name that resolves to nothing, a type that does not fit, a
+pattern where none may bind — and where the grammar leaves two readings of one text, §7 says
+which one the parser takes.</li>
+<li><strong>The list rule</strong> (08 D5/D6): a list of one element may stand without its brackets — <code>struct S :: I</code>, <code>throws E</code>, <code>catch (e in E)</code>, <code>&lt;T :: Display&gt;</code>, <code>@Test</code> —; a list of several stands in
+brackets — <code>:: [I, J]</code>, <code>throws [A, B]</code>, <code>catch (e in [A, B])</code>, <code>@[A, B]</code>. <strong>A list may end
+in a comma</strong> (08 Y9) wherever it stands between brackets, parentheses, braces or angle
+brackets; a tuple keeps its two elements before it.</li>
+</ol>
+<p>The token classes:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Chapter 01</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IDENTIFIER</code></td>
+<td>a name, §3 rule 1; <code>_</code> is one</td>
+</tr>
+<tr>
+<td><code>INT_LITERAL</code>, <code>FLOAT_LITERAL</code></td>
+<td>§4.1, §4.2</td>
+</tr>
+<tr>
+<td><code>CHAR_LITERAL</code></td>
+<td>§4.3</td>
+</tr>
+<tr>
+<td><code>STRING_LITERAL</code></td>
+<td>§4.4: one line, raw, multi-line</td>
+</tr>
+<tr>
+<td><code>BYTE_STRING</code></td>
+<td>§4.5</td>
+</tr>
+<tr>
+<td><code>FSTRING_START</code>, <code>FSTRING_TEXT</code>, <code>HOLE_START</code>, <code>FORMAT_SPEC</code>, <code>HOLE_END</code>, <code>FSTRING_END</code></td>
+<td>§4.6: an f-string's opening (<code>f&quot;</code>, <code>fr&quot;</code>, <code>f&quot;&quot;&quot;</code>, <code>fr&quot;&quot;&quot;</code>), a run of its text, the <code>{</code> and <code>}</code> around a hole, the text after a hole's <code>:</code> at the hole's top level, and its closing quotes</td>
+</tr>
+<tr>
+<td><code>AT_NAME</code></td>
+<td><code>@</code> and a name written against it, §5 rule 1</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-files-and-declarations">2. Files and declarations</h2>
+<pre><code class="language-ebnf">Module          = { Attribute } [ 'module' ';' ] { TopLevelDecl } .
+TopLevelDecl    = ImportDecl
+                | { Attribute } [ Visibility ] Declaration .
+Visibility      = 'pub' | 'internal' | 'private' .
+Declaration     = FunctionDecl | StructDecl | ClassDecl | EnumDecl | InterfaceDecl | ExtendDecl
+                | GlobalBinding | TypeAlias | ExternDecl | ExternBlock .
+Name            = IDENTIFIER | Splice .
+
+ImportDecl      = [ 'pub' ] 'import' Path [ ImportList | 'as' IDENTIFIER ] ';' .
+ImportList      = '{' ImportItem { ',' ImportItem } [ ',' ] '}' .
+ImportItem      = IDENTIFIER [ 'as' IDENTIFIER ] .
+Path            = IDENTIFIER { '.' IDENTIFIER } .
+
+Attribute       = AT_NAME AttributeRest
+                | '@[' IDENTIFIER AttributeRest { ',' IDENTIFIER AttributeRest } [ ',' ] ']' .
+AttributeRest   = { '.' IDENTIFIER } [ '{' [ FieldValue { ',' FieldValue } [ ',' ] ] '}'
+                                     | '(' Expr ')' ] .
+FieldValue      = IDENTIFIER '=' Expr .</code></pre>
+<ol>
+<li>A file is a module (<a href="../../spec/04-modules/">04 §2</a>). <code>module;</code> alone is its header, which names
+nothing and carries the module's attributes; attributes at the top of a file without it belong
+to the first declaration.</li>
+<li>An import takes no attribute, and of the visibility words only <code>pub</code> (<code>LYR-PAR0053</code>).</li>
+</ol>
+<pre><code class="language-ebnf">FunctionDecl    = FunctionHead ( Block | ';' ) .
+FunctionHead    = [ 'inline' ] [ 'mut' ] ( 'fn' | 'macro' ) Name [ GenericParams ]
+                  '(' [ Params ] ')' [ ':' ReturnType ] [ ThrowsClause ] .
+Params          = Param { ',' Param } [ ',' ] .
+Param           = { Attribute } [ '&amp;' ] Name ':' Type [ '...' ] [ '=' Expr ] .
+ThrowsClause    = 'throws' [ Type | '[' Type { ',' Type } [ ',' ] ']' ] .
+
+ExternDecl      = 'extern' STRING_LITERAL ExternFunction .
+ExternBlock     = 'extern' STRING_LITERAL '{' ExternMember { ExternMember } '}' .
+ExternMember    = { Attribute } [ Visibility ] ExternFunction .
+ExternFunction  = [ 'inline' ] [ 'mut' ] 'fn' Name [ GenericParams ] '(' [ ExternParams ] ')'
+                  [ ':' ReturnType ] [ ThrowsClause ] [ '=' STRING_LITERAL ] ';' .
+ExternParams    = '...' | Param { ',' Param } [ ',' [ '...' ] ] .
+
+GlobalBinding   = ( 'let' | 'var' ) IDENTIFIER [ ':' Type ] [ '=' Expr ] ';' .
+TypeAlias       = 'type' Name [ GenericParams ] '=' Type ';' .
+
+GenericParams   = '&lt;' GenericParam { ',' GenericParam } [ ',' ] '&gt;' .
+GenericParam    = IDENTIFIER [ '::' Bounds ] [ '=' Type ] .
+Bounds          = Type | '[' Type { ',' Type } [ ',' ] ']' .</code></pre>
+<ol start="3">
+<li>A function's <code>throws</code> is the function's own, written after its return type; <code>throws</code> alone
+is <code>Error</code> (<a href="../../spec/06-errors/">06</a>). In a member, <code>static</code> stands before <code>inline</code> and <code>mut</code>
+(<code>LYR-PAR0032</code>).</li>
+<li>A parameter's <code>&amp;</code> marks a place (<a href="../../spec/03-types/">03 §8</a>); <code>T...</code> makes the last parameter
+variadic. A bare <code>...</code> is C's variadic arguments and closes the parameters of an <code>extern</code>
+function alone (<a href="../../spec/13-abi/">13</a>).</li>
+</ol>
+<pre><code class="language-ebnf">StructDecl      = 'struct' Name [ GenericParams ] [ '::' Conformances ] TypeBody .
+ClassDecl       = 'class' Name [ GenericParams ] [ '::' Conformances ] TypeBody .
+Conformances    = Conformance | '[' Conformance { ',' Conformance } [ ',' ] ']' .
+Conformance     = Type [ 'by' IDENTIFIER ] .
+TypeBody        = '{' { TypeMember } [ { Attribute } FieldDecl ] '}' .
+TypeMember      = { Attribute } ( FieldDecl ',' | MemberBody [ ',' ] ) .
+FieldDecl       = [ Visibility ] [ 'var' ] Name ':' Type [ '=' Expr ] .
+
+EnumDecl        = 'enum' Name [ GenericParams ] [ '::' Bounds ]
+                  '{' [ Variant { ',' Variant } [ ',' ] ] [ ';' { MemberDecl } ] '}' .
+Variant         = { Attribute } Name [ '(' [ Type { ',' Type } [ ',' ] ] ')'
+                                     | '{' [ VariantField { ',' VariantField } [ ',' ] ] '}'
+                                     | '=' Expr ] .
+VariantField    = { Attribute } Name ':' Type [ '=' Expr ] .
+
+InterfaceDecl   = [ 'sealed' ] 'interface' Name [ GenericParams ] [ '::' Bounds ]
+                  '{' { MemberDecl } '}' .
+ExtendDecl      = 'extend' [ GenericParams ] Type [ '::' Bounds ] '{' { MemberDecl } '}' .
+
+MemberDecl      = { Attribute } MemberBody .
+MemberBody      = AssociatedType
+                | [ Visibility ] ( 'static' StaticBinding | [ 'static' ] FunctionDecl ) .
+StaticBinding   = ( 'let' | 'var' ) IDENTIFIER [ ':' Type ] [ '=' Expr ] ';' .
+AssociatedType  = 'type' Name [ '::' Bounds ] [ '=' Type ] ';' .</code></pre>
+<ol start="5">
+<li>In a struct or a class, a <strong>field</strong> is followed by <code>,</code> unless it stands last; a member that
+closes itself — a body's <code>}</code>, a <code>;</code> — needs none and may have one (08 D1). In an enum the
+variants are separated by <code>,</code> and end with <code>;</code> before the members (08 D2); an interface, an
+<code>extend</code> block and the members of an enum take no separator.</li>
+<li><code>by</code> delegates a conformance of a struct or a class to one of its fields (08 D7); after an
+enum's, an interface's or an <code>extend</code> block's <code>::</code> it has no place (<code>LYR-PAR0047</code>).</li>
+</ol>
+<h2 id="3-types">3. Types</h2>
+<pre><code class="language-ebnf">Type            = { '?' | '??' } TypeCore [ 'throws' [ Type ] ] .
+ReturnType      = { '?' | '??' } TypeCore .
+TypeCore        = TypeAtom [ '.' '[' IDENTIFIER ']' ] { '[' [ INT_LITERAL ] ']' } .
+TypeAtom        = Path [ TypeArgs ]
+                | FunctionType
+                | 'extern' STRING_LITERAL FunctionType
+                | '(' Type ')'
+                | TupleType
+                | Splice .
+TypeArgs        = '&lt;' TypeArg { ',' TypeArg } [ ',' ] '&gt;' .
+TypeArg         = [ IDENTIFIER '=' ] Type .
+FunctionType    = 'fn' '(' [ FnTypeParam { ',' FnTypeParam } [ ',' ] ] ')' '-&gt;' ReturnType
+                  [ 'throws' [ ReturnType | '[' Type { ',' Type } [ ',' ] ']' ] ] .
+FnTypeParam     = [ '&amp;' ] Type .
+TupleType       = '(' TupleElement ',' TupleElement { ',' TupleElement } [ ',' ] ')' .
+TupleElement    = [ IDENTIFIER ':' ] Type .</code></pre>
+<ol>
+<li><code>?</code> makes an optional of what follows it with its suffixes: <code>?T[]</code> is an optional array, an
+array of optionals is <code>(?T)[]</code>; <code>??T</code> is an optional of an optional (<a href="../../spec/03-types/">03 §3</a>).
+<code>T[]</code> is an array, <code>T[4]</code> an inline array of four.</li>
+<li>A function type reaches as far right as it can: <code>fn(int) -&gt; void[]</code> returns <code>void[]</code>, and an
+array of functions is <code>(fn(int) -&gt; void)[]</code>.</li>
+<li><code>throws</code> after a type is the type's own only where a type stands for a value — a field, a
+parameter, a binding, a type argument: <code>Coroutine&lt;int&gt; throws IoError</code>. After the return type
+of a function, a lambda or a function type, the <code>throws</code> belongs to the function; that is why
+a return type is read as <code>ReturnType</code>. Where a function type is itself a return type, a
+<code>throws</code> behind it says neither whose it is, and parentheses must (<code>LYR-PAR0056</code>).</li>
+<li><code>T.[f]</code> is the type of the field a <code>comptime for</code> round names (<a href="../../spec/11-metaprogramming/">11</a>).</li>
+</ol>
+<h2 id="4-statements">4. Statements</h2>
+<pre><code class="language-ebnf">Block           = '{' { Statement } '}' .
+ValueBlock      = '{' { Statement } [ Expr | 'throw' Expr ] '}' .
+Statement       = ';'
+                | Block
+                | 'unsafe' Block
+                | LetStmt
+                | 'using' 'let' IDENTIFIER [ ':' Type ] '=' Expr ';'
+                | FunctionDecl
+                | IfStmt
+                | 'comptime' ( IfStmt | ForStmt )
+                | [ IDENTIFIER ':' ] ( WhileStmt | DoStmt | ForStmt )
+                | LoopExpr
+                | MatchExpr
+                | 'break' [ IDENTIFIER ] [ Expr ] ';'
+                | 'continue' [ IDENTIFIER ] ';'
+                | 'return' [ Expr ] ';'
+                | 'yield' [ Expr ] ';'
+                | 'defer' ( Block | Expr ';' )
+                | 'throw' Expr ';'
+                | 'try' Block { CatchClause }
+                | ExprStmt .
+
+LetStmt         = ( 'let' | 'var' ) ( IDENTIFIER [ ':' Type ] [ '=' Expr [ 'else' Block ] ]
+                                    | Pattern [ ':' Type ] '=' Expr [ 'else' Block ] ) ';' .
+IfStmt          = 'if' '(' Condition ')' Block [ 'else' ( IfStmt | Block ) ] .
+Condition       = Expr | 'let' Pattern '=' Expr .
+WhileStmt       = 'while' '(' Condition ')' Block .
+DoStmt          = 'do' Block 'while' '(' Expr ')' ';' .
+ForStmt         = 'for' '(' ( IDENTIFIER | TuplePattern ) 'in' Expr ')' Block .
+CatchClause     = 'catch' '(' CatchBinding ')' Block .
+CatchBinding    = IDENTIFIER [ ':' Type | 'in' Bounds ] .
+
+ExprStmt        = Expr ';'
+                | BlockEnded [ ';' ] .
+BlockEnded      = Postfix TrailingLambda
+                | MacroCall
+                | Splice .</code></pre>
+<ol>
+<li>A statement's body is a block, always (08 S1): <code>if (c) x;</code> is refused (<code>LYR-PAR0017</code>).</li>
+<li>A <strong>value block</strong> — a match arm, a lambda's body, a branch of an <code>if</code> expression, a clause of
+a <code>try</code> expression, the right of <code>??</code>, the block of <code>comptime</code> — may end in an expression
+without <code>;</code>, its value (<a href="../../spec/07-statements/#3-value-blocks">07 §3</a>). An <code>if</code> with its final
+<code>else</code>, a <code>match</code> and a <code>loop</code> standing last there are that value; elsewhere they are
+statements. Every other block ends with its statements.</li>
+<li>A statement that ends in a block — a call with a trailing block, a macro site with a block —
+needs no <code>;</code> and may have one. An expression statement is a call, an assignment, an increment
+or an expression a rule of 07 names; what else stands there is the checker's to refuse.</li>
+<li>A <strong>local function</strong> is a <code>fn</code> in a body: no type parameters, no default, no variadic
+parameter, a body of its own (<code>LYR-PAR0060</code>). <code>using</code> binds with <code>let</code> only (<code>LYR-PAR0052</code>).</li>
+<li>A label names the loop that follows it and only a loop (<code>LYR-PAR0046</code>); <code>loop</code> is a word only
+before its <code>{</code>, <code>unsafe</code> only before its block, <code>using</code> only before <code>let</code>.</li>
+<li>A <code>;</code> alone is an <strong>empty statement</strong> (08 S10): it stands wherever a statement may, a value
+block's included, does nothing, and <code>lyric fmt</code> drops it.</li>
+</ol>
+<h2 id="5-expressions">5. Expressions</h2>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Operators</th>
+<th>Associativity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>postfix <code>.</code> <code>?.</code> <code>[ ]</code> <code>( )</code> <code>++</code> <code>--</code> <code>!</code> <code>with { }</code>, a trailing block</td>
+<td>left</td>
+</tr>
+<tr>
+<td>2</td>
+<td>prefix <code>!</code> <code>-</code> <code>~</code> <code>++</code> <code>--</code> <code>^</code>, <code>try</code>, <code>throw</code>, <code>comptime</code></td>
+<td>right</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>as</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>*</code> <code>/</code> <code>%</code> <code>*%</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>+</code> <code>-</code> <code>+%</code> <code>-%</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>&lt;&lt;</code> <code>&gt;&gt;</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>..</code> <code>..=</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>&amp;</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>^</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>\|</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code> <code>is</code> <code>in</code> <code>!in</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>==</code> <code>!=</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td>13</td>
+<td><code>&amp;&amp;</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td>14</td>
+<td><code>\|\|</code></td>
+<td>left</td>
+</tr>
+<tr>
+<td>15</td>
+<td><code>??</code></td>
+<td>right</td>
+</tr>
+<tr>
+<td>16</td>
+<td><code>=</code> and the compound assignments</td>
+<td>right</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-ebnf">Expr            = 'try' Expr { CatchExpr }
+                | 'try' ( '?' | '!' ) Expr
+                | Assignment .
+CatchExpr       = 'catch' '(' CatchBinding ')' ( ValueBlock | Expr ) .
+Assignment      = Coalesce [ AssignOp Expr ] .
+AssignOp        = '=' | '+=' | '-=' | '*=' | '/=' | '%=' | '+%=' | '-%=' | '*%=' | '&amp;=' | '|='
+                | '^=' | '&lt;&lt;=' | '&gt;&gt;=' | '&amp;&amp;=' | '||=' | '??=' .
+Coalesce        = Or [ '??' ( ValueBlock | Coalesce ) ] .
+Or              = And { '||' And } .
+And             = Equality { '&amp;&amp;' Equality } .
+Equality        = Comparison [ ( '==' | '!=' ) Comparison ] .
+Comparison      = BitOr [ CompareOp BitOr | 'is' Type ] .
+CompareOp       = '&lt;' | '&lt;=' | '&gt;' | '&gt;=' | 'in' | '!in' .
+BitOr           = BitXor { '|' BitXor } .
+BitXor          = BitAnd { '^' BitAnd } .
+BitAnd          = Range { '&amp;' Range } .
+Range           = Shift [ ( '..' | '..=' ) Shift ] .
+Shift           = Additive { ( '&lt;&lt;' | '&gt;&gt;' ) Additive } .
+Additive        = Multiplicative { ( '+' | '-' | '+%' | '-%' ) Multiplicative } .
+Multiplicative  = Cast { ( '*' | '/' | '%' | '*%' ) Cast } .
+Cast            = Prefix { 'as' Type } .
+Prefix          = ( '!' | '-' | '~' | '++' | '--' | '^' | 'try' | 'throw' ) Prefix
+                | 'comptime' ( ValueBlock | Prefix )
+                | 'comptime' 'if' '(' Expr ')' Expr 'else' Expr
+                | Postfix .
+
+Postfix         = Primary { PostfixOp } .
+PostfixOp       = '.' ( IDENTIFIER | INT_LITERAL | FLOAT_LITERAL )
+                | '.' '[' Expr ']' [ InitBody ]
+                | '.' '[' Expr ',' Expr ']'
+                | '?.' IDENTIFIER
+                | '[' IndexElement ']'
+                | [ TypeArgs ] '(' [ Args ] ')'
+                | '++' | '--' | '!'
+                | 'with' '{' [ WithField { ',' WithField } [ ',' ] ] '}'
+                | TrailingLambda .
+IndexElement    = Expr
+                | [ Expr ] ( '..' | '..=' ) [ Expr ] .
+Args            = Arg { ',' Arg } [ ',' ] .
+Arg             = [ IDENTIFIER ':' ] [ '&amp;' ] Expr [ '...' ] .
+WithField       = IDENTIFIER { '.' IDENTIFIER } '=' Expr .
+TrailingLambda  = '{' [ BlockParam { ',' BlockParam } '=&gt;' ] { Statement } [ Expr | 'throw' Expr ] '}' .
+BlockParam      = [ '&amp;' ] IDENTIFIER | TuplePattern .
+
+Primary         = Literal
+                | FString
+                | 'this'
+                | IDENTIFIER
+                | Path TypeArgs
+                | Path [ TypeArgs { '.' IDENTIFIER } ] InitBody
+                | '.' IDENTIFIER [ InitBody ]
+                | IDENTIFIER '=&gt;' LambdaBody
+                | '(' [ LambdaParam { ',' LambdaParam } [ ',' ] ] ')'
+                  [ ':' ReturnType [ ThrowsClause ] ] '=&gt;' LambdaBody
+                | '(' Expr ')'
+                | '(' Expr ',' Expr { ',' Expr } [ ',' ] ')'
+                | '[' [ Expr { ',' Expr } [ ',' ] ] ']'
+                | IfExpr
+                | MatchExpr
+                | LoopExpr
+                | MacroCall
+                | 'quote' ( '{' { TopLevelDecl } '}' | ValueBlock )
+                | Splice
+                | AT_NAME [ '(' [ Args ] ')' ] .
+Literal         = INT_LITERAL | FLOAT_LITERAL | CHAR_LITERAL | STRING_LITERAL | BYTE_STRING
+                | 'true' | 'false' | 'null' .
+FString         = FSTRING_START { FSTRING_TEXT | HOLE_START Expr [ FORMAT_SPEC ] HOLE_END }
+                  FSTRING_END .
+InitBody        = '{' [ InitItem { ',' InitItem } [ ',' ] ] '}' .
+InitItem        = IDENTIFIER [ '=' Expr ]
+                | '[' Expr ']' '=' Expr
+                | 'comptime' 'for' '(' IDENTIFIER 'in' Expr ')' '[' Expr ']' '=' Expr .
+LambdaParam     = [ '&amp;' ] IDENTIFIER [ ':' Type ]
+                | TuplePattern [ ':' Type ] .
+LambdaBody      = ValueBlock | Expr .
+IfExpr          = 'if' '(' Expr ')' ( ValueBlock | Expr ) 'else' ( ValueBlock | Expr ) .
+MatchExpr       = 'match' '(' Expr ')' '{' { MatchArm ',' | BlockArm [ ',' ] } [ MatchArm ] '}' .
+MatchArm        = Pattern [ 'if' Expr ] '=&gt;' Expr .
+BlockArm        = Pattern [ 'if' Expr ] '=&gt;' ValueBlock .
+LoopExpr        = [ IDENTIFIER ':' ] 'loop' Block .
+MacroCall       = IDENTIFIER '!' ( '(' [ Expr { ',' Expr } [ ',' ] ] ')' [ ValueBlock ]
+                                 | ValueBlock ) .
+Splice          = '#' '{' Expr '}' .</code></pre>
+<ol>
+<li><strong>Assignment is an expression</strong> (08 S8), the lowest level, right-associative. A comparison and
+an equality do not chain: <code>a &lt; b &lt; c</code> is refused with the form to write (<code>LYR-PAR0059</code>), and
+<code>is</code>, a test at the comparisons' level (<a href="../../spec/08-expressions/">08 §4</a>), chains with none of them.
+A range does not chain either (<code>LYR-PAR0005</code>).</li>
+<li><code>try</code> covers everything to its right (<a href="../../spec/06-errors/">06 §4</a>): <code>try a + b</code> is <code>try (a + b)</code>.
+At the start of an expression it covers that expression and takes its <code>catch</code> clauses; to the
+right of an operator the plain <code>try</code> covers from where it stands, and <code>try?</code>, <code>try!</code> and a
+<code>try</code> with clauses stand at the start only (<code>LYR-PAR0050</code>, <code>LYR-PAR0051</code>). <code>throw e</code> is a
+prefix: <code>x ?? throw e</code>.</li>
+<li><code>a..b</code> is a value (<a href="../../spec/03-types/">03</a>); in an index the bounds may be left open — <code>xs[..b]</code>,
+<code>xs[a..]</code>, <code>xs[..]</code> — and <code>^n</code> counts from the end.</li>
+<li>A lambda is written in three forms (08 F1): <code>(n: int): int =&gt; …</code>, <code>x =&gt; …</code>, and a <strong>trailing
+block</strong> after a callee or a call, <code>xs.map { it * 2 }</code>, <code>fold(0) { acc, x =&gt; acc + x }</code>, its
+parameters before <code>=&gt;</code> or the implicit <code>it</code>.</li>
+<li><code>if</code> as an expression has its <code>else</code> (<code>LYR-PAR0036</code>). <code>'comptime' 'if'</code> in an expression
+chooses between two (<code>LYR-PAR0061</code>).</li>
+<li>A match arm whose body is an expression is followed by <code>,</code> unless it stands last; a block arm
+may omit it (08 S9).</li>
+<li><code>name!(…)</code> and <code>name! { … }</code> are a macro's site (<a href="../../spec/11-metaprogramming/#5-macros">11 §5</a>):
+the <code>!</code> written against the name, before <code>(</code> or <code>{</code>. <code>quote { … }</code> holds declarations when
+its first token begins one, statements otherwise; <code>#{ e }</code> splices inside it, where an
+expression, a type or a declaration's name stands.</li>
+<li><code>e.[f]</code>, <code>e.[v, p]</code>, <code>E.[v] { … }</code> and the items <code>[f] = e</code> and <code>comptime for (f in …) [f] = e</code>
+of an initializer reach fields and variants by a compile-time info
+(<a href="../../spec/11-metaprogramming/">11</a>).</li>
+</ol>
+<h2 id="6-patterns">6. Patterns</h2>
+<pre><code class="language-ebnf">Pattern         = PatternTerm { '|' PatternTerm } .
+PatternTerm     = PatternLiteral [ ( '..' | '..=' ) PatternLiteral ]
+                | IDENTIFIER ( ':' Type | 'in' Bounds )
+                | Path [ Payload ]
+                | '.' IDENTIFIER [ Payload ]
+                | '(' Pattern { ',' Pattern } [ ',' ] ')'
+                | '[' [ ArrayElement { ',' ArrayElement } [ ',' ] ] ']' .
+PatternLiteral  = [ '-' ] ( INT_LITERAL | FLOAT_LITERAL ) | STRING_LITERAL | CHAR_LITERAL
+                | 'true' | 'false' | 'null' .
+Payload         = '(' [ Pattern { ',' Pattern } [ ',' ] ] ')'
+                | '{' [ FieldPattern { ',' FieldPattern } [ ',' ] ] '}' .
+FieldPattern    = IDENTIFIER [ '=' Pattern ] .
+ArrayElement    = Pattern | '..' [ IDENTIFIER ] .
+TuplePattern    = '(' Pattern { ',' Pattern } [ ',' ] ')' .</code></pre>
+<ol>
+<li>A name alone binds, always; a variant is written <code>.Red</code> or <code>Signal.Red</code> (08 Y6,
+<a href="../../spec/09-patterns/">09</a>). <code>_</code> binds nothing. <code>c: Circle</code> tests a type and <code>s in [Circle, Rect]</code>
+a set of them.</li>
+<li>A pattern's literal may be negative; a range's bounds are literals. One parenthesized pattern
+is a group, two or more a tuple. An array pattern holds at most one <code>..</code> (<code>LYR-PAR0033</code>).</li>
+</ol>
+<h2 id="7-where-the-grammar-leaves-two-readings">7. Where the grammar leaves two readings</h2>
+<p>The EBNF is ambiguous at a few places, on purpose: each is settled by looking ahead at the
+tokens, never by meaning. In order of how often a program meets them:</p>
+<ol>
+<li><strong><code>&lt;</code> after a name</strong> opens type arguments when it closes balanced over tokens a type may hold
+and is followed by <code>(</code> — a call, <code>f&lt;int&gt;()</code> —, by <code>{</code> that opens an initializer, or, for a
+path in value position, by <code>.</code>, <code>)</code>, <code>]</code>, <code>}</code>, <code>,</code>, <code>;</code> or the end of the text
+(<code>map(xs, ident&lt;int&gt;)</code>). Everywhere else it is the comparison.</li>
+<li><strong>A <code>{</code> after a name</strong> opens an initializer when the braces are empty, hold <code>name =</code> whose
+value ends at <code>,</code> or <code>}</code>, hold names separated by <code>,</code> — the shorthand <code>S { v, w }</code> —, or open
+with <code>[</code> or <code>comptime for</code>. Otherwise the braces are a trailing block: <code>run { total = 5; }</code>,
+whose <code>;</code> makes it a statement's. <strong>No statement begins with an initializer</strong> — its value
+would be dropped (<code>LYR-PAR0055</code>); in a value position, inside any parentheses, brackets or
+braces, and after <code>=</code>, one may stand.</li>
+<li><strong>A trailing block</strong> follows a name, a member or a call; it holds statements when it begins
+with a statement's word or holds a <code>;</code> at its own level, and one expression otherwise.
+<code>{ a, b =&gt; … }</code> names its parameters.</li>
+<li><strong>A <code>(</code></strong> begins a lambda when its matching <code>)</code> is followed by <code>=&gt;</code> or by <code>:</code> and a return
+type and <code>=&gt;</code>; a tuple when a <code>,</code> follows its first element; a group otherwise. In a match
+arm's guard, the first <code>(</code> is a group and a name before <code>=&gt;</code> is no lambda.</li>
+<li><strong>A name after <code>break</code></strong> is a label when a loop around the <code>break</code> carries it, the beginning
+of the value otherwise (07 §1 rule 3).</li>
+<li><strong>An <code>if</code> at the start of a statement</strong> in a value block is the block's value when its chain
+ends in an <code>else</code> and nothing follows it; otherwise, and in every other block, it is the
+statement. The same holds for <code>match</code> and <code>loop</code>.</li>
+<li><strong><code>try?</code> and <code>try!</code></strong>: the sign is written against the word; with a space between, <code>!</code> negates
+what follows — <code>try !done()</code>.</li>
+<li><strong><code>!</code> after a name</strong> before <code>(</code> or <code>{</code>, written against the name, is a macro's site; anywhere
+else it unwraps: <code>x! in xs</code>, <code>x!.f()</code>.</li>
+<li><strong><code>.</code> and a digit</strong>: <code>t.0</code> is a tuple's element, <code>t.0.1</code> two of them; <code>3.show()</code> calls on <code>3</code>;
+<code>1..3</code> is a range.</li>
+</ol>
+<h2 id="8-the-check">8. The check</h2>
+<ol>
+<li><code>tools/grammar.py</code> reads the EBNF of this chapter, cuts a program into the tokens of 01 and
+asks whether it is a <code>Module</code>. Every program the suite expects to compile — each case that
+leads with <code>run</code> or <code>check</code> and expects no <code>error:</code>, every file of a package case — must be
+one; the check runs in this repository's CI.</li>
+<li>The check runs one way. A program the grammar takes may be refused by a rule beside it (§1
+rule 4), so the cases that expect an error are not asked.</li>
+</ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
 <ul>
 <li class="level-2"><a href="#scope">Scope</a></li>
+<li class="level-2"><a href="#1-notation-and-reading">1. Notation and reading</a></li>
+<li class="level-2"><a href="#2-files-and-declarations">2. Files and declarations</a></li>
+<li class="level-2"><a href="#3-types">3. Types</a></li>
+<li class="level-2"><a href="#4-statements">4. Statements</a></li>
+<li class="level-2"><a href="#5-expressions">5. Expressions</a></li>
+<li class="level-2"><a href="#6-patterns">6. Patterns</a></li>
+<li class="level-2"><a href="#7-where-the-grammar-leaves-two-readings">7. Where the grammar leaves two readings</a></li>
+<li class="level-2"><a href="#8-the-check">8. The check</a></li>
 </ul>
 </aside>
 </div>

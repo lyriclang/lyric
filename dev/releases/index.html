@@ -558,6 +558,11 @@ shape, adds the member in a module of the program this one does not import.</p>
 </li>
 <li><p><strong><code>lyric fmt</code> writes two attributes as one group</strong>, <code>@[A, B]</code>, as the design says, on every declaration and at the head of a module; it had kept them stacked. A header without a name is <code>module;</code>, no longer <code>module ;</code>.</p>
 </li>
+<li><p><strong>Every list may end in a comma</strong>, as the design says: type parameters and their bounds, type arguments, a function
+type's parameters, a variant's payload and an associated type's bound now take one too (<code>fn f&lt;A, B,&gt;(g: fn(int,) -&gt; int)</code>).
+<strong>A <code>;</code> alone is an empty statement</strong>: it does nothing, and <code>lyric fmt</code> drops it. Both had been refused as parse errors.
+The grammar is written down as one EBNF in spec chapter 02, and every program of the suite is checked against it.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
