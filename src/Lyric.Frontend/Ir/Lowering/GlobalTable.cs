@@ -225,7 +225,7 @@ internal sealed class GlobalTable
                 return true;
             case UnaryExpr { Operator: UnaryOp.Neg, Operand: IntLiteralExpr or FloatLiteralExpr }:
                 return true;
-            // a constant the compiler computed: what runs is its construction — in Lyric 5;
+            // a constant the compiler computed: what runs is its construction
             case ComptimeExpr:
                 return true;
             case IdentifierExpr id:

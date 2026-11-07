@@ -414,12 +414,11 @@ public sealed class SemaRules
     }
 
     /// <summary>
-    /// Lyric 5's entry: the program starts at the <c>main</c> of
+    /// The entry: the program starts at the <c>main</c> of
     /// its entry module, which is <c>fn main(): void</c> or <c>fn main(): int</c>, may declare
     /// <c>throws</c>, and takes no parameters — the arguments come from the standard library. A
     /// <c>main</c> in any other module is an ordinary function: a module may be a library and a
-    /// program at once, and only the module a build starts from makes its <c>main</c> the root. The
-    /// 4.x rule, one <c>main</c> per compilation, was the VM's (one entry per <c>.lyrbc</c>).
+    /// program at once, and only the module a build starts from makes its <c>main</c> the root.
     /// </summary>
     private void CheckEntry(ModuleSymbol entry)
     {
@@ -888,17 +887,7 @@ public sealed class SemaRules
             $"cannot call 'mut fn {method.Name}' on this receiver — {reason}");
     }
 
-    /// <summary>An array, or a type satisfying <c>Indexable&lt;T&gt;</c>. Both are references, so the
-    /// element is writable: a <c>let</c> pins the name, not the object behind it.
-    ///
-    /// <para>The interface's <c>set</c> setter is a <c>mut fn</c>, which costs nothing here.</para>
-    /// </summary>
-    private bool IsIndexableTarget(LyrType type)
-    {
-        if (type is ArrayOf or SliceOf or ErrorType) return true;
-        if (_types.Indexable is not { } indexable) return false;
-
-        return TypeFacts.SymbolOf(type) is { } symbol
-               && Conformance.Implements(symbol, indexable, _binding);
-    }
+    /// <summary>An array or a view: both are references, so the element is writable — a <c>let</c>
+    /// pins the name, not the object behind it.</summary>
+    private static bool IsIndexableTarget(LyrType type) => type is ArrayOf or SliceOf or ErrorType;
 }

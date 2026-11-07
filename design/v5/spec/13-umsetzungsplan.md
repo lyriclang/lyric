@@ -2508,3 +2508,16 @@ Zwei Tests sind gestrichen, sie prüften nur den 4.x-Pfad (`GenericMemberTests`)
 
 **Lokal gilt ab hier zig 0.16.0 ausdrücklich.** Das WSL-System steht seit dem 2026-11-06 auf 0.17.0, die CI und das Book auf 0.16.0. Unter 0.17 sind die Bindgen- und Link-Tests rot, ohne dass ein Slice etwas dafür kann. Der Umstieg auf 0.17 ist eine eigene Frage und nicht Teil von M17.
 
+## Nachtrag 2026-11-07 — M17 S3b: die 4.x-Pfade ohne Schalter
+
+Der Abgleich jeder Bibliotheksfrage des Frontends gegen `stdlib5` zeigt mehr als die rund 40 Stellen laut Kommentar: Auch der Adapterweg von `for` (`RangeIterator`, `StringIterator`, `rawToChars`) und `WithArg` fragen nach Namen, die `stdlib5` nicht deklariert. S3b wird deshalb geteilt:
+
+| Slice | Inhalt |
+|---|---|
+| **S3b1** | die Bibliotheksfragen gefaltet, die synthetisierten Rümpfe der Familie, die `std.core` als Defaults gibt, der `concat`-Weg der f-strings, die `dotnet`-Prüfung, `as` über `Into`, der Adapterweg von `for`, `WithArg`; die Kommentare über 4.x im Frontend |
+| **S3b2** | `OpaqueRef` mit dem Fall `Opaque` in `std.core` und in der Spec, die Host-Typen (`HostTypes`, `SEM0061`), der Rest der Liste in `CatalogTests` |
+
+**Ohne Bibliothek** bleibt eine eigene Frage: Ein f-string nennt dann im Lowering den fehlenden Baustein (`LYR-SEM0195`), und `Synthesize` schreibt nichts, solange kein `std.core` geladen ist. Das ist keine 4.x-Weiche, sondern der Fall einer kaputten Installation und der Suiten, die nur den Resolver oder den Checker prüfen.
+
+`LYR-SEM0091` und `LYR-SEM0095` verlieren ihre Stelle und verlassen die Liste. Die Erklärung von `LYR-SEM0007` im Katalog nennt noch `Indexable<T>`; sie ändert sich mit S3c, weil der Spec-Anhang aus dem Katalog entsteht. Die Meldung selbst nennt ab S3b1 `Index<K>`: Sie verlangte ein Interface, das es in Lyric 5 nicht gibt.
+

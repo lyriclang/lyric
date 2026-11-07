@@ -110,7 +110,7 @@ public sealed partial class Parser
     /// the same list the stacked spelling declares. The VALUES are parsed as expressions; that
     /// they must be literals is a semantic rule, so the message can name the offending
     /// expression instead of refusing to read it — and which attribute admits the parenthesized
-    /// form is the checker's rule too (<c>WithArg&lt;T&gt;</c>).
+    /// form is the checker's rule too.
     /// </summary>
     private AttributeNode[] ParseAttributeList()
     {
@@ -359,8 +359,7 @@ public sealed partial class Parser
             + "a member of one, or the module header carries one");
     }
 
-    /// <summary>In Lyric 5 every declaration carries attributes; the 4.x
-    /// parser refuses them where its module format had no row for them.</summary>
+    /// <summary>Every declaration carries attributes.</summary>
     private Decl Attach(Decl decl, AttributeNode[] attributes, string what)
     {
         if (attributes.Length == 0) return decl;
@@ -533,7 +532,7 @@ public sealed partial class Parser
     private FunctionDecl ParseFunctionDecl(VisibilityWord isPublic, Span start, bool isStatic = false,
         ExternSpec? spec = null)
     {
-        // 'inline fn': a word of Lyric 5's alone — the 4.x lexer reads 'inline' as a name
+        // 'inline fn'
         var isInline = _buffer.Match(TokenKind.Inline);
         // the order is '[static] [inline] [mut] fn': 'inline static' is refused and read as what it
         // says — the rest of the member parses as written, no cascade
@@ -694,8 +693,7 @@ public sealed partial class Parser
             var name = ExpectNamed("LYR-PAR0026", "parameter name");
             _buffer.Expect(TokenKind.Colon, "LYR-PAR0031", "expected ':' after parameter name");
             var type = ParseType();
-            // 'nums: int...': the variadic parameter names its element; it is
-            // an array of it, as 4.x's 'params nums: int[]' was, and the rules are the same ones.
+            // 'nums: int...': the variadic parameter names its element; it is an array of it.
             var isEllipsis = _buffer.Check(TokenKind.DotDotDot);
             if (isEllipsis) type = new ArrayType(type, Span.Union(type.Span, _buffer.Advance().Span));
             Expr? def = _buffer.Match(TokenKind.Equal) ? ParseExpr(0) : null;

@@ -400,9 +400,8 @@ public sealed class Lexer
                 + string.Join(", ", beyond.Select(c => $"'{c}'"))));
             return new Token(TokenKind.Identifier, new Span(_file, identifierStart, _pos));
         }
-        // Lyric 5 drops 'module' and 'params' as words: names, which the parser still reads
-        // at the two places the words stood, to say what replaced them. It takes the compile-time
-        // words, which stay names in 4.x.
+        // 'module' and 'params' are no words: names, which the parser still reads at the two places
+        // the words stood, to say what replaced them.
         if (Keywords.TryGetValue(lexme, out var kind)
             && kind is not (TokenKind.Module or TokenKind.Params))
             return new Token(kind, new Span(_file, identifierStart, _pos));

@@ -501,7 +501,7 @@ public class LoweringTests
     [Theory]
     // Without the standard library on the module path an f-string's helper is missing, and the message
     // names the missing one rather than claiming "f-strings do not work": it says WHERE and WHAT.
-    [InlineData("pub fn f(): string { return f\"n={1}\"; }", "std.string.fromInt")]
+    [InlineData("pub fn f(): string { return f\"n={1}\"; }", "an f-string's builder")]
     public void Out_of_scope_constructs_report_where_and_what(string source, string expected) =>
         AssertNotSupported(source, expected);
 
@@ -803,7 +803,7 @@ public class LoweringTests
 
         Assert.Null(ir);
         var diagnostic = Assert.Single(de.Diagnostics.Where(d => d.Code == "LYR-SEM0195"));
-        Assert.Contains("std.string.fromInt", diagnostic.Message);
+        Assert.Contains("an f-string's builder", diagnostic.Message);
         Assert.DoesNotContain("cannot lower it yet", diagnostic.Message);
         Assert.True(diagnostic.Notes is null or { Count: 0 });
     }

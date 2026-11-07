@@ -163,7 +163,7 @@ public enum TokenKind
     // This
     This,
 
-    // The compile-time words: Lyric 5's, names in 4.x. Only
+    // The compile-time words. Only
     // 'comptime' has a form yet; 'inline', 'quote' and 'macro' are reserved for theirs.
     Comptime,
     Inline,

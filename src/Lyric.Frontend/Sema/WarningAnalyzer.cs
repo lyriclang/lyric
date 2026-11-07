@@ -307,7 +307,6 @@ internal sealed partial class WarningAnalyzer
                     StructDecl s => s.Attributes,
                     ClassDecl c => c.Attributes,
                     EnumDecl e => e.Attributes,
-                    // Lyric 5's; the 4.x parser refuses attributes on these
                     InterfaceDecl i => i.Attributes,
                     TypeAliasDecl a => a.Attributes,
                     GlobalBindingDecl g => g.Attributes,
@@ -363,12 +362,8 @@ internal sealed partial class WarningAnalyzer
         {
             if (!ReferenceEquals(_types.RefOf(attribute), canonical)) continue;
 
-            // Lyric 5: the value the compiler computed (11 §1 rule 5). The 4.x tools: the string
-            // literals written, each field defaulting to "" — reading the defaults from the struct
-            // declaration would be the general form; strings alone do not need it.
-            string Field(string name) => _fieldsOf is not null
-                ? _fieldsOf(attribute)?.GetValueOrDefault(name) ?? ""
-                : attribute.Fields.FirstOrDefault(f => f.Name == name)?.Value is StringLiteralExpr s ? s.Value : "";
+            // the value the compiler computed (11 §1 rule 5)
+            string Field(string name) => _fieldsOf?.Invoke(attribute)?.GetValueOrDefault(name) ?? "";
 
             // The promise is checked HERE, at the declaration, and not where anything uses this:
             // a form kept past its date is wrong whether or not anyone still calls it, and the
