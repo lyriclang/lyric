@@ -427,6 +427,10 @@ promise. This entry fills with the milestones.
   shape, adds the member in a module of the program this one does not import.
 
 - **`lyric fmt` writes two attributes as one group**, `@[A, B]`, as the design says, on every declaration and at the head of a module; it had kept them stacked. A header without a name is `module;`, no longer `module ;`.
+- **Every list may end in a comma**, as the design says: type parameters and their bounds, type arguments, a function
+  type's parameters, a variant's payload and an associated type's bound now take one too (`fn f<A, B,>(g: fn(int,) -> int)`).
+  **A `;` alone is an empty statement**: it does nothing, and `lyric fmt` drops it. Both had been refused as parse errors.
+  The grammar is written down as one EBNF in spec chapter 02, and every program of the suite is checked against it.
 
 ---
 

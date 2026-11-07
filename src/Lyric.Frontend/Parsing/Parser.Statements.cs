@@ -25,6 +25,7 @@ public sealed partial class Parser
         _tailAtEnd = true;
         while (!_buffer.AtEnd)
         {
+            if (_buffer.Match(TokenKind.Semicolon)) continue; // an empty statement says nothing
             var before = _buffer.Position;
             stmts.Add(ParseStmt());
             if (_buffer.Position == before && !_buffer.AtEnd) _buffer.Advance();
@@ -256,6 +257,8 @@ public sealed partial class Parser
         _allowStructInit = true;
         while (!_buffer.Check(TokenKind.RBrace) && !_buffer.AtEnd)
         {
+            // An empty statement: allowed, and nothing is kept of it, so the formatter drops it.
+            if (_buffer.Match(TokenKind.Semicolon)) continue;
             var before = _buffer.Position;
             stmts.Add(ParseStmt());
             if (_buffer.Position == before && !_buffer.AtEnd)

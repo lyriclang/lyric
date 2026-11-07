@@ -1991,7 +1991,7 @@ public sealed partial class Parser
             {
                 places.Add(_buffer.Match(TokenKind.Amp));
                 parameters.Add(ParseType());
-            } while (_buffer.Match(TokenKind.Comma));
+            } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RParen));
         _buffer.Expect(TokenKind.RParen, "LYR-PAR0008", "expected ')' in function type");
         _buffer.Expect(TokenKind.Arrow, "LYR-PAR0015",
             $"expected '->' in function type, got {Shown(_buffer.Current)}");
@@ -2109,7 +2109,8 @@ public sealed partial class Parser
             args.Add(ParseType());
             if (name is not null) written ??= new List<string?>(Enumerable.Repeat<string?>(null, args.Count - 1));
             written?.Add(name);
-        } while (_buffer.Match(TokenKind.Comma));
+        } while (_buffer.Match(TokenKind.Comma)
+                 && _buffer.Current.TokenKind is not (TokenKind.Greater or TokenKind.Shr or TokenKind.GreaterEqual or TokenKind.ShrEqual));
         names = written?.ToArray();
 
         // Nested generics: split '>>', '>=' and '>>=' into single '>' tokens.
