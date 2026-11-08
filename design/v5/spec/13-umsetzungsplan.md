@@ -2554,6 +2554,8 @@ Die Zählung zeigt rund 100 Kommentare im Frontend, die noch von Bytecode und de
 
 **S7, gebaut:** P4 messbar: `tools/check_coverage.py` im Spec-Repo (Spec 16 §3 r5, CI-Schritt) — jeder nicht zurückgezogene Code des Anhangs hat einen Fall oder steht mit Grund in der Liste (Kommandozeile, Build, Compiler-/Laufzeit-Fehler, Netz, Windows-Gerätename), jeder Abschnitt von 03–13, 15, 16 wird von einem Fall zitiert. Vorher: 77 Codes ohne Fall. 57 Fälle aus den `wrong`-Beispielen des Katalogs, 5 aus seinen Mehrdatei-Beispielen, 3 von Hand; der Läufer liest `exit:` auch bei einer Ablehnung (PKG0009 endet mit 2). `LYR-PAR0006` zurückgezogen: der Lexer lehnt jedes solche Literal zuerst ab.
 
+**S8, Book I:** Kapitel 3–6 nach P6 — Values and types, Functions and closures, Structs, classes and enums, Patterns —, 39 Snippets, jede Behauptung des Texts vorher gegen den Compiler geprüft (Überlauf auch im Release-Profil eine Panik, `?.`/`!`, Grenzen, `mut fn` auch für eine Klasse, Varianten im Muster mit Punkt). `Errors` (Kapitel 7) kommt mit S9; bis dahin führt Patterns auf What the compiler tells you.
+
 **Nach S7, auf Wort des Maintainers (2026-11-08):** `run -C <dir>` startet das Programm in `<dir>` — `-C` heißt jetzt, was es bei `git -C`, `make -C` und `cargo -C` heißt: der Befehl steht dort, als wäre er dort gestartet (Spec 14 §1.1 r2). Anlass: ein Spiel, dessen Assets neben `src/` liegen, fand sie nicht, wenn es mit `-C` aus einem anderen Verzeichnis lief. Das Verzeichnis von `-C`, nicht die Paketwurzel darüber — wie `cd <dir> && lyric run`. `lyric test` lief schon immer in der Paketwurzel und bleibt so.
 
 ## Nachtrag 2026-11-08 — M15 S6 und S7: was vom Plan abweicht

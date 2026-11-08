@@ -323,5 +323,5 @@ $ lyric run
 6 * 7 = 42
 ```
 
-The next chapter, [What the compiler tells you](diagnostics.md), is about the messages you meet
-when a program is not right yet.
+The next chapter, [Values and types](values-and-types.md), looks closer at the values this one
+used: the numbers, the text, the values that may be missing.

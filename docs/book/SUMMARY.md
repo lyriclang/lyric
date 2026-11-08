@@ -5,5 +5,9 @@ the ones before it.
 
 - [Getting started](getting-started.md)
 - [A first program](first-program.md)
+- [Values and types](values-and-types.md)
+- [Functions and closures](functions-and-closures.md)
+- [Structs, classes and enums](structs-classes-enums.md)
+- [Patterns](patterns.md)
 - [What the compiler tells you](diagnostics.md)
 - [C libraries](c-libraries.md)
