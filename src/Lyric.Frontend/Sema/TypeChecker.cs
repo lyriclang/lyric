@@ -14481,7 +14481,17 @@ public sealed class TypeChecker
                 return IsAssignable(expr, fixedFrom, fixedTo, coercionSite);
         }
         if (to is Optional inner)                          // T to ?T, widening
-            return from is NullType || IsAssignable(expr, from, inner.Inner, coercionSite);
+        {
+            if (from is NullType || IsAssignable(expr, from, inner.Inner, coercionSite)) return true;
+            // Through the optional (03 §3.1): a '?T' where a '?U' is expected, when a 'T' stands
+            // where a 'U' is — null stays null, a value is coerced. Wrapping goes first, so a
+            // '?int' where '??int' is expected stays a present '??int'. Not to a C function's
+            // pointer nor from an inline array: those coercions mark or test the expression
+            // itself, and the expression here is the optional.
+            return coercionSite && from is Optional held
+                && inner.Inner is not FnType { IsC: true } && held.Inner is not InlineArrayOf
+                && IsAssignable(expr, held.Inner, inner.Inner, coercionSite);
+        }
         if (from is NullType) return false;
 
         // A coroutine that cannot throw fits where one that may is expected: the target promises

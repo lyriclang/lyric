@@ -4395,6 +4395,16 @@ internal sealed class FunctionLowerer
         for (var i = 0; i < missing; i++) target = ((IrOptionalType)target).Inner;
         var source = from;
 
+        // A coercion through the optional: an absent value stays absent, a present one is
+        // unwrapped, coerced as a value of its own, and wrapped again (03 §3.1). Where the two
+        // optionals are one type there is nothing to do.
+        if (target is IrOptionalType wantedOption && source is IrOptionalType givenOption
+            && !IrType.Equal(wantedOption, givenOption))
+        {
+            value = CoerceThrough(value, givenOption, wantedOption, span);
+            from = source = target;
+        }
+
         // The third implicit transition, a lossless integer widening:
         // the sema admitted 'int8' where 'int' is expected, and the value changes representation
         // here, as a convert — the same instruction 'as' emits, on a pair the rule allows. Only
@@ -4477,6 +4487,37 @@ internal sealed class FunctionLowerer
             value = wrapped;
         }
         return value;
+    }
+
+    /// <summary>A <c>?T</c> where a <c>?U</c> is expected: tested, and its value, if any, coerced
+    /// to <c>U</c> and wrapped again — in a branch, since an absent value has nothing to coerce.</summary>
+    private TempId CoerceThrough(TempId value, IrOptionalType given, IrOptionalType wanted, Span span)
+    {
+        var result = _slots.DeclareSynthetic("through", wanted);
+        var present = _slots.NewTemp(BoolType);
+        _b.Emit(new OptIsSome(present, value, span));
+        var some = _b.NewBlock();
+        var none = _b.NewBlock();
+        var merge = _b.NewBlock();
+        _b.Seal(new CondBranch(present, some, none, span));
+
+        _b.SwitchTo(none);
+        var absent = _slots.NewTemp(wanted);
+        _b.Emit(new OptNone(absent, wanted.Inner, span));
+        StoreValue(result, absent, span);
+        _b.Seal(new Branch(merge, span));
+
+        _b.SwitchTo(some);
+        var inner = _slots.NewTemp(given.Inner);
+        _b.Emit(new OptGet(inner, value, given.Inner, span));
+        var coerced = Coerce(inner, given.Inner, wanted.Inner, span);
+        var wrapped = _slots.NewTemp(wanted);
+        _b.Emit(new OptSome(wrapped, coerced, wanted.Inner, span));
+        StoreValue(result, wrapped, span);
+        _b.Seal(new Branch(merge, span));
+
+        _b.SwitchTo(merge);
+        return LoadValue(result, span);
     }
 
     /// <summary>The IR side of <see cref="TypeFacts.Widens"/>: the same table on scalar kinds.</summary>

@@ -439,6 +439,8 @@ promise. This entry fills with the milestones.
   its own jumps, and a lambda there its `return`.
 - **A type parameter's bound must be an interface, written once** (`LYR-SEM0078`):
   `<T :: [int]>`, a struct as a bound, and `<T :: [Display, Display]>` were accepted.
+- **A coercion reaches through an optional**: a `?Circle` stands where a `?Shape` is expected,
+  a `?int8` where a `?int` is; `null` stays `null`. Both were refused (`LYR-SEM0001`).
 
 ---
 
