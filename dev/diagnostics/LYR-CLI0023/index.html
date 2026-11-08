@@ -51,7 +51,7 @@
 <h1>LYR-CLI0023</h1>
 <p class="code-title">a toolchain cannot be fetched</p>
 <p class="meta">error · <a href="../../spec/14-cli/">spec 14-cli</a></p>
-<p><code>lyric toolchain</code> reaches neither the mirror nor GitHub, the channel has no such version or no archive for this machine, or there is no key to check a signature with. The exit code is 2.</p>
+<p><code>lyric toolchain</code> reaches neither the mirror nor GitHub, or the channel has no such version or no archive for this machine. The exit code is 2.</p>
 <h2 id="explanation">Explanation</h2>
 <p><code>lyric toolchain install</code>, <code>update</code> and <code>list --available</code> read a channel's index — <code>dev.json</code> or <code>stable.json</code>, signed — from the mirror, and from GitHub where the mirror cannot be reached. <code>LYRIC_MIRROR</code> names another mirror in place of both, and <code>LYRIC_MIRROR_KEY</code> the key its signatures are made with. A version is one the index lists, with its build part (<code>+…</code>) or without; <code>dev</code> and <code>stable</code> name the newest of each channel.</p>
 <p>Check the network, name a version <code>lyric toolchain list --available</code> shows, or install on a machine whose target the release has an archive for.</p>

@@ -728,7 +728,8 @@ a mirror served on the machine): a conformance case fetches nothing.</p>
 <strong><code>LYRIC_HOME</code></strong> names: <code>toolchains/&lt;version&gt;/</code> holds each as its archive unpacked it,
 <code>config.toml</code> names the default (<code>default = &quot;&lt;version&gt;&quot;</code>, the one key it takes), and <code>bin</code> is a
 link to the default's directory — a symbolic link, on Windows a junction —, so that <code>bin</code> on the
-<code>PATH</code> runs the default. A directory an install has not finished is no toolchain.</p>
+<code>PATH</code> runs the default, and <code>seen/</code> remembers the newest index of each channel. A directory an
+install has not finished is no toolchain.</p>
 </li>
 <li><p><strong><code>lyric toolchain install &lt;version|dev|stable&gt;</code></strong> installs a toolchain for this machine's
 target. <code>dev</code> and <code>stable</code> name the newest version of their channel; a version is one its
@@ -737,17 +738,23 @@ channel lists, written with its build part (<code>+…</code>) or without. A dev
 installed becomes the default. A version installed already is said and fetched no further.</p>
 </li>
 <li><p><strong>What an install trusts.</strong> The channel's index is fetched with its signature and checked with
-the key the toolchain carries; the archive is fetched no further than the size the index gives
+the keys the toolchain carries for that channel, its own and a reserve; its number is no lower
+than the highest this machine has seen from the same signer. The archive is fetched no further
+than the size the index gives
 and checked against its SHA-256; it is unpacked beside the toolchains and checked against its
 own <code>toolchain.json</code> — its version, its target and every file; only then is it moved into
 place. A difference anywhere installs nothing (<code>LYR-CLI0024</code>), and a run cut short leaves
 nothing a later one counts as installed.</p>
 </li>
-<li><p><strong>Where from.</strong> The index and the archives come from the mirror, and from GitHub's releases
-where the mirror cannot be reached; a signature or a hash that does not hold is never routed
-around. <strong><code>LYRIC_MIRROR</code></strong> names another mirror in place of both, and <strong><code>LYRIC_MIRROR_KEY</code></strong>
-the key its signatures are checked with — set without a mirror, it is refused. A toolchain
-that carries no key installs only from such a mirror.</p>
+<li><p><strong>Where from.</strong> The index and the archives come from the mirror, then from GitHub's releases.
+A source that cannot be reached is followed by the next; one that serves what rule 3 refuses is
+followed by the next with a warning, because only a signature and a hash make anything
+acceptable, whichever source it came from. An index whose signature does not hold is fetched
+once more, with its signature, before it is refused: the two are two requests, and a publish
+can fall between them. Where no source serves what holds, nothing is installed: <code>LYR-CLI0024</code>
+where one served something refused, else <code>LYR-CLI0023</code>. <strong><code>LYRIC_MIRROR</code></strong> names another mirror
+in place of both, and <strong><code>LYRIC_MIRROR_KEY</code></strong> the key its signatures are checked with — set
+without a mirror, it is refused.</p>
 </li>
 <li><p><strong><code>lyric toolchain list</code></strong> names the installed toolchains, the newest first, the default
 marked; with <strong><code>--available</code></strong>, the versions both channels offer, with their dates, those
@@ -810,7 +817,9 @@ target, <code>lldb/</code>, <code>LICENSE</code> and the notices, and <strong><c
 <code>{&quot;version&quot;, &quot;triple&quot;, &quot;files&quot;: [{&quot;path&quot;, &quot;size&quot;, &quot;sha256&quot;}, …]}</code>, every other file with its
 size and SHA-256.</li>
 <li><strong>The index</strong> of a channel is <code>dev.json</code> or <code>stable.json</code>:
-<code>{&quot;channel&quot;, &quot;versions&quot;: [{&quot;version&quot;, &quot;date&quot;, &quot;archives&quot;: {&quot;&lt;triple&gt;&quot;: {&quot;file&quot;, &quot;size&quot;, &quot;sha256&quot;}}}]}</code>.
+<code>{&quot;channel&quot;, &quot;sequence&quot;, &quot;versions&quot;: [{&quot;version&quot;, &quot;date&quot;, &quot;archives&quot;: {&quot;&lt;triple&gt;&quot;: {&quot;file&quot;, &quot;size&quot;, &quot;sha256&quot;}}}]}</code>,
+<code>sequence</code> a positive integer that grows from one index of the channel to the next, the newest
+version first where two compare equal.
 On a mirror it lies at <code>&lt;base&gt;/&lt;channel&gt;.json</code>, its archives under <code>&lt;base&gt;/&lt;channel&gt;/</code>; on GitHub
 the release <code>dev</code> carries the development build with <code>dev.json</code>, the release <code>channels</code> carries
 <code>stable.json</code>, and each stable version has its release <code>v&lt;version&gt;</code>.</li>

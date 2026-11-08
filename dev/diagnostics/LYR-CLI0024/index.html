@@ -51,10 +51,11 @@
 <h1>LYR-CLI0024</h1>
 <p class="code-title">a toolchain fetched is not what its index says</p>
 <p class="meta">error · <a href="../../spec/14-cli/">spec 14-cli</a></p>
-<p>A channel's index does not carry a signature the toolchain's key made, or an archive's size, SHA-256 or <code>toolchain.json</code> differs from what the index and the archive itself list. Nothing is installed; the exit code is 2.</p>
+<p>No source serves a channel's index with a signature one of the toolchain's keys made and no older than this machine has seen, or an archive at the size and SHA-256 its index gives, or the archive's <code>toolchain.json</code> differs from what it holds. Nothing is installed; the exit code is 2.</p>
 <h2 id="explanation">Explanation</h2>
-<p>An install trusts the signature, not the server: the index is signed with the project's key, and it gives each archive's size and SHA-256; the archive lists every file it holds in <code>toolchain.json</code>. A difference anywhere stops the install before the toolchain is in place, and the mirror is not routed around — a mirror that serves a forged index is not one to fall back from quietly.</p>
-<p>Try again later or from GitHub (<code>LYRIC_MIRROR</code> unset); if it persists, the mirror is broken or tampered with.</p>
+<p>An install trusts the signature, not the server: the index is signed with the channel's key, and it gives each archive's size and SHA-256; the archive lists every file it holds in <code>toolchain.json</code>. What one source serves wrongly is said in a warning and the next source asked, because only a signature and a hash make anything acceptable. This error means none served what holds. A difference anywhere stops the install before the toolchain is in place.</p>
+<p>An index can also be refused for being older than one this machine has seen from the same signer: a mirror behind the channel, or one serving an old index on purpose.</p>
+<p>Try again later; if it persists, read what the message says of each source. With <code>LYRIC_MIRROR</code> set there is only that source to ask.</p>
 <h2 id="example">Example</h2>
 <pre><code>$ lyric5 toolchain install dev
 error[LYR-CLI0024]: lyric-5.0.0-dev.20261028-linux-x64.tar.gz has the SHA-256 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08, and its index gives 4e4c294b331f7a2099a379bec34b9f9fc03dc46ab465d998f4d683da53487e6d
