@@ -91,7 +91,7 @@ come with <code>comptime</code>.)</em></li>
 (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V1</a>). A package gathers modules under one name
 (<a href="../../spec/15-project/">15 §1</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/04-modules/</code> — a rule about a package as a package case, a
-directory (<a href="https://github.com/lyriclang/lyric-spec/blob/f1e59541928579992e9d81084ecf2efea68983d3/conformance/README.md">the format</a>); what only the command line shows, in the
+directory (<a href="https://github.com/lyriclang/lyric-spec/blob/0b6a27efdeb41381d2bfd2376cc4ddf4ac64b9c4/conformance/README.md">the format</a>); what only the command line shows, in the
 toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>PackageTests</code>).</p>
 <ol>
 <li>A <strong>package</strong> is a directory with a manifest, <code>lyric.toml</code>; its modules are the <code>.lyr</code> files
@@ -214,7 +214,11 @@ tests (<code>tests/Lyric5.Tests</code>, <code>ImportTests</code>).</p>
 binds the names it lists; <strong>qualified</strong>, <code>import app.util;</code>, binds the module under its last
 segment — <code>util.answer()</code>; <strong>aliased</strong>, <code>import app.util as u;</code>, under another name. A
 selective item may be <strong>renamed</strong>: <code>{ answer as reply }</code> binds <code>reply</code>, and <code>answer</code> is not
-bound (I2). There is no import of everything (I3).</li>
+bound (I2). There is no import of everything (I3).
+1a. The forms of one module <strong>stand side by side</strong> (I6): <code>import app.util;</code> beside
+<code>import app.util { answer }</code> and <code>{ answer as reply }</code>. An import is <strong>written once</strong>: a name
+bound again to what it already names — a selective name listed twice, in one list or in two
+imports, a qualified or an aliased import repeated — is refused (<code>LYR-RES0001</code>).</li>
 <li><strong><code>pub import</code></strong> passes on what it binds (I4): <code>pub import app.util { answer };</code> in <code>app.facade</code>
 makes <code>answer</code> a <code>pub</code> member of <code>app.facade</code> — imported from there, named as <code>facade.answer</code>,
 under the name it was renamed to; a module imported qualified or aliased is passed on as a

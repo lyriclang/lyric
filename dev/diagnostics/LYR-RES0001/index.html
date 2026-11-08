@@ -42,9 +42,9 @@
 <h1>LYR-RES0001</h1>
 <p class="code-title">a name declared twice in one scope</p>
 <p class="meta">error · <a href="../../spec/04-modules/">spec 04-modules</a></p>
-<p>Two declarations take the same name in one scope: a module, a type's members, an <code>extend</code> block, an import beside a declaration, or a parameter list. The second is reported; the first stays.</p>
+<p>Two declarations take the same name in one scope: a module, a type's members, an <code>extend</code> block, an import beside a declaration, an import written twice, or a parameter list. The second is reported; the first stays.</p>
 <h2 id="explanation">Explanation</h2>
-<p>A name means one thing in a scope. Only functions may share a name, and only when they take different numbers of arguments; any other pair of declarations — two types, a type and a function, an import and a declaration, two parameters — collides.</p>
+<p>A name means one thing in a scope. Only functions may share a name, and only when they take different numbers of arguments; any other pair of declarations — two types, a type and a function, an import and a declaration, two parameters — collides. An import is written once: a function imported again under its name is no overload of itself.</p>
 <p>Rename one of the two, or remove the one that is left over. A parameter that is not used is written <code>_</code>, which may repeat.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">struct</span> <span class="ty">Point</span> {
