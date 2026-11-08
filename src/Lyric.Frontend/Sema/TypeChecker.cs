@@ -284,6 +284,11 @@ public sealed class TypeChecker
     /// none: its body is a function of its own.</summary>
     private List<LoopContext> _loops = new();
 
+    /// <summary>In a <c>defer</c> body, the number of loops around the <c>defer</c>: a jump to one of
+    /// them, or a <c>return</c>, would leave the body while the scope is being left
+    /// (<c>LYR-SEM0236</c>). -1 outside a <c>defer</c> body; a lambda's body starts outside one.</summary>
+    private int _deferFloor = -1;
+
     public TypeResult Check()
     {
         try
@@ -3427,6 +3432,14 @@ public sealed class TypeChecker
                 break;
             case ForInStmt fo: InLoop(new LoopContext(false, fo.Label, null), () => CheckForIn(fo, scope)); break;
             case ReturnStmt r:
+                // the function's result is no measure for it: what it returns is checked as a value only
+                if (_deferFloor >= 0)
+                {
+                    _de.Report("LYR-SEM0236", Severity.Error, r.Span,
+                        "'return' in a 'defer' body — the body runs while its scope is being left, and has nowhere to return to");
+                    if (r.Value is not null) CheckExpr(r.Value, scope);
+                    break;
+                }
                 // In a coroutine 'return' ends the body with the coroutine's result: a value
                 // where the type names one, 'Coroutine<Y, R>'; a bare 'return;' where it does not.
                 if (_currentYield is not null && _currentReturn is CoroutineOf ending)
@@ -3501,7 +3514,14 @@ public sealed class TypeChecker
                 }
                 else CheckAssignable(y.Value!, yv, _currentYield, y.Span);
                 break;
-            case DeferStmt de: CheckStmt(de.Body, scope); break;
+            case DeferStmt de:
+            {
+                var savedFloor = _deferFloor;
+                _deferFloor = _loops.Count;
+                try { CheckStmt(de.Body, scope); }
+                finally { _deferFloor = savedFloor; }
+                break;
+            }
             case TryStmt tr:
                 CheckBlock(tr.Body, scope);
                 CheckClauses(tr.Body, tr.Catches, scope, (clause, catchScope) => CheckBlock(clause.Body, catchScope));
@@ -3512,6 +3532,9 @@ public sealed class TypeChecker
                 if (co.Label is null && _loops.Count == 0)
                     _de.Report("LYR-SEM0147", Severity.Error, co.Span,
                         "'continue' stands outside a loop — a lambda's body is no part of the loop around the lambda");
+                else if (TargetOf(co.Label) is { } continued && LeavesDefer(continued))
+                    _de.Report("LYR-SEM0236", Severity.Error, co.Span,
+                        "'continue' in a 'defer' body goes to a loop around the 'defer' — the body runs while its scope is being left");
                 break;
             // an error statement needs no check.
         }
@@ -4323,6 +4346,9 @@ public sealed class TypeChecker
         finally { _loops.RemoveAt(_loops.Count - 1); }
     }
 
+    /// <summary>Whether a jump to <paramref name="loop"/> leaves the <c>defer</c> body being checked.</summary>
+    private bool LeavesDefer(LoopContext loop) => _deferFloor >= 0 && _loops.IndexOf(loop) < _deferFloor;
+
     /// <summary>The loop a jump leaves: the one its label names, or the innermost.</summary>
     private LoopContext? TargetOf(string? label)
     {
@@ -4371,6 +4397,13 @@ public sealed class TypeChecker
             if (br.Label is null)
                 _de.Report("LYR-SEM0147", Severity.Error, br.Span,
                     "'break' stands outside a loop — a lambda's body is no part of the loop around the lambda");
+            if (br.Value is not null) CheckExpr(br.Value, scope);
+            return;
+        }
+        if (LeavesDefer(target))
+        {
+            _de.Report("LYR-SEM0236", Severity.Error, br.Span,
+                "'break' in a 'defer' body leaves a loop around the 'defer' — the body runs while its scope is being left");
             if (br.Value is not null) CheckExpr(br.Value, scope);
             return;
         }
@@ -12701,6 +12734,7 @@ public sealed class TypeChecker
         var savedReturn = _currentReturn;
         var savedInference = _returnInference;
         var savedLoops = _loops;
+        var savedFloor = _deferFloor;
         var savedAskable = _askable;
         // A lambda an 'inline fn' sets in place is no function of its own: its 'return',
         // 'break', 'continue' and 'yield' are the enclosing function's, and it captures nothing.
@@ -12708,6 +12742,7 @@ public sealed class TypeChecker
         if (!inline)
         {
             _loops = new(); // its loops are its own
+            _deferFloor = -1; // and its returns: a lambda in a 'defer' body may return
             _askable = new(ReferenceEqualityComparer.Instance); // a clause's binding is a captured value here (06 §4)
             _currentYield = null; // a lambda is no coroutine: a yield inside it is the DYNAMIC kind
                                   // (§10a) even when the lambda stands inside a coroutine body —
@@ -12778,6 +12813,7 @@ public sealed class TypeChecker
             _currentYield = savedYield;
             _returnInference = savedInference;
             _loops = savedLoops;
+            _deferFloor = savedFloor;
             _askable = savedAskable;
             RecordCaptures(lam);
             _result.MarkGeneratorLambda(lam);
@@ -12886,6 +12922,7 @@ public sealed class TypeChecker
         _currentYield = savedYield;
         _returnInference = savedInference;
         _loops = savedLoops;
+        _deferFloor = savedFloor;
         _askable = savedAskable;
 
         if (!inline) RecordCaptures(lam);

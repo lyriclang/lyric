@@ -434,6 +434,9 @@ promise. This entry fills with the milestones.
   type's parameters, a variant's payload and an associated type's bound now take one too (`fn f<A, B,>(g: fn(int,) -> int)`).
   **A `;` alone is an empty statement**: it does nothing, and `lyric fmt` drops it. Both had been refused as parse errors.
   The grammar is written down as one EBNF in spec chapter 02, and every program of the suite is checked against it.
+- **A jump out of a `defer` body is refused** (`LYR-SEM0236`): a `return` in it, and a `break` or
+  `continue` that goes to a loop around the `defer`, were accepted. A loop inside the body keeps
+  its own jumps, and a lambda there its `return`.
 
 ---
 
