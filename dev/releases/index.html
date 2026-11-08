@@ -570,6 +570,9 @@ its own jumps, and a lambda there its <code>return</code>.</p>
 <li><p><strong>A type parameter's bound must be an interface, written once</strong> (<code>LYR-SEM0078</code>):
 <code>&lt;T :: [int]&gt;</code>, a struct as a bound, and <code>&lt;T :: [Display, Display]&gt;</code> were accepted.</p>
 </li>
+<li><p><strong>A coercion reaches through an optional</strong>: a <code>?Circle</code> stands where a <code>?Shape</code> is expected,
+a <code>?int8</code> where a <code>?int</code> is; <code>null</code> stays <code>null</code>. Both were refused (<code>LYR-SEM0001</code>).</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>

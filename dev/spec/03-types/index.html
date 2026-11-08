@@ -322,6 +322,11 @@ expected, and is wrapped once for every level the expected type has more: an <co
 <code>??int</code> is expected is a present <code>?int</code> that holds the value; a <code>?int</code> there is a present
 <code>??int</code> whatever it holds. <code>null</code> is the absence at the <strong>outermost</strong> level of the type
 expected.</li>
+<li>A coercion reaches <strong>through</strong> an optional: at a coercion site a <code>?T</code> stands where a <code>?U</code> is
+expected when a <code>T</code> stands where a <code>U</code> is — <code>?Circle</code> where <code>?Shape</code> is, <code>?int8</code> where <code>?int</code>
+is (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 T3</a>).
+A <code>null</code> stays <code>null</code>; a value is coerced as a value of its own and wrapped again. Wrapping
+(rule 2) goes first: a <code>?int</code> where <code>??int</code> is expected is a present <code>??int</code>, whatever it holds.</li>
 <li>There is no implicit way down: a <code>?T</code> does not stand where a <code>T</code> is expected, nor a <code>??T</code>
 where a <code>?T</code> is. The ways down are a test (§3.2), <code>??</code> and <code>!</code> (§3.3).</li>
 <li><em>(Informative.)</em> An optional of a class value or of a string occupies the one word of the
