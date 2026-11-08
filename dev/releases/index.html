@@ -457,6 +457,10 @@ holds. <strong>A channel's index carries a number</strong> (<code>sequence</code
 has seen. A download that stalls for 60 seconds counts as a source that is gone. The mirror is
 <code>dl.lyriclang.de</code>.</p>
 </li>
+<li><p><strong>The mirror is up (M15):</strong> <code>https://dl.lyriclang.de</code> serves the toolchains, and <code>lyric toolchain</code>
+asks it before GitHub. Each dev build is uploaded on its way out and then installed from each
+source on Linux, Windows and macOS. Dev keeps its last ten versions there.</p>
+</li>
 <li><p><strong>A C struct's pointer field may be null</strong> (spec chapter 13 §3 rules 1 and 4): a <code>@Layout(C)</code> struct takes
 <code>?Ptr&lt;T&gt;</code> and <code>?CStr</code> fields, one word as C's pointer — a <code>?Ptr</code> is now its address everywhere, 0 for none.
 <code>lyric bindgen</code> writes a struct's pointer fields optional and every field <code>var</code>, so <code>pos.x += 1</code> writes a bound
