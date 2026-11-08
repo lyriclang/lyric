@@ -138,6 +138,8 @@ jobs:
     name: Sign
     needs: [stamp, index]
     uses: ./.github/workflows/sign.yml
+    # an environment's secrets reach a called workflow only through this
+    secrets: inherit
     with:
       environment: ${{ needs.stamp.outputs.trial != 'true' && 'sign-dev' || '' }}
       public_key: ${{ needs.stamp.outputs.trial != 'true' && needs.stamp.outputs.public_key || '' }}
