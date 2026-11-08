@@ -1,4 +1,5 @@
 using System.Formats.Tar;
+using System.Net.Sockets;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using Lyric5.Toolchain;
@@ -72,9 +73,36 @@ public sealed class ToolchainFetch
         _warn = warn;
         _seen = seen;
         _stall = stall ?? DefaultStall;
-        // a mirror that drops packets is told apart from a slow one early, for the source after it
-        _http = new HttpClient(new SocketsHttpHandler { ConnectTimeout = TimeSpan.FromSeconds(10) }) { Timeout = TimeSpan.FromSeconds(60) };
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
+        _http = Client(userAgent, _stall, TimeSpan.FromSeconds(60));
+    }
+
+    /// <summary>A client whose connections give up after 10 s, and whose reads give up when nothing
+    /// came for <paramref name="stall"/>: a mirror that drops packets, or one that stops sending, is
+    /// told apart from a slow one in time for the source after it. The limit sits on the socket,
+    /// where a synchronous read honours it on every system.</summary>
+    public static HttpClient Client(string userAgent, TimeSpan stall, TimeSpan timeout)
+    {
+        var handler = new SocketsHttpHandler
+        {
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+            ConnectCallback = async (context, cancel) =>
+            {
+                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true, ReceiveTimeout = (int)stall.TotalMilliseconds };
+                try
+                {
+                    await socket.ConnectAsync(context.DnsEndPoint, cancel).ConfigureAwait(false);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+            },
+        };
+        var client = new HttpClient(handler) { Timeout = timeout };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
+        return client;
     }
 
     /// <summary>The keys an index of <paramref name="channel"/> may be signed with: the channel's
@@ -280,15 +308,14 @@ public sealed class ToolchainFetch
 
     /// <summary>The archive at <paramref name="url"/> into <paramref name="file"/>, read no further
     /// than the index's size and hashed on the way; its progress drawn on <paramref name="progress"/>.
-    /// A source that sends no byte for <paramref name="stall"/>, by default <see cref="DefaultStall"/>,
-    /// counts as gone.</summary>
+    /// A source that sends no byte for the limit the client's sockets carry (see <see cref="Client"/>)
+    /// counts as gone; <paramref name="stall"/> names that limit in the message.</summary>
     /// <exception cref="ToolchainException"><c>LYR-CLI0023</c> where it cannot be had,
     /// <c>LYR-CLI0024</c> where it is not the size or the hash the index gives.</exception>
     internal static void Download(HttpClient http, TextWriter? progress, string url, string file, ChannelArchive archive, TimeSpan? stall = null)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         long read = 0;
-        var stalled = false;
         try
         {
             using var response = http.Send(new HttpRequestMessage(HttpMethod.Get, url), HttpCompletionOption.ResponseHeadersRead);
@@ -298,12 +325,8 @@ public sealed class ToolchainFetch
             using var output = File.Create(file);
             var buffer = new byte[81920];
             var drawn = DateTime.MinValue;
-            // a source that sends nothing for the limit has its response closed under the read
-            var limit = stall ?? DefaultStall;
-            using var silence = new Timer(_ => { stalled = true; response.Dispose(); }, null, limit, Timeout.InfiniteTimeSpan);
             while (body.Read(buffer) is var n and > 0)
             {
-                silence.Change(limit, Timeout.InfiniteTimeSpan);
                 read += n;
                 if (read > archive.Size)
                     throw new ToolchainException("LYR-CLI0024", $"{archive.File} is larger than the {archive.Size} bytes its index gives", "nothing was installed");
@@ -316,8 +339,9 @@ public sealed class ToolchainFetch
                 }
             }
         }
-        catch (Exception e) when (e is HttpRequestException or OperationCanceledException or IOException or ObjectDisposedException)
+        catch (Exception e) when (e is HttpRequestException or OperationCanceledException or IOException)
         {
+            var stalled = e is IOException { InnerException: SocketException { SocketErrorCode: SocketError.TimedOut } };
             throw new ToolchainException("LYR-CLI0023", stalled ? $"{url}: nothing came for {(stall ?? DefaultStall).TotalSeconds:0.#} s" : $"{url}: {e.Message}");
         }
         finally
