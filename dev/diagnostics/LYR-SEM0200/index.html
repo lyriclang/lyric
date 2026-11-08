@@ -246,10 +246,11 @@
 <h1>LYR-SEM0200</h1>
 <p class="code-title">a type parameter that is never used</p>
 <p class="meta">warning · <a href="../../spec/03-types/">spec 03-types</a> · lint <code>unused-generic</code>, group <code>unused</code>, warn unless said</p>
-<p>A function's or a type's type parameter is named nowhere in it — not in a parameter, the result, a field or the body.</p>
+<p>A function's type parameter is named nowhere in it — not in a parameter, the result or the body. A type's is not reported: a phantom parameter only the type's name uses is a type's own.</p>
 <h2 id="explanation">Explanation</h2>
 <p>A type parameter nothing names cannot be inferred from a call: every caller must write it, and it changes nothing.</p>
 <p>Take it out, or name it where the declaration needs it. A name that begins with <code>_</code> is not reported.</p>
+<p>A type's parameter is not looked at: <code>struct Id&lt;T&gt; { raw: int }</code> makes <code>Id&lt;User&gt;</code> and <code>Id&lt;Order&gt;</code> two types though nothing in <code>Id</code> names <code>T</code>.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">fn</span> first&lt;<span class="ty">T</span>, <span class="ty">U</span>&gt;(xs: <span class="ty">T</span>[]): <span class="ty">T</span> {
     <span class="kw">return</span> xs[<span class="num">0</span>];

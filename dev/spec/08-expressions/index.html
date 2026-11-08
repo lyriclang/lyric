@@ -153,6 +153,9 @@ once, read it, compute, and write it: <code>xs[next()] += 1</code> calls <code>n
 <li><strong>Its value</strong> is the value stored, at the type of the place: <code>o = v</code> where <code>o</code> holds a <code>?T</code>
 or an interface is worth that <code>?T</code> or that interface. A compound assignment is worth the
 new value; <code>t++</code> the old one, <code>++t</code> the new.</li>
+<li>An assignment written as the <strong>condition</strong> of an <code>if</code>, a <code>while</code> or a <code>do … while</code> is warned
+about (<code>LYR-SEM0202</code>): a <code>==</code> is what is usually meant. A <strong>second pair of parentheses</strong> says
+the assignment is meant — <code>if ((done = check()))</code> — and nothing is warned.</li>
 </ol>
 <h2 id="4-precedence">4. Precedence</h2>
 <ol>

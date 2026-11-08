@@ -788,6 +788,10 @@ passed, stored, wrapped, returned. <em>(Informative: such a place costs one byte
 nothing: a binding that holds a <code>void</code> and a parameter written with it are warned about
 (<code>LYR-SEM0173</code>; the review's M6-5). In generic code there is no warning: the binding is a
 <code>T</code>. <code>==</code> and <code>!=</code> on a <code>void</code> are refused (<code>LYR-SEM0003</code>): there is nothing to compare.</li>
+<li>A <strong>function's</strong> type parameter that nothing in it names — no parameter, the result, the body
+— is warned about (<code>LYR-SEM0200</code>): no call can infer it. A <strong>type's</strong> is not (T18): a type
+may carry a parameter only its name uses, a <strong>phantom</strong> — <code>struct Id&lt;T&gt; { raw: int }</code> makes
+<code>Id&lt;User&gt;</code> and <code>Id&lt;Order&gt;</code> two types.</li>
 </ol>
 <h3 id="92-inference-at-a-call">9.2 Inference at a call</h3>
 <ol>
