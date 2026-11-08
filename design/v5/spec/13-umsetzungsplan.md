@@ -2552,6 +2552,8 @@ Die Zählung zeigt rund 100 Kommentare im Frontend, die noch von Bytecode und de
 
 **S6b, Text:** Was gebaut ist und in keinem Kapitel stand: `std.test` (12 §Testing, drei Fälle — eine fehlgeschlagene Assertion panikt mit `LYR-RT0008` und dem, was sie bekam), `@Bench`, `@Warn` und `@Deny` in der geschlossenen Liste 11 §1 r7, `std.meta` reicht die Namen von `std.core` weiter (09 S10). Die Abweichungen Spec↔Bereich, bei denen das Gebaute der Spec folgt und die Bereichszeile nicht gebaut ist, gehen an S12 (Entscheidung oder Tür).
 
+**S7, gebaut:** P4 messbar: `tools/check_coverage.py` im Spec-Repo (Spec 16 §3 r5, CI-Schritt) — jeder nicht zurückgezogene Code des Anhangs hat einen Fall oder steht mit Grund in der Liste (Kommandozeile, Build, Compiler-/Laufzeit-Fehler, Netz, Windows-Gerätename), jeder Abschnitt von 03–13, 15, 16 wird von einem Fall zitiert. Vorher: 77 Codes ohne Fall. 57 Fälle aus den `wrong`-Beispielen des Katalogs, 5 aus seinen Mehrdatei-Beispielen, 3 von Hand; der Läufer liest `exit:` auch bei einer Ablehnung (PKG0009 endet mit 2). `LYR-PAR0006` zurückgezogen: der Lexer lehnt jedes solche Literal zuerst ab.
+
 ## Nachtrag 2026-11-08 — M15 S6 und S7: was vom Plan abweicht
 
 **Anlass**: Die Halte S6 und S7 wurden mit dem Maintainer aufgenommen. Beim Lesen des Codes zeigten sich Lücken, die der
