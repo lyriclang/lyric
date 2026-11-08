@@ -1379,6 +1379,28 @@ it. An integer writes its word (<code>writeInt</code>, <code>writeUint</code> fo
 C8): their slots can be written. A type's own hash is synthesized (<a href="../../spec/05-interfaces/">05 §14</a>).
 An object hashes by its address where its class is <code>Identity</code> (<a href="../../spec/05-interfaces/">05 §14</a> rule
 8): <code>hashIdentityInto(o, &amp;h)</code> writes it as <code>writeInt</code> does.</p>
+<h2 id="testing">Testing</h2>
+<p><code>std.test</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 B12 X1</a>; M8a, the review's S12a) holds the
+assertions a test fails by; <code>lyric test</code> runs a package's tests and <code>subtest</code> splits one
+(<a href="../../spec/14-cli/">14 §3</a>). An assertion is a call like any other: outside a test it panics all the
+same.</p>
+<ol>
+<li><strong>An assertion that does not hold panics</strong> (<code>LYR-RT0008</code>) with what it got against what was
+expected, each as <code>Debug</code> writes it, the actual value first, and the expression the call wrote
+for it where that is not the value itself: <code>assertEq(xs.length(), 3)</code> of two elements says
+<code>xs.length() = 2, expected 3</code>. A <code>message</code> the call gives follows; two values too long to
+compare by eye get their first difference below — a text's first line that differs, else the
+first character.</li>
+<li><strong>The assertions</strong>: <code>assertEq(actual, expected)</code> and <code>assertNotEq</code> over a type that is
+<code>Equatable</code> and <code>Debug</code>; <code>assertTrue(c)</code> and <code>assertFalse(c)</code>; <code>assertNull(v)</code>, and
+<code>assertNotNull(v)</code>, which gives the value back; <code>assertClose(actual, expected, tolerance)</code>
+for floating point, NaN on either side failing; <code>assertLess</code> and <code>assertGreater</code> over an
+<code>Ordered</code> type; <code>assertContains(c, x)</code>, what <code>x in c</code> asks; <code>assertEmpty(c)</code>; and
+<code>fail(message): never</code>.</li>
+<li><strong><code>assertThrows(f)</code></strong> fails unless <code>f</code> throws, and gives what it threw, of the type <code>f</code> says
+it throws. <strong><code>assertPanics(f)</code></strong> runs <code>f</code> in a task of its own and fails unless it panics; it
+gives the <code>PanicInfo</code> the panic left — its <code>code</code>, <code>message</code> and <code>trace</code>.</li>
+</ol>
 <h2 id="benchmarks">Benchmarks</h2>
 <p>A function marked <strong><code>@Bench</code></strong> is a benchmark (design 10 X4; M8c S12b): <code>fn name(&amp;b: Bench)</code>, in
 a module under <code>src/</code> or <code>tests/</code>, which <code>lyric bench</code> runs (<a href="../../spec/14-cli/">14 §4</a>). <code>Bench</code> is
@@ -1617,6 +1639,7 @@ run inside <code>comptime</code> only; a call the program would make at run time
 <li class="level-2"><a href="#compression">Compression</a></li>
 <li class="level-2"><a href="#regular-expressions">Regular expressions</a></li>
 <li class="level-2"><a href="#collections">Collections</a></li>
+<li class="level-2"><a href="#testing">Testing</a></li>
 <li class="level-2"><a href="#benchmarks">Benchmarks</a></li>
 <li class="level-2"><a href="#codecs">Codecs</a></li>
 <li class="level-2"><a href="#json">JSON</a></li>

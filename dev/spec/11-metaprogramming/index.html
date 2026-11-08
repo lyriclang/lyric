@@ -92,12 +92,13 @@ panic while computing it is <code>LYR-CT0001</code>.</li>
 <li>An attribute makes nothing reachable (01 B13): a function only an attribute marks is not
 built. A test is reached from the program <code>lyric test</code> writes.</li>
 <li><strong>The compiler instructions</strong> — in the prelude — are the closed list of <code>std.core</code> the compiler
-reads (09 A11, T2): <code>@Test</code> (rule 2), <code>@callerExpr</code> (rule 3), <code>@callerLine</code> and <code>@callerFile</code>
-(rule 8), <code>@Deprecated</code> (rule 9), <code>@AlwaysInline</code>, <code>@NoInline</code> and <code>@Cold</code> (rule 10),
-<code>@MustUse</code> (rule 11), <code>@NonExhaustive</code> (rule 12), <code>@Allow</code> (rule 13), <code>@Shared</code> (rule 14),
-<code>@SeesConformer</code> (rule 15), <code>@Layout</code> (rule 16), <code>@Export</code> (rule 17) and <code>@When</code> (§3). What
-one says holds for every instance, so beside <code>@Test</code> they sit on a generic declaration too,
-where data may not (<code>LYR-SEM0067</code>).</li>
+reads (09 A11, T2): <code>@Test</code> (rule 2) and <code>@Bench</code> (<a href="../../spec/12-stdlib/#benchmarks">12 §Benchmarks</a>),
+<code>@callerExpr</code> (rule 3), <code>@callerLine</code> and <code>@callerFile</code> (rule 8), <code>@Deprecated</code> (rule 9),
+<code>@AlwaysInline</code>, <code>@NoInline</code> and <code>@Cold</code> (rule 10), <code>@MustUse</code> (rule 11), <code>@NonExhaustive</code> (rule
+12), <code>@Allow</code>, <code>@Warn</code> and <code>@Deny</code> (rule 13), <code>@Shared</code> (rule 14), <code>@SeesConformer</code> (rule 15),
+<code>@Layout</code> (rule 16), <code>@Export</code> (rule 17) and <code>@When</code> (§3). What one says holds for every
+instance, so beside <code>@Test</code> they sit on a generic declaration too, where data may not
+(<code>LYR-SEM0067</code>).</li>
 <li><strong><code>@callerLine</code></strong> on an <code>int</code> parameter and <strong><code>@callerFile</code></strong> on a <code>string</code> one: where a call
 leaves the parameter out, it gets the line the call begins on, or the file the call stands in —
 the package's name, then the path within the package, with <code>/</code> on every system:
@@ -224,7 +225,9 @@ module per target is a file per target, chosen between with <code>comptime if</c
 <p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/09-metaprogrammierung.md">09 A5, A7</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 B13 M1</a>)</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/11-metaprogramming/</code>.</p>
 <ol>
-<li><strong><code>std.meta</code></strong> answers questions about a type as constants (R1): <code>fields&lt;T&gt;()</code>, a
+<li><strong><code>std.meta</code></strong> answers questions about a type as constants (R1) — names <code>std.core</code> declares
+and <code>std.meta</code> passes on (09 S10), so <code>import std.meta { fields }</code> and <code>std.core</code>'s name are
+one: <code>fields&lt;T&gt;()</code>, a
 <code>FieldInfo { name, type, index, visibility, isVar, hasDefault }</code> per field of a struct or a
 class, in declaration order, <code>index</code> its place in the answer, <code>hasDefault</code> whether the
 declaration writes an initializer — the type's own default counts for nothing; a payload's
