@@ -1,5 +1,6 @@
 {
   "channel": "stable",
+  "sequence": 1000,
   "versions": [
     {
       "version": "8.0.0",

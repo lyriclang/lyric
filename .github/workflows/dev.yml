@@ -2,22 +2,23 @@
 # actions/setup-dotnet — see the comment in ci.yml for what that action cost on 2026-08-17.
 name: Dev
 
-# The dev channel (design/v5/spec/11 T5): every push to main is built and replaces the rolling
-# 'dev' prerelease. No promise of any kind — this is where things are tried before they move into
-# a stable release. There is no nightly channel.
+# The dev channel (design/v5/spec/11 T5): every push to main is built, signed and replaces what the
+# rolling 'dev' prerelease holds. No promise of any kind — this is where things are tried before
+# they move into a stable release. There is no nightly channel.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
-# One publish at a time; a newer push supersedes an older run that has not published yet.
-# One run per ref: a dispatch that tries the packaging on a branch does not cancel main's publish.
+# One publish at a time, and none cut short: a newer push waits for the run on its way and replaces
+# one still waiting. One run per ref: a dispatch that tries the packaging on a branch does not hold
+# up main's publish.
 concurrency:
   group: dev-channel-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   LYRIC_VERIFY_IR: "1"
@@ -33,7 +34,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up zig (the Lyric 5 runtime tests build C)
         uses: ./.github/actions/setup-zig
@@ -53,141 +54,120 @@ jobs:
       - name: Test
         run: dotnet test --configuration Release --no-build
 
-  package:
-    name: Package (${{ matrix.rid }})
-    needs: verify
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { rid: win-x64,     os: windows-latest,   triple: x86_64-windows-gnu }
-          - { rid: linux-x64,   os: ubuntu-latest,    triple: x86_64-linux-gnu }
-          - { rid: linux-arm64, os: ubuntu-24.04-arm, triple: aarch64-linux-gnu }
-          - { rid: osx-arm64,   os: macos-latest,     triple: aarch64-macos }
-          # Built across the architecture on the ARM runner, run under Rosetta.
-          - { rid: osx-x64,     os: macos-latest,     triple: x86_64-macos }
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      # The runner's own .NET 10 where it has one; the download only where it has none —
-      # on 2026-10-25 the install script's links answered 409 for hours.
-      - name: The preinstalled .NET, if it is 10
-        id: dotnet
-        shell: bash
-        run: dotnet --list-sdks 2>/dev/null | grep -q '^10\.' && echo "have=1" >> "$GITHUB_OUTPUT" || true
-
-      - name: Set up .NET from global.json
-        if: steps.dotnet.outputs.have != '1'
-        uses: actions/setup-dotnet@v5
-        with:
-          global-json-file: global.json
-
-      # The archive is tried as a user meets it: lyric5 builds its runtime with zig.
-      - name: Set up zig
-        uses: ./.github/actions/setup-zig
-
-      # One version string for every binary in the archive: 5.0.0-dev.<date>+<sha>. MSBuild reads
-      # environment variables as properties, so the inner publishes pick it up as well.
-      - name: Stamp the dev version
-        shell: bash
-        run: |
-          stamp="5.0.0-dev.$(date -u +%Y%m%d)+${GITHUB_SHA::7}"
-          echo "DEV_VERSION=$stamp" >> "$GITHUB_ENV"
-          echo "InformationalVersion=$stamp" >> "$GITHUB_ENV"
-          echo "IncludeSourceRevisionInInformationalVersion=false" >> "$GITHUB_ENV"
-
-      - name: Publish lyric5 (NativeAOT)
-        run: dotnet publish src/Lyric5/Lyric5.csproj --configuration Release -r ${{ matrix.rid }} -o out
-
-      - name: The runtime prebuilt for the target, and the manifest
-        shell: bash
-        run: dotnet run --project tools/Package --configuration Release -- out --version "$DEV_VERSION" --triple ${{ matrix.triple }}
-
-      - name: Rosetta for the x86-64 binary
-        if: matrix.rid == 'osx-x64'
-        shell: bash
-        run: arch -x86_64 /usr/bin/true 2>/dev/null || sudo softwareupdate --install-rosetta --agree-to-license
-
-      - name: The self-report names the dev version
-        shell: bash
-        run: |
-          lyric5=out/lyric5; [ "${{ runner.os }}" = "Windows" ] && lyric5=out/lyric5.exe
-          "$lyric5" --version
-          "$lyric5" --version | head -1 | grep -qx "lyric ${DEV_VERSION}"
-
-      - name: Archive
-        shell: bash
-        run: |
-          name="lyric-${DEV_VERSION%%+*}-${GITHUB_SHA::7}-${{ matrix.rid }}"
-          mkdir -p dist
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            7z a "dist/${name}.zip" "./out/*"
-          else
-            tar -czf "dist/${name}.tar.gz" -C out .
-          fi
-
-      # Unpacked away from the checkout, where no runtime/ above the binary stands in for the
-      # archive's own: a program is built and run with what the archive holds, and the 4.x
-      # standard library, which lyric5 never reads, is not in it.
-      - name: The archive builds and runs a program
-        shell: bash
-        run: |
-          trial="$RUNNER_TEMP/trial"
-          rm -rf "$trial" && mkdir -p "$trial/toolchain" "$trial/hello/src"
-          archive=$(ls dist/*)
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            7z x -o"$trial/toolchain" "$archive" > /dev/null
-            lyric5="$trial/toolchain/lyric5.exe"
-          else
-            tar -xzf "$archive" -C "$trial/toolchain"
-            lyric5="$trial/toolchain/lyric5"
-          fi
-          dotnet run --project tools/Package --configuration Release --no-build -- verify "$trial/toolchain"
-          test -d "$trial/toolchain/runtime/include/lyr" || { echo "the archive holds no runtime"; exit 1; }
-          test -f "$trial/toolchain/runtime/lib/${{ matrix.triple }}/debug/liblyr.a" || { echo "the archive holds no prebuilt runtime"; exit 1; }
-          test -f "$trial/toolchain/lldb/lyric.lldbinit" || { echo "the archive holds no lyric.lldbinit"; exit 1; }
-          test -f "$trial/toolchain/LICENSE" || { echo "the archive holds no LICENSE"; exit 1; }
-          test -f "$trial/toolchain/runtime/include/lyric.h" || { echo "the archive holds no lyric.h"; exit 1; }
-          test -d "$trial/toolchain/stdlib5" || { echo "the archive holds no stdlib5"; exit 1; }
-          printf '[package]\nname = "hello"\nversion = "0.1.0"\n' > "$trial/hello/lyric.toml"
-          printf 'import std.io { println };\n\nfn main(): void {\n    println("hello from the dev archive");\n}\n' > "$trial/hello/src/main.lyr"
-          # A cold cache: the build takes the archive's runtime and compiles none of its own.
-          export LYRIC_CACHE="$trial/cache"
-          out=$(cd "$trial/hello" && "$lyric5" run | tr -d '\r')
-          echo "$out"
-          [ "$out" = "hello from the dev archive" ]
-          if [ -d "$trial/cache/runtime" ]; then echo "the build compiled the runtime beside the prebuilt one"; exit 1; fi
-
-      - name: Upload archive
-        uses: actions/upload-artifact@v7
-        with:
-          name: dist-${{ matrix.rid }}
-          path: dist/*
-          retention-days: 7
-
-  # From main alone: a run dispatched on a branch tries the archives and leaves the channel as it is.
-  publish:
-    name: Publish dev
-    needs: package
-    if: github.ref == 'refs/heads/main'
+  # One stamp for the whole run: the legs of the matrix cannot fall on two sides of midnight.
+  stamp:
+    name: Stamp the dev version
     runs-on: ubuntu-latest
-
+    outputs:
+      version: ${{ steps.stamp.outputs.version }}
+      stem: ${{ steps.stamp.outputs.stem }}
+      date: ${{ steps.stamp.outputs.date }}
+      sequence: ${{ steps.stamp.outputs.sequence }}
+      trial: ${{ steps.stamp.outputs.trial }}
+      minisign_version: ${{ steps.stamp.outputs.minisign_version }}
+      minisign_sha256: ${{ steps.stamp.outputs.minisign_sha256 }}
+      public_key: ${{ steps.stamp.outputs.public_key }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Download archives
-        uses: actions/download-artifact@v8
+      - name: Version, number and pins
+        id: stamp
+        run: |
+          day=$(date -u +%Y%m%d)
+          {
+            echo "version=5.0.0-dev.${day}+${GITHUB_SHA::7}"
+            echo "stem=lyric-5.0.0-dev.${day}-${GITHUB_SHA::7}"
+            echo "date=$(date -u +%Y-%m-%d)"
+            echo "sequence=$(date -u +%s)"
+            [ "$GITHUB_REF" = "refs/heads/main" ] && echo "trial=false" || echo "trial=true"
+            echo "minisign_version=$(sed -n 's/^version = //p' tooling/minisign-version)"
+            echo "minisign_sha256=$(sed -n 's/^linux = //p' tooling/minisign-version)"
+            echo "public_key=$(sed -n 2p tooling/release-keys/dev.pub)"
+          } >> "$GITHUB_OUTPUT"
+
+  package:
+    name: Package
+    needs: [verify, stamp]
+    uses: ./.github/workflows/package.yml
+    with:
+      version: ${{ needs.stamp.outputs.version }}
+      stem: ${{ needs.stamp.outputs.stem }}
+
+  index:
+    name: Index
+    needs: [stamp, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: The archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: dist-*
           merge-multiple: true
           path: dist
 
       - name: Checksums
-        run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+        run: cd dist && sha256sum * > "$RUNNER_TEMP/SHA256SUMS" && cat "$RUNNER_TEMP/SHA256SUMS"
+
+      - name: The channel's index
+        env:
+          VERSION: ${{ needs.stamp.outputs.version }}
+          DATE: ${{ needs.stamp.outputs.date }}
+          SEQUENCE: ${{ needs.stamp.outputs.sequence }}
+        run: |
+          mkdir index
+          cp "$RUNNER_TEMP/SHA256SUMS" index/
+          dotnet run --project tools/Package --configuration Release -- index --channel dev --version "$VERSION" --date "$DATE" --sequence "$SEQUENCE" --archives dist --out index/dev.json
+          cat index/dev.json
+
+      - name: Upload the index
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: index
+          path: index/*
+          retention-days: 7
+
+  sign:
+    name: Sign
+    needs: [stamp, index]
+    uses: ./.github/workflows/sign.yml
+    with:
+      environment: ${{ needs.stamp.outputs.trial != 'true' && 'sign-dev' || '' }}
+      public_key: ${{ needs.stamp.outputs.trial != 'true' && needs.stamp.outputs.public_key || '' }}
+      trial: ${{ needs.stamp.outputs.trial == 'true' }}
+      minisign_version: ${{ needs.stamp.outputs.minisign_version }}
+      minisign_sha256: ${{ needs.stamp.outputs.minisign_sha256 }}
+
+  install-trial:
+    name: Install trial
+    needs: [stamp, sign]
+    uses: ./.github/workflows/install-trial.yml
+    with:
+      channel: dev
+      version: ${{ needs.stamp.outputs.version }}
+      public_key: ${{ needs.sign.outputs.public_key }}
+
+  # From main alone: a run dispatched on a branch tries everything and leaves the channel as it is.
+  publish:
+    name: Publish dev
+    needs: [stamp, install-trial]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Download what was signed
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          path: dist
+          merge-multiple: true
 
       # One moving tag, one prerelease: 'dev' always points at what was built.
       - name: Move the dev tag
@@ -195,13 +175,24 @@ jobs:
           git tag -f dev "$GITHUB_SHA"
           git push -f origin dev
 
-      - name: Replace the dev prerelease
+      # The new archives go up beside the old, the index last and the old archives after it, so that
+      # at no moment does the index on GitHub name an archive that is not there.
+      - name: Update the dev prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete dev --repo "$GITHUB_REPOSITORY" --yes || true
-          gh release create dev dist/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "dev ($(date -u +%Y-%m-%d), ${GITHUB_SHA::7})" \
-            --notes "Lyric 5 in development, built from main at ${GITHUB_SHA::7}. No promise of any kind. The archive holds lyric5, the Lyric 5 command line as it grows, its standard library (stdlib5/) and the runtime's C source (runtime/), prebuilt for the archive's target (a build with another zig, or for another target, builds it from the source on first use). Each archive lists its files in toolchain.json. Building a program needs zig on the PATH." \
-            --prerelease
+          set -euo pipefail
+          title="dev ($(date -u +%Y-%m-%d), ${GITHUB_SHA::7})"
+          notes="Lyric 5 in development, built from main at ${GITHUB_SHA::7}. No promise of any kind. The archive holds lyric5, the Lyric 5 command line as it grows, its standard library (stdlib5/) and the runtime's C source (runtime/), prebuilt for the archive's target (a build with another zig, or for another target, builds it from the source on first use). Each archive lists its files in toolchain.json, each file has its minisign signature, and dev.json is the channel's signed index. Building a program needs zig on the PATH."
+          if ! gh release view dev --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create dev --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes" --prerelease --verify-tag
+          fi
+          cd dist
+          rest=$(ls | grep -vxF -e dev.json -e dev.json.minisig)
+          # shellcheck disable=SC2086
+          gh release upload dev $rest --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload dev dev.json dev.json.minisig --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit dev --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes" --prerelease
+          gh release view dev --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | while read -r asset; do
+            [ -e "$asset" ] || gh release delete-asset dev "$asset" --repo "$GITHUB_REPOSITORY" --yes
+          done

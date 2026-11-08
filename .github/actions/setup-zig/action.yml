@@ -17,7 +17,7 @@ runs:
       run: echo "version=$(tr -d '[:space:]' < tooling/zig-version)" >> "$GITHUB_OUTPUT"
 
     - name: Install zig
-      uses: mlugg/setup-zig@v2
+      uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
       with:
         version: ${{ steps.pin.outputs.version }}
         use-cache: ${{ inputs.cache }}

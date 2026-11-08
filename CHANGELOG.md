@@ -327,6 +327,14 @@ promise. This entry fills with the milestones.
 - **A Windows object names its own file**: the toolchain's C units for Windows were each a different file every
   build (CodeView named a temporary file), so a `--lib` archive and the prebuilt runtime for Windows were never the
   same twice.
+- **Toolchains are signed (M15):** every dev build and stable release carries minisign signatures and
+  a signed index, and a toolchain carries the keys, one per channel and a reserve. The keys are in
+  `tooling/release-keys` and in the book, with what a signature does and does not say.
+- **`lyric toolchain` goes on to the next source** where one serves something refused, with a
+  warning, for an index and for an archive alike; `LYR-CLI0024` now means that no source served what
+  holds. **A channel's index carries a number** (`sequence`), and a machine refuses one lower than it
+  has seen. A download that stalls for 60 seconds counts as a source that is gone. The mirror is
+  `dl.lyriclang.de`.
 - **A C struct's pointer field may be null** (spec chapter 13 §3 rules 1 and 4): a `@Layout(C)` struct takes
   `?Ptr<T>` and `?CStr` fields, one word as C's pointer — a `?Ptr` is now its address everywhere, 0 for none.
   `lyric bindgen` writes a struct's pointer fields optional and every field `var`, so `pos.x += 1` writes a bound

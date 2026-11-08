@@ -45,7 +45,7 @@ public static partial class Program
     }
 
     private static ToolchainFetch Fetcher() =>
-        ToolchainFetch.ForUser(DisplayVersion(), Console.IsErrorRedirected ? null : Console.Error);
+        ToolchainFetch.ForUser(DisplayVersion(), Console.IsErrorRedirected ? null : Console.Error, warning => Console.Error.WriteLine($"warning: {warning}"));
 
     private static int ToolchainInstall(ToolchainHome home, string asked)
     {
