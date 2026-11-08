@@ -109,7 +109,7 @@ not drawn. The exit code is what it would be without the limit.</li>
 <h2 id="3-codes-and-the-catalogue">3. Codes and the catalogue</h2>
 <p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 G9, G10</a>)</p>
 <p><strong>Conformance.</strong> Every rejecting case names its codes; the catalogue against the compiler in the toolchain's
-own tests (<code>tests/Lyric5.Tests</code>, <code>CatalogTests</code>).</p>
+own tests (<code>tests/Lyric5.Tests</code>, <code>CatalogTests</code>); rule 5 by <code>tools/check_coverage.py</code>.</p>
 <ol>
 <li>A code is <code>LYR-</code>, an area — <code>LEX</code>, <code>PAR</code>, <code>RES</code>, <code>SEM</code>, <code>MAC</code>, <code>MIG</code>, <code>CT</code>, <code>CG</code>, <code>PKG</code>, <code>BLD</code>, <code>LNK</code>, <code>CLI</code>,
 <code>ICE</code>, <code>RT</code>, and <code>IR</code>, retired —, and four digits. <code>LNK</code> holds the link's findings
@@ -122,6 +122,13 @@ longer reported is <strong>retired</strong> there: its number is not given to an
 program that reports it and the program put right. A code is read as <code>LYR-SEM0001</code>, <code>SEM0001</code> or
 <code>sem0001</code>; one the catalogue does not hold is a usage error (exit 2, <a href="../../spec/14-cli/">14 §1.1</a>).</li>
 <li>A message begins in lowercase and ends without a period; it names the program's own names in quotes.</li>
+<li><strong>The suite holds every code a program can meet, and every section of the rules.</strong> Each code of
+Appendix A that is not retired is named by a case — under <code>error:</code>, <code>warning:</code> or <code>panic:</code> — or
+stands in the list of codes no program of the suite can raise, each with its reason: the command
+line's, the build driver's, a bug of the compiler or the runtime, a fetch over the network, a
+file a checkout cannot hold. Each section of chapters 03 to 13, 15 and 16 is cited by a case's
+comment (<code>08 §5</code>, <code>12 §Time</code>) or listed with its reason. <code>tools/check_coverage.py</code> holds both
+and holds the lists short: a code a case names is taken off.</li>
 </ol>
 <h2 id="4-the-json-form">4. The JSON form</h2>
 <p>(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 G8, C6</a>)</p>

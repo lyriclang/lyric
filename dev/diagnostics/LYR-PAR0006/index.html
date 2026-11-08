@@ -86,26 +86,15 @@
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
 <h1>LYR-PAR0006</h1>
 <p class="code-title">a numeric literal with an unknown suffix</p>
-<p class="meta">error · <a href="../../spec/01-lexical/">spec 01-lexical</a></p>
+<p class="meta">error, retired · <a href="../../spec/01-lexical/">spec 01-lexical</a></p>
+<div class="retired"><p><strong>Retired.</strong></p>
+<p>the lexer refuses every literal with letters that are no suffix first (LYR-LEX0003, LEX0004, LEX0006), and the decoder speaks only where the lexer said nothing</p>
+</div>
 <p>A numeric literal ends in letters that are no suffix. The lexer refuses such a literal first (LYR-LEX0003, LEX0004, LEX0006), so this code comes only together with that one.</p>
-<h2 id="explanation">Explanation</h2>
-<p>The suffixes are <code>i8</code> to <code>i64</code>, <code>u8</code> to <code>u64</code>, <code>f32</code> and <code>f64</code>. What else stands behind the digits is no part of the literal.</p>
-<p>Write one of the suffixes, or none.</p>
-<h2 id="example">Example</h2>
-<pre><code>$ cat src/main.lyr
-fn main(): void {
-    let x = 10i7;
-    let _ = x;
-}
-$ lyric build
-error[LYR-LEX0003]: invalid suffix 'i7' on decimal literal
-error[LYR-PAR0006]: invalid integer suffix: 'i7'</code></pre>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
 <ul>
-<li class="level-2"><a href="#explanation">Explanation</a></li>
-<li class="level-2"><a href="#example">Example</a></li>
 </ul>
 </aside>
 </div>
