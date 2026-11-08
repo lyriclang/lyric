@@ -446,6 +446,9 @@ promise. This entry fills with the milestones.
   `<T :: [int]>`, a struct as a bound, and `<T :: [Display, Display]>` were accepted.
 - **A coercion reaches through an optional**: a `?Circle` stands where a `?Shape` is expected,
   a `?int8` where a `?int` is; `null` stays `null`. Both were refused (`LYR-SEM0001`).
+- **A selective import written twice is refused** (`LYR-RES0001`), as a qualified or an aliased
+  one already was: `import std.io { println };` twice, or `{ println, println }`, was taken as an
+  overload of itself.
 
 ---
 

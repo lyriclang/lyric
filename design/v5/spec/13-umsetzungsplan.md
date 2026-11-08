@@ -2546,6 +2546,8 @@ Die Zählung zeigt rund 100 Kommentare im Frontend, die noch von Bytecode und de
 
 **S5d, gebaut:** Koerzion durch das Optional (T3, Spec 03 §3.1 r3): `?Circle → ?Shape`, `?int8 → ?int`; `null` bleibt `null`, ein Wert wird für sich umgewandelt und neu verpackt. Das Verpacken geht vor — `?int` nach `??int` ist ein vorhandenes `??int`. Nicht zu einem C-Funktionszeiger und nicht von einem Inline-Array: beide Koerzionen markieren oder prüfen den Ausdruck selbst.
 
+**S5e, gebaut:** Identischer Doppelimport ist ein Fehler (07 I6, Spec 04 §4 r1a): ein selektiver Name, der dieselbe Funktion ein zweites Mal bindet, galt als Überladung seiner selbst; jetzt `LYR-RES0001` wie schon beim qualifizierten und beim Alias-Import. Die Formen eines Moduls stehen weiter nebeneinander.
+
 ## Nachtrag 2026-11-08 — M15 S6 und S7: was vom Plan abweicht
 
 **Anlass**: Die Halte S6 und S7 wurden mit dem Maintainer aufgenommen. Beim Lesen des Codes zeigten sich Lücken, die der

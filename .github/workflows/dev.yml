@@ -51,7 +51,11 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
+      # the whole solution starts a testhost per project; on a slow Windows runner one of them
+      # missed vstest's 90 s to connect, three times on main
       - name: Test
+        env:
+          VSTEST_CONNECTION_TIMEOUT: "300"
         run: dotnet test --configuration Release --no-build
 
   # One stamp for the whole run: the legs of the matrix cannot fall on two sides of midnight.
