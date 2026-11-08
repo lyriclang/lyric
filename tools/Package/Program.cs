@@ -11,6 +11,14 @@ using Lyric5.Toolchain;
 // would stand for nobody's build. Then writes toolchain.json over everything in the directory.
 //
 // verify checks an unpacked archive against its toolchain.json and names what differs; exit 1 on a finding.
+//
+// package index --channel <channel> --version <version> --date <yyyy-mm-dd> --sequence <n>
+//               --archives <directory> --out <file> [--previous <file>] [--keep <n>]
+//
+// index writes a channel's index: the archives in the directory as the newest version, then what the
+// previous index offers, its signature checked first, <n> versions at most. It signs nothing.
+
+if (args is ["index", .. var indexing]) return WriteIndex(indexing);
 
 if (args is ["verify", var unpacked])
 {
@@ -76,3 +84,45 @@ finally
 ToolchainManifest.Write(root, version, target.Triple);
 Console.WriteLine($"{ToolchainManifest.FileName}: {ToolchainManifest.Read(root).Files.Count} files");
 return 0;
+
+static int WriteIndex(string[] options)
+{
+    const string Usage = "usage: package index --channel <channel> --version <version> --date <yyyy-mm-dd> --sequence <n> --archives <directory> --out <file> [--previous <file>] [--keep <n>]";
+    var named = new Dictionary<string, string>(StringComparer.Ordinal);
+    for (var i = 0; i < options.Length; i += 2)
+    {
+        if (i + 1 >= options.Length || options[i] is not ("--channel" or "--version" or "--date" or "--sequence" or "--archives" or "--out" or "--previous" or "--keep"))
+        {
+            Console.Error.WriteLine(Usage);
+            return 2;
+        }
+        named[options[i]] = options[i + 1];
+    }
+    if (new[] { "--channel", "--version", "--date", "--sequence", "--archives", "--out" }.Any(o => !named.ContainsKey(o)) || !long.TryParse(named["--sequence"], out var sequence))
+    {
+        Console.Error.WriteLine(Usage);
+        return 2;
+    }
+    var keep = 1;
+    if (named.TryGetValue("--keep", out var kept) && (!int.TryParse(kept, out keep) || keep < 1))
+    {
+        Console.Error.WriteLine(Usage);
+        return 2;
+    }
+    try
+    {
+        var channel = named["--channel"];
+        ChannelIndex? previous = null;
+        if (named.TryGetValue("--previous", out var before))
+            previous = ChannelIndex.Read(File.ReadAllBytes(before), File.ReadAllText(before + ".minisig"), ToolchainFetch.KeysOf(channel), channel);
+        var index = ChannelIndex.Next(previous, channel, ChannelIndex.ReleaseFrom(named["--archives"], named["--version"], named["--date"]), sequence, keep);
+        File.WriteAllBytes(named["--out"], index.ToJson());
+        Console.WriteLine($"{named["--out"]}: number {sequence}, {index.Releases.Count} version(s), the newest {index.Newest!.Version} with {index.Newest.Archives.Count} archives");
+        return 0;
+    }
+    catch (Exception e) when (e is InvalidDataException or SignatureException or IOException)
+    {
+        Console.Error.WriteLine($"package: {e.Message}");
+        return 1;
+    }
+}

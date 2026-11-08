@@ -45,9 +45,9 @@ internal static class ToolchainFixture
 
     /// <summary>
     /// The fixtures' mirror over HTTP on the loopback: a request's path, its query left aside, is a
-    /// file under <c>mirror/</c> — or the directory given —, unless <see cref="Served"/> gives other
-    /// bytes for it or <see cref="Missing"/> names it. Each path asked for, with its query, is kept
-    /// in <see cref="Asked"/>.
+    /// file under <c>mirror/</c> — or the directory given —, unless <see cref="Once"/> or
+    /// <see cref="Served"/> gives other bytes for it or <see cref="Missing"/> names it. Each path
+    /// asked for, with its query, is kept in <see cref="Asked"/>.
     /// </summary>
     public sealed class MirrorServer : IDisposable
     {
@@ -57,6 +57,10 @@ internal static class ToolchainFixture
         private readonly string _root;
 
         public Dictionary<string, byte[]> Served { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>Bytes for a path's next request alone.</summary>
+        public Dictionary<string, byte[]> Once { get; } = new(StringComparer.Ordinal);
+
         public HashSet<string> Missing { get; } = new(StringComparer.Ordinal);
         public List<string> Asked { get; } = [];
         public int Port { get; }
@@ -112,6 +116,7 @@ internal static class ToolchainFixture
             var path = asked.Split('?')[0];
             var file = Path.Combine(_root, path.TrimStart('/'));
             var body = Missing.Contains(path) ? null
+                : Once.Remove(path, out var once) ? once
                 : Served.TryGetValue(path, out var given) ? given
                 : File.Exists(file) ? File.ReadAllBytes(file) : null;
             var status = body is null ? "404 Not Found" : "200 OK";

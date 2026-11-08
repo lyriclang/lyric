@@ -523,7 +523,7 @@ error[LYR-CLI0022]: git cannot read 'v9.9.9': fatal: not a valid object name v9.
 title = "a toolchain cannot be fetched"
 severity = "error"
 area = "14-cli"
-summary = "`lyric toolchain` reaches neither the mirror nor GitHub, the channel has no such version or no archive for this machine, or there is no key to check a signature with. The exit code is 2."
+summary = "`lyric toolchain` reaches neither the mirror nor GitHub, or the channel has no such version or no archive for this machine. The exit code is 2."
 explanation = '''
 `lyric toolchain install`, `update` and `list --available` read a channel's index — `dev.json` or `stable.json`, signed — from the mirror, and from GitHub where the mirror cannot be reached. `LYRIC_MIRROR` names another mirror in place of both, and `LYRIC_MIRROR_KEY` the key its signatures are made with. A version is one the index lists, with its build part (`+…`) or without; `dev` and `stable` name the newest of each channel.
 
@@ -539,11 +539,13 @@ error[LYR-CLI0023]: the channel 'stable' has no version 5.9.0
 title = "a toolchain fetched is not what its index says"
 severity = "error"
 area = "14-cli"
-summary = "A channel's index does not carry a signature the toolchain's key made, or an archive's size, SHA-256 or `toolchain.json` differs from what the index and the archive itself list. Nothing is installed; the exit code is 2."
+summary = "No source serves a channel's index with a signature one of the toolchain's keys made and no older than this machine has seen, or an archive at the size and SHA-256 its index gives, or the archive's `toolchain.json` differs from what it holds. Nothing is installed; the exit code is 2."
 explanation = '''
-An install trusts the signature, not the server: the index is signed with the project's key, and it gives each archive's size and SHA-256; the archive lists every file it holds in `toolchain.json`. A difference anywhere stops the install before the toolchain is in place, and the mirror is not routed around — a mirror that serves a forged index is not one to fall back from quietly.
+An install trusts the signature, not the server: the index is signed with the channel's key, and it gives each archive's size and SHA-256; the archive lists every file it holds in `toolchain.json`. What one source serves wrongly is said in a warning and the next source asked, because only a signature and a hash make anything acceptable. This error means none served what holds. A difference anywhere stops the install before the toolchain is in place.
 
-Try again later or from GitHub (`LYRIC_MIRROR` unset); if it persists, the mirror is broken or tampered with.
+An index can also be refused for being older than one this machine has seen from the same signer: a mirror behind the channel, or one serving an old index on purpose.
+
+Try again later; if it persists, read what the message says of each source. With `LYRIC_MIRROR` set there is only that source to ask.
 '''
 example = '''
 $ lyric5 toolchain install dev

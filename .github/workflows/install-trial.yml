@@ -1,0 +1,92 @@
+name: Install trial
+
+# What was signed, installed the way a user installs it: on each system, the archive's own lyric5
+# fetches the channel from a mirror served on the machine and checks it against the key. Nothing is
+# published that does not install.
+on:
+  workflow_call:
+    inputs:
+      channel:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      public_key:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: Install (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, os: ubuntu-latest }
+          - { rid: win-x64,   os: windows-latest }
+          - { rid: osx-arm64, os: macos-latest }
+
+    steps:
+      - name: The archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: files
+
+      - name: The index and the sums
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: index
+          path: files
+
+      - name: The signatures
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: signatures
+          path: files
+
+      - name: Install from a mirror on this machine
+        shell: bash
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          VERSION: ${{ inputs.version }}
+          LYRIC_MIRROR: http://127.0.0.1:8765
+          LYRIC_MIRROR_KEY: ${{ inputs.public_key }}
+          RID: ${{ matrix.rid }}
+        run: |
+          set -euo pipefail
+          site="$RUNNER_TEMP/site"
+          mkdir -p "$site/$CHANNEL"
+          cp files/lyric-*.tar.gz files/lyric-*.zip "$site/$CHANNEL/" 2>/dev/null || true
+          cp "files/$CHANNEL.json" "files/$CHANNEL.json.minisig" "$site/"
+
+          first="$RUNNER_TEMP/first"
+          mkdir -p "$first"
+          if [ "$RID" = "win-x64" ]; then
+            7z x -o"$first" files/*-win-x64.zip > /dev/null
+            bin=lyric5.exe
+          else
+            tar -xzf "files/"*"-$RID.tar.gz" -C "$first"
+            bin=lyric5
+          fi
+
+          python=$(command -v python3 || command -v python)
+          (cd "$site" && "$python" -m http.server 8765 --bind 127.0.0.1 > "$RUNNER_TEMP/server.log" 2>&1) &
+          for _ in $(seq 1 30); do
+            curl -fsS -o /dev/null "$LYRIC_MIRROR/$CHANNEL.json" && break
+            sleep 1
+          done
+
+          export LYRIC_HOME="$RUNNER_TEMP/home"
+          "$first/$bin" toolchain install "$CHANNEL"
+          "$first/$bin" toolchain list
+          out=$("$LYRIC_HOME/bin/$bin" --version | head -1 | tr -d '\r')
+          echo "$out"
+          [ "$out" = "lyric $VERSION" ]
+          ls "$LYRIC_HOME/seen"

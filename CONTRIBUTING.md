@@ -203,13 +203,18 @@ release note: what the version delivers, and what it cannot do yet.
 Two channels (design/v5/spec/11 T5):
 
 - **stable** — pushing an annotated `vX.Y.Z` tag runs `.github/workflows/release.yml`,
-  which verifies, packages the Tier 1 targets and publishes the archives as a
-  GitHub release. The first Lyric 5 release is `v5.0.0`; the last Lyric 4
-  release was `v4.5.0`.
-- **dev** — `.github/workflows/dev.yml` builds every push to `main` and
-  replaces the rolling `dev` prerelease, versioned `5.0.0-dev.<date>+<sha>`.
+  which packages the Tier 1 targets, signs them after the maintainer's approval
+  and publishes them as a GitHub release with the channel's signed index. A dispatch
+  on `main` is its dry run, ending in a draft. The first Lyric 5 release is `v5.0.0`;
+  the last Lyric 4 release was `v4.5.0`.
+- **dev** — `.github/workflows/dev.yml` builds and signs every push to `main` and
+  replaces what the rolling `dev` prerelease holds, versioned `5.0.0-dev.<date>+<sha>`.
   **No promise of any kind**: this is where things are tried and grow before
-  they move into a stable release. There is no nightly channel.
+  they move into a stable release. There is no nightly channel. A dispatch on a
+  branch tries the whole pipeline with a throw-away key and publishes nothing.
+
+The keys, and what to do when one is lost or has leaked, are in
+[`tooling/release-keys`](tooling/release-keys/README.md).
 
 **The changelog starts at `v1.0.0`.** A changelog answers "what changed for me
 since last time", and that question presupposes something to be compatible with.

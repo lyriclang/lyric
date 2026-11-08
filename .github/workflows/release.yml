@@ -1,0 +1,173 @@
+name: Release
+
+# The stable channel (design/v5/spec/11 T5). An annotated tag v5.* packages, signs and publishes a
+# release. A dispatch on main is the dry run: the same pipeline with a version of the day, ending in
+# a draft on GitHub — nothing public, no tag, no change to the channel. Both sign with the stable key,
+# which waits for the maintainer's approval.
+on:
+  push:
+    tags: ['v5.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  stamp:
+    name: Stamp the version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.stamp.outputs.version }}
+      stem: ${{ steps.stamp.outputs.stem }}
+      date: ${{ steps.stamp.outputs.date }}
+      sequence: ${{ steps.stamp.outputs.sequence }}
+      dry_run: ${{ steps.stamp.outputs.dry_run }}
+      minisign_version: ${{ steps.stamp.outputs.minisign_version }}
+      minisign_sha256: ${{ steps.stamp.outputs.minisign_sha256 }}
+      public_key: ${{ steps.stamp.outputs.public_key }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Version, number and pins
+        id: stamp
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v5.*)
+              version=${GITHUB_REF_NAME#v}
+              dry_run=false
+              ;;
+            refs/heads/main)
+              version="5.0.0-dev.$(date -u +%Y%m%d)"
+              dry_run=true
+              ;;
+            *)
+              echo "::error::a release runs on a tag v5.*, a dry run on main; this is $GITHUB_REF"
+              exit 1
+              ;;
+          esac
+          {
+            echo "version=$version"
+            echo "stem=lyric-$version"
+            echo "date=$(date -u +%Y-%m-%d)"
+            echo "sequence=$(date -u +%s)"
+            echo "dry_run=$dry_run"
+            echo "minisign_version=$(sed -n 's/^version = //p' tooling/minisign-version)"
+            echo "minisign_sha256=$(sed -n 's/^linux = //p' tooling/minisign-version)"
+            echo "public_key=$(sed -n 2p tooling/release-keys/stable.pub)"
+          } >> "$GITHUB_OUTPUT"
+
+  package:
+    name: Package
+    needs: stamp
+    uses: ./.github/workflows/package.yml
+    with:
+      version: ${{ needs.stamp.outputs.version }}
+      stem: ${{ needs.stamp.outputs.stem }}
+
+  index:
+    name: Index
+    needs: [stamp, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: The archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+
+      - name: Checksums
+        run: cd dist && sha256sum * > "$RUNNER_TEMP/SHA256SUMS" && cat "$RUNNER_TEMP/SHA256SUMS"
+
+      # What the channel offers today, its signature checked by the tool; none before the first release.
+      - name: The channel's index
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.stamp.outputs.version }}
+          DATE: ${{ needs.stamp.outputs.date }}
+          SEQUENCE: ${{ needs.stamp.outputs.sequence }}
+        run: |
+          mkdir index previous
+          cp "$RUNNER_TEMP/SHA256SUMS" index/
+          from=()
+          if gh release download channels --repo "$GITHUB_REPOSITORY" --dir previous --pattern 'stable.json*' 2> /dev/null; then
+            from=(--previous previous/stable.json)
+          fi
+          dotnet run --project tools/Package --configuration Release -- index --channel stable --version "$VERSION" --date "$DATE" --sequence "$SEQUENCE" --archives dist --out index/stable.json --keep 1000 "${from[@]}"
+          cat index/stable.json
+
+      - name: Upload the index
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: index
+          path: index/*
+          retention-days: 7
+
+  sign:
+    name: Sign
+    needs: [stamp, index]
+    uses: ./.github/workflows/sign.yml
+    with:
+      environment: sign-stable
+      public_key: ${{ needs.stamp.outputs.public_key }}
+      trial: false
+      minisign_version: ${{ needs.stamp.outputs.minisign_version }}
+      minisign_sha256: ${{ needs.stamp.outputs.minisign_sha256 }}
+
+  install-trial:
+    name: Install trial
+    needs: [stamp, sign]
+    uses: ./.github/workflows/install-trial.yml
+    with:
+      channel: stable
+      version: ${{ needs.stamp.outputs.version }}
+      public_key: ${{ needs.sign.outputs.public_key }}
+
+  publish:
+    name: Publish
+    needs: [stamp, install-trial]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download what was signed
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: A draft, for a dry run
+        if: needs.stamp.outputs.dry_run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.stamp.outputs.version }}
+        run: |
+          gh release create "v$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --draft --prerelease --target "$GITHUB_SHA" \
+            --title "dry run: $VERSION" \
+            --notes "A dry run of the release pipeline from ${GITHUB_SHA::7}: five archives, their signatures and the channel's index. To be deleted, not published."
+
+      # The archives first; the channel names them only after they are there.
+      - name: The release, then the channel
+        if: needs.stamp.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd dist
+          rest=$(ls | grep -vxF -e stable.json -e stable.json.minisig)
+          # shellcheck disable=SC2086
+          gh release create "$GITHUB_REF_NAME" $rest --repo "$GITHUB_REPOSITORY" --verify-tag --notes-from-tag --title "Lyric ${GITHUB_REF_NAME#v}"
+          if ! gh release view channels --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create channels --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false --prerelease \
+              --title "Channels" --notes "The signed index of the stable channel, which lyric toolchain reads where the mirror cannot be reached."
+          fi
+          gh release upload channels stable.json stable.json.minisig --repo "$GITHUB_REPOSITORY" --clobber
