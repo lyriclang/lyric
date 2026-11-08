@@ -6918,9 +6918,9 @@ fn main(): void {
 title = "a conformance or parent list entry that does not fit"
 severity = "error"
 area = "05-interfaces"
-summary = "A `::` list of a type, an `extend` block or an interface names something that is not an interface, repeats an entry, or makes an interface inherit itself; an associated type's bound names a non-interface."
+summary = "A `::` list of a type, an `extend` block or an interface names something that is not an interface, repeats an entry, or makes an interface inherit itself; an associated type's or a type parameter's bound names a non-interface, or a type parameter repeats a bound."
 explanation = '''
-A conformance list says which interfaces a type satisfies, and a parent list which interfaces an interface extends; only interfaces stand there. Each entry is written once, and an interface's parent chain cannot lead back to itself.
+A conformance list says which interfaces a type satisfies, and a parent list which interfaces an interface extends; only interfaces stand there. Each entry is written once, and an interface's parent chain cannot lead back to itself. A type parameter's bounds are such a list too: `<T :: [Display]>` names an interface, once; `From<int>` and `From<string>` are two bounds.
 
 Name an interface, remove the repeated entry, or break the cycle.
 '''

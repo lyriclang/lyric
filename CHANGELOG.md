@@ -437,6 +437,8 @@ promise. This entry fills with the milestones.
 - **A jump out of a `defer` body is refused** (`LYR-SEM0236`): a `return` in it, and a `break` or
   `continue` that goes to a loop around the `defer`, were accepted. A loop inside the body keeps
   its own jumps, and a lambda there its `return`.
+- **A type parameter's bound must be an interface, written once** (`LYR-SEM0078`):
+  `<T :: [int]>`, a struct as a bound, and `<T :: [Display, Display]>` were accepted.
 
 ---
 

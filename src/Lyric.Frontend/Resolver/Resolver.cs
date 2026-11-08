@@ -851,6 +851,7 @@ public sealed class Resolver
         foreach (var g in fn.Generics)
             foreach (var c in g.Constraints)
                 BindType(c, sig);
+        CheckBounds(fn.Generics);
         // Body types, meaning local bindings and casts, are handled by the sema.
     }
 
@@ -879,6 +880,61 @@ public sealed class Resolver
             // the earlier parameters are.
             if (g.Default is not null) BindType(g.Default, scope);
         }
+        CheckBounds(generics);
+    }
+
+    /// <summary>A type parameter's bounds, once bound: each names an interface, and each is written
+    /// once (<c>LYR-SEM0078</c>, as in a conformance list). A name that did not resolve was
+    /// reported already.</summary>
+    private void CheckBounds(GenericParam[] generics)
+    {
+        foreach (var g in generics)
+        {
+            var seen = new List<(string Key, Span Span)>();
+            foreach (var c in g.Constraints)
+            {
+                var named = c is NamedType nt ? _binding.Resolve(nt) : null;
+                if (named is ImportBindingSymbol imported) named = imported.Target;
+                if (named is ErrorSymbol) continue;
+                if (named is not TypeSymbol { Kind: TypeSymbolKind.Interface })
+                {
+                    var what = named is not null ? $"'{named.Name}' is not one" : "this type is not one";
+                    _de.Report("LYR-SEM0078", Severity.Error, c.Span,
+                        $"only an interface can bound the type parameter '{g.Name}' — {what}");
+                    continue;
+                }
+                if (BoundKey(c) is not { } key) continue;
+                var first = seen.FindIndex(s => s.Key == key);
+                if (first >= 0)
+                {
+                    _de.Report("LYR-SEM0078", Severity.Error, c.Span,
+                        $"'{string.Join('.', ((NamedType)c).Path)}' repeats an earlier bound of '{g.Name}' — one bound, written once",
+                        new DiagnosticNote(seen[first].Span, "the first bound is here"));
+                    continue;
+                }
+                seen.Add((key, c.Span));
+            }
+        }
+    }
+
+    /// <summary>A bound as the symbols it names, for the repetition test: two spellings of one
+    /// interface at the same arguments are one key. <c>null</c> where a part is no named type.</summary>
+    private string? BoundKey(TypeNode node)
+    {
+        if (node is not NamedType nt) return null;
+        var s = _binding.Resolve(nt);
+        if (s is ImportBindingSymbol imported) s = imported.Target;
+        if (s is null) return null;
+        var head = s is TypeSymbol ts ? $"{ts.Name}#{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(ts)}" : string.Join('.', nt.Path);
+        if (nt.TypeArguments.Length == 0) return head;
+        var args = new List<string>();
+        for (var i = 0; i < nt.TypeArguments.Length; i++)
+        {
+            if (BoundKey(nt.TypeArguments[i]) is not { } a) return null;
+            var label = nt.ArgumentNames?[i];
+            args.Add(label is null ? a : $"{label} = {a}");
+        }
+        return $"{head}<{string.Join(", ", args)}>";
     }
 
     private void BindType(TypeNode type, SymbolTable scope)
