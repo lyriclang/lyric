@@ -11955,3 +11955,40 @@ fn main(): void {
     let _ = "hey".shout();
 }
 '''
+
+[LYR-SEM0236]
+title = "a jump out of a 'defer' body"
+severity = "error"
+area = "07-statements"
+summary = "A `return` stands in a `defer` body, or a `break` or `continue` goes to a loop around the `defer`."
+explanation = '''
+A `defer` body runs while its scope is being left — at the end of the scope, on a `return`, a `break`, a `continue` or an error. A jump out of it would start a second way out in the middle of the first, and the rest of the scope's `defer`s would not know which one they run for.
+
+A loop inside the body keeps its own `break` and `continue`, and a lambda in the body its own `return`. To end a loop or a function early, decide before the `defer` runs: set a variable the code after the scope reads.
+'''
+wrong = '''
+fn main(): void {
+    for (i in 0..3) {
+        defer {
+            if (i == 1) {
+                break;
+            }
+        }
+    }
+}
+'''
+right = '''
+fn main(): void {
+    var stop = false;
+    for (i in 0..3) {
+        if (stop) {
+            break;
+        }
+        defer {
+            if (i == 1) {
+                stop = true;
+            }
+        }
+    }
+}
+'''
