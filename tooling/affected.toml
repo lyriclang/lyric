@@ -37,6 +37,25 @@ tests = ["RuntimeBuildTests", "RuntimeProgramTests", "SanitizerTests", "PanicTex
 cases = ["06-", "10-", "12-", "13-"]
 
 [[rule]]
+# The server's scripts and its gate, which no toolchain runs.
+paths = ["tooling/mirror/"]
+tests = ["MirrorGateTests"]
+cases = []
+
+[[rule]]
+# The release pipeline around the archive, and what it pins: tried by a dispatch, not by a test.
+paths = [".github/workflows/sign.yml", ".github/workflows/install-trial.yml", ".github/workflows/release.yml",
+         ".github/workflows/mirror-upload.yml", ".github/workflows/channel-check.yml", ".github/workflows/mirror-watch.yml",
+         "tooling/minisign-version"]
+tests = []
+cases = []
+
+[[rule]]
+paths = ["tooling/release-keys/"]
+tests = ["ToolchainSourcesTests"]
+cases = []
+
+[[rule]]
 # What a link in documentation names: the broken-doc-link lint and the pages read it alike. Before
 # the front end's rule, which would name everything; 4.x runs the same lint.
 paths = ["src/Lyric.Frontend/Sema/DocLinks.cs"]

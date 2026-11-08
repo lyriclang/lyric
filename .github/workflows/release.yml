@@ -29,6 +29,7 @@ jobs:
       minisign_version: ${{ steps.stamp.outputs.minisign_version }}
       minisign_sha256: ${{ steps.stamp.outputs.minisign_sha256 }}
       public_key: ${{ steps.stamp.outputs.public_key }}
+      known_hosts: ${{ steps.stamp.outputs.known_hosts }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -59,6 +60,7 @@ jobs:
             echo "minisign_version=$(sed -n 's/^version = //p' tooling/minisign-version)"
             echo "minisign_sha256=$(sed -n 's/^linux = //p' tooling/minisign-version)"
             echo "public_key=$(sed -n 2p tooling/release-keys/stable.pub)"
+            echo "known_hosts=$(cat tooling/mirror/known_hosts)"
           } >> "$GITHUB_OUTPUT"
 
   package:
@@ -132,6 +134,17 @@ jobs:
       channel: stable
       version: ${{ needs.stamp.outputs.version }}
       public_key: ${{ needs.sign.outputs.public_key }}
+
+  # A dry run goes to staging/: public, named by no index, and nothing else on the mirror changes.
+  mirror-upload:
+    name: Mirror
+    needs: [stamp, install-trial]
+    uses: ./.github/workflows/mirror-upload.yml
+    # an environment's secrets reach a called workflow only through this
+    secrets: inherit
+    with:
+      target: ${{ needs.stamp.outputs.dry_run == 'true' && 'staging' || 'stable' }}
+      known_hosts: ${{ needs.stamp.outputs.known_hosts }}
 
   publish:
     name: Publish
