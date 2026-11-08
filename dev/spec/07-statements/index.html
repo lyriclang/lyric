@@ -229,6 +229,11 @@ error (<a href="../../spec/06-errors/#5-the-error-path">06 §5</a>) — not a pa
 the next begins, and on the <code>break</code> or <code>continue</code> that ends the round.</li>
 <li>A <code>return</code>'s value is <strong>evaluated before</strong> the <code>defer</code>s run, as a value block's tail is
 (<a href="#3-value-blocks">§3</a> rule 4): <code>defer d(); return f();</code> calls <code>f</code>, then <code>d</code>.</li>
+<li>A <code>defer</code> body <strong>does not jump out</strong> of itself (08 S6): a <code>return</code> in it, and a <code>break</code> or
+<code>continue</code> that goes to a loop around the <code>defer</code>, are refused (<code>LYR-SEM0236</code>) — the body runs
+while its scope is being left, and a second way out would begin inside the first. A loop in the
+body keeps its own jumps, and a lambda there its <code>return</code>. A <code>throw</code> leaves it as rule 1 of
+<a href="../../spec/06-errors/#5-the-error-path">06 §5</a> and rule 5 there say.</li>
 </ol>
 </main>
 <aside class="on-this-page" aria-label="On this page">

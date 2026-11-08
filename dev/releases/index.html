@@ -563,6 +563,10 @@ type's parameters, a variant's payload and an associated type's bound now take o
 <strong>A <code>;</code> alone is an empty statement</strong>: it does nothing, and <code>lyric fmt</code> drops it. Both had been refused as parse errors.
 The grammar is written down as one EBNF in spec chapter 02, and every program of the suite is checked against it.</p>
 </li>
+<li><p><strong>A jump out of a <code>defer</code> body is refused</strong> (<code>LYR-SEM0236</code>): a <code>return</code> in it, and a <code>break</code> or
+<code>continue</code> that goes to a loop around the <code>defer</code>, were accepted. A loop inside the body keeps
+its own jumps, and a lambda there its <code>return</code>.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
