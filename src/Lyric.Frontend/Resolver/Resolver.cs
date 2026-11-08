@@ -606,9 +606,11 @@ public sealed class Resolver
             case ImportSelective sel: // import a.b { x, y as z };
                 if (target is not null) ResolveImports(target);
                 for (var i = 0; i < sel.Names.Length; i++)
-                    foreach (var imported in ResolveSelective(module, sel.Names[i], sel.BoundName(i),
-                                 i < sel.NameSpans.Length ? sel.NameSpans[i] : imp.Span, target, imp))
-                        DeclareImport(module, imported, imp);
+                {
+                    var nameAt = i < sel.NameSpans.Length ? sel.NameSpans[i] : imp.Span;
+                    foreach (var imported in ResolveSelective(module, sel.Names[i], sel.BoundName(i), nameAt, target, imp))
+                        DeclareImport(module, imported, imp, nameAt);
+                }
                 break;
             case ImportAlias alias: // import a.b as C;
                 DeclareImport(module, target is not null
@@ -676,10 +678,27 @@ public sealed class Resolver
         return symbol;
     }
 
-    private void DeclareImport(ModuleSymbol module, Symbol sym, ImportDecl imp)
+    /// <summary>The names an import bound a second time, said once each (<c>LYR-RES0001</c>).</summary>
+    private readonly HashSet<(ImportDecl, string)> _importedAgain = new();
+
+    /// <param name="at">Where the name stands, for a selective import's: the import itself otherwise.</param>
+    private void DeclareImport(ModuleSymbol module, Symbol sym, ImportDecl imp, Span? at = null)
     {
         sym.Home = module;
         if (sym is ImportBindingSymbol binding) binding.Reexported = imp.IsPublic;
+        // A function imported again under the name it already has here is no overload of itself:
+        // the second binding is the same import written twice, refused as a qualified or
+        // an aliased import written twice is. The prelude is no import, and stays out of this.
+        if (sym is ImportBindingSymbol { Target: FunctionSymbol again }
+            && module.Members.OverloadsLocal(sym.Name).Any(f => ReferenceEquals(f, again)))
+        {
+            // an overload set is one binding per function, and one name to report
+            if (_importedAgain.Add((imp, sym.Name)))
+                _de.Report("LYR-RES0001", Severity.Error, at ?? imp.Span,
+                    $"'{sym.Name}' is already imported here — an import is written once",
+                    PreviousDeclaration(module.Members, sym.Name));
+            return;
+        }
         if (!module.Members.TryDeclare(sym))
             _de.Report("LYR-RES0001", Severity.Error, imp.Span,
                 $"'{sym.Name}' is already declared in this module",
