@@ -73,8 +73,10 @@ raises a tag that is a version to the newest of its line in the manifest, and wr
 the option the environment's <code>LYRIC_PROFILE</code>, then <code>debug</code>; an unknown name is refused, from
 either; <code>asan</code> and <code>tsan</code> need clang —, <code>--target &lt;triple&gt;</code>
 (a Tier 1 triple; default: this machine), <code>--emit ir|c</code> (prints instead of building; <code>run</code>
-refuses it), <code>-C &lt;dir&gt;</code> (the package is searched from <code>&lt;dir&gt;</code> instead of the current
-directory, and a relative file is relative to it). <code>--offline</code> takes no value: nothing is
+refuses it), <code>-C &lt;dir&gt;</code> (the command stands in <code>&lt;dir&gt;</code> as if it had been started there: the
+package is searched from <code>&lt;dir&gt;</code> instead of the current directory, a relative file is relative
+to it, and <code>run</code> starts the program in it — its working directory, where a relative path the
+program opens is read). <code>--offline</code> takes no value: nothing is
 fetched, and a package read from git comes from the user's cache (<a href="../../spec/15-project/">15 §2</a>).
 <code>--locked</code> takes none either: <code>build</code>, <code>run</code> and <code>test</code> take the lock as it is
 (<a href="../../spec/15-project/">15 §3</a> rule 4).

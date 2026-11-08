@@ -587,6 +587,10 @@ a <code>?int8</code> where a <code>?int</code> is; <code>null</code> stays <code
 one already was: <code>import std.io { println };</code> twice, or <code>{ println, println }</code>, was taken as an
 overload of itself.</p>
 </li>
+<li><p><strong><code>run -C &lt;dir&gt;</code> starts the program in <code>&lt;dir&gt;</code></strong>, as <code>cd &lt;dir&gt; &amp;&amp; lyric run</code> does: a relative path
+the program opens — a game's assets beside its <code>src/</code> — is the directory's. It ran in the directory
+the toolchain was started in.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
