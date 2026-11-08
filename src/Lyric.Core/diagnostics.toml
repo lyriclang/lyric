@@ -4014,9 +4014,9 @@ fn main(): void {
 title = "a name declared twice in one scope"
 severity = "error"
 area = "04-modules"
-summary = "Two declarations take the same name in one scope: a module, a type's members, an `extend` block, an import beside a declaration, or a parameter list. The second is reported; the first stays."
+summary = "Two declarations take the same name in one scope: a module, a type's members, an `extend` block, an import beside a declaration, an import written twice, or a parameter list. The second is reported; the first stays."
 explanation = '''
-A name means one thing in a scope. Only functions may share a name, and only when they take different numbers of arguments; any other pair of declarations — two types, a type and a function, an import and a declaration, two parameters — collides.
+A name means one thing in a scope. Only functions may share a name, and only when they take different numbers of arguments; any other pair of declarations — two types, a type and a function, an import and a declaration, two parameters — collides. An import is written once: a function imported again under its name is no overload of itself.
 
 Rename one of the two, or remove the one that is left over. A parameter that is not used is written `_`, which may repeat.
 '''
