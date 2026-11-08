@@ -2548,6 +2548,8 @@ Die Zählung zeigt rund 100 Kommentare im Frontend, die noch von Bytecode und de
 
 **S5e, gebaut:** Identischer Doppelimport ist ein Fehler (07 I6, Spec 04 §4 r1a): ein selektiver Name, der dieselbe Funktion ein zweites Mal bindet, galt als Überladung seiner selbst; jetzt `LYR-RES0001` wie schon beim qualifizierten und beim Alias-Import. Die Formen eines Moduls stehen weiter nebeneinander.
 
+**S6a, Text:** Die Lesung 10–16 gegen 01, 06, 09, 10, 11 (Befunde in drei Gruppen: Text, Abweichung Spec↔Bereich, Maintainer). Hier die erste: die Deadlock-Bedingung um das Warten auf das System erweitert (06 M6-12 — die Laufzeit tat es schon, geprüft mit `accept()` und `signals().recv()`), falsche Quellen (10 §12 r3/r4, 15 §5.2 r8), zwei doppelte Regeln (12 HTTP r4, 15 §5.3 r16), `position` → `firstWhere`, `Coroutine :: Identity`, `assert` mit Lambda, die Zeile `LYR-RT0020` in 13 §1.4, veraltete „folgt mit M…“-Sätze in 12 und 14. Die Köpfe der Kapitel bleiben bis zum Ende von S6.
+
 ## Nachtrag 2026-11-08 — M15 S6 und S7: was vom Plan abweicht
 
 **Anlass**: Die Halte S6 und S7 wurden mit dem Maintainer aufgenommen. Beim Lesen des Codes zeigten sich Lücken, die der
