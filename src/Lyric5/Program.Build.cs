@@ -187,7 +187,8 @@ public static partial class Program
         // the build's count before the program, whose output follows on the same stream
         Lyric.Core.Rendering.RenderStyle.Current.Events?.Summary();
         BuildStatus.Say("Running", Pipeline.Shown(executable!));
-        return ProcessRunner.RunInherited(executable!, programArgs);
+        // in the directory the command stands in: -C's, as if the toolchain had been started there
+        return ProcessRunner.RunInherited(executable!, programArgs, baseDirectory);
     }
 
     /// <summary>The last status lines of a build that succeeded: the profile, what it compiles with,

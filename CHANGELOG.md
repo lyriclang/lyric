@@ -449,6 +449,9 @@ promise. This entry fills with the milestones.
 - **A selective import written twice is refused** (`LYR-RES0001`), as a qualified or an aliased
   one already was: `import std.io { println };` twice, or `{ println, println }`, was taken as an
   overload of itself.
+- **`run -C <dir>` starts the program in `<dir>`**, as `cd <dir> && lyric run` does: a relative path
+  the program opens — a game's assets beside its `src/` — is the directory's. It ran in the directory
+  the toolchain was started in.
 
 ---
 
