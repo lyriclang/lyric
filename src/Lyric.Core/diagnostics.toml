@@ -10749,11 +10749,13 @@ lint = "unused-generic"
 group = "unused"
 level = "warn"
 area = "03-types"
-summary = "A function's or a type's type parameter is named nowhere in it — not in a parameter, the result, a field or the body."
+summary = "A function's type parameter is named nowhere in it — not in a parameter, the result or the body. A type's is not reported: a phantom parameter only the type's name uses is a type's own."
 explanation = '''
 A type parameter nothing names cannot be inferred from a call: every caller must write it, and it changes nothing.
 
 Take it out, or name it where the declaration needs it. A name that begins with `_` is not reported.
+
+A type's parameter is not looked at: `struct Id<T> { raw: int }` makes `Id<User>` and `Id<Order>` two types though nothing in `Id` names `T`.
 '''
 wrong = '''
 fn first<T, U>(xs: T[]): T {
