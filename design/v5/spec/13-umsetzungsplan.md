@@ -2550,6 +2550,8 @@ Die Zählung zeigt rund 100 Kommentare im Frontend, die noch von Bytecode und de
 
 **S6a, Text:** Die Lesung 10–16 gegen 01, 06, 09, 10, 11 (Befunde in drei Gruppen: Text, Abweichung Spec↔Bereich, Maintainer). Hier die erste: die Deadlock-Bedingung um das Warten auf das System erweitert (06 M6-12 — die Laufzeit tat es schon, geprüft mit `accept()` und `signals().recv()`), falsche Quellen (10 §12 r3/r4, 15 §5.2 r8), zwei doppelte Regeln (12 HTTP r4, 15 §5.3 r16), `position` → `firstWhere`, `Coroutine :: Identity`, `assert` mit Lambda, die Zeile `LYR-RT0020` in 13 §1.4, veraltete „folgt mit M…“-Sätze in 12 und 14. Die Köpfe der Kapitel bleiben bis zum Ende von S6.
 
+**S6b, Text:** Was gebaut ist und in keinem Kapitel stand: `std.test` (12 §Testing, drei Fälle — eine fehlgeschlagene Assertion panikt mit `LYR-RT0008` und dem, was sie bekam), `@Bench`, `@Warn` und `@Deny` in der geschlossenen Liste 11 §1 r7, `std.meta` reicht die Namen von `std.core` weiter (09 S10). Die Abweichungen Spec↔Bereich, bei denen das Gebaute der Spec folgt und die Bereichszeile nicht gebaut ist, gehen an S12 (Entscheidung oder Tür).
+
 ## Nachtrag 2026-11-08 — M15 S6 und S7: was vom Plan abweicht
 
 **Anlass**: Die Halte S6 und S7 wurden mit dem Maintainer aufgenommen. Beim Lesen des Codes zeigten sich Lücken, die der
