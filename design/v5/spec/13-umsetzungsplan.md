@@ -2545,3 +2545,5 @@ Die Zählung zeigt rund 100 Kommentare im Frontend, die noch von Bytecode und de
 **S5c, gebaut:** Eine Schranke eines Typparameters nennt ein Interface, jede einmal (T18, Spec 03 §9.1 r1, `LYR-SEM0078` wie in einer Konformanzliste); `From<int>` und `From<string>` sind zwei. Offen und nicht Teil davon: ein Aufruf `T.from(…)`, der zwischen zwei Schranken desselben Interfaces wählen müsste, findet die Überladung nicht.
 
 **S5d, gebaut:** Koerzion durch das Optional (T3, Spec 03 §3.1 r3): `?Circle → ?Shape`, `?int8 → ?int`; `null` bleibt `null`, ein Wert wird für sich umgewandelt und neu verpackt. Das Verpacken geht vor — `?int` nach `??int` ist ein vorhandenes `??int`. Nicht zu einem C-Funktionszeiger und nicht von einem Inline-Array: beide Koerzionen markieren oder prüfen den Ausdruck selbst.
+
+**S5e, gebaut:** Identischer Doppelimport ist ein Fehler (07 I6, Spec 04 §4 r1a): ein selektiver Name, der dieselbe Funktion ein zweites Mal bindet, galt als Überladung seiner selbst; jetzt `LYR-RES0001` wie schon beim qualifizierten und beim Alias-Import. Die Formen eines Moduls stehen weiter nebeneinander.
