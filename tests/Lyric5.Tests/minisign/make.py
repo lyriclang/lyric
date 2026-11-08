@@ -62,6 +62,7 @@ sha = subprocess.run(['openssl', 'dgst', '-sha256', '-r'], input=archive, captur
 for channel, versions in [('dev', ['5.0.0-dev.20261028+0b3eb5e', '5.0.0-dev.20261027+80182e3']), ('stable', ['5.0.0'])]:
     index = {
         'channel': channel,
+        'sequence': 1000,
         'versions': [
             {
                 'version': version,

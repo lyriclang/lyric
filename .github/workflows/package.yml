@@ -1,0 +1,132 @@
+# The .NET version comes from global.json and the SDK preinstalled on the runner, not from
+# actions/setup-dotnet — see the comment in ci.yml for what that action cost on 2026-08-17.
+name: Package
+
+# One archive per Tier 1 target, each tried as a user meets it. Shared by the dev channel and the
+# release pipeline, so that what is tried on main is what a release ships.
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: The version every binary in the archive names.
+        required: true
+        type: string
+      stem:
+        description: The archive's name before its target.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64,     os: windows-latest,   triple: x86_64-windows-gnu }
+          - { rid: linux-x64,   os: ubuntu-latest,    triple: x86_64-linux-gnu }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm, triple: aarch64-linux-gnu }
+          - { rid: osx-arm64,   os: macos-latest,     triple: aarch64-macos }
+          # Built across the architecture on the ARM runner, run under Rosetta.
+          - { rid: osx-x64,     os: macos-latest,     triple: x86_64-macos }
+
+    # MSBuild reads environment variables as properties, so the inner publishes pick the version up.
+    env:
+      DEV_VERSION: ${{ inputs.version }}
+      ARCHIVE_STEM: ${{ inputs.stem }}
+      InformationalVersion: ${{ inputs.version }}
+      IncludeSourceRevisionInInformationalVersion: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The runner's own .NET 10 where it has one; the download only where it has none —
+      # on 2026-10-25 the install script's links answered 409 for hours.
+      - name: The preinstalled .NET, if it is 10
+        id: dotnet
+        shell: bash
+        run: dotnet --list-sdks 2>/dev/null | grep -q '^10\.' && echo "have=1" >> "$GITHUB_OUTPUT" || true
+
+      - name: Set up .NET from global.json
+        if: steps.dotnet.outputs.have != '1'
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+
+      # The archive is tried as a user meets it: lyric5 builds its runtime with zig.
+      - name: Set up zig
+        uses: ./.github/actions/setup-zig
+
+      - name: Publish lyric5 (NativeAOT)
+        run: dotnet publish src/Lyric5/Lyric5.csproj --configuration Release -r ${{ matrix.rid }} -o out
+
+      - name: The runtime prebuilt for the target, and the manifest
+        shell: bash
+        run: dotnet run --project tools/Package --configuration Release -- out --version "$DEV_VERSION" --triple ${{ matrix.triple }}
+
+      - name: Rosetta for the x86-64 binary
+        if: matrix.rid == 'osx-x64'
+        shell: bash
+        run: arch -x86_64 /usr/bin/true 2>/dev/null || sudo softwareupdate --install-rosetta --agree-to-license
+
+      - name: The self-report names the version
+        shell: bash
+        run: |
+          lyric5=out/lyric5; [ "${{ runner.os }}" = "Windows" ] && lyric5=out/lyric5.exe
+          "$lyric5" --version
+          "$lyric5" --version | head -1 | grep -qxF "lyric ${DEV_VERSION}"
+
+      - name: Archive
+        shell: bash
+        run: |
+          name="${ARCHIVE_STEM}-${{ matrix.rid }}"
+          mkdir -p dist
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z a "dist/${name}.zip" "./out/*"
+          else
+            tar -czf "dist/${name}.tar.gz" -C out .
+          fi
+
+      # Unpacked away from the checkout, where no runtime/ above the binary stands in for the
+      # archive's own: a program is built and run with what the archive holds, and the 4.x
+      # standard library, which lyric5 never reads, is not in it.
+      - name: The archive builds and runs a program
+        shell: bash
+        run: |
+          trial="$RUNNER_TEMP/trial"
+          rm -rf "$trial" && mkdir -p "$trial/toolchain" "$trial/hello/src"
+          archive=$(ls dist/*)
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z x -o"$trial/toolchain" "$archive" > /dev/null
+            lyric5="$trial/toolchain/lyric5.exe"
+          else
+            tar -xzf "$archive" -C "$trial/toolchain"
+            lyric5="$trial/toolchain/lyric5"
+          fi
+          dotnet run --project tools/Package --configuration Release --no-build -- verify "$trial/toolchain"
+          test -d "$trial/toolchain/runtime/include/lyr" || { echo "the archive holds no runtime"; exit 1; }
+          test -f "$trial/toolchain/runtime/lib/${{ matrix.triple }}/debug/liblyr.a" || { echo "the archive holds no prebuilt runtime"; exit 1; }
+          test -f "$trial/toolchain/lldb/lyric.lldbinit" || { echo "the archive holds no lyric.lldbinit"; exit 1; }
+          test -f "$trial/toolchain/LICENSE" || { echo "the archive holds no LICENSE"; exit 1; }
+          test -f "$trial/toolchain/runtime/include/lyric.h" || { echo "the archive holds no lyric.h"; exit 1; }
+          test -d "$trial/toolchain/stdlib5" || { echo "the archive holds no stdlib5"; exit 1; }
+          printf '[package]\nname = "hello"\nversion = "0.1.0"\n' > "$trial/hello/lyric.toml"
+          printf 'import std.io { println };\n\nfn main(): void {\n    println("hello from the dev archive");\n}\n' > "$trial/hello/src/main.lyr"
+          # A cold cache: the build takes the archive's runtime and compiles none of its own.
+          export LYRIC_CACHE="$trial/cache"
+          out=$(cd "$trial/hello" && "$lyric5" run | tr -d '\r')
+          echo "$out"
+          [ "$out" = "hello from the dev archive" ]
+          if [ -d "$trial/cache/runtime" ]; then echo "the build compiled the runtime beside the prebuilt one"; exit 1; fi
+
+      - name: Upload archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: dist-${{ matrix.rid }}
+          path: dist/*
+          retention-days: 7

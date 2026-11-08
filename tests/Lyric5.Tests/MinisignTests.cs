@@ -6,7 +6,8 @@ namespace Lyric5.Tests;
 
 /// <summary>
 /// The signature check a download passes: BLAKE2b-512 and Ed25519 against the RFCs' vectors,
-/// minisign signatures and channel indexes made by OpenSSL (<c>minisign/make.py</c>), and what
+/// minisign signatures and channel indexes made by OpenSSL (<c>minisign/make.py</c>), signatures
+/// the <c>minisign</c> program made and zig's own (<c>minisign/real</c>), and what
 /// each refuses — a changed byte, another key, the legacy form, a changed trusted comment, a key
 /// of small order, an index of another channel.
 /// </summary>
@@ -194,12 +195,38 @@ public class MinisignTests
     [InlineData("5.0.0-dev.20261027+80182e3", "5.0.0-dev.20261028+0b3eb5e", "stands twice")]
     [InlineData("5.0.0-dev.20261028+0b3eb5e", "5.0", "is not a version")]
     [InlineData("\"channel\"", "\"kanal\"", "not a channel index")]
+    [InlineData("\"sequence\"", "\"nummer\"", "not a channel index")]
+    [InlineData("\"sequence\": 1000", "\"sequence\": 0", "the number 0")]
     public void An_index_that_is_not_one_is_refused_before_anything_is_loaded(string from, string to, string message)
     {
         var text = Encoding.UTF8.GetString(Bytes("dev.json"));
         Assert.Contains(from, text);
         var refused = Assert.Throws<InvalidDataException>(() => ChannelIndex.Parse(Encoding.UTF8.GetBytes(text.Replace(from, to))));
         Assert.Contains(message, refused.Message);
+    }
+
+    [Fact]
+    public void A_signature_the_minisign_program_made_is_read_and_its_trusted_comment_given()
+    {
+        var key = MinisignKey.Parse(Text("real/key.pub"));
+        Assert.Equal("signed by minisign 0.12", Minisign.Verify(key, Bytes("archive.bin"), Text("real/archive.bin.minisig")));
+
+        var changed = Bytes("archive.bin");
+        changed[0] ^= 1;
+        Assert.Equal("the signature does not match the file", Refused(() => Minisign.Verify(key, changed, Text("real/archive.bin.minisig"))));
+        Assert.StartsWith("signed with the key", Refused(() => Minisign.Verify(Key("other.pub"), Bytes("archive.bin"), Text("real/archive.bin.minisig"))));
+    }
+
+    [Fact]
+    public void Zig_s_own_signature_of_its_own_archive_holds_under_the_key_the_toolchain_carries()
+    {
+        var hash = Convert.FromHexString(Text("real/zig-x86_64-linux-0.16.0.tar.xz.blake2b").Trim());
+        var signature = Text("real/zig-x86_64-linux-0.16.0.tar.xz.minisig");
+        var comment = Minisign.VerifyHash(MinisignKey.Parse(ZigFetch.PublicKey), hash, signature);
+        Assert.Contains("file:zig-x86_64-linux-0.16.0.tar.xz", comment);
+
+        hash[0] ^= 1;
+        Assert.Equal("the signature does not match the file", Refused(() => Minisign.VerifyHash(MinisignKey.Parse(ZigFetch.PublicKey), hash, signature)));
     }
 
     private static string Refused(Action check) => Assert.Throws<SignatureException>(check).Message;

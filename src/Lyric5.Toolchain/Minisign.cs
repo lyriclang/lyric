@@ -44,7 +44,24 @@ public static class Minisign
     /// <inheritdoc cref="Verify(MinisignKey, Stream, string)"/>
     public static string Verify(MinisignKey key, ReadOnlySpan<byte> data, string signature) => VerifyHash(key, Blake2b.Hash(data), signature);
 
-    private static string VerifyHash(MinisignKey key, byte[] hash, string text)
+    /// <summary>The one of <paramref name="keys"/> whose id <paramref name="signature"/> names, else
+    /// the first: checking with it says what is wrong with a signature none of them made.</summary>
+    public static MinisignKey Signer(IReadOnlyList<MinisignKey> keys, string signature)
+    {
+        var lines = Lines(signature);
+        byte[]? bytes = null;
+        if (lines.Count >= 2)
+        {
+            try { bytes = Convert.FromBase64String(lines[1]); }
+            catch (FormatException) { }
+        }
+        return (bytes is { Length: >= 10 } ? keys.FirstOrDefault(key => bytes.AsSpan(2, 8).SequenceEqual(key.Id)) : null) ?? keys[0];
+    }
+
+    /// <summary>Checks <paramref name="text"/>, the text of a <c>.minisig</c>, over a file whose
+    /// BLAKE2b-512 hash is <paramref name="hash"/>; for a file too large to carry around.</summary>
+    /// <exception cref="SignatureException">The signature does not hold.</exception>
+    public static string VerifyHash(MinisignKey key, byte[] hash, string text)
     {
         var lines = Lines(text);
         if (lines.Count < 4 || !lines[0].StartsWith("untrusted comment:", StringComparison.Ordinal))

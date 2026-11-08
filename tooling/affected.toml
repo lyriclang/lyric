@@ -13,7 +13,7 @@
 
 # The harness itself — what builds and runs the tests and chooses them: everything runs. The rest
 # of tooling/ and .github/ has its rules below.
-full = [".github/workflows/ci.yml", ".github/workflows/dev.yml", ".github/actions/setup-zig/", "tooling/conformance/",
+full = [".github/workflows/ci.yml", ".github/workflows/dev.yml", ".github/workflows/package.yml", ".github/actions/setup-zig/", "tooling/conformance/",
         "tooling/affected.py", "tooling/c-smoke/", "tooling/valgrind/", "global.json", "Directory.Build.props",
         "Directory.Build.targets", "Lyric.slnx", "tests/Lyric5.Tests/Lyric5.Tests.csproj", "tests/Directory.Build.props"]
 

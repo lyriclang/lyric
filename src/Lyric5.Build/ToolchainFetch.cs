@@ -1,4 +1,5 @@
 using System.Formats.Tar;
+using System.Net.Sockets;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using Lyric5.Toolchain;
@@ -26,90 +27,186 @@ public sealed record ToolchainSource(string Name, Func<string, string> IndexUrl,
 
 /// <summary>
 /// Fetches a channel's index and a toolchain's archive and installs it: the index only with a
-/// signature the key holds, the archive only at the size and the SHA-256 the index gives, unpacked
-/// beside the toolchains, checked against its <c>toolchain.json</c> and only then moved into place —
-/// a run cut short leaves nothing a later one counts as installed. The mirror is asked first and
-/// GitHub after it, where the mirror cannot be reached; a signature or a hash that does not hold is
-/// never routed around. <c>LYRIC_MIRROR</c> names another mirror in place of both, and
-/// <c>LYRIC_MIRROR_KEY</c> the key its signatures are checked with.
+/// signature one of the channel's keys made and no older than the one this machine has seen, the
+/// archive only at the size and the SHA-256 the index gives, unpacked beside the toolchains, checked
+/// against its <c>toolchain.json</c> and only then moved into place — a run cut short leaves nothing
+/// a later one counts as installed. The mirror is asked first and GitHub after it. What one source
+/// serves wrongly is said and the next one asked: only a signature and a hash make anything
+/// acceptable, so another source can add no risk, and a broken mirror stops nobody. Where no source
+/// serves what holds, nothing is installed. <c>LYRIC_MIRROR</c> names another mirror in place of
+/// both, and <c>LYRIC_MIRROR_KEY</c> the key its signatures are checked with.
 /// </summary>
 public sealed class ToolchainFetch
 {
-    public const string Mirror = "https://dl.lyric.oil1i.de";
+    public const string Mirror = "https://dl.lyriclang.de";
     public const string GitHubReleases = "https://github.com/lyriclang/lyric/releases/download";
 
-    /// <summary>The key the project signs its releases with, as the line of base64 of its
-    /// <c>.pub</c>; none before the first signed release.</summary>
-    public static readonly string? PublicKey = null;
+    /// <summary>The key the development builds are signed with, as the line of base64 of its <c>.pub</c>.</summary>
+    public const string DevKey = "RWQM0eXpRYf8iCHBHUgYJPQOdE1oXy+fpGIov6Kz1PlP7Wp2llW+CCOv";
+
+    /// <summary>The key the stable releases are signed with.</summary>
+    public const string StableKey = "RWRzuPHBZrHnLIGQOgkuBJqmlH9C0P5rHYKFHlPd/8S1dreWrbTox657";
+
+    /// <summary>The key held offline for the day a channel's own key is lost; both channels accept it.</summary>
+    public const string ReserveKey = "RWShnZuifvfSSrKoQURRq3baivxxQTHuAXLJxOgsLU0Sz/R1JJ1P8RTH";
+
+    /// <summary>How long a download may go without a byte before its source counts as gone.</summary>
+    public static readonly TimeSpan DefaultStall = TimeSpan.FromSeconds(60);
 
     private readonly IReadOnlyList<ToolchainSource> _sources;
-    private readonly MinisignKey? _key;
+    private readonly Func<string, IReadOnlyList<MinisignKey>> _keys;
     private readonly HttpClient _http;
     private readonly TextWriter? _progress;
+    private readonly Action<string>? _warn;
+    private readonly string? _seen;
+    private readonly TimeSpan _stall;
     private readonly Dictionary<string, (ChannelIndex Index, ToolchainSource Source)> _indexes = new(StringComparer.Ordinal);
 
-    public ToolchainFetch(IReadOnlyList<ToolchainSource> sources, MinisignKey? key, string userAgent, TextWriter? progress)
+    /// <param name="warn">Told of each source that served something refused, where another follows it.</param>
+    /// <param name="seen">The directory that remembers the newest index seen; nothing is remembered without one.</param>
+    /// <param name="stall">How long a download may go without a byte; <see cref="DefaultStall"/> if not given.</param>
+    public ToolchainFetch(IReadOnlyList<ToolchainSource> sources, Func<string, IReadOnlyList<MinisignKey>> keys, string userAgent, TextWriter? progress, Action<string>? warn = null, string? seen = null, TimeSpan? stall = null)
     {
         _sources = sources;
-        _key = key;
+        _keys = keys;
         _progress = progress;
-        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
+        _warn = warn;
+        _seen = seen;
+        _stall = stall ?? DefaultStall;
+        _http = Client(userAgent, _stall, TimeSpan.FromSeconds(60));
     }
 
-    /// <summary>The sources and the key as the environment sets them; the progress of a download
-    /// is drawn on <paramref name="progress"/> where it is given.</summary>
+    /// <summary>A client whose connections give up after 10 s, and whose reads give up when nothing
+    /// came for <paramref name="stall"/>: a mirror that drops packets, or one that stops sending, is
+    /// told apart from a slow one in time for the source after it. The limit sits on the socket,
+    /// where a synchronous read honours it on every system.</summary>
+    public static HttpClient Client(string userAgent, TimeSpan stall, TimeSpan timeout)
+    {
+        var handler = new SocketsHttpHandler
+        {
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+            ConnectCallback = async (context, cancel) =>
+            {
+                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true, ReceiveTimeout = (int)stall.TotalMilliseconds };
+                try
+                {
+                    await socket.ConnectAsync(context.DnsEndPoint, cancel).ConfigureAwait(false);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+            },
+        };
+        var client = new HttpClient(handler) { Timeout = timeout };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
+        return client;
+    }
+
+    /// <summary>The keys an index of <paramref name="channel"/> may be signed with: the channel's
+    /// own and the reserve, so that a key of one channel can sign nothing for the other.</summary>
+    public static IReadOnlyList<MinisignKey> KeysOf(string channel) =>
+        [MinisignKey.Parse(channel == ChannelIndex.Dev ? DevKey : StableKey), MinisignKey.Parse(ReserveKey)];
+
+    /// <summary>The sources and the keys as the environment sets them; the progress of a download
+    /// is drawn on <paramref name="progress"/> where it is given, and <paramref name="warn"/> told
+    /// of a source that served something refused.</summary>
     /// <exception cref="ToolchainException"><c>LYR-CLI0023</c>: <c>LYRIC_MIRROR_KEY</c> is no key, or is set without a mirror.</exception>
-    public static ToolchainFetch ForUser(string version, TextWriter? progress)
+    public static ToolchainFetch ForUser(string version, TextWriter? progress, Action<string>? warn = null)
     {
         var mirror = Environment.GetEnvironmentVariable("LYRIC_MIRROR");
         var named = Environment.GetEnvironmentVariable("LYRIC_MIRROR_KEY");
-        MinisignKey? key = null;
+        Func<string, IReadOnlyList<MinisignKey>> keys = KeysOf;
         if (!string.IsNullOrWhiteSpace(named))
         {
             if (string.IsNullOrWhiteSpace(mirror))
                 throw new ToolchainException("LYR-CLI0023", "LYRIC_MIRROR_KEY is set and LYRIC_MIRROR is not", "the key is the one a mirror of your own signs with; name the mirror too");
+            MinisignKey key;
             try { key = MinisignKey.Parse(named); }
             catch (SignatureException e) { throw new ToolchainException("LYR-CLI0023", $"LYRIC_MIRROR_KEY: {e.Message}"); }
+            keys = _ => [key];
         }
-        else if (PublicKey is not null) key = MinisignKey.Parse(PublicKey);
         IReadOnlyList<ToolchainSource> sources = string.IsNullOrWhiteSpace(mirror)
             ? [ToolchainSource.OfMirror(Mirror), ToolchainSource.GitHub]
             : [ToolchainSource.OfMirror(mirror)];
-        return new ToolchainFetch(sources, key, $"lyric/{version}", progress);
+        return new ToolchainFetch(sources, keys, $"lyric/{version}", progress, warn, Path.Combine(LyricHome.Root, "seen"));
     }
 
-    /// <summary>The index of <paramref name="channel"/>, from the first source that serves it,
-    /// checked against the key.</summary>
-    /// <exception cref="ToolchainException"><c>LYR-CLI0023</c> where no source serves it,
-    /// <c>LYR-CLI0024</c> where its signature does not hold.</exception>
+    /// <summary>The index of <paramref name="channel"/>, from the first source that serves one that
+    /// holds. A signature that does not fit is fetched once more with its index: the two are two
+    /// requests, and a publish between them parts a good pair.</summary>
+    /// <exception cref="ToolchainException"><c>LYR-CLI0024</c> where a source served one refused and
+    /// none served one that holds, <c>LYR-CLI0023</c> where no source served any.</exception>
     public ChannelIndex Index(string channel)
     {
         if (_indexes.TryGetValue(channel, out var known)) return known.Index;
-        if (_key is null)
-            throw new ToolchainException("LYR-CLI0023", "this toolchain carries no key to check a channel's signature with",
-                "a build of your own installs from a mirror of your own: LYRIC_MIRROR names it, LYRIC_MIRROR_KEY its key");
+        var keys = _keys(channel);
         var failures = new List<string>();
+        var refusals = new List<string>();
         foreach (var source in _sources)
         {
             var url = source.IndexUrl(channel);
-            if (Get(url, out var reason) is not { } json || Get(url + ".minisig", out reason) is not { } signature)
+            string? refusal = null;
+            for (var attempt = 0; attempt < 2; attempt++)
             {
-                failures.Add(reason);
-                continue;
+                if (Get(url, out var reason) is not { } json || Get(url + ".minisig", out reason) is not { } signature)
+                {
+                    failures.Add(reason);
+                    refusal = null;
+                    break;
+                }
+                ChannelIndex index;
+                try { index = ChannelIndex.Read(json, System.Text.Encoding.UTF8.GetString(signature), keys, channel); }
+                catch (Exception e) when (e is SignatureException or InvalidDataException)
+                {
+                    refusal = $"the index of the channel '{channel}' from {source.Name} is refused: {e.Message}";
+                    continue;
+                }
+                if (Seen(channel, index) is var seen && index.Sequence < seen)
+                {
+                    refusal = $"the index of the channel '{channel}' from {source.Name} is refused: it is number {index.Sequence}, and this machine has seen number {seen}";
+                    break;
+                }
+                Remember(channel, index);
+                _indexes[channel] = (index, source);
+                return index;
             }
-            ChannelIndex index;
-            try { index = ChannelIndex.Read(json, System.Text.Encoding.UTF8.GetString(signature), _key, channel); }
-            catch (Exception e) when (e is SignatureException or InvalidDataException)
-            {
-                throw new ToolchainException("LYR-CLI0024", $"the index of the channel '{channel}' from {source.Name} is refused: {e.Message}",
-                    "nothing was installed; a mirror that serves this is not to be trusted");
-            }
-            _indexes[channel] = (index, source);
-            return index;
+            if (refusal is null) continue;
+            refusals.Add(refusal);
+            if (!ReferenceEquals(source, _sources[^1])) _warn?.Invoke(refusal);
         }
+        if (refusals.Count > 0)
+            throw new ToolchainException("LYR-CLI0024", string.Join("; ", refusals), "nothing was installed; a mirror that serves this is not to be trusted");
         throw new ToolchainException("LYR-CLI0023", $"the index of the channel '{channel}' cannot be fetched: {string.Join("; ", failures)}");
     }
+
+    /// <summary>The highest number of an index of <paramref name="channel"/> by the same signer this
+    /// machine has seen, 0 for none. Numbers of another signer, a mirror of one's own, do not compare.</summary>
+    private long Seen(string channel, ChannelIndex index)
+    {
+        if (_seen is null) return 0;
+        try { return long.TryParse(File.ReadAllText(SeenFile(channel, index)).Trim(), out var number) ? number : 0; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return 0; }
+    }
+
+    /// <summary>Keeps the index's number; a home that cannot be written costs the memory, not the install.</summary>
+    private void Remember(string channel, ChannelIndex index)
+    {
+        if (_seen is null || index.Sequence == Seen(channel, index)) return;
+        var file = SeenFile(channel, index);
+        var partial = $"{file}.{Environment.ProcessId}";
+        try
+        {
+            Directory.CreateDirectory(_seen);
+            File.WriteAllText(partial, index.Sequence + "\n");
+            File.Move(partial, file, overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+
+    private string SeenFile(string channel, ChannelIndex index) => Path.Combine(_seen!, $"{channel}-{index.SignedBy}");
 
     /// <summary>The release <paramref name="asked"/> names — <c>dev</c> or <c>stable</c> for the
     /// newest of the channel, else a version, with or without its build part — and its channel.</summary>
@@ -141,12 +238,12 @@ public sealed class ToolchainFetch
         if (!release.Archives.TryGetValue(triple, out var archive))
             throw new ToolchainException("LYR-CLI0023", $"lyric {version} has no archive for {triple}",
                 $"it has: {string.Join(", ", release.Archives.Keys.Order(StringComparer.Ordinal))}");
-        var source = _indexes.TryGetValue(channel, out var known) ? known.Source : _sources[0];
+        var first = _indexes.TryGetValue(channel, out var known) ? known.Source : _sources[0];
         var partial = home.Partial();
         try
         {
             var file = Path.Combine(partial, archive.File);
-            Download(source.ArchiveUrl(channel, release, archive), file, archive);
+            FromSomeSource([first, .. _sources.Where(s => !ReferenceEquals(s, first))], channel, release, archive, file);
             var tree = Path.Combine(partial, "toolchain");
             Unpack(file, tree);
             Check(tree, version, triple);
@@ -159,6 +256,27 @@ public sealed class ToolchainFetch
             try { Directory.Delete(partial, recursive: true); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         }
+    }
+
+    /// <summary>The archive into <paramref name="file"/> from the first source that has it as the
+    /// index says; the index is signed, so any source will do.</summary>
+    private void FromSomeSource(IReadOnlyList<ToolchainSource> sources, string channel, ChannelRelease release, ChannelArchive archive, string file)
+    {
+        var failures = new List<ToolchainException>();
+        foreach (var source in sources)
+        {
+            try
+            {
+                Download(_http, _progress, source.ArchiveUrl(channel, release, archive), file, archive, _stall);
+                return;
+            }
+            catch (ToolchainException failure)
+            {
+                failures.Add(failure);
+                if (!ReferenceEquals(source, sources[^1])) _warn?.Invoke(failure.Message);
+            }
+        }
+        throw failures.FirstOrDefault(f => f.Code == "LYR-CLI0024") ?? failures[0];
     }
 
     private byte[]? Get(string url, out string reason) => Get(_http, url, out reason);
@@ -188,13 +306,13 @@ public sealed class ToolchainFetch
         }
     }
 
-    private void Download(string url, string file, ChannelArchive archive) => Download(_http, _progress, url, file, archive);
-
     /// <summary>The archive at <paramref name="url"/> into <paramref name="file"/>, read no further
-    /// than the index's size and hashed on the way; its progress drawn on <paramref name="progress"/>.</summary>
+    /// than the index's size and hashed on the way; its progress drawn on <paramref name="progress"/>.
+    /// A source that sends no byte for the limit the client's sockets carry (see <see cref="Client"/>)
+    /// counts as gone; <paramref name="stall"/> names that limit in the message.</summary>
     /// <exception cref="ToolchainException"><c>LYR-CLI0023</c> where it cannot be had,
     /// <c>LYR-CLI0024</c> where it is not the size or the hash the index gives.</exception>
-    internal static void Download(HttpClient http, TextWriter? progress, string url, string file, ChannelArchive archive)
+    internal static void Download(HttpClient http, TextWriter? progress, string url, string file, ChannelArchive archive, TimeSpan? stall = null)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         long read = 0;
@@ -221,9 +339,10 @@ public sealed class ToolchainFetch
                 }
             }
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or IOException)
+        catch (Exception e) when (e is HttpRequestException or OperationCanceledException or IOException)
         {
-            throw new ToolchainException("LYR-CLI0023", $"{url}: {e.Message}");
+            var stalled = e is IOException { InnerException: SocketException { SocketErrorCode: SocketError.TimedOut } };
+            throw new ToolchainException("LYR-CLI0023", stalled ? $"{url}: nothing came for {(stall ?? DefaultStall).TotalSeconds:0.#} s" : $"{url}: {e.Message}");
         }
         finally
         {

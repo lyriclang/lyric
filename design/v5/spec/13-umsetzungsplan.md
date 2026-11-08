@@ -2551,3 +2551,27 @@ Die Zählung zeigt rund 100 Kommentare im Frontend, die noch von Bytecode und de
 **S6a, Text:** Die Lesung 10–16 gegen 01, 06, 09, 10, 11 (Befunde in drei Gruppen: Text, Abweichung Spec↔Bereich, Maintainer). Hier die erste: die Deadlock-Bedingung um das Warten auf das System erweitert (06 M6-12 — die Laufzeit tat es schon, geprüft mit `accept()` und `signals().recv()`), falsche Quellen (10 §12 r3/r4, 15 §5.2 r8), zwei doppelte Regeln (12 HTTP r4, 15 §5.3 r16), `position` → `firstWhere`, `Coroutine :: Identity`, `assert` mit Lambda, die Zeile `LYR-RT0020` in 13 §1.4, veraltete „folgt mit M…“-Sätze in 12 und 14. Die Köpfe der Kapitel bleiben bis zum Ende von S6.
 
 **S6b, Text:** Was gebaut ist und in keinem Kapitel stand: `std.test` (12 §Testing, drei Fälle — eine fehlgeschlagene Assertion panikt mit `LYR-RT0008` und dem, was sie bekam), `@Bench`, `@Warn` und `@Deny` in der geschlossenen Liste 11 §1 r7, `std.meta` reicht die Namen von `std.core` weiter (09 S10). Die Abweichungen Spec↔Bereich, bei denen das Gebaute der Spec folgt und die Bereichszeile nicht gebaut ist, gehen an S12 (Entscheidung oder Tür).
+
+## Nachtrag 2026-11-08 — M15 S6 und S7: was vom Plan abweicht
+
+**Anlass**: Die Halte S6 und S7 wurden mit dem Maintainer aufgenommen. Beim Lesen des Codes zeigten sich Lücken, die der
+Plan vom Oktober nicht sah; er nahm am 2026-11-05 alle sechs Abweichungen an. Sie gehen P2, P3 und P8 vor.
+
+| # | Entscheidung | Warum / Verworfen |
+|---|---|---|
+| E1 | **Drei Schlüssel** statt „ein Schlüssel“ (P2): `dev` (signiert in der CI ohne Freigabe), `stable` (in der CI hinter der Freigabe des Maintainers), Reserve (offline, nie auf GitHub). Das Binary trägt sie; ein Kanal nimmt seinen eigenen und die Reserve | Ein Schlüssel, der bei jedem Push automatisch signiert, nähme mit seinem Fall `stable` mit; ohne Reserve wäre ein Verlust das Ende aller Updates. Verworfen: Widerruf (kein Server, der ihn trägt) — `tooling/release-keys/README.md` sagt, was stattdessen zu tun ist |
+| E2 | **Environments statt Repository-Secrets**: `sign-dev` nur `main`, `sign-stable` `main` und `v5.*` mit Freigabe; ein Ruleset auf `main` (kein Force-Push, kein Löschen, nur per PR, 0 Freigaben). Der Signier-Job hat keinen Checkout, keinen Bau und keine Action von außerhalb GitHubs; alle Actions per Commit-Hash | Ein Repository-Secret kann jeder Workflow auf jedem Branch lesen. Bleibt offen: ein Admin-Token kann die Regeln ändern |
+| E3 | **Eine Quelle, die Falsches liefert, wird übergangen** (Spec 14 §13, ersetzt „never routed around“): das Paar Index + Signatur wird einmal neu geholt, dann die nächste Quelle mit Warnung; Archive ebenso; `LYR-CLI0024` erst, wenn keine Quelle Haltbares liefert. Ein Download ohne Byte für 60 s zählt als weg, ein Verbindungsaufbau hat 10 s | Annehmbar macht nur Signatur und Hash, eine weitere Quelle kann nichts verschlimmern, aber ein kaputter Mirror hielte sonst jede Installation an. Index und Signatur sind zwei Anfragen, ein Upload dazwischen ergäbe sonst einen harten Fehler. `lyric toolchain install zig` hielt es schon so |
+| E4 | **Upload in zwei Schritten** (P8): nach `incoming/<id>/`, dann `publish <id>` über ein Gate-Skript auf dem Server. `deploy` braucht eine Shell, denn `sshd` startet den erzwungenen Befehl über sie; `restrict` nimmt ihm alles andere. Kommt mit S7 | `rrsync` allein kann weder atomar veröffentlichen noch aufräumen |
+| E6 | **Der Mirror heißt `dl.lyriclang.de`** und läuft auf einem eigenen VPS statt neben den anderen Projekten des Maintainers (P8, 14 C9, P3). Der Name steht im Binary, darum vor der ersten signierten Build. Die Seite bleibt auf `lyric.oil1i.de` | Der Mirror braucht fast nichts (statische Dateien, unter 10 GB). Auf dem gemeinsamen Server hätte „Firewall 22/80/443“ die Gameserver getroffen, und der Upload-Zugang aus der CI läge neben allem anderen. Verworfen: `dl.lyric.oil1i.de` (hängt das Projekt an die private Domain) |
+| E5 | **Eine Nummer im Index** (P3): `sequence`, wachsend (Sekunden seit 1970 beim Bau); der Client merkt sich je Kanal und Signierer die höchste unter `~/.lyric/seen/` und lehnt niedrigere ab | Ein Mirror konnte einen alten, gültig signierten Index beliebig lange ausliefern. Eine frische Maschine merkt das weiterhin nicht |
+
+**Was S6 außerdem gefunden hat**: `dev.yml` gab allen Jobs `contents: write`, auch den Tests; ein neuer Push konnte den
+Lauf zwischen `gh release delete` und `create` abbrechen und ließ dann keinen Dev-Release zurück (jetzt: kein Abbruch, die
+neuen Dateien neben die alten, der Index zuletzt, die alten danach); die Version wurde je Matrix-Bein neu gestempelt und
+konnte über Mitternacht auseinanderlaufen; der Rückfall Mirror → GitHub hatte keinen Test, weil `LYRIC_MIRROR` beide
+ersetzt. Der Rückfall auf den echten GitHub-Pfad wartet auf S7.
+
+**Vor dem Veröffentlichen**: Je Lauf installiert der Job `Install trial` auf Linux, Windows und macOS das Signierte von
+einem Mirror auf der Maschine; was sich nicht installiert, wird nicht veröffentlicht. Ein Dispatch auf einem Branch fährt
+die ganze Kette mit einem Wegwerfschlüssel und veröffentlicht nichts.

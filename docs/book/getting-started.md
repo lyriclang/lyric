@@ -62,8 +62,22 @@ A command in that package then runs with an installed toolchain that is 5.1 or l
 where it is — whichever one you started; at a terminal, one is offered for installing where none
 is. `LYRIC_TOOLCHAIN=local` runs the one you started, and `LYRIC_TOOLCHAIN=5.1.0` a version.
 
-The channels are published from the first signed release on; until then `lyric toolchain` installs
-only from a mirror of your own, which `LYRIC_MIRROR` names with its key in `LYRIC_MIRROR_KEY`.
+`lyric toolchain` asks the mirror first and GitHub after it. What one of them serves wrongly is said
+in a warning and the other asked: only a signature and a hash make anything acceptable, wherever it
+came from. `LYRIC_MIRROR` names a mirror of your own in place of both, with its key in
+`LYRIC_MIRROR_KEY`.
+
+To check a first download by hand, before you have a `lyric` to do it for you, use
+[minisign](https://jedisct1.github.io/minisign/) and the key of its channel:
+
+```text
+dev      RWQM0eXpRYf8iCHBHUgYJPQOdE1oXy+fpGIov6Kz1PlP7Wp2llW+CCOv
+stable   RWRzuPHBZrHnLIGQOgkuBJqmlH9C0P5rHYKFHlPd/8S1dreWrbTox657
+reserve  RWShnZuifvfSSrKoQURRq3baivxxQTHuAXLJxOgsLU0Sz/R1JJ1P8RTH
+```
+
+A signature says that a file came out of the project's release pipeline. It says nothing about
+whether the code is good, and a toolchain trusts the keys it was built with for as long as it runs.
 
 `lyric env` says what a build here reads and where each value comes from — the C compiler and zig
 (`installed` or `PATH`), the profile, and each lint's level with who set it (`-D`, `[lints]`).

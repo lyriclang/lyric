@@ -1,7 +1,8 @@
 # Writes the fixtures of ToolchainCommandTests: a mirror as `lyric toolchain` reads one — the
 # channels' indexes signed the way minisign signs (with OpenSSL, sharing no code with the checker),
 # and for each version an archive per Tier 1 target holding a stand-in toolchain with its
-# toolchain.json —, plus a signed index that gives every archive a wrong hash. The secret key is
+# toolchain.json —, plus a signed index that gives every archive a wrong hash and an older signed
+# index of the dev channel. The secret key is
 # thrown away. The archives are byte for byte the same on every run but for the key.
 #
 #   python3 tests/Lyric5.Tests/toolchain/make.py      (needs openssl 3 on the PATH)
@@ -125,13 +126,18 @@ for channel, versions in [('dev', DEV), ('stable', STABLE)]:
                 f.write(data)
             archives[triple] = {'file': file, 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
         releases.append({'version': version, 'date': '2026-11-' + (version[16:18] if channel == 'dev' else '05'), 'archives': archives})
-    index = {'channel': channel, 'versions': releases}
+    index = {'channel': channel, 'sequence': 1000, 'versions': releases}
     path = os.path.join(MIRROR, channel + '.json')
     text = (json.dumps(index, indent=2) + '\n').encode()
     with open(path, 'wb') as f:
         f.write(text)
     key.minisig(text, path)
     if channel == 'dev':
+        path = os.path.join(HERE, 'older-dev.json')
+        text = (json.dumps({**index, 'sequence': 999}, indent=2) + '\n').encode()
+        with open(path, 'wb') as f:
+            f.write(text)
+        key.minisig(text, path)
         for release in index['versions']:
             for archive in release['archives'].values():
                 archive['sha256'] = '0' * 64

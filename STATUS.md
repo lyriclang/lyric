@@ -56,7 +56,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M13b | LSP, DAP, clients | XL | **done** 2026-10-26 |
 | M14 | FFI and embedding | L | **done** 2026-10-28 |
 | M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | **done** 2026-10-29 |
-| M15 | Distribution | M | **done** 2026-10-29 but its halts (S6 signing; S7 mirror set aside by the maintainer 2026-11-04) |
+| M15 | Distribution | M | **done** 2026-10-29 but its halts (S6 signing in progress with the maintainer 2026-11-05; S7 mirror next) |
 | M16 | Migration (`lyric fix --from-4`) | L | **done** 2026-11-06 |
 | P | std by subject module (design 10 P1–P12, plan in 13) | L | **done** 2026-11-04 |
 | M17 | Spec 5.0, suite, Book; the 4.x remains leave | XL (measured, was L) | open: plan in 13 |
@@ -1449,6 +1449,11 @@ archive with its runtime prebuilt, minisign signatures and the channel index che
 (install, list, switch, remove, `install zig`, `env`), a package's pin hands the command to its toolchain, the ICE
 report, Lyric names in the C, the measured `lyric dap` on Windows. **S6** (signing the releases) and **S7** (the
 mirror) wait for the maintainer's key and DNS; S9 closes after them.
+
+**S6, 2026-11-05**, with the maintainer, who made the keys and the environments. The plan's departures E1–E6 are in
+design 13's addendum of that day; open points 301 and 303 close: a fixture signed by `minisign` itself, zig's key against
+zig's signature, and one real `lyric toolchain install zig` against zig's page and mirrors. Still unproven: the release
+pipeline's tag path, which runs only with a real tag.
 
 ### M14b — done (2026-10-29)
 

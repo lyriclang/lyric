@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Read the specification's pin
         id: pin
@@ -39,7 +39,7 @@ jobs:
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Checkout the specification
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: lyriclang/lyric-spec
           ref: ${{ steps.pin.outputs.sha }}
@@ -72,7 +72,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # main is dev; a tag vX.Y.Z is the frozen X.Y, its links into the repository at the tag.
       - name: Decide what is being published
@@ -98,7 +98,7 @@ jobs:
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Checkout the specification
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: lyriclang/lyric-spec
           ref: ${{ steps.pin.outputs.sha }}
@@ -110,7 +110,7 @@ jobs:
       # A second working tree of this repository on the publishing branch. Cloned rather than
       # initialised, so 'origin' and the push credentials are already in place.
       - name: Checkout the published site
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: gh-pages
           path: pages

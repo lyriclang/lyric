@@ -180,10 +180,11 @@ public class ToolchainCommandTests
         {
             server.Asked.Clear();
             Refused("LYR-CLI0023", "LYRIC_MIRROR_KEY is set and LYRIC_MIRROR is not");
-            using (Variable("LYRIC_MIRROR_KEY", null))
-                Refused("LYR-CLI0023", "this toolchain carries no key to check a channel's signature with");
             Assert.Empty(server.Asked);
         }
+        // a mirror that names no key is checked with the project's, which did not sign these
+        using (Variable("LYRIC_MIRROR_KEY", null))
+            Refused("LYR-CLI0024", "the index of the channel 'dev' from http://127.0.0.1:");
     }
 
     [Fact]
