@@ -19,7 +19,7 @@ public class LegacyTests
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             File.WriteAllText(file, text);
         }
-        Put("CNAME", "lyric.oil1i.de");
+        Put("CNAME", "lyriclang.de");
         Put(".nojekyll", "");
         Put("index.html", "<meta http-equiv=\"refresh\" content=\"0; url=v2.0.0/\" />");
         Put("versions.json", "[{ \"version\": \"nightly\", \"stable\": false }, { \"version\": \"v2.0.0\", \"stable\": true }, { \"version\": \"v1.0.0\", \"stable\": true }]");

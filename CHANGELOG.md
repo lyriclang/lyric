@@ -16,6 +16,9 @@ Lyric 5 is built on `main` along [`design/v5/spec/13-umsetzungsplan.md`](design/
 Nothing here is released; the rolling `dev` prerelease carries the current state without any
 promise. This entry fills with the milestones.
 
+- **The website moved to <https://lyriclang.de>.** Every diagnostic's link and the editor's
+  "explain" action point there. <https://lyric.oil1i.de> sends every address on to the same path at the
+  new name, so the links older toolchains print keep working.
 - **The Lyric 5 migration warnings are gone** (`LYR-SEM0107`–`SEM0110`, added for 4.6): the
   design decided a hard cut with no 4.x warning stages toward 5.
 - **A runtime in C (M1** — `design/v5/spec/01`, spec chapter 13 §1**):** a program links

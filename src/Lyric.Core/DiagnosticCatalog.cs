@@ -237,7 +237,7 @@ public static class DiagnosticCatalog
     }
 
     /// <summary>The website, under which every version of the toolchain has its pages.</summary>
-    public const string Site = "https://lyric.oil1i.de";
+    public const string Site = "https://lyriclang.de";
 
     /// <summary>A code's page under a version's root: <c>diagnostics/LYR-SEM0001/</c>.</summary>
     public static string PagePath(string code) => $"diagnostics/{code}/";
