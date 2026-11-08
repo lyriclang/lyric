@@ -283,7 +283,8 @@ no bound leaves the type. A range of characters has its values the scalar values
 the surrogates passed over, its first <code>'\0'</code> and its last <code>'\u{10FFFF}'</code>. A range walked
 changes: <code>start</code> and <code>end</code> are <code>var</code>.</li>
 <li>A <strong><code>Coroutine&lt;T&gt;</code></strong> is an <code>Iterator</code> of <code>T</code> and <code>Closeable</code>, built in (design 10 B6 I7): its
-<code>Error</code> is what it throws, <code>never</code> where nothing, and it conforms to nothing else. A loop over
+<code>Error</code> is what it throws, <code>never</code> where nothing; it is an <code>Identity</code> (design 06 A7) and
+conforms to nothing else. A loop over
 one pulls it and closes it on its way out (<a href="../../spec/07-statements/">07 §2</a> rule 7): left early, its
 stack unwinds and its defers run.</li>
 <li>The <strong>adapters</strong> are members of every iterator (design 10 B6 I3, I4), each giving a struct of
@@ -324,7 +325,7 @@ differ — reduced once both are known; open, it covers each of its parts.</li>
 <li>A <strong>function an adapter or a terminator takes may throw</strong> (design 05 K4; 13 M8c P2): <code>map</code>,
 <code>filter</code>, <code>takeWhile</code>, <code>skipWhile</code> and <code>inspect</code> take a <code>fn(…) -&gt; … throws E</code> and give an
 iterator whose <code>Error</code> is <code>Join&lt;I.Error, E&gt;</code>; <code>fold</code>, <code>reduce</code>, <code>any</code>, <code>all</code>, <code>none</code>, <code>find</code>,
-<code>position</code> and <code>forEach</code> throw <code>Join&lt;I.Error, E&gt;</code>. <code>E</code> is what the function throws, bound at the
+<code>firstWhere</code> and <code>forEach</code> throw <code>Join&lt;I.Error, E&gt;</code>. <code>E</code> is what the function throws, bound at the
 call, and <code>never</code> where it throws nothing — then nothing is joined and no <code>try</code> stands:
 <code>words.iter().map((s) =&gt; try int.parse(s))</code> is walked with <code>try</code>, <code>xs.iter().map((x) =&gt; x * 2)</code>
 without.</li>
@@ -482,8 +483,8 @@ the same nine bytes.</li>
 </ul>
 <h2 id="input-and-output">Input and output</h2>
 <p>The core of <code>std.io</code>, its buffers and its text (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 O1–O3</a>;
-M8b S2, S3 and S10a). The files, the console's streams and the network follow with M8b's later
-slices.</p>
+M8b S2, S3 and S10a). The files, the console's streams and the network have sections of their
+own below.</p>
 <ol>
 <li><strong><code>IoError</code></strong> is the one error that input and output throw (O3), a struct: <code>kind: IoErrorKind</code>, <code>path: ?string</code>, <code>detail: string</code> and <code>inner: ?Error</code> — the field O3 calls
 <code>cause</code>, named so because <code>Error</code> asks for a method <code>cause()</code> and a type's members do not share
@@ -623,7 +624,8 @@ type's name (<a href="../../spec/07-statements/">07</a> K5), so they carry <code
 </ol>
 <h2 id="time">Time</h2>
 <p><code>std.time</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 Q1</a>; M8b S5a, S5b): spans, the system's two clocks,
-the calendar and RFC 3339. The time zones' database and the format patterns follow with M10.</p>
+the calendar and RFC 3339; the time zones' database and the format patterns are <strong>The zones</strong>
+below.</p>
 <ol>
 <li><strong><code>Duration</code></strong> is a span in whole nanoseconds, negative or not: <code>ofNanos</code>, <code>ofMicros</code>,
 <code>ofMillis</code>, <code>ofSecs</code>, <code>ofMinutes</code>, <code>ofHours</code>; <code>nanos()</code>, <code>millis()</code> and <code>secs()</code> rounded toward
@@ -657,7 +659,7 @@ Dates and times compare and order; a date's text is ISO 8601's <code>YYYY-MM-DD<
 without trailing zeros. Both read back from their texts (<code>Parse</code>): <code>Time.parse(&quot;09:30:00.5&quot;)</code>
 takes up to nine digits of fraction and refuses an offset, which is a <code>DateTime</code>'s.</li>
 <li><strong>A zone</strong> is a fixed offset from UTC: <code>Zone.utc</code>, <code>Zone.fixed(offset)</code> — whole minutes under
-a day, else <code>TimeError</code>. <em>(Informative.)</em> The zones of a database come with M10.</li>
+a day, else <code>TimeError</code>. A zone of the database is in <strong>The zones</strong> below.</li>
 <li><strong><code>DateTime</code></strong> is a date and a time of day at an offset: <code>DateTime.of(date, time, zone)</code>,
 <code>instant.toDateTime(zone)</code>, <code>toInstant()</code>, <code>date()</code>, <code>time()</code>, <code>offset()</code>. Two compare field by
 field — one moment at two offsets is two date-times, one instant.</li>
@@ -728,8 +730,8 @@ empty ones and <code>.</code>, keeping <code>..</code>; nothing is normalized.</
 </ol>
 <h2 id="files">Files</h2>
 <p><code>std.fs</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">design 10 O4, O5</a>; M8b S6b, S6c): <code>File</code>, a handle on a file, and the
-conveniences that read or write a file whole or its lines one by one. The directories follow
-with S7.</p>
+conveniences that read or write a file whole or its lines one by one. The directories are the
+next section's.</p>
 <ol>
 <li><strong><code>File.open(path)</code></strong> opens to read, <strong><code>File.create(path)</code></strong> to write — made where it is not
 there, cut to nothing where it is —, <strong><code>File.openWith(path, options)</code></strong> as an <code>OpenOptions</code>
@@ -1017,26 +1019,6 @@ that is none, a <code>Content-Length</code> that is no number, a folded line, mo
 line beyond 64 KiB), a body that ends early or a chunk that is none (<code>IoError</code>,
 <code>UnexpectedEof</code> or <code>InvalidData</code>). The errors of the connection are <code>IoError</code>, a cancel
 <code>Cancelled</code>. <code>http.get(text)</code> is a GET with the defaults and redirects followed.</p>
-</li>
-<li><p><strong>The server</strong> (M10 S8). <code>Server.bind(addr, options)</code> with <code>ServerOptions { keepAlive = true, serverName = &quot;lyric5&quot; }</code>, <code>localAddr()</code>, <code>serve(handler)</code> — <code>handler: fn(Request) -&gt; Response throws Error</code> — and <code>shutdown()</code>. <code>serve</code> accepts until the listener is closed and takes a task
-per connection; on it each request is read as the client writes one: the request line
-(origin-form, absolute-form or <code>*</code>; HTTP/1.1 or 1.0), the headers (§3's limits), the body
-framed by <code>Content-Length</code> or <code>Transfer-Encoding: chunked</code> and given to the handler as the
-request's <code>body</code> (a <code>Reader</code>; <code>request.bytes()</code>, <code>text()</code>, <code>json&lt;T&gt;()</code> read it whole; a body
-the handler leaves is read away before the next request). <code>Expect: 100-continue</code> is answered
-with <code>100 Continue</code> before the handler runs. The handler's response goes out as <code>HTTP/1.1</code>
-with <code>Server</code>, <code>Content-Length</code> where the body's length is known and in chunks else, nothing
-for a HEAD, a 204, a 304 or a 1xx; <code>Response.of(status, bytes, contentType)</code>,
-<code>Response.withText(text, status)</code>, <code>Response.withJson(value, status)</code>, <code>Response.stream(status, reader, length)</code> and <code>Response.empty(status)</code> make one, its <code>headers</code> are the handler's to
-set. A handler that throws answers <code>500</code> with the error's message as text. The connection
-stays for the next request unless the request was HTTP/1.0 without <code>keep-alive</code>, a side said
-<code>Connection: close</code>, <code>keepAlive</code> is off, or the server is shutting down; it is closed after
-the peer's remaining bytes are read away (a close with bytes unread would reset it and lose the
-answer). A request that is none — a request line or version that is none, no <code>Host</code> under
-HTTP/1.1, a target that is no URI, a <code>Content-Length</code> that is no number, a transfer encoding
-that is not chunked, a folded line — is answered <code>400 Bad Request</code> with the reason as text and
-the connection closed. <code>shutdown()</code> closes the listener (<code>serve</code> returns), closes the
-connections waiting for a request, and lets a request under way be answered first.</p>
 </li>
 <li><p><strong>The server</strong> (M10 S8). <code>Server.bind(addr, options)</code> with <code>ServerOptions { keepAlive = true, serverName = &quot;lyric5&quot; }</code>, <code>localAddr()</code>, <code>serve(handler)</code> — <code>handler: fn(Request) -&gt; Response throws Error</code> — and <code>shutdown()</code>. <code>serve</code> accepts until the listener is closed and takes a task
 per connection; on it each request is read as the client writes one: the request line

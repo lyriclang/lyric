@@ -101,7 +101,7 @@ is refused (<code>LYR-PKG0002</code>).</li>
 <p>The packages a package imports from (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V7</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases that hold their dependencies in
 their own directories, and the git repositories they read as their versions
-(<a href="https://github.com/lyriclang/lyric-spec/blob/0b6a27efdeb41381d2bfd2376cc4ddf4ac64b9c4/conformance/README.md">the suite's README</a>); the toolchain's own tests
+(<a href="https://github.com/lyriclang/lyric-spec/blob/70aa9e9bd95b1a62a83f51880e8c0cd1e389c0a6/conformance/README.md">the suite's README</a>); the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>: <code>DependencyTests</code>, <code>GitDependencyTests</code>, <code>PackageContentTests</code>).</p>
 <ol>
 <li><code>[dependencies]</code> names them, each where it is read from: a directory,
@@ -279,7 +279,7 @@ ELF library without a <code>soname</code> would be recorded by the path it was l
 machine's; each is refused (<code>LYR-BLD0006</code>, exit 1), the message saying how to name it. A shared library of
 the system is linked by name (<code>libs</code>); one the program finds while it runs is <code>std.ffi</code>'s
 <code>Library</code> (<a href="../../spec/13-abi/">13 §5</a>). <em>(Rule 8 replaces, the same day, a rule that refused every
-shared library of a package — <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07, E3′</a>.)</em></p>
+shared library of a package — <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11, E3′</a>.)</em></p>
 </li>
 <li><p><strong><code>frameworks = [&quot;Cocoa&quot;]</code></strong> are macOS frameworks, linked as <code>-framework Cocoa</code>: a key of
 <code>[native.macos]</code> and of the macOS triples' tables only (<code>LYR-PKG0003</code> elsewhere).</p>
@@ -357,9 +357,6 @@ has needed is not held. Under <code>--locked</code> a build that needs a tree th
 refused (<code>LYR-PKG0011</code>), as §3 rule 4 refuses a revision. <strong><code>lyric update</code></strong> reads the trees
 the lock holds anew — those it names, or every one —, a branch at its head and a moved tag at
 its commit; a tree's tag is not raised, as a tree has no version.</p>
-</li>
-<li><p>A tree runs nothing: it is compiled, as the package's sources are, and no trust is asked for it
-(§8 rule 6). What an archive does, its bytes say; the lock holds them.</p>
 </li>
 <li><p>A tree runs nothing: it is compiled, as the package's sources are, and no trust is asked for it
 (§8 rule 6). What an archive does, its bytes say; the lock holds them.</p>

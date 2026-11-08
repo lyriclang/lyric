@@ -216,7 +216,7 @@ with the line <code>panic while panicking [CODE]: message</code>, still with 101
 </tr>
 <tr>
 <td><code>LYR-RT0011</code></td>
-<td><code>assert(condition, message)</code> with a false condition: <code>assertion failed: </code>, the condition as written, then the message where one is given (<a href="../../spec/06-errors/#9-panics-and-never">06 §9</a>)</td>
+<td><code>assert(condition, message)</code> with a false condition — the message a lambda, called then: <code>assertion failed: </code>, the condition as written, then the message where one is given (<a href="../../spec/06-errors/#9-panics-and-never">06 §9</a>)</td>
 </tr>
 <tr>
 <td><code>LYR-RT0012</code></td>
@@ -244,23 +244,27 @@ with the line <code>panic while panicking [CODE]: message</code>, still with 101
 </tr>
 <tr>
 <td><code>LYR-RT0018</code></td>
-<td>every task of a thread waits, none sleeps, and no other thread lives that could wake one: <code>deadlock: every task waits, and nothing can wake one</code>, raised in one of the waiting tasks (<a href="../../spec/10-concurrency/">10 §2</a> rule 12)</td>
+<td>every task of a thread waits, none sleeps or waits for the system (a socket, a pipe, a signal's channel), and no other thread lives that could wake one: <code>deadlock: every task waits, and nothing can wake one</code>, raised in one of the waiting tasks (<a href="../../spec/10-concurrency/">10 §2</a> rule 12)</td>
 </tr>
 <tr>
 <td><code>LYR-RT0019</code></td>
 <td><code>lock</code>, <code>read</code>, <code>write</code> or <code>run</code> on a lock a task panicked while it held: <code>lock poisoned by a panic: &lt;code&gt;: &lt;message&gt;</code>, the first panic named (<a href="../../spec/10-concurrency/">10 §10</a> rule 6)</td>
 </tr>
 <tr>
+<td><code>LYR-RT0020</code></td>
+<td>the runtime found its own invariant broken — a bug of the runtime or the compiler, never of the program (<a href="../../spec/appendix-a-diagnostics/">appendix A</a>)</td>
+</tr>
+<tr>
 <td><code>LYR-RT0021</code></td>
 <td>a C function returned, for an enum with <code>@Layout</code>, an integer no variant stands for: <code>C returned &lt;n&gt;, which is no variant of &lt;enum&gt; (it has &lt;count&gt;)</code> (§3 rule 5)</td>
 </tr>
 <tr>
-<td><code>LYR-RT0023</code></td>
-<td>a <code>GcHandle</code> read as a handle of another class than its object's, or of none (§3 rule 12)</td>
-</tr>
-<tr>
 <td><code>LYR-RT0022</code></td>
 <td>C called a Lyric function through its pointer on a thread Lyric does not run: <code>C called a Lyric function on a thread Lyric does not run …</code> — but for a Callback's that returns nothing, which goes to its thread (§3 rules 9, 13); or an export before the runtime started: <code>C called an export before lyr_init started the runtime</code> (§4 rule 6)</td>
+</tr>
+<tr>
+<td><code>LYR-RT0023</code></td>
+<td>a <code>GcHandle</code> read as a handle of another class than its object's, or of none (§3 rule 12)</td>
 </tr>
 </tbody>
 </table>
@@ -306,11 +310,11 @@ coroutine (<code>lyr/coro.h</code>); generators, tasks and channels are built on
 on. A yield goes back to the coroutine's resumer — the thread's own stack, or the coroutine
 that resumed it — and nowhere else (asymmetric), and nothing interrupts a coroutine between a
 resume and its next yield (cooperative).</li>
-<li>A coroutine's stack is reserved at its first resume — 256 KiB in the release profile and
-2 MiB in the others, whose unoptimized frames are some four times as large, unless its
-creation says otherwise (the sweep after M10, W5) — and costs memory only as its pages are
-reached. Running out of it is a stack overflow (<code>LYR-RT0006</code>, §1.4 item 7), as on a thread's
-stack.</li>
+<li>A coroutine's stack is reserved at its first resume — 256 KiB in the release profile and 2 MiB in
+the others, whose unoptimized frames are some four times as large, unless its creation says
+otherwise (the sweep after M10, W5) — a size the runtime's interface takes (<code>lyr_coro_new</code>,
+<code>lyr_task_start</code>), not one a program writes — and costs memory only as its pages are reached.
+Running out of it is a stack overflow (<code>LYR-RT0006</code>, §1.4 item 7), as on a thread's stack.</li>
 <li>A coroutine runs on the thread that first resumed it, and only there.</li>
 <li>A coroutine is an object. While it is suspended, what its frames hold lives as long as the
 coroutine: one that nothing references any more is collected with its stack, and nothing on
