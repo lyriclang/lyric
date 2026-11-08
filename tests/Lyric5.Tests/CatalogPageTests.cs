@@ -82,7 +82,7 @@ public class CatalogPageTests
     public void A_toolchain_names_the_page_of_its_own_version(string version, string site)
     {
         Assert.Equal(site, DiagnosticCatalog.SiteVersion(version));
-        Assert.Equal($"https://lyric.oil1i.de/{site}/diagnostics/LYR-SEM0001/", DiagnosticCatalog.PageUrl("LYR-SEM0001", version));
+        Assert.Equal($"https://lyriclang.de/{site}/diagnostics/LYR-SEM0001/", DiagnosticCatalog.PageUrl("LYR-SEM0001", version));
     }
 
     private static readonly IReadOnlyList<SpecChapter> Chapters =

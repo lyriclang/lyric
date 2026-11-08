@@ -90,7 +90,7 @@ public sealed class CodeActionTests
     {
         var (diagnostics, _) = await ActionsFor("fn main(): int {\n    let x: int = \"no\";\n    return x;\n}\n");
         var finding = Assert.Single(diagnostics.EnumerateArray());
-        Assert.Equal("https://lyric.oil1i.de/5.0/diagnostics/LYR-SEM0001/",
+        Assert.Equal("https://lyriclang.de/5.0/diagnostics/LYR-SEM0001/",
             finding.GetProperty("codeDescription").GetProperty("href").GetString());
     }
 }
