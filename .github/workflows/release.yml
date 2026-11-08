@@ -117,6 +117,8 @@ jobs:
     name: Sign
     needs: [stamp, index]
     uses: ./.github/workflows/sign.yml
+    # an environment's secrets reach a called workflow only through this
+    secrets: inherit
     with:
       environment: sign-stable
       public_key: ${{ needs.stamp.outputs.public_key }}
@@ -138,6 +140,8 @@ jobs:
     name: Mirror
     needs: [stamp, install-trial]
     uses: ./.github/workflows/mirror-upload.yml
+    # an environment's secrets reach a called workflow only through this
+    secrets: inherit
     with:
       target: ${{ needs.stamp.outputs.dry_run == 'true' && 'staging' || 'stable' }}
       known_hosts: ${{ needs.stamp.outputs.known_hosts }}

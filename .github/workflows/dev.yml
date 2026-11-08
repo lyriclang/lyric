@@ -156,6 +156,8 @@ jobs:
     name: Sign
     needs: [stamp, index]
     uses: ./.github/workflows/sign.yml
+    # an environment's secrets reach a called workflow only through this
+    secrets: inherit
     with:
       environment: ${{ needs.stamp.outputs.trial != 'true' && 'sign-dev' || '' }}
       public_key: ${{ needs.stamp.outputs.trial != 'true' && needs.stamp.outputs.public_key || '' }}
@@ -179,6 +181,8 @@ jobs:
     needs: [stamp, install-trial]
     if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/mirror-upload.yml
+    # an environment's secrets reach a called workflow only through this
+    secrets: inherit
     with:
       target: dev
       known_hosts: ${{ needs.stamp.outputs.known_hosts }}
