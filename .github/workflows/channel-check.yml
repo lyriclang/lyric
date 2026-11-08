@@ -1,0 +1,88 @@
+name: Channel check
+
+# The channel as a user finds it, from the addresses a toolchain carries: on each system lyric5
+# installs it once with GitHub blocked, so that only the mirror can serve it, and once with the mirror
+# blocked, so that only GitHub can.
+on:
+  workflow_call:
+    inputs:
+      channel:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: Install (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, os: ubuntu-latest }
+          - { rid: win-x64,   os: windows-latest }
+          - { rid: osx-arm64, os: macos-latest }
+
+    steps:
+      - name: This target's archive
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: dist-${{ matrix.rid }}
+          path: files
+
+      - name: Install, from one source at a time
+        shell: bash
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          VERSION: ${{ inputs.version }}
+          RID: ${{ matrix.rid }}
+        run: |
+          set -euo pipefail
+          first="$RUNNER_TEMP/first"
+          mkdir -p "$first"
+          if [ "$RID" = "win-x64" ]; then
+            7z x -o"$first" files/*.zip > /dev/null
+            bin=lyric5.exe
+            hosts=/c/Windows/System32/drivers/etc/hosts
+          else
+            tar -xzf files/*.tar.gz -C "$first"
+            bin=lyric5
+            hosts=/etc/hosts
+          fi
+          cp "$hosts" "$RUNNER_TEMP/hosts"
+
+          # one name per line at 127.0.0.1 and ::1: a refused connection, at once
+          block() {
+            cp "$RUNNER_TEMP/hosts" "$RUNNER_TEMP/hosts.new"
+            for name in "$@"; do
+              printf '127.0.0.1 %s\n::1 %s\n' "$name" "$name" >> "$RUNNER_TEMP/hosts.new"
+            done
+            if [ "$RID" = "win-x64" ]; then
+              cp "$RUNNER_TEMP/hosts.new" "$hosts"
+              ipconfig //flushdns > /dev/null
+            else
+              sudo cp "$RUNNER_TEMP/hosts.new" "$hosts"
+              if [ "$RID" = "osx-arm64" ]; then sudo dscacheutil -flushcache; fi
+            fi
+          }
+
+          from() {
+            export LYRIC_HOME="$RUNNER_TEMP/home-$1"
+            "$first/$bin" toolchain install "$CHANNEL"
+            out=$("$LYRIC_HOME/bin/$bin" --version | head -1 | tr -d '\r')
+            echo "$1: $out"
+            [ "$out" = "lyric $VERSION" ]
+          }
+
+          block github.com objects.githubusercontent.com release-assets.githubusercontent.com
+          from mirror
+
+          block dl.lyriclang.de
+          from github
+
+          block

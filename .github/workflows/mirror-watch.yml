@@ -1,0 +1,40 @@
+name: Mirror watch
+
+# From outside, once a day: does the mirror answer, is its certificate good for a while, and does it
+# keep up with GitHub? A failed run mails the maintainer. Its one job holds no secret.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    name: Watch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Answers, certificate, freshness
+        run: |
+          set -euo pipefail
+          host=dl.lyriclang.de
+          curl -fsS --max-time 30 -o mirror.json "https://$host/dev.json"
+          curl -fsS --max-time 30 -o mirror.json.minisig "https://$host/dev.json.minisig"
+          curl -fsSL --max-time 60 -o github.json https://github.com/lyriclang/lyric/releases/download/dev/dev.json
+
+          days=14
+          echo | openssl s_client -connect "$host:443" -servername "$host" 2> /dev/null | openssl x509 -noout -enddate -checkend $((days * 86400)) \
+            || { echo "::error::the certificate runs out within $days days: its renewal is failing"; exit 1; }
+
+          mirror=$(jq .sequence mirror.json)
+          github=$(jq .sequence github.json)
+          newest=$(jq -r '.versions[0].archives | to_entries[0].value.file' mirror.json)
+          curl -fsS --max-time 30 -I "https://$host/dev/$newest" > /dev/null \
+            || { echo "::error::the index on the mirror names $newest, which it does not serve"; exit 1; }
+          echo "mirror $mirror, github $github"
+          # a push may be on its way: a day behind is the alarm, not a minute
+          if [ "$mirror" -lt $((github - 86400)) ]; then
+            echo "::error::the mirror is more than a day behind GitHub"
+            exit 1
+          fi

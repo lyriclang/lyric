@@ -335,6 +335,9 @@ promise. This entry fills with the milestones.
   holds. **A channel's index carries a number** (`sequence`), and a machine refuses one lower than it
   has seen. A download that stalls for 60 seconds counts as a source that is gone. The mirror is
   `dl.lyriclang.de`.
+- **The mirror is up (M15):** `https://dl.lyriclang.de` serves the toolchains, and `lyric toolchain`
+  asks it before GitHub. Each dev build is uploaded on its way out and then installed from each
+  source on Linux, Windows and macOS. Dev keeps its last ten versions there.
 - **A C struct's pointer field may be null** (spec chapter 13 §3 rules 1 and 4): a `@Layout(C)` struct takes
   `?Ptr<T>` and `?CStr` fields, one word as C's pointer — a `?Ptr` is now its address everywhere, 0 for none.
   `lyric bindgen` writes a struct's pointer fields optional and every field `var`, so `pos.x += 1` writes a bound
