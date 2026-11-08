@@ -247,9 +247,9 @@
 <h1>LYR-SEM0078</h1>
 <p class="code-title">a conformance or parent list entry that does not fit</p>
 <p class="meta">error · <a href="../../spec/05-interfaces/">spec 05-interfaces</a></p>
-<p>A <code>::</code> list of a type, an <code>extend</code> block or an interface names something that is not an interface, repeats an entry, or makes an interface inherit itself; an associated type's bound names a non-interface.</p>
+<p>A <code>::</code> list of a type, an <code>extend</code> block or an interface names something that is not an interface, repeats an entry, or makes an interface inherit itself; an associated type's or a type parameter's bound names a non-interface, or a type parameter repeats a bound.</p>
 <h2 id="explanation">Explanation</h2>
-<p>A conformance list says which interfaces a type satisfies, and a parent list which interfaces an interface extends; only interfaces stand there. Each entry is written once, and an interface's parent chain cannot lead back to itself.</p>
+<p>A conformance list says which interfaces a type satisfies, and a parent list which interfaces an interface extends; only interfaces stand there. Each entry is written once, and an interface's parent chain cannot lead back to itself. A type parameter's bounds are such a list too: <code>&lt;T :: [Display]&gt;</code> names an interface, once; <code>From&lt;int&gt;</code> and <code>From&lt;string&gt;</code> are two bounds.</p>
 <p>Name an interface, remove the repeated entry, or break the cycle.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">struct</span> <span class="ty">Meters</span> {

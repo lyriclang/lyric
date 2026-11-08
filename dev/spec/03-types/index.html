@@ -744,7 +744,9 @@ parameters take no default and no variadic rest (<code>LYR-PAR0060</code>).</li>
 may declare <strong>type parameters</strong>,
 <code>fn ident&lt;T&gt;(x: T): T</code>, <code>struct Pair&lt;A, B&gt; { … }</code>; a parameter may carry <strong>constraints</strong>,
 <code>&lt;T :: [Show, Eq&lt;T&gt;]&gt;</code>, the interfaces an argument must satisfy (<a href="../../spec/05-interfaces/">05</a>) — one also
-without the brackets, <code>&lt;T :: Show&gt;</code>, where a <code>,</code> after it begins the next parameter.
+without the brackets, <code>&lt;T :: Show&gt;</code>, where a <code>,</code> after it begins the next parameter. Only an
+interface bounds a parameter, and each bound is written once — <code>From&lt;int&gt;</code> and <code>From&lt;string&gt;</code>
+are two (<code>LYR-SEM0078</code>, as in a conformance list).
 Inside the declaration a value of type <code>T</code> has the members its constraints give it and no
 others (T18): the body is checked once, at the declaration, not per instance.</li>
 <li>An <strong>instance</strong> names the arguments: <code>Pair&lt;int, string&gt;</code>, <code>ident&lt;int&gt;</code>. Two argument lists

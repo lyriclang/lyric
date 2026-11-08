@@ -567,6 +567,9 @@ The grammar is written down as one EBNF in spec chapter 02, and every program of
 <code>continue</code> that goes to a loop around the <code>defer</code>, were accepted. A loop inside the body keeps
 its own jumps, and a lambda there its <code>return</code>.</p>
 </li>
+<li><p><strong>A type parameter's bound must be an interface, written once</strong> (<code>LYR-SEM0078</code>):
+<code>&lt;T :: [int]&gt;</code>, a struct as a bound, and <code>&lt;T :: [Display, Display]&gt;</code> were accepted.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
