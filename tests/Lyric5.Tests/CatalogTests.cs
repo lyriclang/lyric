@@ -105,6 +105,7 @@ public partial class CatalogTests
     {
         ["LYR-PAR0001"] = "the single-item parse of std.syntax and a macro's read-back reports into its own engine",
         ["LYR-SEM0090"] = "a range value without std.core: lyric5 always loads it",
+        ["LYR-PAR0006"] = "a literal's unknown suffix: the lexer refuses it first, and the decoder's check stays its guard",
     };
 
     [Fact]

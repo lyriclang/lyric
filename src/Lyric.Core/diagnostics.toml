@@ -1983,21 +1983,7 @@ title = "a numeric literal with an unknown suffix"
 severity = "error"
 area = "01-lexical"
 summary = "A numeric literal ends in letters that are no suffix. The lexer refuses such a literal first (LYR-LEX0003, LEX0004, LEX0006), so this code comes only together with that one."
-explanation = '''
-The suffixes are `i8` to `i64`, `u8` to `u64`, `f32` and `f64`. What else stands behind the digits is no part of the literal.
-
-Write one of the suffixes, or none.
-'''
-example = '''
-$ cat src/main.lyr
-fn main(): void {
-    let x = 10i7;
-    let _ = x;
-}
-$ lyric build
-error[LYR-LEX0003]: invalid suffix 'i7' on decimal literal
-error[LYR-PAR0006]: invalid integer suffix: 'i7'
-'''
+retired = "the lexer refuses every literal with letters that are no suffix first (LYR-LEX0003, LEX0004, LEX0006), and the decoder speaks only where the lexer said nothing"
 
 [LYR-PAR0007]
 title = "a numeric literal too large"
