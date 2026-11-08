@@ -18,9 +18,12 @@ Debian, set up by the scripts in `setup/`, each one read before it is run:
 | `20-ssh.sh apply <admin>` | keys alone, no root, only the admin and `deploy` | undoes itself after 10 minutes unless confirmed |
 | `30-firewall.sh apply` | in: 22, 80, 443 and ICMP, limited per address; out: free | undoes itself after 10 minutes unless confirmed |
 | `40-web.sh <name>` | Caddy with a certificate it fetches and renews; static files; logs of 14 days with shortened addresses | no |
+| `41-redirect.sh <old> <new>` | an old name of the site answers with a permanent redirect, path and all | no |
 | `50-deploy.sh <pub>` | the user `deploy`, whose one key reaches only `gate.py` | no |
 
-Nothing else belongs on this machine: no site, no build, no secrets of the project.
+Nothing else belongs on this machine: no site, no build, no secrets of the project. A redirect is the
+one exception, being as static as a file: `lyric.oil1i.de`, the site's name until 2026-11-08, sends every
+path on to `https://lyriclang.de`, so that the links old toolchains print keep working.
 
 To set up a new one, point the name at it, make an admin user with a key and a password for sudo, copy
 `setup/` over with `scp`, and run them in that order. Keep a session open across `20` and `30`, and

@@ -33,7 +33,7 @@ $name {
 	root * /srv/mirror/public
 
 	@root path /
-	respond @root "The download mirror of the Lyric toolchain. See https://lyric.oil1i.de/ and lyric toolchain install." 200
+	respond @root "The download mirror of the Lyric toolchain. See https://lyriclang.de/ and lyric toolchain install." 200
 
 	@index path /dev.json /dev.json.minisig /stable.json /stable.json.minisig
 	header @index Cache-Control "no-cache"
@@ -73,6 +73,10 @@ $name {
 	}
 }
 EOF
+# the redirects 41-redirect.sh put in place stay across a rerun
+if [ -n "$(ls /etc/caddy/redirects/*.caddy 2> /dev/null)" ]; then
+  printf '\nimport /etc/caddy/redirects/*.caddy\n' >> "$new"
+fi
 chmod 644 "$new"
 if ! caddy validate --adapter caddyfile --config "$new"; then
   echo "caddy refuses the configuration; the running one stays" >&2
