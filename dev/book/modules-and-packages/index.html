@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Modules and packages — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Modules and packages</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/errors/">Errors</a></li>
+<li><a href="../../book/interfaces-and-generics/">Interfaces and generics</a></li>
+<li><a href="../../book/collections/">Collections and iterators</a></li>
+<li><a class="current" href="../../book/modules-and-packages/">Modules and packages</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Modules and packages</h1>
+<p>A program grows past one file. In Lyric every file is a <strong>module</strong>, every directory under <code>src/</code>
+groups modules, and a <strong>package</strong> — a directory with a <code>lyric.toml</code> — is what you build, publish
+and depend on. This chapter is about how modules name each other, what one module lets the others
+see, and how a package takes in another.</p>
+<h2 id="a-file-is-a-module">A file is a module</h2>
+<p>A module's name is its file's path below <code>src/</code>, without <code>.lyr</code>, with the package's name in front.
+In a package named <code>shop</code>:</p>
+<pre><code class="language-text">shop/
+  lyric.toml
+  src/
+    main.lyr          the module shop.main — the program starts at its main
+    cart.lyr          shop.cart
+    pricing/
+      tax.lyr         shop.pricing.tax</code></pre>
+<p>A file writes no module header: where it lies is what it is called. A directory is no module of
+its own, only the place its files' names go through.</p>
+<h2 id="importing">Importing</h2>
+<p>An <code>import</code> names a module and what the file takes from it. The forms are the same for the
+standard library, for your own modules and for another package's:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println, print <span class="kw">as</span> write };
+<span class="kw">import</span> std.io;
+<span class="kw">import</span> std.math <span class="kw">as</span> m;
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    write(<span class="str">"6 * 7 = "</span>);
+    println(<span class="str">f"</span>{m.pow(<span class="num">6</span>, <span class="num">2</span>) + <span class="num">6</span>}<span class="str">"</span>);
+    io.println(<span class="str">"done"</span>);
+}</code></pre>
+<pre class="output"><code>6 * 7 = 42
+done</code></pre>
+<ul>
+<li><strong>Selective</strong>, <code>import std.io { println }</code>, takes the names in braces; <code>as</code> renames one.</li>
+<li><strong>Qualified</strong>, <code>import std.io;</code>, takes the module under its last name: <code>io.println</code>.</li>
+<li><strong>Aliased</strong>, <code>import std.math as m;</code>, takes it under another name: <code>m.pow</code>.</li>
+</ul>
+<p>The forms can stand side by side for one module, but each name is imported once: the same import
+written twice is an error. An import nothing uses is a warning, so a file's imports say what it
+really uses. There is no import of everything a module has.</p>
+<p>The <strong>prelude</strong> is imported everywhere without a line: <code>List</code>, <code>Map</code>, <code>Set</code>, <code>Result</code>, <code>Error</code>,
+<code>assert</code>, <code>panic</code> and the interfaces the language itself uses. <code>println</code> is not in it — writing to
+the console is something a file says it does.</p>
+<h2 id="what-a-module-shows">What a module shows</h2>
+<p>A declaration is seen by every module of its own package. A word in front changes that:</p>
+<pre><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> total(prices: <span class="ty">int</span>[]): <span class="ty">int</span> {
+    <span class="kw">var</span> sum = <span class="num">0</span>;
+    <span class="kw">for</span> (p <span class="kw">in</span> prices) {
+        sum += p;
+    }
+    <span class="kw">return</span> sum + tax(sum);
+}
+
+<span class="kw">private</span> <span class="kw">fn</span> tax(amount: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> amount / <span class="num">10</span>;
+}</code></pre>
+<ul>
+<li><strong><code>pub</code></strong> — every package may use it: it is the package's surface.</li>
+<li>no word — every module of this package, and no other package.</li>
+<li><strong><code>private</code></strong> — this module alone.</li>
+</ul>
+<p>A field or a method takes the same words: a <code>pub struct</code> may keep some fields <code>private</code>, so that
+only its own module can build it or change them.</p>
+<p>A package's <strong>root module</strong>, <code>src/lib.lyr</code>, is the name the package has for others: <code>import shop</code>
+reads it. With <code>pub import</code> it passes on what its modules declare, so that a user of the package
+writes <code>import shop { total }</code> without knowing which file <code>total</code> lives in:</p>
+<pre><code class="language-text">// src/lib.lyr
+pub import shop.cart { total };</code></pre>
+<h2 id="depending-on-another-package">Depending on another package</h2>
+<p>A package names the packages it uses under <code>[dependencies]</code> in its manifest — by a directory, or by
+a git repository and a tag:</p>
+<pre><code class="language-toml">[package]
+name = "shop"
+version = "0.1.0"
+
+[dependencies]
+money = { path = "../money" }
+http = { git = "https://github.com/example/http", tag = "v1.2.0" }</code></pre>
+<p><code>lyric add</code> writes such a line for you. The first build reads the git repositories, keeps them in
+the user's cache and writes <code>lyric.lock</code>: the exact commit of each, so that the next build — on
+another machine, in CI — reads the same code. <code>lyric update</code> reads the tags anew and moves the lock.</p>
+<p>A module imports from its own package, from <code>std</code>, and from the packages its manifest names — not
+from the packages those depend on. What a package uses, its manifest says.</p>
+<p>The next chapter, <a href="../../book/diagnostics/">What the compiler tells you</a>, is about the messages you meet when
+a program is not right yet.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/collections/">← Collections and iterators</a><a class="next" href="../../book/diagnostics/">What the compiler tells you →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

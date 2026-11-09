@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Interfaces and generics — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Interfaces and generics</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/errors/">Errors</a></li>
+<li><a class="current" href="../../book/interfaces-and-generics/">Interfaces and generics</a></li>
+<li><a href="../../book/collections/">Collections and iterators</a></li>
+<li><a href="../../book/modules-and-packages/">Modules and packages</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Interfaces and generics</h1>
+<p>Some code does not care which type it works on, as long as the type can do certain things: sort
+anything that can be compared, total the area of anything that has one. An <strong>interface</strong> names
+what a type must be able to do; a type <strong>conforms</strong> by doing it. A <strong>generic</strong> function or type
+takes the type as a parameter, bounded by the interfaces it needs.</p>
+<h2 id="interfaces">Interfaces</h2>
+<p>An interface lists methods. A type names the interfaces it conforms to after <code>::</code> and implements
+their methods; a method the interface writes out itself is a <strong>default</strong> the type may replace:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">interface</span> <span class="ty">Shape</span> {
+    <span class="kw">fn</span> area(): <span class="ty">float</span>;
+
+    <span class="kw">fn</span> describe(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="str">f"</span><span class="str">a shape of area </span>{<span class="kw">this</span>.area()}<span class="str">"</span>;
+    }
+}
+
+<span class="kw">struct</span> <span class="ty">Circle</span> :: [<span class="ty">Shape</span>] {
+    r: <span class="ty">float</span>,
+
+    <span class="kw">fn</span> area(): <span class="ty">float</span> {
+        <span class="kw">return</span> <span class="num">3.0</span> * <span class="kw">this</span>.r * <span class="kw">this</span>.r;
+    }
+}
+
+<span class="kw">struct</span> <span class="ty">Square</span> :: [<span class="ty">Shape</span>] {
+    side: <span class="ty">float</span>,
+
+    <span class="kw">fn</span> area(): <span class="ty">float</span> {
+        <span class="kw">return</span> <span class="kw">this</span>.side * <span class="kw">this</span>.side;
+    }
+
+    <span class="kw">fn</span> describe(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="str">f"</span><span class="str">a square of side </span>{<span class="kw">this</span>.side}<span class="str">"</span>;
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> shapes: <span class="ty">Shape</span>[] = [<span class="ty">Circle</span> { r = <span class="num">1.0</span> }, <span class="ty">Square</span> { side = <span class="num">2.0</span> }];
+    <span class="kw">for</span> (s <span class="kw">in</span> shapes) {
+        println(s.describe());
+    }
+}</code></pre>
+<pre class="output"><code>a shape of area 3.0
+a square of side 2.0</code></pre>
+<p>A value of type <code>Shape</code> holds any value that conforms, and a call on it reaches that value's own
+method — the circle's <code>area</code>, the square's <code>describe</code>. Which method runs is decided by the value,
+while the program runs; a call of a method on a struct or a class of known type is decided by the
+compiler.</p>
+<h3 id="which-one-is-it">Which one is it?</h3>
+<p>A <code>match</code> can ask an interface value for its type. <code>c: Circle</code> matches a circle and binds it as
+one, with its fields:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">interface</span> <span class="ty">Shape</span> {
+    <span class="kw">fn</span> area(): <span class="ty">float</span>;
+}
+
+<span class="kw">struct</span> <span class="ty">Circle</span> :: [<span class="ty">Shape</span>] {
+    r: <span class="ty">float</span>,
+
+    <span class="kw">fn</span> area(): <span class="ty">float</span> {
+        <span class="kw">return</span> <span class="num">3.0</span> * <span class="kw">this</span>.r * <span class="kw">this</span>.r;
+    }
+}
+
+<span class="kw">struct</span> <span class="ty">Square</span> :: [<span class="ty">Shape</span>] {
+    side: <span class="ty">float</span>,
+
+    <span class="kw">fn</span> area(): <span class="ty">float</span> {
+        <span class="kw">return</span> <span class="kw">this</span>.side * <span class="kw">this</span>.side;
+    }
+}
+
+<span class="kw">fn</span> kind(s: <span class="ty">Shape</span>): <span class="ty">string</span> {
+    <span class="kw">return</span> <span class="kw">match</span> (s) {
+        c: <span class="ty">Circle</span> =&gt; <span class="str">f"</span><span class="str">circle of radius </span>{c.r}<span class="str">"</span>,
+        _: <span class="ty">Square</span> =&gt; <span class="str">"square"</span>,
+        _ =&gt; <span class="str">"something else"</span>,
+    };
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(kind(<span class="ty">Circle</span> { r = <span class="num">1.0</span> }));
+    println(kind(<span class="ty">Square</span> { side = <span class="num">2.0</span> }));
+}</code></pre>
+<pre class="output"><code>circle of radius 1.0
+square</code></pre>
+<p>Asking a value its type is a fallback. Where each type should behave in its own way, a method of
+the interface says it better: the next type added cannot forget to implement it.</p>
+<h2 id="the-librarys-interfaces">The library's interfaces</h2>
+<p>Much of the language works through interfaces of the standard library. A type that conforms to
+<code>Display</code> is written by an f-string through its <code>show()</code>. <code>extend</code> adds a conformance to a type
+after the fact — your own type, or one of the library's:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">struct</span> <span class="ty">Point</span> :: [<span class="ty">Equatable</span>] {
+    x: <span class="ty">int</span>,
+    y: <span class="ty">int</span>,
+}
+
+<span class="kw">extend</span> <span class="ty">Point</span> :: [<span class="ty">Display</span>] {
+    <span class="kw">fn</span> show(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="str">f"</span><span class="str">(</span>{<span class="kw">this</span>.x}<span class="str">, </span>{<span class="kw">this</span>.y}<span class="str">)</span><span class="str">"</span>;
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> a = <span class="ty">Point</span> { x = <span class="num">1</span>, y = <span class="num">2</span> };
+    println(<span class="str">f"</span>{a}<span class="str"> </span>{a == <span class="ty">Point</span> { x = <span class="num">1</span>, y = <span class="num">2</span> }}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>(1, 2) true</code></pre>
+<p><code>Equatable</code> gives <code>==</code> and <code>!=</code>. For a struct whose fields are all equatable, naming the interface
+is enough: the comparison is field by field, and nothing has to be written. <code>Ordered</code> gives <code>&lt;</code> and
+the other comparisons, <code>Hashable</code> makes a value a key of a <code>Map</code>, and <code>Closeable</code> is what
+<a href="../../book/errors/#cleaning-up"><code>using let</code></a> closes.</p>
+<h2 id="generic-functions">Generic functions</h2>
+<p>A function takes type parameters in angle brackets. A <strong>bound</strong> after <code>::</code> says which interfaces
+an argument's type must conform to, and only what those interfaces give can be used in the body:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> largest&lt;<span class="ty">T</span> :: [<span class="ty">Ordered</span>]&gt;(xs: <span class="ty">T</span>[]): <span class="ty">T</span> {
+    <span class="kw">var</span> best = xs[<span class="num">0</span>];
+    <span class="kw">for</span> (x <span class="kw">in</span> xs) {
+        <span class="kw">if</span> (x &gt; best) {
+            best = x;
+        }
+    }
+    <span class="kw">return</span> best;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(<span class="str">f"</span>{largest([<span class="num">3</span>, <span class="num">9</span>, <span class="num">2</span>])}<span class="str"> </span>{largest([<span class="str">"pear"</span>, <span class="str">"apple"</span>])}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>9 pear</code></pre>
+<p>The call does not name <code>T</code>: the compiler finds it from the argument. The body is checked once,
+against the bound — <code>&gt;</code> is there because <code>Ordered</code> gives it — and the compiler then makes a copy of
+the function for each type it is called with, so a generic call costs what a plain one costs.</p>
+<h2 id="generic-types">Generic types</h2>
+<p>A struct, a class, an enum or an interface can take type parameters too:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">struct</span> <span class="ty">Pair</span>&lt;<span class="ty">A</span>, <span class="ty">B</span>&gt; {
+    first: <span class="ty">A</span>,
+    second: <span class="ty">B</span>,
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> p = <span class="ty">Pair</span> { first = <span class="num">1</span>, second = <span class="str">"one"</span> };
+    println(<span class="str">f"</span>{p.first}<span class="str"> </span>{p.second}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>1 one</code></pre>
+<p><code>List&lt;T&gt;</code>, <code>Map&lt;K, V&gt;</code> and <code>Result&lt;T, E&gt;</code> of the library are generic types of this kind. There is no
+relation between <code>Pair&lt;int, string&gt;</code> and <code>Pair&lt;int8, string&gt;</code>: they are two types, as <code>List&lt;Circle&gt;</code>
+and <code>List&lt;Shape&gt;</code> are.</p>
+<p>The next chapter, <a href="../../book/collections/">Collections and iterators</a>, puts those library types to work.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/errors/">← Errors</a><a class="next" href="../../book/collections/">Collections and iterators →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

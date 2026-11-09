@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Collections and iterators — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Collections and iterators</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/errors/">Errors</a></li>
+<li><a href="../../book/interfaces-and-generics/">Interfaces and generics</a></li>
+<li><a class="current" href="../../book/collections/">Collections and iterators</a></li>
+<li><a href="../../book/modules-and-packages/">Modules and packages</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Collections and iterators</h1>
+<p>An array holds a fixed number of values. The library's three collections grow and shrink: a
+<strong>List</strong> keeps values in order, a <strong>Map</strong> finds a value by its key, a <strong>Set</strong> knows whether it holds
+a value. All three are in the prelude, and all three are walked by <strong>iterators</strong> — the same small
+set of steps for every collection, for a range, for the lines of a file.</p>
+<h2 id="list">List</h2>
+<p>A <code>List&lt;T&gt;</code> is an array that grows. <code>push</code> adds at the end, <code>pop</code> takes from the end, and the rest
+works as on an array — an index, a length, a <code>for</code> loop:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> xs = <span class="ty">List</span>&lt;<span class="ty">int</span>&gt;.new();
+xs.push(<span class="num">3</span>);
+xs.push(<span class="num">1</span>);
+xs.push(<span class="num">2</span>);
+println(<span class="str">f"</span>{xs}<span class="str"> </span>{xs.length()}<span class="str"> </span>{xs[<span class="num">0</span>]}<span class="str"> </span>{xs.contains(<span class="num">2</span>)}<span class="str">"</span>);
+xs.insert(<span class="num">0</span>, <span class="num">9</span>);
+<span class="kw">let</span> removed = xs.removeAt(<span class="num">1</span>);
+println(<span class="str">f"</span>{xs}<span class="str"> </span>{removed}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>[3, 1, 2] 3 3 true
+[9, 1, 2] 3</code></pre>
+<p><code>List.of([…])</code> makes a list from an array's elements. A <code>List</code> is a class: two names that hold one
+list see the same elements, which is why a <code>let</code> list can still be pushed onto.</p>
+<p>Sorting works on a <strong>view</strong> of the elements, the list's <code>asSlice()</code>, and sorts them in place:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> xs = <span class="ty">List</span>.of([<span class="num">3</span>, <span class="num">1</span>, <span class="num">2</span>]);
+xs.asSlice().sort();
+println(<span class="str">f"</span>{xs}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>[1, 2, 3]</code></pre>
+<h2 id="map">Map</h2>
+<p>A <code>Map&lt;K, V&gt;</code> holds a value for each key. Reading <code>map[key]</code> gives a <code>?V</code> — the key may not be
+there —, so a read is usually followed by a <code>??</code>. Writing <code>null</code> to a key removes it:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> ages = <span class="ty">Map</span>&lt;<span class="ty">string</span>, <span class="ty">int</span>&gt;.new();
+ages[<span class="str">"ada"</span>] = <span class="num">36</span>;
+ages[<span class="str">"bob"</span>] = <span class="num">25</span>;
+println(<span class="str">f"</span>{ages[<span class="str">"ada"</span>] ?? <span class="num">0</span>}<span class="str"> </span>{ages[<span class="str">"zoe"</span>] ?? -<span class="num">1</span>}<span class="str"> </span>{ages.length()}<span class="str"> </span>{ages.containsKey(<span class="str">"bob"</span>)}<span class="str">"</span>);
+ages[<span class="str">"bob"</span>] = <span class="kw">null</span>;
+println(<span class="str">f"</span>{ages.length()}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>36 -1 2 true
+1</code></pre>
+<p>A key's type must be <code>Hashable</code> — the integers, <code>string</code>, and your own types that
+conform. A map promises no order of its keys: a program that prints them sorts them first, as the
+next example does.</p>
+<h2 id="set">Set</h2>
+<p>A <code>Set&lt;T&gt;</code> holds each value once; <code>insert</code> of a value it holds already changes nothing:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> seen = <span class="ty">Set</span>&lt;<span class="ty">string</span>&gt;.new();
+seen.insert(<span class="str">"a"</span>);
+seen.insert(<span class="str">"a"</span>);
+seen.insert(<span class="str">"b"</span>);
+println(<span class="str">f"</span>{seen.length()}<span class="str"> </span>{seen.contains(<span class="str">"b"</span>)}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>2 true</code></pre>
+<h2 id="iterators">Iterators</h2>
+<p><code>iter()</code> gives an <strong>iterator</strong> over a collection, a range or an array: something that hands out one
+value at a time. On it stand the <strong>adapters</strong>, which make another iterator — <code>map</code>, <code>filter</code>, <code>take</code>,
+<code>skip</code>, <code>enumerate</code> —, and the <strong>terminators</strong>, which pull the values through and give a result —
+<code>collect</code>, <code>sum</code>, <code>count</code>, <code>fold</code>, <code>any</code>, <code>all</code>, <code>find</code>, <code>firstWhere</code>, <code>maxBy</code>. Nothing happens until
+a terminator pulls:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> words = [<span class="str">"pear"</span>, <span class="str">"fig"</span>, <span class="str">"apple"</span>, <span class="str">"kiwi"</span>];
+<span class="kw">let</span> lengths = words.iter().map((w) =&gt; w.length()).collect&lt;<span class="ty">List</span>&lt;<span class="ty">int</span>&gt;&gt;();
+<span class="kw">let</span> total = words.iter().map((w) =&gt; w.length()).sum();
+<span class="kw">let</span> longest = words.iter().maxBy((w) =&gt; w.length());
+<span class="kw">let</span> firstLong = words.iter().firstWhere((w) =&gt; w.length() &gt; <span class="num">3</span>);
+println(<span class="str">f"</span>{lengths}<span class="str"> </span>{total}<span class="str"> </span>{longest ?? <span class="str">"-"</span>}<span class="str"> </span>{firstLong ?? <span class="str">"-"</span>}<span class="str">"</span>);
+println(<span class="str">f"</span>{words.iter().any((w) =&gt; w == <span class="str">"fig"</span>)}<span class="str"> </span>{words.iter().count()}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>[4, 3, 5, 4] 16 apple pear
+true 4</code></pre>
+<p><code>maxBy</code> and <code>firstWhere</code> give an optional: an empty input has no answer. A range is walked the same
+way, and <code>fold</code> carries a value through the walk:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> evens = (<span class="num">1</span>..=<span class="num">10</span>).iter().filter((n) =&gt; n % <span class="num">2</span> == <span class="num">0</span>).take(<span class="num">3</span>).collect&lt;<span class="ty">List</span>&lt;<span class="ty">int</span>&gt;&gt;();
+<span class="kw">let</span> sum = (<span class="num">1</span>..=<span class="num">4</span>).iter().fold(<span class="num">0</span>, (acc, n) =&gt; acc + n);
+println(<span class="str">f"</span>{evens}<span class="str"> </span>{sum}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>[2, 4, 6] 10</code></pre>
+<p><code>enumerate</code> pairs each value with its place, and a <code>for</code> loop takes the pair apart:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">for</span> ((i, w) <span class="kw">in</span> [<span class="str">"pear"</span>, <span class="str">"fig"</span>].iter().enumerate()) {
+    println(<span class="str">f"</span>{i}<span class="str">: </span>{w}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>0: pear
+1: fig</code></pre>
+<h2 id="putting-them-together">Putting them together</h2>
+<p>A map from a word's length to the words of that length, printed in the order of the lengths —
+<code>sorted()</code> collects an iterator into a sorted list. A list of text prints its elements in quotes,
+as <code>Debug</code> writes them, so that an empty text or one with a comma in it can be told apart:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> words = [<span class="str">"pear"</span>, <span class="str">"fig"</span>, <span class="str">"apple"</span>, <span class="str">"kiwi"</span>];
+<span class="kw">let</span> byLength = <span class="ty">Map</span>&lt;<span class="ty">int</span>, <span class="ty">List</span>&lt;<span class="ty">string</span>&gt;&gt;.new();
+<span class="kw">for</span> (w <span class="kw">in</span> words) {
+    <span class="kw">let</span> key = w.length();
+    <span class="kw">if</span> (byLength[key] == <span class="kw">null</span>) {
+        byLength[key] = <span class="ty">List</span>&lt;<span class="ty">string</span>&gt;.new();
+    }
+    byLength[key]!.push(w);
+}
+<span class="kw">for</span> (k <span class="kw">in</span> byLength.keys().sorted()) {
+    println(<span class="str">f"</span>{k}<span class="str">: </span>{byLength[k]!}<span class="str">"</span>);
+}
+println(words.join(<span class="str">", "</span>));</code></pre>
+<pre class="output"><code>3: ["fig"]
+4: ["pear", "kiwi"]
+5: ["apple"]
+pear, fig, apple, kiwi</code></pre>
+<p>The <code>!</code> after <code>byLength[key]</code> says that the key is there: the line before put it there. <code>join</code>
+writes an array's elements with a separator between them.</p>
+<p>The next chapter, <a href="../../book/modules-and-packages/">Modules and packages</a>, splits a program into files.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/interfaces-and-generics/">← Interfaces and generics</a><a class="next" href="../../book/modules-and-packages/">Modules and packages →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

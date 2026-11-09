@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Errors — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Errors</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a class="current" href="../../book/errors/">Errors</a></li>
+<li><a href="../../book/interfaces-and-generics/">Interfaces and generics</a></li>
+<li><a href="../../book/collections/">Collections and iterators</a></li>
+<li><a href="../../book/modules-and-packages/">Modules and packages</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Errors</h1>
+<p>A function that can fail says so in its signature: <code>throws</code> and the errors it may throw. Every
+call of it is marked <code>try</code>, so that a reader sees where a function can stop early, and every error
+is either handled or passed on by a function that says so in turn. <a href="../../book/first-program/#errors">A first
+program</a> met the basics; this chapter makes errors of its own, handles
+them by kind, and cleans up on the way out.</p>
+<h2 id="an-error-of-your-own">An error of your own</h2>
+<p>An error is a value of a type that conforms to <code>Error</code>: it says what went wrong in <code>message()</code>, and
+carries whatever else the handler may need:</p>
+<pre><code class="language-lyric"><span class="kw">struct</span> <span class="ty">NotFound</span> :: [<span class="ty">Error</span>] {
+    name: <span class="ty">string</span>,
+
+    <span class="kw">fn</span> message(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="str">f"</span><span class="str">no user '</span>{<span class="kw">this</span>.name}<span class="str">'</span><span class="str">"</span>;
+    }
+}
+
+<span class="kw">struct</span> <span class="ty">Locked</span> :: [<span class="ty">Error</span>] {
+    <span class="kw">fn</span> message(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="str">"the account is locked"</span>;
+    }
+}</code></pre>
+<p><code>throw</code> ends the function with the error. A function that throws more than one kind lists them:</p>
+<pre><code class="language-lyric"><span class="kw">struct</span> <span class="ty">NotFound</span> :: [<span class="ty">Error</span>] {
+    name: <span class="ty">string</span>,
+
+    <span class="kw">fn</span> message(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="str">f"</span><span class="str">no user '</span>{<span class="kw">this</span>.name}<span class="str">'</span><span class="str">"</span>;
+    }
+}
+
+<span class="kw">struct</span> <span class="ty">Locked</span> :: [<span class="ty">Error</span>] {
+    <span class="kw">fn</span> message(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="str">"the account is locked"</span>;
+    }
+}
+
+<span class="kw">fn</span> find(name: <span class="ty">string</span>): <span class="ty">int</span> <span class="kw">throws</span> [<span class="ty">NotFound</span>, <span class="ty">Locked</span>] {
+    <span class="kw">if</span> (name == <span class="str">"root"</span>) {
+        <span class="kw">throw</span> <span class="ty">Locked</span> {};
+    }
+    <span class="kw">if</span> (name != <span class="str">"ada"</span>) {
+        <span class="kw">throw</span> <span class="ty">NotFound</span> { name = name };
+    }
+    <span class="kw">return</span> <span class="num">7</span>;
+}</code></pre>
+<p>The list is part of the signature. A caller knows from it exactly what can come out, and the
+compiler holds the body to it: a <code>throw</code> of anything else, or a call that throws something the
+list leaves out, does not compile.</p>
+<h2 id="handling-by-kind">Handling by kind</h2>
+<p><code>try { … } catch …</code> runs the block and, where an error comes out of it, the first <code>catch</code> whose
+type fits. Inside the block, the <code>try</code> marks are not needed: the block is the mark.</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">struct</span> <span class="ty">NotFound</span> :: [<span class="ty">Error</span>] {
+    name: <span class="ty">string</span>,
+
+    <span class="kw">fn</span> message(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="str">f"</span><span class="str">no user '</span>{<span class="kw">this</span>.name}<span class="str">'</span><span class="str">"</span>;
+    }
+}
+
+<span class="kw">struct</span> <span class="ty">Locked</span> :: [<span class="ty">Error</span>] {
+    <span class="kw">fn</span> message(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="str">"the account is locked"</span>;
+    }
+}
+
+<span class="kw">fn</span> find(name: <span class="ty">string</span>): <span class="ty">int</span> <span class="kw">throws</span> [<span class="ty">NotFound</span>, <span class="ty">Locked</span>] {
+    <span class="kw">if</span> (name == <span class="str">"root"</span>) {
+        <span class="kw">throw</span> <span class="ty">Locked</span> {};
+    }
+    <span class="kw">if</span> (name != <span class="str">"ada"</span>) {
+        <span class="kw">throw</span> <span class="ty">NotFound</span> { name = name };
+    }
+    <span class="kw">return</span> <span class="num">7</span>;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">for</span> (name <span class="kw">in</span> [<span class="str">"ada"</span>, <span class="str">"bob"</span>, <span class="str">"root"</span>]) {
+        <span class="kw">try</span> {
+            println(<span class="str">f"</span>{name}<span class="str">: </span>{find(name)}<span class="str">"</span>);
+        } <span class="kw">catch</span> (e: <span class="ty">NotFound</span>) {
+            println(<span class="str">f"</span><span class="str">missing: </span>{e.message()}<span class="str"> (</span>{e.name}<span class="str">)</span><span class="str">"</span>);
+        } <span class="kw">catch</span> (e: <span class="ty">Locked</span>) {
+            println(<span class="str">f"</span><span class="str">locked: </span>{e.message()}<span class="str">"</span>);
+        }
+    }
+}</code></pre>
+<pre class="output"><code>ada: 7
+missing: no user 'bob' (bob)
+locked: the account is locked</code></pre>
+<p><code>catch (e: Error)</code> takes any error. A <code>main</code> whose <code>try</code> leaves something uncaught must say
+<code>throws</code> itself; an error that leaves <code>main</code> ends the program with its message and exit code 1:</p>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">struct</span> <span class="ty">Broke</span> :: [<span class="ty">Error</span>] {
+    <span class="kw">fn</span> message(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="str">"it broke"</span>;
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Broke</span> {
+    <span class="kw">throw</span> <span class="ty">Broke</span> {};
+}</code></pre>
+<pre><code class="language-text">error: it broke</code></pre>
+<p>The line below it names the place the error was thrown, as a panic's trace does.</p>
+<h2 id="errors-as-values">Errors as values</h2>
+<p>Sometimes an error is not to be handled right away but kept — gathered from many calls, sent to
+another task, returned in a list. <code>Result&lt;T, E&gt;</code> is the value of a call that gave a <code>T</code> or threw an
+<code>E</code>; <code>Result.of</code> runs a function and catches what it throws into one:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">struct</span> <span class="ty">Odd</span> :: [<span class="ty">Error</span>] {
+    n: <span class="ty">int</span>,
+
+    <span class="kw">fn</span> message(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="str">f"</span>{<span class="kw">this</span>.n}<span class="str"> is odd</span><span class="str">"</span>;
+    }
+}
+
+<span class="kw">fn</span> half(n: <span class="ty">int</span>): <span class="ty">int</span> <span class="kw">throws</span> <span class="ty">Odd</span> {
+    <span class="kw">if</span> (n % <span class="num">2</span> != <span class="num">0</span>) {
+        <span class="kw">throw</span> <span class="ty">Odd</span> { n = n };
+    }
+    <span class="kw">return</span> n / <span class="num">2</span>;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">for</span> (n <span class="kw">in</span> [<span class="num">4</span>, <span class="num">7</span>]) {
+        <span class="kw">let</span> outcome = <span class="ty">Result</span>.of(() =&gt; <span class="kw">try</span> half(n));
+        <span class="kw">match</span> (outcome) {
+            .<span class="ty">Ok</span>(v) =&gt; println(<span class="str">f"</span>{n}<span class="str">: </span>{v}<span class="str">"</span>),
+            .<span class="ty">Err</span>(e) =&gt; println(<span class="str">f"</span>{n}<span class="str">: </span>{e.message()}<span class="str">"</span>),
+        }
+    }
+}</code></pre>
+<pre class="output"><code>4: 2
+7: 7 is odd</code></pre>
+<p><code>get()</code> turns a <code>Result</code> back into a call: the value, or the error thrown again.</p>
+<h2 id="where-an-error-cannot-happen">Where an error cannot happen</h2>
+<p>Now and then a call can throw by its signature but not with the arguments you give it — a parse of
+a constant you wrote yourself. <code>try!</code> takes the value and turns an error into a panic, which stops
+the program with the error's message and where it came from:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> port = <span class="kw">try</span>! <span class="ty">int</span>.parse(<span class="str">"8080"</span>);
+println(<span class="str">f"</span>{port}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>8080</code></pre>
+<p>Use it where an error would be a bug in the program, not a thing that happens to it.</p>
+<h2 id="cleaning-up">Cleaning up</h2>
+<p>A function that returns early — with <code>return</code>, or because an error came out of a call — still has
+to put things back. <code>defer</code> runs a statement when the scope is left, whichever way it is left.
+<code>using let</code> does the same for a value that must be closed: it calls the value's <code>close()</code> at the end
+of the scope. Both run in the reverse of the order they were written, the last first:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">class</span> <span class="ty">Log</span> :: [<span class="ty">Closeable</span>] {
+    name: <span class="ty">string</span>,
+
+    <span class="kw">fn</span> close(): <span class="ty">void</span> {
+        println(<span class="str">f"</span><span class="str">closed </span>{<span class="kw">this</span>.name}<span class="str">"</span>);
+    }
+}
+
+<span class="kw">fn</span> work(): <span class="ty">void</span> {
+    <span class="kw">defer</span> println(<span class="str">"deferred"</span>);
+    using <span class="kw">let</span> log = <span class="ty">Log</span> { name = <span class="str">"log"</span> };
+    println(<span class="str">f"</span><span class="str">working with </span>{log.name}<span class="str">"</span>);
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    work();
+}</code></pre>
+<pre class="output"><code>working with log
+closed log
+deferred</code></pre>
+<p>Files, sockets and locks of the library are <code>Closeable</code>; <code>using let</code> is how a program holds one
+without leaking it when an error passes through.</p>
+<h2 id="errors-and-panics">Errors and panics</h2>
+<p>An <strong>error</strong> is something that happens to a correct program: a file that is not there, a number a
+user mistyped, a server that does not answer. The program is expected to deal with it, and the
+types make sure it does. A <strong>panic</strong> is a bug: an index past the end, an overflow, a <code>!</code> on
+<code>null</code>, an <code>assert</code> that does not hold. It stops the program — or, in a program with tasks, the
+task it happened in — with a message and the place, and is not caught.</p>
+<p>The next chapter, <a href="../../book/interfaces-and-generics/">Interfaces and generics</a>, is about code that works
+for many types at once.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/patterns/">← Patterns</a><a class="next" href="../../book/interfaces-and-generics/">Interfaces and generics →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>
