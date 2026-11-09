@@ -164,3 +164,5 @@ variable, `lyric.toml`, or the default.
 
 `lyric help` lists the verbs, `lyric help <verb>` a verb's options, and
 `lyric completions bash|zsh|fish|pwsh` prints a script that teaches your shell all of them.
+
+The next chapter is about the one language Lyric talks to directly: [C libraries](c-libraries.md).

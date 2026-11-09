@@ -21,8 +21,8 @@ show code the compiler does not take.
 | ` ```text `, ` ```toml `, ` ```sh ` … | nothing |
 
 A snippet that declares `fn main` is the program as it stands. Without one, a snippet is one of two
-kinds. **Declarations** — a line at its left edge starts a function, a type, an extension or an
-attribute — are built with an empty `fn main(): void {}` after them: they must compile, nothing
+kinds. **Declarations** — a line at its left edge starts a function, a macro, a type, an extension
+or an attribute — are built with an empty `fn main(): void {}` after them: they must compile, nothing
 runs. **Statements** are the body of `main`: the snippet's `import` lines go above it, everything
 else into `fn main(): void { … }`. A snippet writes its imports itself — the prelude is all it has
 without them — and declares what it uses; it sees nothing of the snippets before it.
