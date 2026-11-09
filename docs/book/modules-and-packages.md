@@ -113,5 +113,5 @@ another machine, in CI — reads the same code. `lyric update` reads the tags an
 A module imports from its own package, from `std`, and from the packages its manifest names — not
 from the packages those depend on. What a package uses, its manifest says.
 
-The next chapter, [What the compiler tells you](diagnostics.md), is about the messages you meet when
-a program is not right yet.
+The next chapter puts the parts so far together in a whole program: [a command-line
+tool](project-cli-tool.md).
