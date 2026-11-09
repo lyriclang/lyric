@@ -118,9 +118,11 @@ jobs:
       - name: Checksums
         run: cd dist && sha256sum * > "$RUNNER_TEMP/SHA256SUMS" && cat "$RUNNER_TEMP/SHA256SUMS"
 
-      # The last ten builds: what the channel offers now and this one. Whichever source's index the tool
-      # finds good, by its signature; none at all starts the list afresh, so a source that is down or
-      # broken costs old versions, never the build. The mirror keeps all ten, GitHub the newest.
+      # The last ten builds: what the channel offers now and this one. Only the mirror's own index, when
+      # the tool finds it good by its signature: the mirror keeps all ten, GitHub only the newest, so an
+      # index from GitHub names builds the mirror never had, and the gate refuses an index that names a
+      # file it holds nowhere. None at all starts the list afresh, so a mirror that is down or broken
+      # costs old versions, never the build.
       - name: The channel's index
         env:
           VERSION: ${{ needs.stamp.outputs.version }}
@@ -133,15 +135,13 @@ jobs:
             dotnet run --project tools/Package --configuration Release -- index --channel dev --version "$VERSION" --date "$DATE" --sequence "$SEQUENCE" --archives dist --out index/dev.json --keep 10 "$@"
           }
           built=
-          for base in https://dl.lyriclang.de https://github.com/lyriclang/lyric/releases/download/dev; do
-            if curl -fsSL --retry 2 --max-time 30 -o previous/dev.json "$base/dev.json" \
-              && curl -fsSL --retry 2 --max-time 30 -o previous/dev.json.minisig "$base/dev.json.minisig" \
-              && build_index --previous previous/dev.json; then
-              echo "built on the index from $base"
-              built=1
-              break
-            fi
-          done
+          base=https://dl.lyriclang.de
+          if curl -fsSL --retry 2 --max-time 30 -o previous/dev.json "$base/dev.json" \
+            && curl -fsSL --retry 2 --max-time 30 -o previous/dev.json.minisig "$base/dev.json.minisig" \
+            && build_index --previous previous/dev.json; then
+            echo "built on the index from $base"
+            built=1
+          fi
           [ -n "$built" ] || build_index
           cat index/dev.json
 
