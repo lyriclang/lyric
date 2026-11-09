@@ -107,7 +107,7 @@ public sealed partial record Snippet(string File, int Line, SnippetKind Kind, st
     [GeneratedRegex(@"^fn main\(", RegexOptions.Multiline)]
     private static partial Regex MainDeclaration();
 
-    [GeneratedRegex(@"^(?:pub )?(?:fn|struct|enum|class|interface|extend|type|opaque type) |^@", RegexOptions.Multiline)]
+    [GeneratedRegex(@"^(?:pub )?(?:fn|macro|struct|enum|class|interface|extend|type|opaque type) |^@", RegexOptions.Multiline)]
     private static partial Regex Declaration();
 
     /// <summary>

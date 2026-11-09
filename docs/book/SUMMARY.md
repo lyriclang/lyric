@@ -20,3 +20,5 @@ the ones before it.
 - [Testing and tools](testing-and-tools.md)
 - [What the compiler tells you](diagnostics.md)
 - [C libraries](c-libraries.md)
+- [Comptime and macros](comptime-and-macros.md)
+- [Coming from Lyric 4](coming-from-lyric-4.md)

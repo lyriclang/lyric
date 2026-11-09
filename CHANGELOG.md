@@ -459,8 +459,10 @@ promise. This entry fills with the milestones.
   closures, structs, classes and enums, patterns, errors, interfaces and generics, collections and
   iterators, modules and packages, tasks and coroutines, files, processes and the network, testing
   and tools — and two projects, a command-line tool and a server, which walk through
-  `examples/logfilter` and `examples/jsonserver`. Every snippet runs in the test suite, and the two
-  example programs are the ones the suite builds and runs.
+  `examples/logfilter` and `examples/jsonserver`, comptime and macros, and a chapter for readers
+  coming from Lyric 4. Every snippet runs in the test suite, and the two example programs are the
+  ones the suite builds and runs. A Book snippet or doc-test that declares a `macro` is a
+  declaration, built beside an empty `main`.
 - **`run -C <dir>` starts the program in `<dir>`**, as `cd <dir> && lyric run` does: a relative path
   the program opens — a game's assets beside its `src/` — is the directory's. It ran in the directory
   the toolchain was started in.
