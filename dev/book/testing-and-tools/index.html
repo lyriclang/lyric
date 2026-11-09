@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Testing and tools — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Testing and tools</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/errors/">Errors</a></li>
+<li><a href="../../book/interfaces-and-generics/">Interfaces and generics</a></li>
+<li><a href="../../book/collections/">Collections and iterators</a></li>
+<li><a href="../../book/modules-and-packages/">Modules and packages</a></li>
+<li><a href="../../book/project-cli-tool/">Project: a command-line tool</a></li>
+<li><a href="../../book/tasks-and-coroutines/">Tasks and coroutines</a></li>
+<li><a href="../../book/files-processes-network/">Files, processes, the network</a></li>
+<li><a href="../../book/project-server/">Project: a server</a></li>
+<li><a class="current" href="../../book/testing-and-tools/">Testing and tools</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Testing and tools</h1>
+<p>A program that works today should still work after the next change. This chapter is about the
+tests that make sure of it, and the other tools <code>lyric</code> brings along: the formatter, the fixer, the
+documentation, the editor support.</p>
+<h2 id="tests">Tests</h2>
+<p>A test is a function marked <code>@Test</code>: no parameters, returning nothing, allowed to throw. It
+checks with the assertions of <code>std.test</code>, and fails when one does not hold:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.test { assertEq, assertTrue };
+
+<span class="kw">fn</span> discounted(cents: <span class="ty">int</span>, percent: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> cents - cents * percent / <span class="num">100</span>;
+}
+
+@Test
+<span class="kw">fn</span> aFifthOffAHundred() {
+    assertEq(discounted(<span class="num">10000</span>, <span class="num">20</span>), <span class="num">8000</span>);
+}
+
+@Test
+<span class="kw">fn</span> nothingOffIsTheSame() {
+    <span class="kw">let</span> price = <span class="num">999</span>;
+    assertEq(discounted(price, <span class="num">0</span>), price);
+    assertTrue(discounted(price, <span class="num">100</span>) == <span class="num">0</span>);
+}</code></pre>
+<p>Tests can stand beside the code they test, in a module under <code>src/</code>, or in modules of their own
+under <code>tests/</code>. A module under <code>tests/</code> is part of the package: it imports the package's modules by
+their names, and sees what is not private. A package <code>prices</code> with its code in <code>src/discount.lyr</code>
+has its tests in, say, <code>tests/discount.lyr</code>:</p>
+<pre><code class="language-text">prices/
+├── lyric.toml
+├── src/
+│   ├── discount.lyr      fn discounted(…)
+│   └── main.lyr
+└── tests/
+    └── discount.lyr      import prices.discount { discounted };</code></pre>
+<p><code>lyric test</code> builds every <code>@Test</code> of the package into one program and runs it. Each test runs in a
+task of its own, so one that panics fails and the others still run:</p>
+<pre><code class="language-sh">lyric test</code></pre>
+<pre><code class="language-text">ok    prices.tests.discount.aFifthOffAHundred
+ok    prices.tests.discount.nothingOff
+FAIL  prices.tests.discount.halfOfAnOddPrice
+      panic [LYR-RT0008]: discounted(999, 50) = 500, expected 499
+
+3 tests: 2 passed, 1 failed, 0 skipped</code></pre>
+<p>A failed assertion says what it got, from which expression, and what it expected — the actual
+value first — and a backtrace below it says where. The exit code is 1 when a test failed, so a CI
+job fails with it. <code>lyric test -f discount</code> runs only the tests whose name holds <code>discount</code>.</p>
+<p>The other assertions follow the same pattern: <code>assertNotEq</code>, <code>assertLess</code>, <code>assertContains</code>,
+<code>assertClose</code> for floats, <code>assertNull</code>. <code>assertThrows</code> runs a function and expects an error of a
+type, which it returns for a closer look:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.core { <span class="ty">ParseError</span> };
+<span class="kw">import</span> std.test { assertThrows, assertTrue };
+
+@Test
+<span class="kw">fn</span> aWordIsNoNumber() {
+    <span class="kw">let</span> e = assertThrows&lt;<span class="ty">ParseError</span>&gt;(() =&gt; {
+        <span class="kw">let</span> _ = <span class="kw">try</span> <span class="ty">int</span>.parse(<span class="str">"seven"</span>);
+    });
+    assertTrue(e.message().length() &gt; <span class="num">0</span>);
+}</code></pre>
+<p>A test the attribute gives fields to can be skipped with a reason, given a time limit in seconds,
+or run beside the other parallel ones: <code>@Test { skip = &quot;needs a network&quot; }</code>,
+<code>@Test { timeout = 10 }</code>, <code>@Test { parallel = true }</code>. Parallel is a choice, not the default:
+tests share the working directory, the environment and the globals, as threads do.</p>
+<h2 id="examples-in-documentation-are-tests">Examples in documentation are tests</h2>
+<p>A <code>```lyric</code> block in a documentation comment is a test too. <code>lyric test</code> builds and runs it,
+and compares what it prints with the <code>```output</code> block below it — the same rules as this Book's
+snippets. Its line names the element it documents, <code>ok    doc: prices.discount.discounted (src/discount.lyr:3)</code>, so an example in the documentation cannot go stale unnoticed:</p>
+<pre><code class="language-lyric"><span class="com">/// The price with the discount taken off, in cents.</span>
+<span class="com">///</span>
+<span class="com">/// ```lyric</span>
+<span class="com">/// import std.io { println };</span>
+<span class="com">///</span>
+<span class="com">/// println(discounted(1000, 15));</span>
+<span class="com">/// ```</span>
+<span class="com">///</span>
+<span class="com">/// ```output</span>
+<span class="com">/// 850</span>
+<span class="com">/// ```</span>
+<span class="kw">pub</span> <span class="kw">fn</span> discounted(cents: <span class="ty">int</span>, percent: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> cents - cents * percent / <span class="num">100</span>;
+}</code></pre>
+<h2 id="benchmarks">Benchmarks</h2>
+<p>A function marked <code>@Bench</code> takes a <code>Bench</code> and gives it the code to time. <code>lyric bench</code> builds the
+benchmarks in the release profile and runs each many times over:</p>
+<pre><code class="language-lyric">@Bench
+<span class="kw">fn</span> sumAThousand(&amp;b: <span class="ty">Bench</span>): <span class="ty">void</span> {
+    b.iter {
+        <span class="kw">var</span> total = <span class="num">0</span>;
+        <span class="kw">for</span> (i <span class="kw">in</span> <span class="num">0</span>..<span class="num">1000</span>) {
+            total += i;
+        }
+    }
+}</code></pre>
+<p>Each prints its nanoseconds and allocations per run. <code>--save base.txt</code> keeps the numbers and
+<code>--compare base.txt</code> shows the change against them — run before and after an optimization.</p>
+<h2 id="the-formatter">The formatter</h2>
+<p><code>lyric fmt</code> puts the package's files into the one form: indentation, spaces, where lines break.
+There are no settings, so every Lyric program looks the same and a diff shows only what changed.
+<code>lyric fmt --check</code> changes nothing and fails where a file is not in form — the line for a CI job.</p>
+<h2 id="check-fix-explain">Check, fix, explain</h2>
+<p><code>lyric check</code> says everything <code>build</code> would say, without making a binary — fast enough to run on
+every save. Many findings come with a suggested change, shown as <code>help:</code> with the fixed line;
+<code>lyric fix</code> applies the ones that are safe and says what is left. Each finding has a code, and the
+<a href="../../book/diagnostics/">diagnostics chapter</a> shows how to read them and where each code is explained.</p>
+<p>Lints are warnings about code that works but is likely not what was meant — an unused import, a
+string grown with <code>+</code> in a loop. They are set in <code>lyric.toml</code>, per package:</p>
+<pre><code class="language-toml">[lints]
+deny = ["unused-import"]
+allow = ["string-concat-in-loop"]</code></pre>
+<p>and one place in the code can allow a lint with an attribute, <code>@Allow(&quot;unused-variable&quot;)</code>, on the
+declaration it concerns.</p>
+<h2 id="documentation">Documentation</h2>
+<p><code>lyric doc</code> writes the package's reference under <code>out/doc/</code>: every <code>pub</code> module, type and function
+with its documentation comment, linked to each other — the standard library's reference is made
+the same way. <code>lyric api</code> prints the public surface, one line per element; <code>lyric api --diff v1.0.0</code>
+shows what changed against a git tag, which is how a library sees a breaking change before its
+users do.</p>
+<h2 id="in-the-editor">In the editor</h2>
+<p><code>lyric lsp</code> is a language server: an editor that speaks LSP gets the diagnostics as you type, go
+to definition, hover with the type and the documentation, completion, rename, and the fixes of
+<code>lyric fix</code> as code actions. <code>lyric dap</code> is a debug adapter with lldb behind it: breakpoints in
+Lyric source, stepping, and the values of variables. The extensions for VS Code and the JetBrains
+IDEs start both.</p>
+<p>The next chapter is about what the compiler says when a program is not right yet: <a href="../../book/diagnostics/">What the
+compiler tells you</a>.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/project-server/">← Project: a server</a><a class="next" href="../../book/diagnostics/">What the compiler tells you →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

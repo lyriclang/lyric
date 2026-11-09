@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tasks and coroutines — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Tasks and coroutines</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/errors/">Errors</a></li>
+<li><a href="../../book/interfaces-and-generics/">Interfaces and generics</a></li>
+<li><a href="../../book/collections/">Collections and iterators</a></li>
+<li><a href="../../book/modules-and-packages/">Modules and packages</a></li>
+<li><a href="../../book/project-cli-tool/">Project: a command-line tool</a></li>
+<li><a class="current" href="../../book/tasks-and-coroutines/">Tasks and coroutines</a></li>
+<li><a href="../../book/files-processes-network/">Files, processes, the network</a></li>
+<li><a href="../../book/project-server/">Project: a server</a></li>
+<li><a href="../../book/testing-and-tools/">Testing and tools</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Tasks and coroutines</h1>
+<p>A program often waits: for a file, a socket, a timer, another part of itself. Lyric lets it wait
+without blocking everything else. Two things do that, and they are different: a <strong>task</strong> runs at
+the same time as the code that started it, a <strong>coroutine</strong> runs only when its caller asks it for the
+next value.</p>
+<h2 id="coroutines">Coroutines</h2>
+<p>A function whose return type is <code>Coroutine&lt;T&gt;</code> may <code>yield</code> values. Calling it runs nothing yet; it
+gives a coroutine, and each <code>next()</code> runs the body up to its next <code>yield</code> and returns that value —
+or <code>null</code> once the body has run through:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> countdown(from: <span class="ty">int</span>): <span class="ty">Coroutine</span>&lt;<span class="ty">int</span>&gt; {
+    <span class="kw">var</span> n = from;
+    <span class="kw">while</span> (n &gt; <span class="num">0</span>) {
+        <span class="kw">yield</span> n;
+        n -= <span class="num">1</span>;
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> c = countdown(<span class="num">3</span>);
+    <span class="kw">while</span> (<span class="kw">let</span> n = c.next()) {
+        println(n);
+    }
+    println(<span class="str">"liftoff"</span>);
+}</code></pre>
+<pre class="output"><code>3
+2
+1
+liftoff</code></pre>
+<p>The local <code>n</code> survives each <code>yield</code>: the body continues where it paused. A coroutine is an
+iterator, so <code>for</code> walks it too, and it may be endless — the caller decides how much it takes:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> naturals(): <span class="ty">Coroutine</span>&lt;<span class="ty">int</span>&gt; {
+    <span class="kw">var</span> n = <span class="num">0</span>;
+    <span class="kw">while</span> (<span class="kw">true</span>) {
+        <span class="kw">yield</span> n;
+        n += <span class="num">1</span>;
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> squares = naturals().map((n) =&gt; n * n).take(<span class="num">5</span>).collect&lt;<span class="ty">List</span>&lt;<span class="ty">int</span>&gt;&gt;();
+    println(squares.asSlice().join(<span class="str">", "</span>));
+}</code></pre>
+<pre class="output"><code>0, 1, 4, 9, 16</code></pre>
+<p>A coroutine runs on its caller's thread, in its caller's time. Nothing happens in it between two
+<code>next()</code> calls.</p>
+<h2 id="tasks">Tasks</h2>
+<p><code>spawn</code> from <code>std.task</code> starts a function as a task and returns its handle at once. The task runs
+beside the code that started it; <code>await()</code> waits until it has ended and gives its result:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.task { spawn };
+
+<span class="kw">fn</span> slowSquare(n: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> n * n;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">var</span> a = spawn(() =&gt; slowSquare(<span class="num">6</span>));
+    <span class="kw">var</span> b = spawn(() =&gt; slowSquare(<span class="num">7</span>));
+    <span class="kw">let</span> first = <span class="kw">try</span> a.await();
+    <span class="kw">let</span> second = <span class="kw">try</span> b.await();
+    println(first + second);
+}</code></pre>
+<pre class="output"><code>85</code></pre>
+<p>The tasks of a thread take turns: one runs until it waits — for a timer, a socket, a channel, a
+child process —, and then another one runs. Waiting is what lets the others go, so a task that
+computes for a long time without waiting holds the thread; <code>yieldNow()</code> gives it away on purpose.
+Tasks are cheap — a server can have one per connection. For work that should
+run on several cores at once, <code>std.thread</code> has threads and a pool.</p>
+<p>A task's errors come back through <code>await()</code>. The type of the handle carries them — the lambda here
+can throw a <code>ParseError</code>, so <code>await()</code> can too:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.core { <span class="ty">ParseError</span> };
+<span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.task { spawn };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">var</span> parsing = spawn(() =&gt; <span class="kw">try</span> <span class="ty">int</span>.parse(<span class="str">"forty-two"</span>));
+    <span class="kw">try</span> {
+        println(parsing.await());
+    } <span class="kw">catch</span> (e: <span class="ty">ParseError</span>) {
+        println(<span class="str">f"</span><span class="str">the task failed: </span>{e.message()}<span class="str">"</span>);
+    }
+}</code></pre>
+<pre class="output"><code>the task failed: the text is not a value of the type</code></pre>
+<h2 id="sleeping-and-timeouts">Sleeping and timeouts</h2>
+<p><code>sleep</code> waits for a <code>Duration</code>, and lets the other tasks run meanwhile. <code>withTimeout</code> runs a body
+and gives up on it after a time, with a <code>TimedOut</code> error:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.task { sleep, withTimeout, <span class="ty">TimedOut</span> };
+<span class="kw">import</span> std.time { <span class="ty">Duration</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> quick = <span class="kw">try</span> withTimeout(<span class="ty">Duration</span>.ofSecs(<span class="num">5</span>), () =&gt; {
+        <span class="kw">try</span> sleep(<span class="ty">Duration</span>.ofMillis(<span class="num">10</span>));
+        <span class="kw">return</span> <span class="str">"in time"</span>;
+    });
+    println(quick);
+
+    <span class="kw">try</span> {
+        withTimeout(<span class="ty">Duration</span>.ofMillis(<span class="num">10</span>), () =&gt; {
+            <span class="kw">try</span> sleep(<span class="ty">Duration</span>.ofSecs(<span class="num">5</span>));
+        });
+    } <span class="kw">catch</span> (_: <span class="ty">TimedOut</span>) {
+        println(<span class="str">"too slow"</span>);
+    }
+}</code></pre>
+<pre class="output"><code>in time
+too slow</code></pre>
+<p>Giving up cancels the body: its waiting <code>sleep</code> throws <code>Cancelled</code>, the body unwinds — <code>using</code> and
+<code>defer</code> run as usual — and only then does <code>withTimeout</code> return. A task can be cancelled from its
+handle too, with <code>cancel()</code>. Cancelling is a request: it takes effect when the task next waits.</p>
+<h2 id="channels">Channels</h2>
+<p>Tasks talk through a <code>Channel&lt;T&gt;</code>. <code>send</code> puts a value in, <code>recv</code> takes the next one out — waiting
+for it if there is none yet — and gives <code>null</code> once the channel is closed and empty:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.task { spawn, <span class="ty">Channel</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> words = <span class="ty">Channel</span>&lt;<span class="ty">string</span>&gt;.new();
+    <span class="kw">var</span> producer = spawn(() =&gt; {
+        <span class="kw">for</span> (w <span class="kw">in</span> [<span class="str">"one"</span>, <span class="str">"two"</span>, <span class="str">"three"</span>]) {
+            <span class="kw">try</span> words.send(w);
+        }
+        words.close();
+    });
+    <span class="kw">var</span> count = <span class="num">0</span>;
+    <span class="kw">while</span> (<span class="kw">let</span> w = <span class="kw">try</span> words.recv()) {
+        count += w.length();
+    }
+    <span class="kw">try</span> producer.await();
+    println(<span class="str">f"</span>{count}<span class="str"> letters</span><span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>11 letters</code></pre>
+<p>A channel works between threads as well as between the tasks of one thread. <code>Select</code> waits on
+several channels at once and takes whichever is ready first, with an optional timeout.</p>
+<h2 id="scopes">Scopes</h2>
+<p>A task started with <code>spawn</code> lives on its own: if nothing awaits it, nothing notices how it ended. A
+<code>TaskScope</code> ties tasks to a block. Its <code>close()</code> — run by <code>using</code> at the end of the block — waits for
+every task it started, and the first that fails cancels the others and makes <code>close()</code> throw:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.task { sleep, <span class="ty">TaskScope</span> };
+<span class="kw">import</span> std.time { <span class="ty">Duration</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">var</span> total = <span class="num">0</span>;
+    {
+        using <span class="kw">let</span> scope = <span class="ty">TaskScope</span>.new();
+        <span class="kw">for</span> (n <span class="kw">in</span> <span class="num">1</span>..=<span class="num">3</span>) {
+            scope.spawn(() =&gt; {
+                <span class="kw">try</span> sleep(<span class="ty">Duration</span>.ofMillis(n * <span class="num">5</span>));
+                total += n;
+            });
+        }
+    }
+    println(total);
+}</code></pre>
+<pre class="output"><code>6</code></pre>
+<p>When the block ends, all three tasks have ended: none outlives the code that started it. That is
+the shape to reach for when a piece of work splits into parts — a request that asks three services,
+a directory read file by file — because an error in one part cannot be lost and no part keeps
+running after the whole has given up.</p>
+<p>The next chapter puts tasks to work on files, processes and the network: <a href="../../book/files-processes-network/">Files, processes, the
+network</a>.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/project-cli-tool/">← Project: a command-line tool</a><a class="next" href="../../book/files-processes-network/">Files, processes, the network →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

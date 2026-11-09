@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Project: a server — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Project: a server</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/errors/">Errors</a></li>
+<li><a href="../../book/interfaces-and-generics/">Interfaces and generics</a></li>
+<li><a href="../../book/collections/">Collections and iterators</a></li>
+<li><a href="../../book/modules-and-packages/">Modules and packages</a></li>
+<li><a href="../../book/project-cli-tool/">Project: a command-line tool</a></li>
+<li><a href="../../book/tasks-and-coroutines/">Tasks and coroutines</a></li>
+<li><a href="../../book/files-processes-network/">Files, processes, the network</a></li>
+<li><a class="current" href="../../book/project-server/">Project: a server</a></li>
+<li><a href="../../book/testing-and-tools/">Testing and tools</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Project: a server</h1>
+<p>The second project is a small web service: <code>jsonserver</code> keeps a list of items and answers HTTP
+requests with JSON. <code>GET /items</code> gives the list, <code>GET /items/2</code> one item, <code>POST /items</code> adds one. The
+same program is its own client: started without arguments, it serves on a port the system picks,
+talks to itself, prints what came back and ends — which is how the test suite runs it. Started with
+a port, it stays up for a browser or <code>curl</code> until Ctrl-C.</p>
+<p>The finished program is <a href="https://github.com/lyriclang/lyric/blob/main/examples/jsonserver/src/main.lyr"><code>examples/jsonserver</code></a>. It uses
+<code>std.http</code> on both sides, <code>std.json</code> between them, and a task to serve while <code>main</code> asks.</p>
+<h2 id="the-data">The data</h2>
+<p>An item is a struct. Its conformance to <code>Codable</code> lets <code>std.json</code> write it and read it back, field
+by field, by name — the compiler writes that code from the declaration:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.codec { <span class="ty">Codable</span> };
+<span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.json { encode, decode };
+
+<span class="kw">struct</span> <span class="ty">Item</span> :: [<span class="ty">Codable</span>, <span class="ty">Equatable</span>] {
+    id: <span class="ty">int</span>,
+    name: <span class="ty">string</span>,
+    price: <span class="ty">float</span>,
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> bread = <span class="ty">Item</span> { id = <span class="num">1</span>, name = <span class="str">"Brot"</span>, price = <span class="num">2.5</span> };
+    <span class="kw">let</span> text = <span class="kw">try</span> encode(bread);
+    println(text);
+    <span class="kw">let</span> back = <span class="kw">try</span> decode&lt;<span class="ty">Item</span>&gt;(text);
+    println(back == bread);
+    <span class="kw">let</span> many = <span class="kw">try</span> decode&lt;<span class="ty">Item</span>[]&gt;(<span class="str">"[{\"id\": 2, \"name\": \"Käse\", \"price\": 7.0}]"</span>);
+    println(many[<span class="num">0</span>].name);
+}</code></pre>
+<pre class="output"><code>{"id":1,"name":"Brot","price":2.5}
+true
+Käse</code></pre>
+<p>A text that does not fit the type — a field missing, a string where a number belongs — throws a
+<code>DecodeError</code> that says where — <code>[0].price</code> — and what was wrong. For a server that is the answer to a bad request, not a crash.</p>
+<h2 id="the-handler">The handler</h2>
+<p>A server is, at its heart, a function from a request to a response. <code>std.http</code> calls it for every
+request — each connection is a task of its own —, and a handler that throws answers 500 with the
+error's message:</p>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.http { <span class="ty">Request</span>, <span class="ty">Response</span>, <span class="ty">Method</span> };
+
+<span class="kw">fn</span> handle(req: <span class="ty">Request</span>): <span class="ty">Response</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">if</span> (req.uri.path == <span class="str">"/hello"</span> &amp;&amp; req.method == <span class="ty">Method</span>.<span class="ty">Get</span>) {
+        <span class="kw">return</span> <span class="ty">Response</span>.withText(<span class="str">"hello\n"</span>);
+    }
+    <span class="kw">return</span> <span class="ty">Response</span>.withText(<span class="str">"not here\n"</span>, <span class="num">404</span>);
+}</code></pre>
+<p>Because it is a plain function, it can be called without any network at all — with a request made
+by hand, its response read back:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.codec { <span class="ty">Codable</span> };
+<span class="kw">import</span> std.collections { <span class="ty">List</span> };
+<span class="kw">import</span> std.http { <span class="ty">Request</span>, <span class="ty">Response</span>, <span class="ty">Method</span> };
+<span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.uri { <span class="ty">Uri</span> };
+
+<span class="kw">struct</span> <span class="ty">Item</span> :: [<span class="ty">Codable</span>] {
+    id: <span class="ty">int</span>,
+    name: <span class="ty">string</span>,
+}
+
+<span class="kw">struct</span> <span class="ty">Problem</span> :: [<span class="ty">Codable</span>] {
+    error: <span class="ty">string</span>,
+}
+
+<span class="kw">let</span> items: <span class="ty">List</span>&lt;<span class="ty">Item</span>&gt; = <span class="ty">List</span>&lt;<span class="ty">Item</span>&gt;.new();
+
+<span class="kw">fn</span> handle(req: <span class="ty">Request</span>): <span class="ty">Response</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> path = req.uri.path;
+    <span class="kw">if</span> (path == <span class="str">"/items"</span> &amp;&amp; req.method == <span class="ty">Method</span>.<span class="ty">Get</span>) {
+        <span class="kw">return</span> <span class="kw">try</span> <span class="ty">Response</span>.withJson(items.toArray());
+    }
+    <span class="kw">if</span> (path.startsWith(<span class="str">"/items/"</span>)) {
+        <span class="kw">let</span> id = <span class="kw">try</span> <span class="ty">int</span>.parse(path.splitOnce(<span class="str">"/items/"</span>)!.<span class="num">1</span>);
+        <span class="kw">for</span> (item <span class="kw">in</span> items) {
+            <span class="kw">if</span> (item.id == id) {
+                <span class="kw">return</span> <span class="kw">try</span> <span class="ty">Response</span>.withJson(item);
+            }
+        }
+        <span class="kw">return</span> <span class="kw">try</span> <span class="ty">Response</span>.withJson(<span class="ty">Problem</span> { error = <span class="str">f"</span><span class="str">no item </span>{id}<span class="str">"</span> }, <span class="num">404</span>);
+    }
+    <span class="kw">return</span> <span class="kw">try</span> <span class="ty">Response</span>.withJson(<span class="ty">Problem</span> { error = <span class="str">f"</span><span class="str">no </span>{path}<span class="str">"</span> }, <span class="num">404</span>);
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    items.push(<span class="ty">Item</span> { id = <span class="num">1</span>, name = <span class="str">"Brot"</span> });
+    <span class="kw">for</span> (path <span class="kw">in</span> [<span class="str">"/items"</span>, <span class="str">"/items/1"</span>, <span class="str">"/items/9"</span>]) {
+        <span class="kw">let</span> res = <span class="kw">try</span> handle(<span class="ty">Request</span>.get(<span class="ty">Uri</span>.parse(<span class="str">"http://localhost"</span> + path)));
+        println(<span class="str">f"</span>{res.status.code}<span class="str"> </span>{<span class="kw">try</span> res.text()}<span class="str">"</span>);
+    }
+}</code></pre>
+<pre class="output"><code>200 [{"id":1,"name":"Brot"}]
+200 {"id":1,"name":"Brot"}
+404 {"error":"no item 9"}</code></pre>
+<p><code>items</code> is a module-level <code>let</code>: one list for the whole program, which every request sees. It is
+safe here because the server's tasks all run on one thread and take turns only where they wait —
+a handler that pushes an item does it in one piece. A server spread over several threads would put
+the list behind a lock from <code>std.sync</code>.</p>
+<p>The finished handler also takes a <code>POST</code>: <code>req.json&lt;NewItem&gt;()</code> reads the body as a type of its
+own — a new item has no <code>id</code> yet —, and the response gets the status 201 and a <code>Location</code> header.</p>
+<h2 id="serving">Serving</h2>
+<p><code>Server.bind</code> takes an address and opens the port; <code>serve</code> runs the handler for every request until
+<code>shutdown()</code>. <code>serve</code> waits, so it runs in a task, and <code>main</code> is free to be the client:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.http { <span class="ty">Client</span>, <span class="ty">Request</span>, <span class="ty">Response</span>, <span class="ty">Server</span> };
+<span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.net { <span class="ty">IpAddr</span>, <span class="ty">SocketAddr</span> };
+<span class="kw">import</span> std.task { spawn };
+<span class="kw">import</span> std.uri { <span class="ty">Uri</span> };
+
+<span class="kw">fn</span> handle(req: <span class="ty">Request</span>): <span class="ty">Response</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">return</span> <span class="ty">Response</span>.withText(<span class="str">f"</span><span class="str">you asked for </span>{req.uri.path}<span class="str">"</span>);
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">var</span> server = <span class="kw">try</span> <span class="ty">Server</span>.bind(<span class="ty">SocketAddr</span> { ip = <span class="ty">IpAddr</span>.<span class="ty">V4</span>(<span class="num">127</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">1</span>), port = <span class="num">0</span> });
+    <span class="kw">let</span> base = <span class="str">f"</span><span class="str">http://127.0.0.1:</span>{(<span class="kw">try</span> server.localAddr()).port}<span class="str">"</span>;
+    <span class="kw">var</span> serving = spawn(() =&gt; {
+        <span class="kw">try</span> server.serve(handle);
+    });
+
+    <span class="kw">var</span> client = <span class="ty">Client</span>.new();
+    <span class="kw">let</span> res = <span class="kw">try</span> client.get(<span class="ty">Uri</span>.parse(base + <span class="str">"/items"</span>));
+    println(<span class="str">f"</span>{res.status.code}<span class="str"> </span>{<span class="kw">try</span> res.text()}<span class="str">"</span>);
+    client.close();
+
+    server.shutdown();
+    <span class="kw">try</span> serving.await();
+}</code></pre>
+<pre class="output"><code>200 you asked for /items</code></pre>
+<p>The port 0 asks the system for any free one, and <code>localAddr()</code> says which it gave — so two runs, or
+two tests, never fight over a port. <code>shutdown()</code> stops taking connections and lets the ones in
+flight finish; <code>await()</code> waits until <code>serve</code> has returned.</p>
+<h2 id="staying-up">Staying up</h2>
+<p>With a port on the command line, the finished program serves until it is told to stop.
+<code>std.os.signals</code> turns the system's signals into a channel, so stopping is one more thing a task
+waits for:</p>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.http { <span class="ty">Request</span>, <span class="ty">Response</span>, <span class="ty">Server</span> };
+<span class="kw">import</span> std.io { eprintln };
+<span class="kw">import</span> std.net { <span class="ty">IpAddr</span>, <span class="ty">SocketAddr</span> };
+<span class="kw">import</span> std.os { signals, <span class="ty">Signal</span> };
+<span class="kw">import</span> std.task { spawn };
+
+<span class="kw">fn</span> handle(req: <span class="ty">Request</span>): <span class="ty">Response</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">return</span> <span class="ty">Response</span>.withText(<span class="str">f"</span><span class="str">hello from </span>{req.uri.path}<span class="str">\n</span><span class="str">"</span>);
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">var</span> server = <span class="kw">try</span> <span class="ty">Server</span>.bind(<span class="ty">SocketAddr</span> { ip = <span class="ty">IpAddr</span>.<span class="ty">V4</span>(<span class="num">127</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">1</span>), port = <span class="num">8080</span> });
+    eprintln(<span class="str">"serving on http://127.0.0.1:8080/"</span>);
+    <span class="kw">var</span> serving = spawn(() =&gt; {
+        <span class="kw">try</span> server.serve(handle);
+    });
+    <span class="kw">let</span> stop = signals(<span class="ty">Signal</span>.<span class="ty">Interrupt</span>, <span class="ty">Signal</span>.<span class="ty">Terminate</span>);
+    <span class="kw">let</span> _ = <span class="kw">try</span> stop.recv();
+    server.shutdown();
+    <span class="kw">try</span> serving.await();
+}</code></pre>
+<p>Ctrl-C sends <code>Interrupt</code>; a service manager stopping the program sends <code>Terminate</code>. Either way the
+server finishes the requests it has and the program ends with 0, instead of being cut off mid-answer.</p>
+<h2 id="what-it-used">What it used</h2>
+<p>Structs that are <code>Codable</code>; a module-level list; a handler as a plain function, tried without a
+network; a server in a task and a client in <code>main</code>; a port the system picks; signals as a channel.
+The next chapter is about making sure such a program keeps working: <a href="../../book/testing-and-tools/">testing and
+tools</a>.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/files-processes-network/">← Files, processes, the network</a><a class="next" href="../../book/testing-and-tools/">Testing and tools →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

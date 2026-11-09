@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Files, processes, the network — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Files, processes, the network</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/errors/">Errors</a></li>
+<li><a href="../../book/interfaces-and-generics/">Interfaces and generics</a></li>
+<li><a href="../../book/collections/">Collections and iterators</a></li>
+<li><a href="../../book/modules-and-packages/">Modules and packages</a></li>
+<li><a href="../../book/project-cli-tool/">Project: a command-line tool</a></li>
+<li><a href="../../book/tasks-and-coroutines/">Tasks and coroutines</a></li>
+<li><a class="current" href="../../book/files-processes-network/">Files, processes, the network</a></li>
+<li><a href="../../book/project-server/">Project: a server</a></li>
+<li><a href="../../book/testing-and-tools/">Testing and tools</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Files, processes, the network</h1>
+<p>A program talks to the world outside it through the standard library: <code>std.fs</code> for files and
+directories, <code>std.path</code> for the names of them, <code>std.process</code> for other programs, <code>std.net</code> and
+<code>std.http</code> for the network. Everything that can fail out there throws — mostly an <code>IoError</code>, whose
+<code>kind</code> says what went wrong and whose <code>path</code> says where; both live in <code>std.io</code>.</p>
+<h2 id="files">Files</h2>
+<p>The shortest way in and out is a whole file at once: <code>writeText</code>, <code>readText</code>, and for bytes
+<code>writeBytes</code> and <code>readBytes</code>. <code>std.path.join</code> puts a name together the way the system writes it:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.fs { readText, writeText, tempDir, removeAll };
+<span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.path { join };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> dir = <span class="kw">try</span> tempDir();
+    <span class="kw">let</span> notes = join(dir, <span class="str">"notes.txt"</span>);
+    <span class="kw">try</span> writeText(notes, <span class="str">"first\nsecond\nthird\n"</span>);
+    <span class="kw">let</span> text = <span class="kw">try</span> readText(notes);
+    println(<span class="str">f"</span>{text.lines().count()}<span class="str"> lines</span><span class="str">"</span>);
+    <span class="kw">try</span> removeAll(dir);
+}</code></pre>
+<pre class="output"><code>3 lines</code></pre>
+<p><code>tempDir()</code> makes a fresh directory for the program; <code>removeAll</code> takes it away with what is in it.
+A big file is better read line by line, without holding all of it: <code>lines(path)</code> gives an iterator
+that reads as it goes. A file that is not there is an <code>IoError</code> of the kind <code>NotFound</code>:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.fs { lines };
+<span class="kw">import</span> std.io { println, <span class="ty">IoError</span>, <span class="ty">IoErrorKind</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">try</span> {
+        <span class="kw">for</span> (line <span class="kw">in</span> lines(<span class="str">"no/such/file.txt"</span>)) {
+            println(line);
+        }
+    } <span class="kw">catch</span> (e: <span class="ty">IoError</span>) {
+        <span class="kw">if</span> (e.kind == <span class="ty">IoErrorKind</span>.<span class="ty">NotFound</span>) {
+            println(<span class="str">f"</span><span class="str">missing: </span>{e.path ?? <span class="str">"?"</span>}<span class="str">"</span>);
+        }
+    }
+}</code></pre>
+<pre class="output"><code>missing: no/such/file.txt</code></pre>
+<p>For more control there is <code>File</code>, opened with <code>OpenOptions</code> — to append, to create a file that is
+not there, to empty one that is, to read and write in one — and closed by <code>using</code>. A directory is
+read with <code>readDir</code>, a whole tree with <code>walk</code>; <code>metadata</code> says how big a file is and when it changed.</p>
+<h2 id="processes">Processes</h2>
+<p>A <code>Command</code> describes a program to start: its name or path, its arguments, its working directory,
+its environment, and where its standard streams go. <code>output()</code> runs it to its end and gives back
+what it printed:</p>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.process { <span class="ty">Command</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> git = <span class="ty">Command</span> { program = <span class="str">"git"</span>, args = [<span class="str">"--version"</span>] };
+    <span class="kw">let</span> out = <span class="kw">try</span> git.output();
+    <span class="kw">if</span> (out.status.success()) {
+        println(<span class="ty">string</span>.fromUtf8Lossy(out.stdout).trim());
+    } <span class="kw">else</span> {
+        println(<span class="str">f"</span><span class="str">git ended with </span>{out.status.code() ?? -<span class="num">1</span>}<span class="str">"</span>);
+    }
+}</code></pre>
+<p>The name is looked up on <code>PATH</code>; a program that is not there throws <code>IoError</code> with the kind
+<code>NotFound</code>. <code>output()</code> reads the child's output and errors concurrently and waits for its end; it is
+a wait like any other, so the other tasks run meanwhile. <code>spawn()</code> instead returns the running
+<code>Child</code>, with pipes to write its input and read its output piece by piece, and <code>wait()</code> for its end.</p>
+<h2 id="the-network">The network</h2>
+<p><code>std.net</code> has the sockets: <code>TcpListener</code> waits for connections, <code>TcpStream</code> is one, <code>UdpSocket</code> sends
+datagrams, and <code>resolve</code> turns a host name into addresses. A stream is a <code>Reader</code> and a <code>Writer</code>, so
+what reads and writes files reads and writes it too. Here a server and its client in one program,
+on the loopback address and a port the system picks:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.net { <span class="ty">IpAddr</span>, <span class="ty">SocketAddr</span>, <span class="ty">TcpListener</span>, <span class="ty">TcpStream</span> };
+<span class="kw">import</span> std.task { spawn };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">var</span> listener = <span class="kw">try</span> <span class="ty">TcpListener</span>.bind(<span class="ty">SocketAddr</span> { ip = <span class="ty">IpAddr</span>.<span class="ty">V4</span>(<span class="num">127</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">1</span>), port = <span class="num">0</span> });
+    <span class="kw">let</span> addr = <span class="kw">try</span> listener.localAddr();
+    <span class="kw">var</span> server = spawn(() =&gt; {
+        <span class="kw">var</span> conn = <span class="kw">try</span> listener.accept();
+        <span class="kw">let</span> buf: <span class="ty">uint8</span>[] = [<span class="num">0u8</span>] * <span class="num">16</span>;
+        <span class="kw">let</span> n = <span class="kw">try</span> conn.read(buf[..]);
+        <span class="kw">try</span> conn.write(buf[<span class="num">0</span>..n]);
+        <span class="kw">try</span> conn.close();
+    });
+
+    <span class="kw">var</span> client = <span class="kw">try</span> <span class="ty">TcpStream</span>.connect(addr);
+    <span class="kw">try</span> client.write(<span class="str">"ping"</span>.bytes()[..]);
+    <span class="kw">let</span> reply: <span class="ty">uint8</span>[] = [<span class="num">0u8</span>] * <span class="num">16</span>;
+    <span class="kw">let</span> n = <span class="kw">try</span> client.read(reply[..]);
+    println(<span class="ty">string</span>.fromUtf8Lossy(reply[<span class="num">0</span>..n]));
+    <span class="kw">try</span> client.close();
+    <span class="kw">try</span> server.await();
+    <span class="kw">try</span> listener.close();
+}</code></pre>
+<pre class="output"><code>ping</code></pre>
+<p>The server is a task: while it waits in <code>accept()</code>, the client part of <code>main</code> runs. That is the whole
+trick of a network program in Lyric — each connection in a task of its own, each waiting where it
+must, and the waiting costs nothing.</p>
+<p>Most programs do not speak TCP by hand. <code>std.http</code> has a <code>Client</code> that fetches a URL and a <code>Server</code>
+that calls a function for each request. The next chapter builds on both: <a href="../../book/project-server/">a
+server</a>.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/tasks-and-coroutines/">← Tasks and coroutines</a><a class="next" href="../../book/project-server/">Project: a server →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

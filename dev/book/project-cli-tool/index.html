@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Project: a command-line tool — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Project: a command-line tool</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/errors/">Errors</a></li>
+<li><a href="../../book/interfaces-and-generics/">Interfaces and generics</a></li>
+<li><a href="../../book/collections/">Collections and iterators</a></li>
+<li><a href="../../book/modules-and-packages/">Modules and packages</a></li>
+<li><a class="current" href="../../book/project-cli-tool/">Project: a command-line tool</a></li>
+<li><a href="../../book/tasks-and-coroutines/">Tasks and coroutines</a></li>
+<li><a href="../../book/files-processes-network/">Files, processes, the network</a></li>
+<li><a href="../../book/project-server/">Project: a server</a></li>
+<li><a href="../../book/testing-and-tools/">Testing and tools</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Project: a command-line tool</h1>
+<p>This chapter builds a whole program from the parts of the chapters before: <code>logfilter</code>, a small
+grep for log files. It prints the lines of a file that a regular expression matches, and takes a
+few options:</p>
+<pre><code class="language-text">logfilter [-v] [-c] [-n] [--color | --no-color] &lt;pattern&gt; &lt;file&gt;</code></pre>
+<p><code>-v</code> prints the lines that do <em>not</em> match, <code>-c</code> only their count, <code>-n</code> each line with its number.
+Matches are colored on a terminal. Like grep, it ends with 0 when it printed a line, 1 when there
+was none, and 2 when it was called wrong.</p>
+<p>The finished program is <a href="https://github.com/lyriclang/lyric/blob/main/examples/logfilter/src/main.lyr"><code>examples/logfilter</code></a>; the test
+suite builds it and runs it over a log. Here it grows in steps, each a program of its own.</p>
+<h2 id="the-package">The package</h2>
+<p><code>lyric new</code> makes the directory with a manifest and a <code>main</code>:</p>
+<pre><code class="language-sh">lyric new logfilter
+cd logfilter</code></pre>
+<pre><code class="language-toml">[package]
+name = "logfilter"
+version = "0.1.0"</code></pre>
+<p>The program is <code>src/main.lyr</code>; <code>lyric run -- &lt;args&gt;</code> builds it and passes it what follows <code>--</code>.</p>
+<h2 id="the-arguments">The arguments</h2>
+<p><code>std.os.args()</code> gives the command line, the program's own name first. Taking it apart is a plain
+loop — and a function of its own, so it can be tried with any arguments, not only the real ones:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">struct</span> <span class="ty">Options</span> {
+    <span class="kw">var</span> invert: <span class="ty">bool</span> = <span class="kw">false</span>,
+    <span class="kw">var</span> countOnly: <span class="ty">bool</span> = <span class="kw">false</span>,
+    <span class="kw">var</span> numbered: <span class="ty">bool</span> = <span class="kw">false</span>,
+    <span class="kw">var</span> pattern: <span class="ty">string</span> = <span class="str">""</span>,
+    <span class="kw">var</span> file: <span class="ty">string</span> = <span class="str">""</span>,
+}
+
+<span class="com">/// The options of a command line, or null where it is not one the tool takes.</span>
+<span class="kw">fn</span> parse(given: <span class="ty">string</span>[]): ?<span class="ty">Options</span> {
+    <span class="kw">var</span> o = <span class="ty">Options</span> { };
+    <span class="kw">var</span> rest: <span class="ty">List</span>&lt;<span class="ty">string</span>&gt; = <span class="ty">List</span>.new();
+    <span class="kw">for</span> (a <span class="kw">in</span> given[<span class="num">1</span>..]) {
+        <span class="kw">if</span> (a == <span class="str">"-v"</span>) {
+            o.invert = <span class="kw">true</span>;
+        } <span class="kw">else</span> <span class="kw">if</span> (a == <span class="str">"-c"</span>) {
+            o.countOnly = <span class="kw">true</span>;
+        } <span class="kw">else</span> <span class="kw">if</span> (a == <span class="str">"-n"</span>) {
+            o.numbered = <span class="kw">true</span>;
+        } <span class="kw">else</span> <span class="kw">if</span> (a.startsWith(<span class="str">"-"</span>) &amp;&amp; a.length() &gt; <span class="num">1</span>) {
+            <span class="kw">return</span> <span class="kw">null</span>;
+        } <span class="kw">else</span> {
+            rest.push(a);
+        }
+    }
+    <span class="kw">if</span> (rest.length() != <span class="num">2</span>) {
+        <span class="kw">return</span> <span class="kw">null</span>;
+    }
+    o.pattern = rest[<span class="num">0</span>];
+    o.file = rest[<span class="num">1</span>];
+    <span class="kw">return</span> o;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">if</span> (<span class="kw">let</span> o = parse([<span class="str">"logfilter"</span>, <span class="str">"-n"</span>, <span class="str">"ERROR"</span>, <span class="str">"server.log"</span>])) {
+        println(<span class="str">f"</span>{o.pattern}<span class="str"> in </span>{o.file}<span class="str">, numbered: </span>{o.numbered}<span class="str">"</span>);
+    }
+    println(parse([<span class="str">"logfilter"</span>, <span class="str">"-x"</span>, <span class="str">"ERROR"</span>, <span class="str">"server.log"</span>]) == <span class="kw">null</span>);
+}</code></pre>
+<pre class="output"><code>ERROR in server.log, numbered: true
+true</code></pre>
+<p>The fields have defaults, so <code>Options { }</code> is the tool called with no flags; they are <code>var</code>, so the
+loop can set them. <code>null</code> stands for &quot;not
+a command line I take&quot;; <code>main</code> turns it into the usage message and the exit code 2.</p>
+<h2 id="matching">Matching</h2>
+<p><code>std.regex</code> has the regular expressions. <code>Regex.new</code> compiles a pattern and throws a <code>RegexError</code>
+for one it cannot take — the user typed it, so that is an error to report, not a bug:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.regex { <span class="ty">Regex</span>, <span class="ty">RegexError</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> lines = [
+        <span class="str">"08:00:01 INFO  server started"</span>,
+        <span class="str">"08:00:07 ERROR db: connection refused"</span>,
+        <span class="str">"08:00:11 WARN  slow request 1203ms"</span>,
+    ];
+    <span class="kw">let</span> re = <span class="kw">try</span> <span class="ty">Regex</span>.new(<span class="str">"ERROR|WARN"</span>);
+    <span class="kw">for</span> (line <span class="kw">in</span> lines) {
+        <span class="kw">if</span> (re.isMatch(line)) {
+            println(line);
+        }
+    }
+
+    <span class="kw">try</span> {
+        <span class="kw">let</span> _ = <span class="ty">Regex</span>.new(<span class="str">"(ERROR"</span>);
+    } <span class="kw">catch</span> (e: <span class="ty">RegexError</span>) {
+        println(<span class="str">f"</span><span class="str">logfilter: </span>{e.message()}<span class="str">"</span>);
+    }
+}</code></pre>
+<pre class="output"><code>08:00:07 ERROR db: connection refused
+08:00:11 WARN  slow request 1203ms
+logfilter: the group is not closed at offset 0</code></pre>
+<p>The syntax is RE2's: no backreferences, and in exchange no pattern can make a match take
+exponential time — a property worth having in a tool that takes patterns from anyone.</p>
+<h2 id="colors">Colors</h2>
+<p>On a terminal, each match is shown in bold red. <code>std.term</code> has the styles; <code>force</code> wraps a text in
+one, and <code>findAll</code> gives the matches with where they start and end:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.core { <span class="ty">StringBuilder</span> };
+<span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.regex { <span class="ty">Regex</span> };
+<span class="kw">import</span> std.term { <span class="ty">Style</span>, <span class="ty">Color</span> };
+
+<span class="kw">fn</span> highlighted(re: <span class="ty">Regex</span>, line: <span class="ty">string</span>, style: <span class="ty">Style</span>): <span class="ty">string</span> {
+    <span class="kw">let</span> out = <span class="ty">StringBuilder</span>.new();
+    <span class="kw">var</span> last = <span class="num">0</span>;
+    <span class="kw">var</span> it = re.findAll(line);
+    <span class="kw">let</span> bytes = line.bytes();
+    <span class="kw">while</span> (<span class="kw">let</span> m = it.next()) {
+        out.appendStr(<span class="ty">string</span>.fromUtf8Lossy(bytes[last..m.start]));
+        out.appendStr(style.force(m.value));
+        last = m.end;
+    }
+    out.appendStr(<span class="ty">string</span>.fromUtf8Lossy(bytes[last..bytes.length()]));
+    <span class="kw">return</span> out.toString();
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> re = <span class="kw">try</span> <span class="ty">Regex</span>.new(<span class="str">"ERROR"</span>);
+    <span class="kw">let</span> shown = highlighted(re, <span class="str">"db ERROR here"</span>, <span class="ty">Style</span> { fg = <span class="ty">Color</span>.<span class="ty">Red</span>, bold = <span class="kw">true</span> });
+    println(shown.replace(<span class="str">"\u{1b}"</span>, <span class="str">"ESC"</span>));
+}</code></pre>
+<pre class="output"><code>db ESC[1;31mERRORESC[0m here</code></pre>
+<p>The positions are byte offsets, so the line is cut as bytes and put back together as text. The
+pieces go into a <code>StringBuilder</code>: growing a string with <code>+</code> in a loop copies all of it each round,
+and the compiler warns about it. Whether
+to color at all is <code>colorsEnabled()</code>: true on a terminal, false into a pipe or a file, and the
+<code>NO_COLOR</code> and <code>FORCE_COLOR</code> variables have their say. <code>--color</code> and <code>--no-color</code> override it.</p>
+<h2 id="putting-it-together">Putting it together</h2>
+<p><code>main</code> returns an <code>int</code>: that is the exit code. It may also throw — a file that cannot be read
+ends the program with the error's message and the code 1:</p>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.fs { readText };
+<span class="kw">import</span> std.io { eprintln, println };
+<span class="kw">import</span> std.os { args };
+<span class="kw">import</span> std.regex { <span class="ty">Regex</span> };
+
+<span class="kw">fn</span> main(): <span class="ty">int</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> given = args();
+    <span class="kw">if</span> (given.length() != <span class="num">3</span>) {
+        eprintln(<span class="str">"usage: logfilter &lt;pattern&gt; &lt;file&gt;"</span>);
+        <span class="kw">return</span> <span class="num">2</span>;
+    }
+    <span class="kw">let</span> re = <span class="kw">try</span> <span class="ty">Regex</span>.new(given[<span class="num">1</span>]);
+    <span class="kw">let</span> text = <span class="kw">try</span> readText(given[<span class="num">2</span>]);
+    <span class="kw">var</span> selected = <span class="num">0</span>;
+    <span class="kw">for</span> (line <span class="kw">in</span> text.lines()) {
+        <span class="kw">if</span> (re.isMatch(line)) {
+            selected += <span class="num">1</span>;
+            println(line);
+        }
+    }
+    <span class="kw">return</span> <span class="kw">if</span> (selected &gt; <span class="num">0</span>) <span class="num">0</span> <span class="kw">else</span> <span class="num">1</span>;
+}</code></pre>
+<p>This is the core of the tool; the finished one adds the options, the numbers and the colors, and
+catches a <code>RegexError</code> to report it with the code 2 instead of 1. Run over a log:</p>
+<pre><code class="language-sh">lyric run -- -n "ERROR|WARN" server.log</code></pre>
+<pre><code class="language-text">2:2026-10-14T08:00:05Z WARN  slow request GET /api/users 1203ms
+3:2026-10-14T08:00:07Z ERROR db: connection refused (attempt 3)
+5:2026-10-14T08:00:11Z ERROR db: timeout after 5000ms</code></pre>
+<p><code>lyric build --profile release</code> makes the binary for good, under <code>out/release/&lt;target&gt;/</code>: one file,
+with nothing to install beside it.</p>
+<h2 id="what-it-used">What it used</h2>
+<p>Options in a struct with defaults; an optional for &quot;not valid&quot;; a loop over a slice; <code>std.regex</code>
+and its error; byte offsets and text; <code>main</code>'s return value as the exit code and its <code>throws</code> for
+the failures a user can cause. The next chapter turns to programs that wait for many things at once:
+<a href="../../book/tasks-and-coroutines/">tasks and coroutines</a>.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/modules-and-packages/">← Modules and packages</a><a class="next" href="../../book/tasks-and-coroutines/">Tasks and coroutines →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>
