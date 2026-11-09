@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Coming from Lyric 4 — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Coming from Lyric 4</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/errors/">Errors</a></li>
+<li><a href="../../book/interfaces-and-generics/">Interfaces and generics</a></li>
+<li><a href="../../book/collections/">Collections and iterators</a></li>
+<li><a href="../../book/modules-and-packages/">Modules and packages</a></li>
+<li><a href="../../book/project-cli-tool/">Project: a command-line tool</a></li>
+<li><a href="../../book/tasks-and-coroutines/">Tasks and coroutines</a></li>
+<li><a href="../../book/files-processes-network/">Files, processes, the network</a></li>
+<li><a href="../../book/project-server/">Project: a server</a></li>
+<li><a href="../../book/testing-and-tools/">Testing and tools</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+<li><a href="../../book/comptime-and-macros/">Comptime and macros</a></li>
+<li><a class="current" href="../../book/coming-from-lyric-4/">Coming from Lyric 4</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Coming from Lyric 4</h1>
+<p>Lyric 5 is a new language with an old name. Lyric 4 ran on a virtual machine on .NET; Lyric 5
+compiles through C to a native binary, with a runtime of its own, a collector, and tasks on
+stacks of their own. The surface kept much of what worked, and changed what the design round
+found wrong. This chapter is for a reader who knows Lyric 4: what to unlearn, and why.</p>
+<p>Much stays as it was: <code>?T</code> and <code>x!</code>, <code>throws T</code> and <code>catch (e: T)</code>, <code>Coroutine&lt;T&gt;</code> with
+<code>next()</code>, <code>List&lt;int&gt;.of</code>, <code>push</code>, interfaces with <code>::</code>, <code>@Test</code> and <code>assertEq</code>.</p>
+<h2 id="the-first-hour">The first hour</h2>
+<p><strong>Imports name the module, not a submodule.</strong> <code>println</code> is <code>std.io</code>'s:</p>
+<pre><code class="language-text">import std.io.console { println };     // Lyric 4</code></pre>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(<span class="str">"hello"</span>);
+}</code></pre>
+<pre class="output"><code>hello</code></pre>
+<p><strong>No module header.</strong> A file's path names its module; <code>module app.geometry;</code> is gone. A bare
+<code>module;</code> remains only as a place for attributes that concern the whole module.</p>
+<p><strong><code>main</code> takes no arguments and may throw.</strong> The command line is <code>std.os.args()</code>, and an error
+that leaves <code>main</code> ends the program with its message and the exit code 1 (a panic ends it with
+101):</p>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.os { args };
+
+<span class="kw">fn</span> main(): <span class="ty">int</span> <span class="kw">throws</span> <span class="ty">Error</span> {
+    <span class="kw">let</span> given = args();
+    println(<span class="str">f"</span>{given.length() - <span class="num">1</span>}<span class="str"> arguments</span><span class="str">"</span>);
+    <span class="kw">return</span> <span class="num">0</span>;
+}</code></pre>
+<p><strong>The manifest is <code>lyric.toml</code></strong>, read and never run, where Lyric 4 had <code>lyric.json</code>.</p>
+<h2 id="values">Values</h2>
+<p><strong>A field is written only where it says <code>var</code>.</strong> In Lyric 4 every field was writable. Now <code>var</code>
+means the same in a field as in a local — it may change:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">struct</span> <span class="ty">Counter</span> {
+    <span class="kw">var</span> count: <span class="ty">int</span> = <span class="num">0</span>,
+    name: <span class="ty">string</span>,
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">var</span> c = <span class="ty">Counter</span> { name = <span class="str">"clicks"</span> };
+    c.count += <span class="num">1</span>;
+    println(<span class="str">f"</span>{c.name}<span class="str">: </span>{c.count}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>clicks: 1</code></pre>
+<p><strong>Overflow panics</strong>, in every profile, where Lyric 4 wrapped silently. A wrap you want is
+spelled: <code>+%</code>, <code>-%</code>, <code>*%</code>. <strong><code>int</code> is <code>int64</code></strong>, one type with two names; Lyric 4 kept them apart.</p>
+<p><strong>A string's <code>length()</code> is its bytes</strong>, in constant time; <code>charCount()</code> counts characters.
+<code>length()</code> takes parentheses on everything — arrays too, which had a field <code>length</code> in Lyric 4.</p>
+<p><strong>Numbers become text through an f-string</strong>, <code>f&quot;{n}&quot;</code>, and are formatted there with one small
+language of its own — <code>{pi:.2f}</code> instead of .NET's <code>{pi:N2}</code>:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> pi = <span class="num">3.14159</span>;
+    <span class="kw">let</span> n = <span class="num">42</span>;
+    println(<span class="str">f"</span>{pi:<span class="str">.2f</span>}<span class="str"> </span>{n}<span class="str"> </span>{n:<span class="str">&gt;5</span>}<span class="str">|</span><span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>3.14 42    42|</code></pre>
+<p><strong>A variant in a pattern has a dot</strong>: <code>.Red =&gt;</code>. A bare name in a pattern always binds a new
+variable, so a misspelled variant can no longer turn into a catch-all. <strong>Varargs</strong> are
+<code>values: int...</code>, and an array is spread into them as <code>f(xs...)</code>. String escapes are <code>\u{…}</code>;
+<code>\xNN</code> stays for byte strings.</p>
+<h2 id="errors">Errors</h2>
+<p><strong>Every call that can throw is marked <code>try</code>.</strong> Lyric 4 let throwing calls stand unmarked; now the
+reader sees each place an error can come from, and the compiler refuses the call without it. The
+twin functions <code>text</code> and <code>textOrThrow</code> are one function again: it throws, and <code>try?</code> makes an
+absent value of the error where that is what you want:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> n = <span class="kw">try</span>? <span class="ty">int</span>.parse(<span class="str">"twelve"</span>);
+    println(n == <span class="kw">null</span>);
+}</code></pre>
+<pre class="output"><code>true</code></pre>
+<p>The root of what is thrown is <code>Error</code>, where Lyric 4 had <code>Throwable</code>. A function may name several:
+<code>throws [ParseError, IoError]</code>, and <code>catch (e in [A, B])</code> takes either.</p>
+<h2 id="tasks">Tasks</h2>
+<p>Lyric 4 ran coroutines of <code>Coroutine&lt;Wait&gt;</code> under a <code>run()</code> loop. In Lyric 5, <code>spawn</code> starts a
+task and returns its handle — <code>Task&lt;T&gt; throws E</code> —, <code>await()</code> gives its result, and <code>main</code> is
+itself a task: there is no loop to start. A task may wait anywhere, in any function, without that
+function being marked. A coroutine is still a <code>Coroutine&lt;T&gt;</code>, resumed with <code>next()</code>; <code>resume</code> is
+gone. <a href="../../book/tasks-and-coroutines/">Tasks and coroutines</a> has the whole story.</p>
+<h2 id="visibility">Visibility</h2>
+<p>A declaration without <code>pub</code> is <strong>internal</strong>: seen in the whole package, not only in its own
+module as in Lyric 4. <code>private</code> keeps it to its module.</p>
+<h2 id="what-is-gone">What is gone</h2>
+<ul>
+<li><strong>The virtual machine and its tools.</strong> There is no bytecode file and no <code>lyrc</code>, <code>lyrvm</code> and the
+others beside it: one <code>lyric</code> command with its verbs builds, runs, tests, formats and serves the
+editor.</li>
+<li><strong><code>extern &quot;dotnet&quot;</code>.</strong> C is the one foreign language (<code>extern &quot;C&quot;</code>; see <a href="../../book/c-libraries/">C
+libraries</a>).</li>
+<li><strong>Capabilities and <code>--grant</code>.</strong> A native program has the rights its process has; a sandbox is
+the operating system's job, or the job of the embedding host.</li>
+<li><strong>Hashing by <code>hash(): int</code>.</strong> A type hashes by feeding a <code>Hasher</code> (<code>hash(&amp;h: Hasher)</code>), and a
+<code>Map</code> is SipHash — which also means its order differs from run to run. Never rely on it.</li>
+</ul>
+<h2 id="moving-a-program">Moving a program</h2>
+<p><code>lyric fix --from-4</code> rewrites what can be rewritten mechanically — imports, the module header,
+fields that are written, <code>try</code> marks, patterns — and leaves a note for what needs a person: a
+place where wrapping arithmetic was relied on, a string indexed by character. The result is a
+start, not a promise; build it and read what <code>lyric check</code> says next. <a href="../../book/diagnostics/">What the compiler tells
+you</a> explains how.</p>
+<p>This is the Book's last chapter. From here, the standard library's reference has every module —
+on the website, or for a package of your own from <code>lyric doc</code> — and the specification every rule.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/comptime-and-macros/">← Comptime and macros</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

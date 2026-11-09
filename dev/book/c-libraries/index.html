@@ -37,6 +37,8 @@
 <li><a href="../../book/testing-and-tools/">Testing and tools</a></li>
 <li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
 <li><a class="current" href="../../book/c-libraries/">C libraries</a></li>
+<li><a href="../../book/comptime-and-macros/">Comptime and macros</a></li>
+<li><a href="../../book/coming-from-lyric-4/">Coming from Lyric 4</a></li>
 </ul>
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
@@ -370,7 +372,9 @@ libs = ["GL", "X11", "m", "pthread", "dl", "rt"]</code></pre>
 definitions raylib's own Makefile uses, and makes <code>bounce.rl</code> from <code>raylib.h</code> — <code>import bounce.rl { InitWindow, DrawCircleV, Color, Vector2 }</code>, and the program draws. raylib's colours are macros, which no binding holds: the
 example writes them out. It builds for Linux on Linux (X11 and OpenGL come from the system), for Windows from any
 machine, and for macOS on a Mac.</p>
-<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/diagnostics/">← What the compiler tells you</a></nav>
+<p>The next chapter is about the work a program can do while it is compiled: <a href="../../book/comptime-and-macros/">comptime and
+macros</a>.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/diagnostics/">← What the compiler tells you</a><a class="next" href="../../book/comptime-and-macros/">Comptime and macros →</a></nav>
 </main>
 </div>
 <footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>

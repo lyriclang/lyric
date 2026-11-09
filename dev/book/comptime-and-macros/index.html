@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Comptime and macros — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Comptime and macros</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/errors/">Errors</a></li>
+<li><a href="../../book/interfaces-and-generics/">Interfaces and generics</a></li>
+<li><a href="../../book/collections/">Collections and iterators</a></li>
+<li><a href="../../book/modules-and-packages/">Modules and packages</a></li>
+<li><a href="../../book/project-cli-tool/">Project: a command-line tool</a></li>
+<li><a href="../../book/tasks-and-coroutines/">Tasks and coroutines</a></li>
+<li><a href="../../book/files-processes-network/">Files, processes, the network</a></li>
+<li><a href="../../book/project-server/">Project: a server</a></li>
+<li><a href="../../book/testing-and-tools/">Testing and tools</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+<li><a class="current" href="../../book/comptime-and-macros/">Comptime and macros</a></li>
+<li><a href="../../book/coming-from-lyric-4/">Coming from Lyric 4</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Comptime and macros</h1>
+<p>Some work is better done once, while the program is compiled, than every time it runs: a table
+computed from a formula, a choice between platforms, code that would be the same for every field
+of a struct. Lyric does this work in Lyric — the same language, run by the compiler — and in three
+steps, from the plainest to the most powerful: <code>comptime</code>, type information, and macros.</p>
+<h2 id="comptime"><code>comptime</code></h2>
+<p><code>comptime e</code> evaluates <code>e</code> while the program is compiled; the site stands for the value as if it
+had been written there. The functions it calls are ordinary functions:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> squares(n: <span class="ty">int</span>): <span class="ty">int</span>[] {
+    <span class="kw">let</span> out = <span class="ty">List</span>&lt;<span class="ty">int</span>&gt;.new();
+    <span class="kw">for</span> (i <span class="kw">in</span> <span class="num">0</span>..n) {
+        out.push(i * i);
+    }
+    <span class="kw">return</span> out.toArray();
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> table = <span class="kw">comptime</span> squares(<span class="num">8</span>);
+    println(table[<span class="num">7</span>]);
+}</code></pre>
+<pre class="output"><code>49</code></pre>
+<p>The binary holds the eight numbers; <code>squares</code> never runs in it. The evaluation is pure: code at
+compile time may compute anything, but may not print, read a file, look at the clock or start a
+task — a call that reaches the world is an error at the site, naming the call. That keeps a build
+the same on every machine. A panic during the evaluation is a compile error too, and a site that
+computes too long hits a budget instead of hanging the build.</p>
+<p>A value made at compile time is of a value type: a number, a string, an array, a struct, an enum,
+a tuple. An object of a class is not — it has an identity that belongs to a run.</p>
+<p><code>comptime { … }</code> evaluates a whole block, its last expression the value — the place for a few
+<code>let</code>s that only the computation needs.</p>
+<h2 id="choosing-by-target">Choosing by target</h2>
+<p><code>target</code> and <code>profile</code> are constants of the build: the operating system and architecture it is
+built for, and whether the profile is a debug one. <code>comptime if</code> chooses by them; every branch is
+checked, only the chosen one is built:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> lineEnd(): <span class="ty">string</span> {
+    <span class="kw">comptime</span> <span class="kw">if</span> (target.os == .<span class="ty">Windows</span>) {
+        <span class="kw">return</span> <span class="str">"\r\n"</span>;
+    } <span class="kw">else</span> {
+        <span class="kw">return</span> <span class="str">"\n"</span>;
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(lineEnd().length() &gt; <span class="num">0</span>);
+}</code></pre>
+<pre class="output"><code>true</code></pre>
+<p><code>@When(cond)</code> does the same for a whole declaration at a module's top level — a function that
+exists on one system only.</p>
+<h2 id="type-information">Type information</h2>
+<p><code>std.meta</code> answers questions about a type, as constants: <code>fields&lt;T&gt;()</code> lists a struct's fields,
+<code>variants&lt;E&gt;()</code> an enum's variants, <code>typeName&lt;T&gt;()</code> its name. <code>comptime for</code> walks such a list,
+its body once per element, and <code>e.[f]</code> is the field of <code>e</code> that the info <code>f</code> names:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+<span class="kw">import</span> std.meta { fields };
+
+<span class="kw">struct</span> <span class="ty">Config</span> {
+    host: <span class="ty">string</span>,
+    port: <span class="ty">int</span>,
+    verbose: <span class="ty">bool</span>,
+}
+
+<span class="kw">fn</span> describe(c: <span class="ty">Config</span>): <span class="ty">void</span> {
+    <span class="kw">comptime</span> <span class="kw">for</span> (f <span class="kw">in</span> fields&lt;<span class="ty">Config</span>&gt;()) {
+        println(<span class="str">f"</span>{f.name}<span class="str"> = </span>{c.[f]}<span class="str">"</span>);
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    describe(<span class="ty">Config</span> { host = <span class="str">"localhost"</span>, port = <span class="num">8080</span>, verbose = <span class="kw">false</span> });
+}</code></pre>
+<pre class="output"><code>host = localhost
+port = 8080
+verbose = false</code></pre>
+<p>The loop is unrolled: the compiled <code>describe</code> is three <code>println</code>s, each reading its field
+directly, with its own type — nothing is looked up at run time. This is how the standard library
+writes <code>Debug</code>, <code>Equatable</code> and the JSON codec for any struct: a default method of an interface
+that walks <code>Self</code>'s fields.</p>
+<h2 id="macros">Macros</h2>
+<p>A macro is a function over syntax. It takes pieces of the program — expressions, blocks,
+declarations, as values of <code>std.syntax</code> — and gives back new ones, which stand in the place of the
+site before the module is checked. <code>quote { … }</code> writes the code it gives back, and <code>#{e}</code> puts a
+piece into it:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.syntax { <span class="ty">Block</span>, <span class="ty">Expr</span>, <span class="ty">Stmt</span> };
+
+<span class="com">/// `retry!(n) { body }` runs the body up to n times, until it does not throw.</span>
+<span class="kw">pub</span> <span class="kw">macro</span> retry(n: <span class="ty">Expr</span>, body: <span class="ty">Block</span>): <span class="ty">Stmt</span>[] {
+    <span class="kw">return</span> <span class="kw">quote</span> {
+        <span class="kw">var</span> attempts = <span class="num">0</span>;
+        loop {
+            attempts += <span class="num">1</span>;
+            <span class="kw">try</span> {
+                #{body}
+                <span class="kw">break</span>;
+            } <span class="kw">catch</span> (e) {
+                <span class="kw">if</span> (attempts &gt;= #{n}) {
+                    <span class="kw">throw</span> e;
+                }
+            }
+        }
+    };
+}</code></pre>
+<p>A macro expands in the modules that import it, not in its own — so it lives in a module of its own,
+and a site calls it with a <code>!</code>:</p>
+<pre><code class="language-text">import app.tools { retry };
+
+retry!(3) {
+    result = try fetch();
+};</code></pre>
+<p>The quote is hygienic: <code>attempts</code> and <code>e</code> are the macro's own, fresh at every site, so a variable
+<code>attempts</code> the caller has beside the site is not touched. <code>lyric expand</code> prints a module with its
+macros replaced by what they gave, which is the way to see what a site turned into. A macro can
+also be an attribute — <code>@Builder struct Point { … }</code> adding a <code>PointBuilder</code> beside the struct —
+and an expression macro can take a little language of its own in a string.</p>
+<p><a href="https://github.com/lyriclang/lyric/blob/main/examples/macros/src/main.lyr"><code>examples/macros</code></a> has all three kinds at work, and the test
+suite builds it and compares what <code>lyric expand</code> prints.</p>
+<h2 id="which-to-reach-for">Which to reach for</h2>
+<p>The order of this chapter is the order to try them in. A plain function first; <code>comptime</code> when its
+result is the same on every run; type information when the same code would be written once per
+field; a macro only when the code must take a shape a function cannot — a new kind of statement, a
+declaration made from another. A macro is the hardest of the three to read, to debug and to change,
+and the compiler can say least about what it will produce.</p>
+<p>The next chapter is for readers who know the language this one replaces: <a href="../../book/coming-from-lyric-4/">Coming from Lyric
+4</a>.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/c-libraries/">← C libraries</a><a class="next" href="../../book/coming-from-lyric-4/">Coming from Lyric 4 →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

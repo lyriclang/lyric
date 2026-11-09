@@ -599,8 +599,10 @@ overload of itself.</p>
 closures, structs, classes and enums, patterns, errors, interfaces and generics, collections and
 iterators, modules and packages, tasks and coroutines, files, processes and the network, testing
 and tools — and two projects, a command-line tool and a server, which walk through
-<code>examples/logfilter</code> and <code>examples/jsonserver</code>. Every snippet runs in the test suite, and the two
-example programs are the ones the suite builds and runs.</p>
+<code>examples/logfilter</code> and <code>examples/jsonserver</code>, comptime and macros, and a chapter for readers
+coming from Lyric 4. Every snippet runs in the test suite, and the two example programs are the
+ones the suite builds and runs. A Book snippet or doc-test that declares a <code>macro</code> is a
+declaration, built beside an empty <code>main</code>.</p>
 </li>
 <li><p><strong><code>run -C &lt;dir&gt;</code> starts the program in <code>&lt;dir&gt;</code></strong>, as <code>cd &lt;dir&gt; &amp;&amp; lyric run</code> does: a relative path
 the program opens — a game's assets beside its <code>src/</code> — is the directory's. It ran in the directory
