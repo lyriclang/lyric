@@ -11,8 +11,8 @@ namespace Lyric5.Tests;
 /// other operating system; a dependency's globals are ready before the importer's.
 /// The file tool, <c>programs/filetool.lyr</c>, over a tree the test makes. The word counter,
 /// <c>programs/wordcount.lyr</c>, over a text in four scripts. The log
-/// filter, <c>programs/logfilter.lyr</c>, over a log; the JSON server, <c>programs/jsonserver.lyr</c>, with its
-/// client; the gzip tool, <c>programs/gzipfile.lyr</c>, against .NET's GZipStream and the platform's gzip.
+/// filter, <c>examples/logfilter</c>, over a log; the JSON server, <c>examples/jsonserver</c>, with its
+/// client — the programs the Book's two projects walk through; the gzip tool, <c>programs/gzipfile.lyr</c>, against .NET's GZipStream and the platform's gzip.
 /// The C library examples: <c>examples/ffi</c>, <c>examples/native-prebuilt</c> with its archives made again,
 /// <c>examples/raylib</c> built from raylib's release.
 /// Through <c>Main</c>, so in the console collection.
@@ -37,6 +37,10 @@ public class ExampleTests
 
     private static string ProgramText(string name, [System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
         File.ReadAllText(Path.Combine(Path.GetDirectoryName(here)!, "programs", name + ".lyr"));
+
+    /// <summary>The <c>main</c> of an example package under <c>examples/</c>, as it stands there.</summary>
+    private static string ExampleText(string name, [System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
+        File.ReadAllText(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "examples", name, "src", "main.lyr"));
 
     /// <summary>As a user meets them: <c>src/main.lyr</c> of a package, built and run — the prelude
     /// and every module of the standard library at hand.</summary>
@@ -206,7 +210,7 @@ public class ExampleTests
     [Fact]
     public void The_log_filter_selects_the_lines_a_regex_matches()
     {
-        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", ProgramText("logfilter")));
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", ExampleText("logfilter")));
         var (built, _, why) = Run("build", "-C", dir);
         Assert.True(built == 0, why);
         var host = Target.Host;
@@ -252,7 +256,7 @@ public class ExampleTests
     [Fact]
     public void The_json_server_serves_and_its_client_fetches()
     {
-        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", ProgramText("jsonserver")));
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", ExampleText("jsonserver")));
         var (built, _, why) = Run("build", "-C", dir);
         Assert.True(built == 0, why);
         var host = Target.Host;
