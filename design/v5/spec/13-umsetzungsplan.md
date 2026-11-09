@@ -2556,6 +2556,8 @@ Die Zählung zeigt rund 100 Kommentare im Frontend, die noch von Bytecode und de
 
 **S8, Book I:** Kapitel 3–6 nach P6 — Values and types, Functions and closures, Structs, classes and enums, Patterns —, 39 Snippets, jede Behauptung des Texts vorher gegen den Compiler geprüft (Überlauf auch im Release-Profil eine Panik, `?.`/`!`, Grenzen, `mut fn` auch für eine Klasse, Varianten im Muster mit Punkt). `Errors` (Kapitel 7) kommt mit S9; bis dahin führt Patterns auf What the compiler tells you.
 
+**S9, Book II:** Kapitel 7–10 — Errors, Interfaces and generics, Collections and iterators, Modules and packages —, 22 Snippets, die Behauptungen vorher gegen den Compiler geprüft (ein `throw` außerhalb der Liste ist `SEM0034`, ein Fehler aus `main` endet mit 1, `Equatable` ohne Methode vergleicht Feld für Feld, `sort` steht auf `asSlice()`, `Set.insert`, `join` auf einem Array). Modules and packages führt bis zum Projektkapitel (S10) auf What the compiler tells you.
+
 **Nach S7, auf Wort des Maintainers (2026-11-08):** `run -C <dir>` startet das Programm in `<dir>` — `-C` heißt jetzt, was es bei `git -C`, `make -C` und `cargo -C` heißt: der Befehl steht dort, als wäre er dort gestartet (Spec 14 §1.1 r2). Anlass: ein Spiel, dessen Assets neben `src/` liegen, fand sie nicht, wenn es mit `-C` aus einem anderen Verzeichnis lief. Das Verzeichnis von `-C`, nicht die Paketwurzel darüber — wie `cd <dir> && lyric run`. `lyric test` lief schon immer in der Paketwurzel und bleibt so.
 
 ## Nachtrag 2026-11-08 — M15 S6 und S7: was vom Plan abweicht

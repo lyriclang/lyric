@@ -213,5 +213,4 @@ fn main(): void {
 A plain `let` takes a pattern too, as long as it cannot fail: `let (a, b) = pair;` always fits a
 pair. A pattern that might not fit needs the `else`, and the compiler says so where it is missing.
 
-Errors — the other way a function can end — get a chapter of their own. The next one, [What the
-compiler tells you](diagnostics.md), is about the messages you meet when a program is not right yet.
+The next chapter is about the other way a function can end: [errors](errors.md).
