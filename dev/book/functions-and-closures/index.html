@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Functions and closures — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Functions and closures</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a class="current" href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Functions and closures</h1>
+<p>A function names its parameters and their types, the type it gives back, and a body. Lyric
+reads a function's signature as its promise: callers are checked against it, and the body is
+checked against it once, where it is written. This chapter goes from plain functions to the
+functions that are values — lambdas, and the closures they make.</p>
+<h2 id="parameters-and-results">Parameters and results</h2>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> area(width: <span class="ty">int</span>, height: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> width * height;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(<span class="str">f"</span>{area(<span class="num">3</span>, <span class="num">4</span>)}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>12</code></pre>
+<p>A function that gives nothing back declares no result type, or <code>void</code>; <code>main</code> is one. A
+<code>return</code> may stand anywhere in a body, and every way through a function that gives a value must
+end in one: the compiler checks that none falls off the end.</p>
+<h2 id="defaults-and-names">Defaults and names</h2>
+<p>A parameter may have a default, used where the call leaves it out. Every parameter can be named
+at the call, which helps where two arguments of one type would be easy to swap. The positional
+arguments come first; the named ones follow in any order:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> greet(name: <span class="ty">string</span>, greeting: <span class="ty">string</span> = <span class="str">"Hello"</span>): <span class="ty">string</span> {
+    <span class="kw">return</span> <span class="str">f"</span>{greeting}<span class="str">, </span>{name}<span class="str">!</span><span class="str">"</span>;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(greet(<span class="str">"Ada"</span>));
+    println(greet(<span class="str">"Ada"</span>, greeting: <span class="str">"Hi"</span>));
+    println(greet(greeting: <span class="str">"Hey"</span>, name: <span class="str">"Bo"</span>));
+}</code></pre>
+<pre class="output"><code>Hello, Ada!
+Hi, Ada!
+Hey, Bo!</code></pre>
+<h2 id="one-name-several-counts">One name, several counts</h2>
+<p>Two functions may share a name when they take different numbers of arguments — the call picks
+by its count:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> area(side: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> side * side;
+}
+
+<span class="kw">fn</span> area(width: <span class="ty">int</span>, height: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> width * height;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(<span class="str">f"</span>{area(<span class="num">3</span>)}<span class="str"> </span>{area(<span class="num">3</span>, <span class="num">4</span>)}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>9 12</code></pre>
+<p>That is the only overloading there is: never by the parameters' types. A name means at most one
+function per count, so a call never needs the arguments' types to know which function it calls.</p>
+<h2 id="functions-are-values">Functions are values</h2>
+<p>A function's type is written <code>fn(int) -&gt; int</code>: what it takes and what it gives. A function by
+its name is a value of such a type, and so is a <strong>lambda</strong>, a function written where it is used —
+its parameters in parentheses, then <code>=&gt;</code> and its result:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> apply(f: <span class="kw">fn</span>(<span class="ty">int</span>) -&gt; <span class="ty">int</span>, x: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> f(x);
+}
+
+<span class="kw">fn</span> double(x: <span class="ty">int</span>): <span class="ty">int</span> {
+    <span class="kw">return</span> x * <span class="num">2</span>;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> addOne = (x: <span class="ty">int</span>) =&gt; x + <span class="num">1</span>;
+    println(<span class="str">f"</span>{apply(double, <span class="num">21</span>)}<span class="str"> </span>{apply(addOne, <span class="num">1</span>)}<span class="str"> </span>{apply((x) =&gt; x * x, <span class="num">5</span>)}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>42 2 25</code></pre>
+<p>Where the lambda goes to a parameter whose type is known, its own parameters need no types:
+<code>(x) =&gt; x * x</code> is a <code>fn(int) -&gt; int</code> because <code>apply</code> asks for one. A lambda's body may also be a
+block, with a <code>return</code> of its own:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> clamp = (x: <span class="ty">int</span>): <span class="ty">int</span> =&gt; {
+    <span class="kw">if</span> (x &lt; <span class="num">0</span>) {
+        <span class="kw">return</span> <span class="num">0</span>;
+    }
+    <span class="kw">return</span> x;
+};
+println(<span class="str">f"</span>{clamp(-<span class="num">5</span>)}<span class="str"> </span>{clamp(<span class="num">5</span>)}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>0 5</code></pre>
+<h2 id="closures">Closures</h2>
+<p>A lambda sees the names around it. It <strong>captures</strong> them: a <code>let</code> by its value, a <code>var</code> as the
+variable itself, so that a change on either side is seen on the other. Here the counter's <code>n</code>
+lives on in the closure after <code>counter</code> has returned:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> counter(): <span class="kw">fn</span>() -&gt; <span class="ty">int</span> {
+    <span class="kw">var</span> n = <span class="num">0</span>;
+    <span class="kw">return</span> () =&gt; {
+        n += <span class="num">1</span>;
+        <span class="kw">return</span> n;
+    };
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> next = counter();
+    <span class="kw">let</span> _ = next();
+    <span class="kw">let</span> _ = next();
+    println(<span class="str">f"</span>{next()}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>3</code></pre>
+<p>Each call of <code>counter</code> makes a closure of its own, with an <code>n</code> of its own.</p>
+<h2 id="blocks-after-a-call">Blocks after a call</h2>
+<p>A function whose last parameter is a function can take it as a block after the call's
+parentheses, or without them where it is the only argument. That is how code reads that runs a
+body for you — twice here, and in the library a test, a benchmark's loop or a task:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> twice(body: <span class="kw">fn</span>() -&gt; <span class="ty">void</span>): <span class="ty">void</span> {
+    body();
+    body();
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    twice {
+        println(<span class="str">"again"</span>);
+    }
+}</code></pre>
+<pre class="output"><code>again
+again</code></pre>
+<p>The block follows the parentheses where there are other arguments, and names its own parameters
+before a <code>=&gt;</code> where the function it stands for takes some:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> repeat(times: <span class="ty">int</span>, body: <span class="kw">fn</span>(<span class="ty">int</span>) -&gt; <span class="ty">void</span>): <span class="ty">void</span> {
+    <span class="kw">for</span> (i <span class="kw">in</span> <span class="num">0</span>..times) {
+        body(i);
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    repeat(<span class="num">2</span>) { round =&gt;
+        println(<span class="str">f"</span><span class="str">round </span>{round}<span class="str">"</span>);
+    }
+}</code></pre>
+<pre class="output"><code>round 0
+round 1</code></pre>
+<h2 id="lambdas-over-collections">Lambdas over collections</h2>
+<p>Most lambdas are short and go to a library function that calls them for each element. An array's
+<code>iter()</code> walks it, <code>filter</code> keeps what a lambda says yes to, <code>map</code> turns each element into another,
+and <code>collect</code> gathers what comes out:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> numbers = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>];
+<span class="kw">let</span> tens = numbers.iter().filter((x) =&gt; x % <span class="num">2</span> == <span class="num">0</span>).map((x) =&gt; x * <span class="num">10</span>).collect&lt;<span class="ty">List</span>&lt;<span class="ty">int</span>&gt;&gt;();
+println(<span class="str">f"</span>{tens}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>[20, 40, 60]</code></pre>
+<p>Nothing is copied along the way: the iterator pulls one element at a time through the chain. The
+collections and their iterators have a chapter of their own later in the Book.</p>
+<p>The next chapter, <a href="../../book/structs-classes-enums/">Structs, classes and enums</a>, gives values a shape and
+functions a home: the methods of a type.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/values-and-types/">← Values and types</a><a class="next" href="../../book/structs-classes-enums/">Structs, classes and enums →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

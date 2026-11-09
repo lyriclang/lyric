@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Structs, classes and enums — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Structs, classes and enums</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a class="current" href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Structs, classes and enums</h1>
+<p>A program's own types give its values a shape and its functions a home. Lyric has three kinds:
+a <strong>struct</strong> is a value made of named fields, a <strong>class</strong> is an object that several places can
+share, and an <strong>enum</strong> is a value that is one of a list of cases. Each can carry methods.</p>
+<h2 id="structs">Structs</h2>
+<p>A struct names its fields and their types. A value of it is written with the type's name and its
+fields in braces; a field with a default may be left out:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">struct</span> <span class="ty">Point</span> {
+    x: <span class="ty">int</span>,
+    y: <span class="ty">int</span> = <span class="num">0</span>,
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> p = <span class="ty">Point</span> { x = <span class="num">3</span>, y = <span class="num">4</span> };
+    <span class="kw">let</span> q = <span class="ty">Point</span> { x = <span class="num">5</span> };
+    println(<span class="str">f"</span>{p.x}<span class="str"> </span>{p.y}<span class="str"> </span>{q.y}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>3 4 0</code></pre>
+<p>A field is read-only unless it is declared <code>var</code>. <code>with</code> makes a copy with some fields changed,
+and leaves the original as it was:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">struct</span> <span class="ty">Point</span> {
+    x: <span class="ty">int</span>,
+    y: <span class="ty">int</span>,
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> p = <span class="ty">Point</span> { x = <span class="num">1</span>, y = <span class="num">2</span> };
+    <span class="kw">let</span> q = p with { y = <span class="num">7</span> };
+    println(<span class="str">f"</span>{p.y}<span class="str"> </span>{q.y}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>2 7</code></pre>
+<h3 id="methods">Methods</h3>
+<p>Functions declared inside the type are its <strong>methods</strong>. A method reads the value it is called on
+as <code>this</code>; a method that writes to <code>this</code> says so with <code>mut fn</code>, and only a <code>var</code> field can be
+written. A <code>static fn</code> belongs to the type and has no <code>this</code> — the usual place for a function that
+makes a value:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">struct</span> <span class="ty">Counter</span> {
+    <span class="kw">var</span> count: <span class="ty">int</span>,
+
+    <span class="kw">static</span> <span class="kw">fn</span> starting(at: <span class="ty">int</span>): <span class="ty">Counter</span> {
+        <span class="kw">return</span> <span class="ty">Counter</span> { count = at };
+    }
+
+    <span class="kw">fn</span> doubled(): <span class="ty">int</span> {
+        <span class="kw">return</span> <span class="kw">this</span>.count * <span class="num">2</span>;
+    }
+
+    <span class="kw">mut</span> <span class="kw">fn</span> add(n: <span class="ty">int</span>): <span class="ty">void</span> {
+        <span class="kw">this</span>.count += n;
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">var</span> c = <span class="ty">Counter</span>.starting(at: <span class="num">1</span>);
+    c.add(<span class="num">4</span>);
+    println(<span class="str">f"</span>{c.count}<span class="str"> </span>{c.doubled()}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>5 10</code></pre>
+<h3 id="a-struct-is-a-value">A struct is a value</h3>
+<p>Assigning a struct, passing it to a function or storing it copies it: each place has its own.
+Changing one copy leaves the others alone:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">struct</span> <span class="ty">Point</span> {
+    <span class="kw">var</span> x: <span class="ty">int</span>,
+
+    <span class="kw">mut</span> <span class="kw">fn</span> moveBy(dx: <span class="ty">int</span>): <span class="ty">void</span> {
+        <span class="kw">this</span>.x += dx;
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> a = <span class="ty">Point</span> { x = <span class="num">1</span> };
+    <span class="kw">var</span> b = a;
+    b.moveBy(<span class="num">10</span>);
+    println(<span class="str">f"</span>{a.x}<span class="str"> </span>{b.x}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>1 11</code></pre>
+<p>That is why <code>moveBy</code> needs <code>b</code> to be a <code>var</code>: it changes the value that <code>b</code> holds.</p>
+<h2 id="classes">Classes</h2>
+<p>A class looks like a struct, but its value is a reference to one object. Two names that hold the
+same object see each other's changes:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">class</span> <span class="ty">Account</span> {
+    <span class="kw">var</span> balance: <span class="ty">int</span>,
+
+    <span class="kw">mut</span> <span class="kw">fn</span> deposit(amount: <span class="ty">int</span>): <span class="ty">void</span> {
+        <span class="kw">this</span>.balance += amount;
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> mine = <span class="ty">Account</span> { balance = <span class="num">10</span> };
+    <span class="kw">let</span> shared = mine;
+    shared.deposit(<span class="num">5</span>);
+    println(<span class="str">f"</span>{mine.balance}<span class="str">"</span>);
+}</code></pre>
+<pre class="output"><code>15</code></pre>
+<p>A <code>let</code> holding a class keeps naming the same object; the object itself can still change through
+its <code>mut fn</code>s. Use a class for something that has an identity — an account, a connection, a node
+that several others point to — and a struct for a value, like a point or a date. When in doubt, a
+struct: copying it is cheap, and nobody changes it behind your back.</p>
+<h2 id="enums">Enums</h2>
+<p>An enum is a value that is exactly one of its <strong>variants</strong>. The simplest have no data:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">enum</span> <span class="ty">Color</span> { <span class="ty">Red</span>, <span class="ty">Green</span>, <span class="ty">Blue</span> }
+
+<span class="kw">fn</span> name(c: <span class="ty">Color</span>): <span class="ty">string</span> {
+    <span class="kw">return</span> <span class="kw">match</span> (c) {
+        .<span class="ty">Red</span> =&gt; <span class="str">"red"</span>,
+        .<span class="ty">Green</span> =&gt; <span class="str">"green"</span>,
+        .<span class="ty">Blue</span> =&gt; <span class="str">"blue"</span>,
+    };
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(name(<span class="ty">Color</span>.<span class="ty">Green</span>));
+    println(name(.<span class="ty">Blue</span>));
+}</code></pre>
+<pre class="output"><code>green
+blue</code></pre>
+<p>Where the type is known, <code>.Blue</code> is enough: the compiler knows which enum it is. A <code>match</code> must
+cover every variant; one that forgets a variant does not compile.</p>
+<h3 id="variants-that-carry-data">Variants that carry data</h3>
+<p>A variant can carry values — by position in parentheses, or by name in braces. An enum's own
+methods follow its variants, after a <code>;</code>:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">enum</span> <span class="ty">Shape</span> {
+    <span class="ty">Circle</span>(<span class="ty">float</span>),
+    <span class="ty">Rect</span> { width: <span class="ty">float</span>, height: <span class="ty">float</span> },
+    <span class="ty">Empty</span>;
+
+    <span class="kw">fn</span> area(): <span class="ty">float</span> {
+        <span class="kw">return</span> <span class="kw">match</span> (<span class="kw">this</span>) {
+            .<span class="ty">Circle</span>(r) =&gt; <span class="num">3.0</span> * r * r,
+            .<span class="ty">Rect</span> { width, height } =&gt; width * height,
+            .<span class="ty">Empty</span> =&gt; <span class="num">0.0</span>,
+        };
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> shapes = [<span class="ty">Shape</span>.<span class="ty">Circle</span>(<span class="num">1.0</span>), <span class="ty">Shape</span>.<span class="ty">Rect</span> { width = <span class="num">2.0</span>, height = <span class="num">3.0</span> }, <span class="ty">Shape</span>.<span class="ty">Empty</span>];
+    <span class="kw">for</span> (s <span class="kw">in</span> shapes) {
+        println(<span class="str">f"</span>{s.area()}<span class="str">"</span>);
+    }
+}</code></pre>
+<pre class="output"><code>3.0
+6.0
+0.0</code></pre>
+<p>In a pattern, a variant is written with its dot. A bare name there is a new binding that matches
+anything — the compiler says so where a variant of that name exists.</p>
+<p>An enum is how Lyric says &quot;one of these&quot;: a result that is a value or an error, a token of a
+parser, a command a program reads. The next chapter, <a href="../../book/patterns/">Patterns</a>, shows everything
+<code>match</code> can take apart.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/functions-and-closures/">← Functions and closures</a><a class="next" href="../../book/patterns/">Patterns →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>

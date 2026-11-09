@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en" data-root="../../" data-version="dev">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Values and types — Lyric</title>
+<link rel="stylesheet" href="../../site.css" />
+<script src="../../theme.js"></script>
+</head>
+<body class="article">
+<header class="topbar">
+<div class="brand"><a class="wordmark" href="../../">Lyric</a><span class="version" id="version">dev</span></div>
+<nav class="areas" aria-label="Areas"><a class="current" href="../../book/">Book</a><a href="../../std/">std</a><a href="../../spec/">Spec</a><a href="../../diagnostics/">Diagnostics</a><span class="pending">Download</span></nav>
+<form class="search" role="search"><input type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" aria-controls="search-results" aria-expanded="false" disabled="disabled" /><ul class="search-results" id="search-results" role="listbox" aria-label="Search results" hidden="hidden"></ul></form>
+<button class="theme-toggle" type="button" aria-label="Switch between light and dark" hidden="hidden">◐</button>
+<a class="github" href="https://github.com/lyriclang/lyric">GitHub</a>
+</header>
+<div class="columns">
+<nav class="sidebar" aria-label="Contents">
+<div class="sidebar-bar"><span class="where">Values and types</span><button class="contents-toggle" type="button" aria-expanded="false" aria-controls="sidebar-box" hidden="hidden">Contents</button></div>
+<ul class="sidebar-box" id="sidebar-box">
+<li><a href="../../book/">The Lyric Book</a></li>
+<li><a href="../../book/getting-started/">Getting started</a></li>
+<li><a href="../../book/first-program/">A first program</a></li>
+<li><a class="current" href="../../book/values-and-types/">Values and types</a></li>
+<li><a href="../../book/functions-and-closures/">Functions and closures</a></li>
+<li><a href="../../book/structs-classes-enums/">Structs, classes and enums</a></li>
+<li><a href="../../book/patterns/">Patterns</a></li>
+<li><a href="../../book/diagnostics/">What the compiler tells you</a></li>
+<li><a href="../../book/c-libraries/">C libraries</a></li>
+</ul>
+</nav>
+<main class="text" data-pagefind-body="" data-pagefind-filter="area:Book" data-pagefind-meta="area:Book">
+<h1>Values and types</h1>
+<p>Every value in Lyric has a type, and the compiler knows it before the program runs. Most of the
+time it finds the type itself; you write one where you want to say what you mean, or where there
+is nothing to find it from. This chapter goes through the values a program starts with: numbers,
+text, truth values, the absence of a value, and the ways to put several values together.</p>
+<h2 id="numbers">Numbers</h2>
+<p><code>int</code> is a whole number of 64 bits, and the type an integer literal has unless something asks
+for another. <code>float</code> is a 64-bit floating-point number, the type of a literal with a point or an
+exponent:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> answer = <span class="num">42</span>;
+<span class="kw">let</span> ratio = <span class="num">7.0</span> / <span class="num">2.0</span>;
+println(<span class="str">f"</span>{answer}<span class="str"> </span>{ratio}<span class="str"> </span>{<span class="num">0.1</span> + <span class="num">0.2</span>}<span class="str">"</span>);
+println(<span class="str">f"</span>{<span class="ty">int</span>.max}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>42 3.5 0.30000000000000004
+9223372036854775807</code></pre>
+<p><code>0.1 + 0.2</code> is not <code>0.3</code> in any language whose floats follow IEEE 754; Lyric prints the shortest
+text that reads back as the same number, and hides nothing.</p>
+<p>Integer division cuts towards zero, and <code>%</code> takes the sign of the left side:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+println(<span class="str">f"</span>{<span class="num">7</span> / <span class="num">2</span>}<span class="str"> </span>{-<span class="num">7</span> / <span class="num">2</span>}<span class="str"> </span>{<span class="num">7</span> % <span class="num">3</span>}<span class="str"> </span>{-<span class="num">7</span> % <span class="num">3</span>}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>3 -3 1 -1</code></pre>
+<p>Literals can be written with separators, in hexadecimal and in binary:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+println(<span class="str">f"</span>{<span class="num">1_000_000</span>}<span class="str"> </span>{<span class="num">0xff</span>}<span class="str"> </span>{<span class="num">0b1010</span>}<span class="str"> </span>{<span class="num">1e3</span>}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>1000000 255 10 1000.0</code></pre>
+<h3 id="the-other-sizes">The other sizes</h3>
+<p>Beside <code>int</code> and <code>float</code> there are the signed <code>int8</code>, <code>int16</code> and <code>int32</code>, the unsigned <code>uint8</code>,
+<code>uint16</code>, <code>uint32</code> and <code>uint</code>, and <code>float32</code>. A literal takes one of them with a suffix — <code>3i8</code>,
+<code>200u8</code>, <code>1.5f32</code> — or from the type it is written for. Each type knows its range:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> small: <span class="ty">int8</span> = <span class="num">100</span>;
+println(<span class="str">f"</span>{small}<span class="str"> </span>{<span class="ty">int8</span>.min}<span class="str"> </span>{<span class="ty">int8</span>.max}<span class="str"> </span>{<span class="ty">uint8</span>.max}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>100 -128 127 255</code></pre>
+<p>Arithmetic stays in its type. A result that does not fit is not cut down to fit: the program
+stops with a panic, in every build profile:</p>
+<p class="snippet-note no-run">Compiles; not run here</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> big: <span class="ty">int8</span> = <span class="num">127</span>;
+println(<span class="str">f"</span>{big + <span class="num">1</span>}<span class="str">"</span>);</code></pre>
+<pre><code class="language-text">panic [LYR-RT0002]: arithmetic overflow in '+'</code></pre>
+<h3 id="converting">Converting</h3>
+<p>A smaller integer goes where a larger one is expected, because every value of it fits: an <code>int8</code>
+is an <code>int</code> wherever an <code>int</code> is wanted. Nothing else converts by itself — not an integer into a
+float, not a float into an integer:</p>
+<p class="snippet-note fails">Does not compile — the compiler reports <code>LYR-SEM0001</code></p>
+<pre class="fails"><code class="language-lyric"><span class="kw">fn</span> main(): <span class="ty">void</span> {
+    <span class="kw">let</span> count = <span class="num">3</span>;
+    <span class="kw">let</span> half: <span class="ty">float</span> = count / <span class="num">2</span>;
+}</code></pre>
+<pre class="diagnostic"><code>error[LYR-SEM0001]: cannot assign 'int' to 'float'
+ --&gt; src/main.lyr:3:23
+  |
+3 |     let half: float = count / 2;
+  |               -----   ^^^^^^^^^
+  |               |
+  |               expected 'float' here</code></pre>
+<p><code>as</code> converts between any two number types, and says that you know what happens: a float loses
+its fraction, an integer too large for the narrower type keeps its low bits:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> count = <span class="num">3</span>;
+<span class="kw">let</span> half = count <span class="kw">as</span> <span class="ty">float</span> / <span class="num">2.0</span>;
+println(<span class="str">f"</span>{half}<span class="str"> </span>{<span class="num">3.9</span> <span class="kw">as</span> <span class="ty">int</span>}<span class="str"> </span>{-<span class="num">3.9</span> <span class="kw">as</span> <span class="ty">int</span>}<span class="str"> </span>{<span class="num">300</span> <span class="kw">as</span> <span class="ty">uint8</span>}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>1.5 3 -3 44</code></pre>
+<h2 id="text">Text</h2>
+<p>A <code>string</code> is text in UTF-8. Its <code>length()</code> counts bytes; its <code>chars()</code> walk its characters:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> word = <span class="str">"héllo"</span>;
+println(<span class="str">f"</span>{word.length()}<span class="str"> </span>{word.chars().count()}<span class="str"> </span>{word.toUpper()}<span class="str">"</span>);
+println(<span class="str">f"</span>{word.contains(<span class="str">"ll"</span>)}<span class="str"> </span>{word.replace(<span class="str">"h"</span>, <span class="str">"j"</span>)}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>6 5 HÉLLO
+true jéllo</code></pre>
+<p>An <strong>f-string</strong> puts values into text between braces, each written as its type shows it. After a
+colon, a hole says how: <code>.2f</code> for two decimals, <code>&gt;5</code> and <code>&lt;5</code> to fill a width, <code>x</code> for hexadecimal:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> pi = <span class="num">3.14159</span>;
+println(<span class="str">f"</span><span class="str">[</span>{pi:<span class="str">.2f</span>}<span class="str">] [</span>{<span class="num">42</span>:<span class="str">&gt;5</span>}<span class="str">] [</span>{<span class="num">42</span>:<span class="str">&lt;5</span>}<span class="str">] [</span>{<span class="num">255</span>:<span class="str">x</span>}<span class="str">]</span><span class="str">"</span>);</code></pre>
+<pre class="output"><code>[3.14] [   42] [42   ] [ff]</code></pre>
+<p>A <code>char</code> is one Unicode scalar value, written in single quotes. It converts to and from its
+number, a <code>uint32</code>, and to nothing else:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> e = <span class="str">'é'</span>;
+println(<span class="str">f"</span>{e}<span class="str"> </span>{e <span class="kw">as</span> <span class="ty">uint32</span>}<span class="str"> </span>{<span class="num">65u32</span> <span class="kw">as</span> <span class="ty">char</span>}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>é 233 A</code></pre>
+<p>A <code>bool</code> is <code>true</code> or <code>false</code>; <code>&amp;&amp;</code>, <code>||</code> and <code>!</code> combine them, and the right side of <code>&amp;&amp;</code> and
+<code>||</code> is evaluated only where the left one does not decide.</p>
+<h2 id="nothing-optional-values">Nothing: optional values</h2>
+<p>A value that may be missing has an <strong>optional</strong> type, written with a <code>?</code> in front: a <code>?int</code> holds
+an <code>int</code> or <code>null</code>. A plain <code>int</code> is never <code>null</code> — the compiler does not let a <code>null</code> in — so a
+missing value can only be where the type says it can be.</p>
+<p><code>??</code> gives the value, or the one on its right where there is none:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> missing: ?<span class="ty">int</span> = <span class="kw">null</span>;
+<span class="kw">let</span> present: ?<span class="ty">int</span> = <span class="num">4</span>;
+println(<span class="str">f"</span>{missing ?? <span class="num">0</span>}<span class="str"> </span>{present ?? <span class="num">0</span>}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>0 4</code></pre>
+<p>A test against <code>null</code> narrows the value: inside the branch where it is not <code>null</code>, it is the plain
+type, and the methods of that type are there:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">fn</span> describe(name: ?<span class="ty">string</span>): <span class="ty">string</span> {
+    <span class="kw">if</span> (name != <span class="kw">null</span>) {
+        <span class="kw">return</span> <span class="str">f"</span>{name.length()}<span class="str"> letters</span><span class="str">"</span>;
+    }
+    <span class="kw">return</span> <span class="str">"no name"</span>;
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(describe(<span class="str">"Ada"</span>));
+    println(describe(<span class="kw">null</span>));
+}</code></pre>
+<pre class="output"><code>3 letters
+no name</code></pre>
+<p><code>?.</code> calls a method only where there is a value and gives <code>null</code> otherwise, and <code>!</code> takes the
+value out and stops the program with a panic where there is none — for the places where you know
+better than the compiler.</p>
+<h2 id="several-values-at-once">Several values at once</h2>
+<p>An <strong>array</strong> holds values of one type, in order. Its elements are read and written by index from
+0; reading past its end is a panic. A <code>let</code> array keeps its length and its elements; a <code>var</code>
+array's elements may change:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">var</span> scores = [<span class="num">3</span>, <span class="num">1</span>, <span class="num">2</span>];
+scores[<span class="num">0</span>] = <span class="num">5</span>;
+println(<span class="str">f"</span>{scores}<span class="str"> </span>{scores.length()}<span class="str"> </span>{scores[<span class="num">2</span>]}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>[5, 1, 2] 3 2</code></pre>
+<p>A <code>for</code> loop walks an array's elements:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">var</span> total = <span class="num">0</span>;
+<span class="kw">for</span> (score <span class="kw">in</span> [<span class="num">5</span>, <span class="num">1</span>, <span class="num">2</span>]) {
+    total += score;
+}
+println(<span class="str">f"</span>{total}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>8</code></pre>
+<p>An array has the length it was made with. A <code>List</code> grows as you push onto it — it comes with
+the collections, later in the Book.</p>
+<p>A <strong>tuple</strong> puts a few values of different types together without naming a type for them. Its
+parts are <code>.0</code>, <code>.1</code> and on, and a <code>let</code> takes it apart:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> pair = (<span class="num">1</span>, <span class="str">"one"</span>);
+<span class="kw">let</span> (number, word) = pair;
+println(<span class="str">f"</span>{pair.<span class="num">0</span>}<span class="str"> </span>{pair.<span class="num">1</span>}<span class="str"> </span>{number}<span class="str"> </span>{word}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>1 one 1 one</code></pre>
+<p>A tuple is good for a function that gives back two things. Where the parts mean something, a
+<a href="../../book/structs-classes-enums/">struct</a> gives them names.</p>
+<h2 id="writing-a-type-down">Writing a type down</h2>
+<p>A <code>let</code> or a <code>var</code> takes the type of its value. Write one after a colon where the value alone
+does not say it — an empty array, a <code>null</code>, a literal meant to be a smaller number:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">let</span> none: ?<span class="ty">string</span> = <span class="kw">null</span>;
+<span class="kw">let</span> bytes: <span class="ty">uint8</span>[] = [];
+<span class="kw">let</span> tiny: <span class="ty">int16</span> = <span class="num">7</span>;
+println(<span class="str">f"</span>{none ?? <span class="str">"-"</span>}<span class="str"> </span>{bytes.length()}<span class="str"> </span>{tiny}<span class="str">"</span>);</code></pre>
+<pre class="output"><code>- 0 7</code></pre>
+<p>A parameter and a function's result always carry their types: they are the function's promise to
+its callers, read where the function is called, and the next chapter,
+<a href="../../book/functions-and-closures/">Functions and closures</a>, starts from them.</p>
+<nav class="pager" aria-label="Previous and next" data-pagefind-ignore="all"><a class="previous" href="../../book/first-program/">← A first program</a><a class="next" href="../../book/functions-and-closures/">Functions and closures →</a></nav>
+</main>
+</div>
+<footer class="footer"><a href="../../releases/">Releases</a><a href="/legacy/">Lyric 1.0.0–4.5.0 (Legacy)</a><a href="https://github.com/lyriclang/lyric">GitHub</a></footer>
+<script src="../../nav.js" defer="defer"></script>
+<script src="../../version.js" defer="defer"></script>
+<script src="../../search.js" defer="defer"></script>
+</body>
+</html>
