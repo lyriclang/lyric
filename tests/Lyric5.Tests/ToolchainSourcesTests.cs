@@ -67,6 +67,19 @@ public class ToolchainSourcesTests
     }
 
     [Fact]
+    public void A_connection_that_sends_nothing_does_not_hold_the_mirrors_answers()
+    {
+        using var server = new MirrorServer();
+        using var silent = new TcpClient();
+        silent.Connect(IPAddress.Loopback, server.Port);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var index = Fetch([], null, server.Address).Index(ChannelIndex.Dev);
+        clock.Stop();
+        Assert.Equal(Newest, index.Newest!.Version);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(30), $"the index took {clock.Elapsed}");
+    }
+
+    [Fact]
     public void A_forged_index_at_every_source_installs_nothing()
     {
         using var first = new MirrorServer();

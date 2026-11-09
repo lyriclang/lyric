@@ -47,7 +47,10 @@ internal static class ToolchainFixture
     /// The fixtures' mirror over HTTP on the loopback: a request's path, its query left aside, is a
     /// file under <c>mirror/</c> — or the directory given —, unless <see cref="Once"/> or
     /// <see cref="Served"/> gives other bytes for it or <see cref="Missing"/> names it. Each path
-    /// asked for, with its query, is kept in <see cref="Asked"/>.
+    /// asked for, with its query, is kept in <see cref="Asked"/>. Each connection is answered on a
+    /// thread of its own and dropped after 10 s of silence: answered one after another, a single
+    /// connection that sends nothing held every request behind it until the fetch's 60 s ran out,
+    /// and the source counted as unreachable where a test expected it refused.
     /// </summary>
     public sealed class MirrorServer : IDisposable
     {
@@ -94,11 +97,15 @@ internal static class ToolchainFixture
                 TcpClient client;
                 try { client = _listener.AcceptTcpClient(); }
                 catch (Exception e) when (e is SocketException or ObjectDisposedException or InvalidOperationException) { return; }
-                using (client)
+                new Thread(() =>
                 {
-                    try { Answer(client.GetStream()); }
-                    catch (IOException) { }
-                }
+                    using (client)
+                    {
+                        client.ReceiveTimeout = 10_000;
+                        try { Answer(client.GetStream()); }
+                        catch (Exception e) when (e is IOException or SocketException or ObjectDisposedException) { }
+                    }
+                }) { IsBackground = true }.Start();
             }
         }
 
@@ -115,10 +122,14 @@ internal static class ToolchainFixture
             lock (Asked) Asked.Add(asked);
             var path = asked.Split('?')[0];
             var file = Path.Combine(_root, path.TrimStart('/'));
-            var body = Missing.Contains(path) ? null
-                : Once.Remove(path, out var once) ? once
-                : Served.TryGetValue(path, out var given) ? given
-                : File.Exists(file) ? File.ReadAllBytes(file) : null;
+            byte[]? body;
+            lock (Asked)
+            {
+                body = Missing.Contains(path) ? null
+                    : Once.Remove(path, out var once) ? once
+                    : Served.TryGetValue(path, out var given) ? given
+                    : File.Exists(file) ? File.ReadAllBytes(file) : null;
+            }
             var status = body is null ? "404 Not Found" : "200 OK";
             body ??= "not here\n"u8.ToArray();
             stream.Write(Encoding.ASCII.GetBytes($"HTTP/1.1 {status}\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n"));
