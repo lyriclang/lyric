@@ -564,6 +564,26 @@ das Zählen und Rotieren der Bits; `clamp` bleibt Methode auf `Ordered`, ein Int
 | P11 | **Teilstring-Suche in O(n+m)** (Two-Way, wie `memmem` in glibc und Rusts `str::find`) statt `memchr`+`memcmp` (O(n·m) im schlechtesten Fall) — `find`, `count`, `split`, `findAll` laufen darüber | glibc, Rust |
 | P12 | **Beim Bauen entschieden** (P-S6, 2026-11-04), nach P1 und P6 („ein Begriff, ein Name, ein Ort“): **die Kodier-Namensräume** — ein Modul, das **ein** Format ist, hat freie Funktionen (`json.encode`, `toml.decode`); ein Modul mit **mehreren** Formaten nennt jedes mit einem leeren Struct und statischen Funktionen (`Base64.encode`, `Hex.decode`, `Utf16`, `Gzip.compress`) — darum **`percentEncode`/`percentDecode` → `Percent.encode`/`Percent.decode`** in `std.uri`. **Bleiben**: `reasonOf(code)` (ein Nachschlagen in der Tabelle, im Fachmodul; was den Status beschreibt, `status.reason` und `isSuccess()`, steht an ihm); `int.toBytesLE`/`fromBytesLE` (schon P2: Empfänger-Funktionen in `std.encoding`); **`plusDays(n)`** — an `Date` hält der Parameter `int` angebrochene Tage fern, die ein `Date + Duration` erst zur Laufzeit ablehnen könnte; an `DateTime` ist ein Kalendertag in der Zone 23 bis 25 Stunden lang (dieselbe Ortszeit am nächsten Tag), also eine andere Rechnung als vergangene Zeit, die `Instant + Duration` ist; **`toString` neben `show`** — `show` ist `Display`, der Text für einen Leser; `toString` die Umwandlung in einen eigenen `string` derselben Bytes (`StringBuilder`, `StringView`, `CStr`, das an UTF-8 scheitern kann), bei `StringView` fallen beide zusammen | verworfen: `Date :: [Add<Duration>]` mit Panik bei angebrochenen Tagen; ein Kodiermodul je Format (`std.base64` …) |
 
+
+## Review 2026-11-10 — die offenen Punkte aus M17 S5 und S6
+
+Entscheidungen des Maintainers („alle nach Empfehlung“) zu dem, was die Lesung der Spec gegen
+die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, Nachtrag
+2026-11-10); „Betrifft“ nennt die Zeile, die sich ändert; die Uhr steht in der Zeile. Wo eine
+ältere Zeile dieses Dokuments widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| A5 | **Ein Map-Schlüssel, der kein Text und keine Ganzzahl ist, ist ein `EncodeError` zur Laufzeit** (E6 sagte Übersetzungsfehler) — die Spec folgt dem Gebauten: der Codec ist generisch über `Encoder`, und welche Schlüssel ein Format hält, weiß erst das Format (TOML keine, ein künftiges vielleicht). Ein Fehler zur Übersetzungszeit je Format ist eine Tür nach 5.0 | E6 |
+| A6 | **Eine Nutzlast-Variante mit Namen schreibt ihre Felder benannt** (E3, wie entschieden, serdes Form): `{ "Circle": { "r": 1 } }`. Heute schreibt der Codec ein einzelnes Feld bar und mehrere positionell. Positionell bleibt nur, wo die Nutzlast keine Namen hat (ein Tupel). Das Datenformat ist ein Vertrag nach außen, also vor 5.0. Uhr: M17 S12c | E3 |
+| A7 | **Der Transport von `std.http` ist `fn(host: string, port: int)`** (Q6 sagte `fn(SocketAddr) -> Stream`) — die Spec folgt dem Gebauten: TLS braucht den Hostnamen für SNI und die Prüfung des Zertifikats, eine Adresse hat ihn nicht mehr | Q6 |
+| A8 | **`Hasher` steht in `std.core`** (K2 sagte `std.hash`) — die Spec folgt dem Gebauten: `Hashable` ist ein Interface des Prelude, und sein Member nennt den Typ | K2 |
+| B3 | **`sizeOf<T>()` und `alignOf<T>()` werden öffentlich** (M1): `std.ffi` hat sie privat, und wer ein C-Layout von Hand prüft oder einen Puffer bemisst, braucht sie. In `std.meta`, als `comptime`-Konstanten. Uhr: M17 S12d | M1 |
+| B4 | **`target.endian` und `profile.name`** (M1) werden gebaut — eine Konstante des Ziels und der Name des Profils, neben dem, was `target` und `profile` schon sagen. Uhr: M17 S12d | M1 |
+| B6 | **`warn` und `note` in `std.syntax`** (M2) werden gebaut: ein Makro, das nur ablehnen kann, zwingt den Nutzer zum Raten. `map` über einen Baum ist eine Tür nach 5.0 — ein Makro schreibt seinen Lauf selbst. Uhr: M17 S12d | M2 |
+| B7 | **`comptime Regex.new(…)` prüft zur Übersetzungszeit** — Tür nach 5.0, wie die Spec es schon sagt (S8) | S8 |
+| B8 | **`list[a..b]` gibt keinen `Slice<T>`** (C3): `list.asSlice()[a..b]` sagt, dass der View am Puffer der Liste hängt. Tür nach 5.0 | C3 |
+
 ---
 
 **Bereich 10 ist damit vollständig entschieden** (B1–B13, 2026-09-29). Nachträge in anderen

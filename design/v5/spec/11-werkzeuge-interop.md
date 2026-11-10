@@ -400,6 +400,25 @@ und 0005 hält schon L1).
 | E3′e | **`--lib`**: die `dylibs` kommen neben `lib<name>.a`/`.so`/`.dll` und stehen in der Link-Zeile (E11, `linkArgs`) | — | X8 |
 | E3′f | **Reproduzierbarkeit und Vertrauen**: eine `dylib` des Pakets hält der Lock-Hash wie ein Archiv; was ein Skript über `linkSearch` findet, gehört der Maschine wie `pkgConfig` (N3). Keine neue Vertrauensregel (E13) | — | P6, BS5 |
 
+
+## Review 2026-11-10 — die offenen Punkte aus M17 S5 und S6
+
+Entscheidungen des Maintainers („alle nach Empfehlung“) zu dem, was die Lesung der Spec gegen
+die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, Nachtrag
+2026-11-10); „Betrifft“ nennt die Zeile, die sich ändert; die Uhr steht in der Zeile. Wo eine
+ältere Zeile dieses Dokuments widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| A10 | **`config.toml` nennt nur das Default-Toolchain** (C4 setzte es in die Präzedenzleiter): benutzerweite Einstellungen sind eine Tür nach 5.0 | C4, T7 |
+| A11 | **`[lints]` nimmt nur Arrays**, keinen Gruppenschlüssel (`warnings = "deny"`, L2/L3; das Beispiel in W2 hat schon Arrays); `@Allow` steht nur an Deklarationen (das Modul entfiel 2026-10-22, 09 A11). Gruppenschlüssel sind eine Tür nach 5.0; `--deny-warnings` gibt es | L1–L3 |
+| A12 | **Optionen je Verb, und `test` endet mit 0 oder 1** — die Spec folgt dem Gebauten (Spec 14): jede Option, `-C` und `--json` eingeschlossen, steht in der Tabelle der Verben, die sie nehmen (Spec 14 §5); `lyric test` sagt, ob alle Tests grün sind, nicht wie ein einzelner endete. C3 und C5 sind in diesen Teilen überholt | C3, C5 |
+| B9 | **`lyric doctor` und `lyric demangle` gibt es in 5.0 nicht** (T1, E9): `lyric env` sagt, was `doctor` sagen sollte; die Namen im C sind lesbar. Tür nach 5.0 | T1, E9 |
+| B10 | **`lyric lsp --version`** wird gebaut (T6): die Clients prüfen es. Was `--version` außerdem nennt (`std`) und die Regel zur Deprecation (C10) sind eine Tür nach 5.0. Uhr: M17 S12e | C10, T6 |
+| B11 | **`--json` meldet keinen Fortschritt** (C6): Diagnosen, Artefakte, Testergebnisse. Tür nach 5.0 | C6 |
+| B12 | **`lyric doc` dokumentiert das Paket, nicht seine Abhängigkeiten** (E7). Tür nach 5.0 | E7 |
+| B13 | **`LyrConfig.log`, `lyr_gc_collect()` und `lyr_gc_stats()` stehen nicht im öffentlichen Header** (H1, H5; der Plan nannte die Statistik schon eine Tür). Tür nach 5.0 | H1, H5 |
+
 ---
 
 **Bereich 11 ist damit vollständig entschieden** (W1–W9, 2026-09-29). Es bleibt 12 (Migration).

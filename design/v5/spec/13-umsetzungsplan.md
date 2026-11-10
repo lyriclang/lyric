@@ -2562,6 +2562,16 @@ Die Zählung zeigt rund 100 Kommentare im Frontend, die noch von Bytecode und de
 
 **S11, Book IV:** Kapitel 18 Comptime and macros und 19 Coming from Lyric 4; die Durchsicht von vorn nach hinten (jedes Kapitel führt auf das nächste, auch What the compiler tells you und C libraries, die es nicht taten); `SUMMARY` in der Reihenfolge von P6. Die Startseite verlinkt das Book schon (Knopf und Eintrag). Die Snippet-Regel von `Book.cs` nimmt `macro` zu den Deklarationen: ein Makro ist eine Funktion über Syntax, und als Anweisungen in `main` gesetzt verwarf es der Parser. Ein Makro expandiert nicht im eigenen Modul, daher steht seine Verwendung im Kapitel als Text und verweist auf `examples/macros`, das die Suite baut.
 
+**S12, entschieden (2026-11-10):** Die offenen Punkte aus S5 und S6 — zwölf Abweichungen zwischen Bereich und Gebautem (A1–A12), fünfzehn entschiedene, nicht gebaute Zeilen (B1–B15), fünf Stellen, an denen die Spec Unentschiedenes beschrieb (C1–C5), die Reste aus S5 (D) — lagen dem Maintainer je mit Empfehlung vor; er nahm alle an („alle nach Empfehlung“). Die Zeilen stehen je Bereich im Abschnitt „Review 2026-11-10“ von 01, 03, 04, 06, 08, 09, 10 und 11. Zwei Stellen weichen von der Liste ab, beide beim Eintragen gefunden: zu `T.from(…)` zwischen zwei Schranken empfahl sie einen Fehler mit dem Rat, `From<int>.from(…)` zu schreiben — 04 S7 hat diese Form ausgeschlossen, also wählt der Aufruf über die Argumente (03 D1); und der Panik-Haken des Hosts (C3) ist in der Laufzeit gebaut, nur nicht in `lyric.h` zugesagt — der Satz der Spec fällt trotzdem, die Begründung in 01 sagt es. Eine Tür ohne Bereichszeile: die zwei Senkungen einer Lambda (`(x) =>` und `x =>` geben im C verschiedene Namen), folgenlos, nach 5.0. Was die Betriebszeilen nennen (der Spiegel `dl.lyriclang.de`, der Upload von Dev), bleibt beim Maintainer.
+
+| Slice | Inhalt |
+|---|---|
+| **S12a** Text | die Zeilen in den Bereichen; Spec 13 §1.4 ohne den Panik-Haken (C3), Spec 12 mit den Antwortformen und der Panik-Regel als normativem Abschnitt und dem Namensgesetz als informativem (C5), ein Fall dazu |
+| **S12b** Compiler | `I.m(this)` erreicht den Default (04 A1); `++`/`--` nur auf Ganzzahlen (04 A3); `T.from(…)` zwischen zwei Schranken (03 D1); das implizite Member an einem Parameter, dessen Typ ein Typargument festlegt (03 D2); `is` kettet nicht (08 D4) |
+| **S12c** Codec | eine Nutzlast-Variante mit Namen schreibt ihre Felder benannt (10 A6) |
+| **S12d** std.meta, std.syntax | `sizeOf<T>()`, `alignOf<T>()`, `target.endian`, `profile.name`, `warn`, `note` (10 B3, B4, B6) |
+| **S12e** Werkzeug | `lyric lsp --version` (11 B10); die Zeitgrenze von `StdTests` auf macOS, wo das C der std-Tests zweimal 300 s überschritt |
+
 **Nach S7, auf Wort des Maintainers (2026-11-08):** `run -C <dir>` startet das Programm in `<dir>` — `-C` heißt jetzt, was es bei `git -C`, `make -C` und `cargo -C` heißt: der Befehl steht dort, als wäre er dort gestartet (Spec 14 §1.1 r2). Anlass: ein Spiel, dessen Assets neben `src/` liegen, fand sie nicht, wenn es mit `-C` aus einem anderen Verzeichnis lief. Das Verzeichnis von `-C`, nicht die Paketwurzel darüber — wie `cd <dir> && lyric run`. `lyric test` lief schon immer in der Paketwurzel und bleibt so.
 
 ## Nachtrag 2026-11-08 — M15 S6 und S7: was vom Plan abweicht

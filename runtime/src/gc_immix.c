@@ -2058,7 +2058,7 @@ void lyr_gc_safepoint_slow(void) {
 }
 
 /* A function entry's check failed: a stop asked for — or, below the thread's own bound, a stack
- * overflow, the panic it is (13 §1.4 item 7). */
+ * overflow, the panic it is (13 §1.4 item 6). */
 void lyr_gc_stack_slow(uintptr_t frame) {
     Thread *t = self;
     if (t == NULL) {
