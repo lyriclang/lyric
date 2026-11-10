@@ -42,10 +42,7 @@
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
 <h1>The standard library contract</h1>
 <blockquote>
-<p><strong>Partly written.</strong> §1 was written with milestone <strong>M3</strong> of the Lyric 5 plan; the rest comes with
-<strong>M8a–M10</strong>, spec-first: each rule lands here with its conformance case before or with its
-implementation. Source of the decisions:
-<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 Standard library</a>.</p>
+<p>Source of the decisions: <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 Standard library</a>.</p>
 </blockquote>
 <h2 id="scope">Scope</h2>
 <p>What of the standard library is language: the prelude, the core interfaces and their contracts (hash, order, clone), the answer forms and the panic rule, the naming law, the syntax tree as values (<code>std.syntax</code>), serialization as a pair (<code>std.codec</code>), JSON (<code>std.json</code>), TOML (<code>std.toml</code>).</p>
@@ -387,6 +384,107 @@ two digits; or the sign and <code>inf</code> or <code>nan</code>. The value is t
 the range an infinity, below it a zero, as IEEE 754 rounds — a float has no <code>Overflow</code>.</li>
 <li>A <strong>bool</strong> is <code>true</code> or <code>false</code>.</li>
 </ul>
+<h2 id="answer-forms-and-the-panic-rule">Answer forms and the panic rule</h2>
+<p>What a function of the library answers says what kind of question it is
+(<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 B3</a>). One operation has one form; the caller chooses what to make of it (<code>try?</code>,
+<code>try!</code>, <code>Result.of</code>, <a href="../../spec/06-errors/#6-the-expression-forms">06 §6</a>), and no name carries the
+form (rule 6 of the naming law below).</p>
+<ol>
+<li><strong><code>throws E</code></strong> answers an operation that can fail for a reason the caller may need: a file,
+the network, a process, a decoding, a <strong>parse</strong>. <code>int.parse(s)</code> throws a <code>ParseError</code>
+(<a href="#parsing">§Parsing</a>); it does not answer <code>?int</code>.</li>
+<li><strong><code>?T</code></strong> answers a lookup whose absence has no reason: <code>list.get(i)</code>, <code>map.get(k)</code>,
+<code>xs.first()</code>, <code>std.os</code>'s <code>env(name)</code>, the end of an iterator.</li>
+<li><strong><code>bool</code></strong> answers whether something is so — <code>exists</code>, <code>isEmpty</code>, <code>contains</code> — or tells what
+happened as information: <code>Set.insert(v)</code> says whether <code>v</code> was new. It never says whether an
+operation worked.</li>
+<li><strong><code>Result&lt;T, E&gt;</code></strong> is no return type of the library: a caller builds one
+(<a href="#results-and-conversions">§Results and conversions</a>).</li>
+<li><strong>The panic rule.</strong> A panic answers a precondition the program text states. An argument that
+may come from data never panics — it answers <code>?T</code> or <code>bool</code>, or throws; an argument the
+programmer writes — an index, a separator, a format, the bound of a range — may: <code>xs[i]</code>
+outside <code>xs</code> panics (<code>LYR-RT0003</code>), <code>xs.get(i)</code> answers <code>null</code>. No parser, decoder or path of
+input and output of the library panics on its input.</li>
+</ol>
+<h2 id="the-naming-law">The naming law</h2>
+<p><em>(Informative.)</em> How the library names what it has (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/10-stdlib.md">10 B2</a>); a library of a program that
+follows it reads like the standard one.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Rule</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Types in PascalCase, the built-in ones aside; functions, methods and fields in camelCase; modules short and lower case; a constant is a static member</td>
+<td><code>int.max</code>, <code>float.epsilon</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>A function is a verb; a predicate starts with <code>is</code>, <code>has</code>, <code>contains</code> or <code>can</code>; a field is a noun</td>
+<td><code>int.parse</code>, <code>isBlank</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Constructors stand on the type: <code>new</code>, <code>empty()</code>, <code>withCapacity(n)</code>, <code>of(elements)</code>, <code>from(another form)</code>, <code>of</code> and a unit</td>
+<td><code>List.of([1, 2])</code>, <code>Duration.ofSecs(5)</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>toX()</code> makes a copy, <code>asX()</code> sees the same data in O(1)</td>
+<td><code>toList()</code>, <code>asSlice()</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>A plural for a collection, the singular for an element</td>
+<td><code>keys()</code>, <code>first()</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>No answer form in a name: no <code>OrThrow</code>, <code>OrNull</code>, <code>tryX</code></td>
+<td><code>try? fs.readText(p)</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>No type in a name: one function over <code>Num</code></td>
+<td><code>abs(x)</code>, <code>sum()</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>No <code>get</code> prefix for reading; <code>get(k)</code> is a lookup; <code>length()</code> with parentheses everywhere</td>
+<td><code>xs.length()</code>, <code>m.get(k)</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>A mutation is named for what it does and gives <code>void</code> or what it removed; its copying twin takes a participle or <code>to</code></td>
+<td><code>sort()</code> and <code>sorted()</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>No <code>bool</code> parameter that changes the operation: two functions or an enum</td>
+<td><code>trimStart()</code>, not <code>trim(true)</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td>A suffix names the output, never the input</td>
+<td><code>n.toBytesLE()</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td>An error type ends in <code>Error</code>, its reasons are an <code>…ErrorKind</code>; options are a struct with defaults</td>
+<td><code>IoError { kind, path, detail }</code></td>
+</tr>
+<tr>
+<td>13</td>
+<td>An assertion takes the actual value first, then the expected one</td>
+<td><code>assertEq(got, 4)</code></td>
+</tr>
+</tbody>
+</table>
 <h2 id="results-and-conversions">Results and conversions</h2>
 <p>A failure kept as a value, and a value made from another (design 05 E1, 10 B3, B4) — both
 <code>std.core</code>'s, and named in the prelude (<a href="../../spec/04-modules/">04</a>).</p>
@@ -1616,6 +1714,8 @@ run inside <code>comptime</code> only; a call the program would make at run time
 <li class="level-3"><a href="#stdmath-clamp-a-chars-code-point">std.math, clamp, a char's code point</a></li>
 <li class="level-2"><a href="#iteration">Iteration</a></li>
 <li class="level-3"><a href="#parsing">Parsing</a></li>
+<li class="level-2"><a href="#answer-forms-and-the-panic-rule">Answer forms and the panic rule</a></li>
+<li class="level-2"><a href="#the-naming-law">The naming law</a></li>
 <li class="level-2"><a href="#results-and-conversions">Results and conversions</a></li>
 <li class="level-2"><a href="#arrays-and-views">Arrays and views</a></li>
 <li class="level-2"><a href="#hashing">Hashing</a></li>

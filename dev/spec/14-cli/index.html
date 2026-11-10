@@ -42,10 +42,7 @@
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
 <h1>The command line</h1>
 <blockquote>
-<p><strong>Partly written.</strong> §1 was written with milestone <strong>M2</strong> of the Lyric 5 plan, §2 with <strong>M7</strong>, §3
-with <strong>M8a</strong>; the rest comes with <strong>M8a–M13</strong>, spec-first: each rule lands here with its
-conformance case before or with its implementation. Source of the decisions:
-<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 Tooling and interop W1</a>.</p>
+<p>Source of the decisions: <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 Tooling and interop W1</a>.</p>
 </blockquote>
 <h2 id="scope">Scope</h2>
 <p>The one binary and its verbs, option grammar, the precedence ladder, exit codes, the NDJSON output schema. Versioned as a contract (C10).</p>
@@ -287,7 +284,7 @@ package's modules under <code>src/</code> is a test of its own, after the marked
 the order of their paths. It is named <code>doc: &lt;module&gt;.&lt;element&gt; (&lt;file&gt;:&lt;line&gt;)</code> — the element
 the comment documents, a member as <code>Type.member</code>, the module alone for <code>//!</code> — and <code>-f</code> and the
 count take it as the others. Its fence says what it must do, as the Book's snippets
-(<a href="https://lyric.oil1i.de/dev/book/">Book</a>) do: <code>lyric</code> builds and runs, and prints what an
+(<a href="https://lyriclang.de/dev/book/">Book</a>) do: <code>lyric</code> builds and runs, and prints what an
 <code>```output</code> block right below it says; <code>lyric,no_run</code> builds; <code>lyric,compile_fail=CODE</code> fails
 to build with that code and no other, and says what a <code>```diagnostic</code> block right below it
 says. A block without <code>fn main</code> is made a program as the Book's are — its statements the body

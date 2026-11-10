@@ -42,10 +42,7 @@
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
 <h1>Modules and packages</h1>
 <blockquote>
-<p><strong>Partly written.</strong> §1 was written with milestone <strong>M3</strong> of the Lyric 5 plan (slice S6), §2 to
-§4 with <strong>M7</strong> (slices S1, S2a–S2c, S3a, S3b), §5 with the review of <strong>M8a</strong> (R3a); the rest follows with M7, spec-first: each rule
-lands here with its conformance case before or with its implementation. Source of the decisions:
-<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 Modules</a>.</p>
+<p>Source of the decisions: <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 Modules</a>.</p>
 </blockquote>
 <h2 id="scope">Scope</h2>
 <p>Module names from paths, visibility (<code>private</code>, <code>internal</code>, <code>pub</code>), imports, the prelude, editions, packages and their resolution; module-level bindings.</p>
@@ -91,7 +88,7 @@ come with <code>comptime</code>.)</em></li>
 (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V1</a>). A package gathers modules under one name
 (<a href="../../spec/15-project/">15 §1</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/04-modules/</code> — a rule about a package as a package case, a
-directory (<a href="https://github.com/lyriclang/lyric-spec/blob/ab8269557f10f3aab5aba7f7c06a35d3c755f7b6/conformance/README.md">the format</a>); what only the command line shows, in the
+directory (<a href="https://github.com/lyriclang/lyric-spec/blob/5da7b27ed72f41c8a5ccfdfb31c29aa87bceeba9/conformance/README.md">the format</a>); what only the command line shows, in the
 toolchain's own tests (<code>tests/Lyric5.Tests</code>, <code>PackageTests</code>).</p>
 <ol>
 <li>A <strong>package</strong> is a directory with a manifest, <code>lyric.toml</code>; its modules are the <code>.lyr</code> files

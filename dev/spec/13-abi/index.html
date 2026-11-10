@@ -42,10 +42,7 @@
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Spec" data-pagefind-meta="area:Spec">
 <h1>ABI and embedding</h1>
 <blockquote>
-<p><strong>Partly written.</strong> §1 was written with milestone <strong>M1</strong> of the Lyric 5 plan, §1.6 and §1.7 with <strong>M6</strong>, §2 with <strong>M7</strong>, §3 with <strong>M14</strong>; the rest comes
-with <strong>M14</strong>, spec-first: each rule lands here with its conformance case before or with its
-implementation. Source of the decisions:
-<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 Runtime</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 Tooling and interop W4/W5</a>.</p>
+<p>Source of the decisions: <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/01-laufzeit.md">01 Runtime</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 Tooling and interop W4/W5</a>.</p>
 </blockquote>
 <h2 id="scope">Scope</h2>
 <p>The C ABI as the one foreign boundary: the type table, <code>@Layout(C)</code>, pointers, callbacks, exports, the embedding API (<code>lyr_init</code>, exports as tasks, <code>LyrStatus</code>), and libraries loaded while a program runs. Replaces the 4.x bytecode chapter.</p>
@@ -162,7 +159,7 @@ limit ends with <code>    ... deeper frames not shown</code>.)</em></p>
 </li>
 <li><p>A panic on any thread ends the whole process, with one report. A panic on another thread
 meanwhile waits for that end and writes nothing. A second panic on the panicking thread
-itself — while its report is written or the hook runs (item 5) — ends the process at once
+itself — while its report is written — ends the process at once
 with the line <code>panic while panicking [CODE]: message</code>, still with 101.</p>
 </li>
 <li><p>The runtime's panic codes:</p>
@@ -240,7 +237,7 @@ with the line <code>panic while panicking [CODE]: message</code>, still with 101
 </tr>
 <tr>
 <td><code>LYR-RT0017</code></td>
-<td>control reached a place the implementation holds unreachable — behind a call that does not return, behind a <code>match</code> that covers every case. No program causes it: it is a defect of the implementation, reported instead of acted on. A build that optimizes may end as a crash there instead (item 6): at once, and never by going on</td>
+<td>control reached a place the implementation holds unreachable — behind a call that does not return, behind a <code>match</code> that covers every case. No program causes it: it is a defect of the implementation, reported instead of acted on. A build that optimizes may end as a crash there instead (item 5): at once, and never by going on</td>
 </tr>
 <tr>
 <td><code>LYR-RT0018</code></td>
@@ -269,10 +266,6 @@ with the line <code>panic while panicking [CODE]: message</code>, still with 101
 </tbody>
 </table>
 </li>
-<li><p>A host may set one <strong>panic hook</strong>. It is called once per process, after the report is
-written, on the panicking thread, with the code, the message and the frames as written. It
-cannot prevent the end: when it returns, the process exits with 101.</p>
-</li>
 <li><p>A <strong>crash</strong> is not a panic: an invalid memory access, an illegal instruction, a trap, an
 arithmetic fault or an abort. When the runtime installed its handlers (§1.5), it writes <code>crash: </code> and a
 description, then the frames from the faulting one outward, in the form of item 2; then the
@@ -290,7 +283,7 @@ foreign code —: running into it ends the process with the same report.</p>
 <h3 id="15-program-start-and-end">1.5 Program start and end</h3>
 <ol>
 <li>A standalone program starts the runtime with its defaults, which install the handlers of
-§1.4 item 6. Its exit code is the value <code>main</code> returns, masked to <code>0..255</code>
+§1.4 item 5. Its exit code is the value <code>main</code> returns, masked to <code>0..255</code>
 (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 C5</a>).</li>
 <li>A host starts the runtime itself (<code>lyr_init</code>, §5 rule 1), once per process: a second start is
 refused and changes nothing. The host chooses the program's arguments, a heap limit (0: none), whether the
@@ -314,7 +307,7 @@ resume and its next yield (cooperative).</li>
 the others, whose unoptimized frames are some four times as large, unless its creation says
 otherwise (the sweep after M10, W5) — a size the runtime's interface takes (<code>lyr_coro_new</code>,
 <code>lyr_task_start</code>), not one a program writes — and costs memory only as its pages are reached.
-Running out of it is a stack overflow (<code>LYR-RT0006</code>, §1.4 item 7), as on a thread's stack.</li>
+Running out of it is a stack overflow (<code>LYR-RT0006</code>, §1.4 item 6), as on a thread's stack.</li>
 <li>A coroutine runs on the thread that first resumed it, and only there.</li>
 <li>A coroutine is an object. While it is suspended, what its frames hold lives as long as the
 coroutine: one that nothing references any more is collected with its stack, and nothing on
@@ -638,7 +631,7 @@ output of its own — <code>examples/embedded-host</code> —, in the toolchain'
 <ol>
 <li><strong><code>lyr_init(config)</code></strong> starts the runtime, once per process, and answers <code>LYR_OK</code>; a second call
 answers <code>LYR_ERROR</code> and changes nothing. <code>config</code> — <code>NULL</code> for zeros — gives the program's
-arguments, a heap limit, whether the runtime installs its fault handlers (§1.4 item 6), and the
+arguments, a heap limit, whether the runtime installs its fault handlers (§1.4 item 5), and the
 writers its standard output and error go to instead of the process's (<code>stdout_write</code>,
 <code>stderr_write</code>, with <code>write_context</code>). <strong><code>lyr_shutdown()</code></strong> writes out what the program wrote and
 stops the runtime.</li>
