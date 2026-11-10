@@ -276,6 +276,20 @@ Kennung (der M8c-Slice), „Betrifft“ und Uhr wie im Abschnitt davor.
 | S13 | **`LYR-SEM0126` am geschriebenen Typ** (bestätigt; nachziehen): ein für einen Wert geschriebener reiner Constraint-Typ meldet sich dort einmal — Bindung, Parameter, Rückgabe, auch als Optional — und läuft als Fehlertyp weiter; Aufrufe und Gebräuche schweigen. Felder, Elemente von Arrays und Tupeln und Typargumente (`List<Equatable>`) melden es noch am Übergang. Uhr: M8c S18 | D9 |
 | S18 | **`AsSlice<T>` sagt, wer einen View von sich gibt** (bestätigt nach S15–S19): `interface AsSlice<T> { fn asSlice(): Slice<T>; }` in `std.core`, nach dem Member, das `List` schon hatte; `List` ist eins. Nicht im Prelude (B2 nennt es nicht) — ein eigener Typ, der den Bereich will, importiert es | D4, D6 |
 
+
+## Review 2026-11-10 — die offenen Punkte aus M17 S5 und S6
+
+Entscheidungen des Maintainers („alle nach Empfehlung“) zu dem, was die Lesung der Spec gegen
+die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, Nachtrag
+2026-11-10); „Betrifft“ nennt die Zeile, die sich ändert; die Uhr steht in der Zeile. Wo eine
+ältere Zeile dieses Dokuments widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| A1 | **`I.m(this)` in der eigenen Implementierung von `m` erreicht den Default** (D3, wie entschieden): heute ruft es die Implementierung selbst und rekursiert, bis der Stack endet (`LYR-RT0006`) — es gab keinen Weg zum Default. Spec 05 §4 Regel 1 bekommt die Ausnahme: im Rumpf der Implementierung von `I.m`, mit `this` als Empfänger, ist `I.m(this, …)` der Default des Interfaces; ein Interface ohne Default für `m` lehnt den Aufruf dort ab. Überall sonst bleibt `I.m(x)` die Implementierung des Typs von `x`. Java schreibt dafür `I.super.m()`; eine eigene Form wäre ein zweiter Weg für einen Fall. Uhr: M17 S12b | D3 |
+| A2 | **Eine Implementierung darf den Default eines Parameters wiederholen** — F1 fällt in diesem Teil, die Spec folgt dem Gebauten: der Compiler nahm es immer an, und ein Fall der Suite nutzt es. Eine Implementierung ohne Default erbt den des Interfaces | D5 F1 |
+| A3 | **`++`/`--` nur auf Ganzzahlen**, wie D6 sagt: heute auch auf `float` — ein Inkrement um 1.0 ist kein Schritt zum Nachbarn, und `x += 1.0` sagt, was gemeint ist. Spec 08 §6.1 („a number“) wird „an integer“, der Fall `increment-gives-the-old-or-the-new-value` verliert seinen `float`-Teil. Uhr: M17 S12b | D6 |
+
 ---
 
 **Bereich 4 ist damit vollständig entschieden** (D1–D15, 2026-09-28).

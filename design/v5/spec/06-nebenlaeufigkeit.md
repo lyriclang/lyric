@@ -194,6 +194,19 @@ Die Kennungen sind die des Reviews; „Betrifft“ nennt, was die Zeile ändert 
 | M7-5 | **Der Scheduler benutzt die Klasse `Atomic` nicht**: er arbeitet mit std-internen atomaren Operationen auf eigenen Feldern (07 D4). `std.sync` importiert `std.task`, nicht umgekehrt; der Modulschnitt 10 Q10 gilt unverändert | N10 |
 | — | Technische Wahl beim Bauen: `park` ist die Primitive der Laufzeit, „unpark“ das Wieder-bereit-Machen durch den Scheduler in Lyric. `Cancelled` lebt in `std.task`; der Compiler lädt das Modul für jedes Programm mit einer Koroutine | N5, 10 Q10 |
 
+
+## Review 2026-11-10 — die offenen Punkte aus M17 S5 und S6
+
+Entscheidungen des Maintainers („alle nach Empfehlung“) zu dem, was die Lesung der Spec gegen
+die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, Nachtrag
+2026-11-10); „Betrifft“ nennt die Zeile, die sich ändert; die Uhr steht in der Zeile. Wo eine
+ältere Zeile dieses Dokuments widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| B15 | **`Isolate.spawn` wird nicht gebaut** (G7 nannte es ein Muster): ein Thread mit eigenem Scheduler, erreichbar nur über Kanäle, ist `Thread` plus `Channel` (Spec 10 §9) — so steht es im Book. Eine eigene Funktion dafür ist eine Tür nach 5.0 | G7 |
+| C4 | **Was die Spec über Sperren und Pools sagt, ist entschieden** (gebaut seit M6/M8b, hier nachgetragen): ein wartender Schreiber eines `RwLock` geht vor, Leser nach ihm warten (Spec 10 §10 Regel 2); `pool.spawn` verteilt der Reihe nach über die Threads des Pools (§11 Regel 2); `parallelMap` läuft auf dem Pool des Programms — ein Thread je Prozessor, beim ersten Aufruf gestartet —, das erste Element auf dem Thread des Aufrufers, und wirft den Fehler des ersten Elements in Reihenfolge, wenn alle gestarteten Aufrufe geendet haben (§11 Regel 5) | G4, P5 |
+
 ---
 
 **Bereich 6 ist damit vollständig entschieden** (N1–N10, 2026-09-29).

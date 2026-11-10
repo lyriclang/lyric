@@ -361,6 +361,18 @@ der M8c-Slice, der ihn fand.
 |---|---|---|
 | S12a | **Eine leere nachgestellte Lambda wird untersucht**: `subtest("row") { }` ist `LYR-PAR0002` „expected an expression, got RBrace“, mit einer Anweisung im Rumpf geht es. Y11 sagt nicht ausdrücklich, ob `run { }` steht; vermutlich liest der Parser den Block als Wertblock. Ist es ein Parser-Fehler, wird er behoben; zeigt sich eine Frage der Grammatik, kommt sie als Entscheidung zurück. Uhr: M8c S18 | Y11 |
 
+
+## Review 2026-11-10 — die offenen Punkte aus M17 S5 und S6
+
+Entscheidungen des Maintainers („alle nach Empfehlung“) zu dem, was die Lesung der Spec gegen
+die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, Nachtrag
+2026-11-10); „Betrifft“ nennt die Zeile, die sich ändert; die Uhr steht in der Zeile. Wo eine
+ältere Zeile dieses Dokuments widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| D4 | **`is` kettet nicht**, wie Y4 es für die Vergleichsstufe sagt (nicht-assoziativ; Spec 02 schreibt es so): `x is A is B` ist ein Parsefehler wie `a < b < c`. Heute nimmt der Parser die Kette. Uhr: M17 S12b | Y4 |
+
 ---
 
 **Bereich 8 ist damit vollständig entschieden** (Y1–Y12, 2026-09-29) — und mit ihm die Sprache.

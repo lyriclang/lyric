@@ -221,6 +221,23 @@ den anderen Bereichen; wo eine ältere Zeile dieses Dokuments dem widerspricht, 
 |---|---|---|
 | A11 | **`@Warn(name)` und `@Deny(name)` neben `@Allow(name)`**: die drei Ebenen eines Lints an einer Deklaration (das Modul entfiel 2026-10-22, A10), ein Mechanismus mit `[lints]` und `-A`/`-W`/`-D` (11 W7 L1, das sie schon nannte); jedes nimmt Name, Gruppe oder Nummer | A10, A11 |
 
+
+## Review 2026-11-10 — die offenen Punkte aus M17 S5 und S6
+
+Entscheidungen des Maintainers („alle nach Empfehlung“) zu dem, was die Lesung der Spec gegen
+die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, Nachtrag
+2026-11-10); „Betrifft“ nennt die Zeile, die sich ändert; die Uhr steht in der Zeile. Wo eine
+ältere Zeile dieses Dokuments widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| A9 | **`@MustUse` steht an `spawn`, nicht am Typ `Task`** — die Spec folgt dem Gebauten: ein verworfener `Task` aus `spawn` warnt, dazu der Lint `unused-task`; ein `Task` aus einem Feld oder einer Sammlung zu verwerfen ist kein Fehler des Aufrufers | A11 |
+| B1 | **`embed` gibt `uint8[]`** (Q4 nannte auch `string`): `string.fromUtf8(embed(p))` sagt, dass der Text UTF-8 sein muss, und wirft, wo er es nicht ist. Eine zweite Form ist eine Tür nach 5.0 | Q4 |
+| B2 | **Attribute werden einzeln gelesen** (R1 und 10 M1 nannten `FieldInfo.attributes` und eine Liste): `attribute<A>(f)`, `variantAttribute`, `memberAttribute`, `parameterAttribute`, `typeAttribute` decken jeden Fall, den std und die Beispiele haben. Eine Liste ist eine Tür nach 5.0 | R1 |
+| B5 | **Ein `Type` von std.meta steht nicht an einer Typposition eines `quote`** (10 M1): ein Makro schreibt den Typ als Text (`std.syntax`). Tür nach 5.0 | A7 |
+| C1 | **`@SeesConformer` ist entschieden** — der Befund des Maintainers in der Durchsicht nach M10 (Punkt 6, „W10“), gebaut in b67bb3c6 (2026-10-15), hier nachgetragen: die Defaults eines so markierten Interfaces fragen mit dem Modul des Konformers und sehen jedes seiner Felder (Spec 11 §1 Regel 15, §4 Regel 10). Das ersetzt für diese Interfaces die Absage an den Opt-in in D2: std.core's Familie und `Encode`/`Decode` mussten private Felder sehen, und vorher stand dafür eine Liste von Namen im Compiler | D2 |
+| C2 | **Die übrigen Punkte der Durchsicht nach M10**, mit dem Maintainer entschieden und gebaut, hier nachgetragen (Spec 11 §4 zitiert sie): **W6** jeder Leser fragt die Variable seiner eigenen Schleife (`attribute`, `variantAttribute`, `memberAttribute`; 99608a6d); **W9** ein `FieldInfo` sagt `kind` und `hasDefault` (7ad1bacf); **X2** die Felder einer Nutzlast-Variante nehmen ihre Defaults wie die eines Structs (ce8c45c9); **X3** ein Member wird über seine Info gerufen, `e.[m](…)` und `T.[m](…)` (913b683f); **X4** `members<T>()` mit `kind` und `parameters`, `parameterAttribute` (0b42ad20); **X5** der Typ eines Felds über seine Info, `T.[f]` (d12f00a7) | R1, A7 |
+
 ---
 
 **Bereich 9 ist damit vollständig entschieden** (A1–A12, 2026-09-29).

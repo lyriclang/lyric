@@ -392,6 +392,21 @@ widerspricht, gilt die Zeile hier.
 |---|---|---|
 | S11 | **Ein statisches Interface-Member mit Rumpf ist ein Default.** T5 ließ Statics nur deklarieren (`LYR-SEM0127`): ein Rumpf „liefe für keinen Typ“. Seit M9a S9 wird ein Default je Konformer an Ort und Stelle gesetzt — ein statischer genauso, `Self` der Konformer, `E.m(…)` und `T.m(…)` seine Instanz, ein eigenes Static des Konformers ersetzt ihn. Damit schreibt `std.core` R5s Enum-Reflexion (`Variants.all()`, `fromName`) als Default statt im Compiler, und ein Nutzer-Interface bekommt Fabriken mit Rumpf (`static fn two(): Self[] { … }`). `static let` deklariert weiter nur. Verworfen: die Statics als Quelltext synthetisieren (der zweite Mechanismus, den S10 gerade gelöscht hat) | T5; Spec 05 §2 Regel 2, 11 §4 Regel 5 |
 
+
+## Review 2026-11-10 — die offenen Punkte aus M17 S5 und S6
+
+Entscheidungen des Maintainers („alle nach Empfehlung“) zu dem, was die Lesung der Spec gegen
+die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, Nachtrag
+2026-11-10); „Betrifft“ nennt die Zeile, die sich ändert; die Uhr steht in der Zeile. Wo eine
+ältere Zeile dieses Dokuments widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| A4 | **`x[k].f = v` bleibt abgelehnt** (Spec 05 §12 Regel 9): das Zurückschreiben über `IndexSet`, das N1 für ein Feld eines indizierten Elements beschreibt, ist eine Tür nach 5.0. Bis dahin `var e = x[k]; e.f = v; x[k] = e;` | N1, T14 |
+| D1 | **`T.from(…)` zwischen zwei Schranken desselben Interfaces wählt über die Argumente**, wie der Aufruf auf einem Typ (04 S7, entschieden 2026-10-22: über eine Schranke wählt die Instanz der Schranke): `<T :: [From<int>, From<string>]>` mit `T.from("abc")` nimmt `From<string>`. Heute findet die Suche die Überladung nicht. *Die Liste empfahl einen Fehler mit dem Rat, `From<int>.from(…)` zu schreiben; diese Form gibt es nach 04 S7 nicht, also folgt die Zeile 04 S7.* Uhr: M17 S12b | T18 |
+| D2 | **Ein implizites Member an einem Parameter, dessen Typ ein Typargument festlegt** (`f<Signal>(.Red)` für `fn f<T>(x: T)`): die Position erwartet `Signal`, also gilt `.Red` dort wie an jeder Position mit einem Enum-Typ (`LYR-SEM0113` nur, wo keiner erwartet wird). Uhr: M17 S12b — prüfen, gebaut, wo es fehlt | T8 |
+| D3 | **Wo die Unifikation eines Aufrufs scheitert, meldet sie** (T8, `same(1, "s")`): heute bindet das erste Argument `T`, die Meldung steht am zweiten. Beide Formen lehnen dasselbe Programm ab; der Ort der Meldung ist eine Tür nach 5.0 | T8 |
+
 ---
 
 **Bereich 3 ist damit vollständig entschieden** (T1–T19, 2026-09-28).
