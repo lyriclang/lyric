@@ -1,0 +1,53 @@
+name: Mirror upload
+
+# What the run made and signed, onto the mirror: the upload first, then one command that moves it into
+# place with the index last. The job holds the deploy key and runs nothing of the repository. The key
+# reaches only the gate on the server, which can upload and publish and do nothing else, and the
+# server's identity is pinned by the caller, from tooling/mirror/known_hosts. A toolchain trusts the
+# signatures, not this upload.
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: dev, stable, or staging for a dry run.
+        required: true
+        type: string
+      known_hosts:
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  upload:
+    name: Upload
+    runs-on: ubuntu-latest
+    environment: mirror
+    permissions: {}
+
+    steps:
+      - name: What was signed
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          path: files
+          merge-multiple: true
+
+      - name: Upload and publish
+        env:
+          DEPLOY_KEY: ${{ secrets.MIRROR_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ inputs.known_hosts }}
+          TARGET: ${{ inputs.target }}
+          UPLOAD: run-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          [ -n "${DEPLOY_KEY:-}" ] || { echo "::error::the environment gives no deploy key"; exit 1; }
+          umask 077
+          key="$RUNNER_TEMP/deploy.key"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
+          command -v rsync > /dev/null || sudo apt-get install -y -q rsync
+          # -4: GitHub's runners have no IPv6
+          ssh_command="ssh -4 -i $key -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts -o StrictHostKeyChecking=yes"
+          rsync -rt --timeout=300 --chmod=D755,F644 -e "$ssh_command" files/ "deploy@dl.lyriclang.de:$UPLOAD/"
+          $ssh_command deploy@dl.lyriclang.de publish "$TARGET" "$UPLOAD"

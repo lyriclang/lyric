@@ -16,6 +16,9 @@ Lyric 5 is built on `main` along [`design/v5/spec/13-umsetzungsplan.md`](design/
 Nothing here is released; the rolling `dev` prerelease carries the current state without any
 promise. This entry fills with the milestones.
 
+- **The website moved to <https://lyriclang.de>.** Every diagnostic's link and the editor's
+  "explain" action point there. <https://lyric.oil1i.de> sends every address on to the same path at the
+  new name, so the links older toolchains print keep working.
 - **The Lyric 5 migration warnings are gone** (`LYR-SEM0107`–`SEM0110`, added for 4.6): the
   design decided a hard cut with no 4.x warning stages toward 5.
 - **A runtime in C (M1** — `design/v5/spec/01`, spec chapter 13 §1**):** a program links
@@ -335,6 +338,9 @@ promise. This entry fills with the milestones.
   holds. **A channel's index carries a number** (`sequence`), and a machine refuses one lower than it
   has seen. A download that stalls for 60 seconds counts as a source that is gone. The mirror is
   `dl.lyriclang.de`.
+- **The mirror is up (M15):** `https://dl.lyriclang.de` serves the toolchains, and `lyric toolchain`
+  asks it before GitHub. Each dev build is uploaded on its way out and then installed from each
+  source on Linux, Windows and macOS. Dev keeps its last ten versions there.
 - **A C struct's pointer field may be null** (spec chapter 13 §3 rules 1 and 4): a `@Layout(C)` struct takes
   `?Ptr<T>` and `?CStr` fields, one word as C's pointer — a `?Ptr` is now its address everywhere, 0 for none.
   `lyric bindgen` writes a struct's pointer fields optional and every field `var`, so `pos.x += 1` writes a bound
@@ -452,6 +458,14 @@ promise. This entry fills with the milestones.
 - **A selective import written twice is refused** (`LYR-RES0001`), as a qualified or an aliased
   one already was: `import std.io { println };` twice, or `{ println, println }`, was taken as an
   overload of itself.
+- **The Book** has thirteen chapters more, after the first program: values and types, functions and
+  closures, structs, classes and enums, patterns, errors, interfaces and generics, collections and
+  iterators, modules and packages, tasks and coroutines, files, processes and the network, testing
+  and tools — and two projects, a command-line tool and a server, which walk through
+  `examples/logfilter` and `examples/jsonserver`, comptime and macros, and a chapter for readers
+  coming from Lyric 4. Every snippet runs in the test suite, and the two example programs are the
+  ones the suite builds and runs. A Book snippet or doc-test that declares a `macro` is a
+  declaration, built beside an empty `main`.
 - **`run -C <dir>` starts the program in `<dir>`**, as `cd <dir> && lyric run` does: a relative path
   the program opens — a game's assets beside its `src/` — is the directory's. It ran in the directory
   the toolchain was started in.

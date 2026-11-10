@@ -116,6 +116,9 @@ public partial class BookTests
     {
         var declarations = new Snippet("t.md", 1, SnippetKind.Run, "struct P {\n    x: int,\n}", null, null);
         Assert.Equal("struct P {\n    x: int,\n}\n\nfn main(): void {}\n", declarations.Program());
+        // a macro is a declaration too: a function over syntax
+        var macro = new Snippet("t.md", 1, SnippetKind.Run, "pub macro twice(e: Expr): Expr {\n    return quote { #{e} * 2 };\n}", null, null);
+        Assert.EndsWith("}\n\nfn main(): void {}\n", macro.Program());
         var program = new Snippet("t.md", 1, SnippetKind.Run, "fn main(): void {\n}\n", null, null);
         Assert.Equal("fn main(): void {\n}\n", program.Program());
     }

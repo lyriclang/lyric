@@ -464,3 +464,6 @@ definitions raylib's own Makefile uses, and makes `bounce.rl` from `raylib.h` â€
 DrawCircleV, Color, Vector2 }`, and the program draws. raylib's colours are macros, which no binding holds: the
 example writes them out. It builds for Linux on Linux (X11 and OpenGL come from the system), for Windows from any
 machine, and for macOS on a Mac.
+
+The next chapter is about the work a program can do while it is compiled: [comptime and
+macros](comptime-and-macros.md).

@@ -246,6 +246,19 @@ widerspricht, gilt die Zeile hier.
 | S13 | **Release-Traces sind bestmöglich.** Im Release-Profil kann ein Rahmen fehlen: der einer Funktion, die der IR-Inliner in ihren Rufer einbettet (B10), und der einer Funktion, die mit einem Aufruf endet — der C-Compiler setzt den Rahmen des Gerufenen an ihre Stelle (Sibling-Call): `fn main(): int { return check(3); }` zeigt nur `check`. Debug zeigt jeden Rahmen. So hält es Rust im Release; Go eliminiert keine Endaufrufe. Verworfen: `-fno-optimize-sibling-calls` im Release — Kosten für jedes Programm, für einen Rahmen, den Debug ohnehin zeigt. Die Spec sagt es in 13 §1.4 Regel 2 (S16) | E8, B10 |
 | S13 | **Der Wachstumspfad des `StringBuilder` steht aus der Reihe**: eine eigene Funktion (Rusts `#[cold]`-Muster, `do_reserve_and_handle`); eingebettet wird nur die Prüfung auf Platz. Sonst spleißt der IR-Inliner (≤ 24 Ops je Gerufenem, ≤ 64 Stellen je Rufer) den ganzen Pfad in jeden f-String — `synth`: C 208 → 403 KB, Bau 4,08 → 4,61 s. Verworfen: das Budget je Rufer an der Größe statt an den Stellen messen — es ändert den Code jedes Programms und braucht eine neue Vermessung. Uhr: M8c | B10, 10 S6 |
 
+
+## Review 2026-11-10 — die offenen Punkte aus M17 S5 und S6
+
+Entscheidungen des Maintainers („alle nach Empfehlung“) zu dem, was die Lesung der Spec gegen
+die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, Nachtrag
+2026-11-10); „Betrifft“ nennt die Zeile, die sich ändert; die Uhr steht in der Zeile. Wo eine
+ältere Zeile dieses Dokuments widerspricht, gilt die Zeile hier.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| B14 | **Weak-Referenzen bleiben eine Primitive der Laufzeit** (L1, gebaut in M11): `lyr_weak_*` mit Rückruf beim Leeren steht in 13 §1 der Spec; eine Fläche in Lyric (`Weak<T>`) ist eine Tür nach 5.0 | L1 |
+| C3 | **Kein Panik-Haken im Vertrag des Hosts in 5.0**: die Laufzeit hat einen (`lyr_set_panic_hook` in `lyr/panic.h`, mit eigenem Test), aber `lyric.h` sagt ihn nicht zu, und `lyr/…` bleibt intern (11 E9). Spec 13 §1.4 Punkt 5 beschrieb ihn als Teil des Vertrags — der Satz fällt (M17 S12a). Ein Host, der vom Ende erfahren will, liest die Fehlerausgabe (`stderr_write`) und den Exit-Code 101. Ihn in `lyric.h` aufzunehmen ist eine Tür nach 5.0 | L1, 11 H1, E9 |
+
 ---
 
 **Bereich 1 ist damit vollständig entschieden** (L1–L12, 2026-09-28).

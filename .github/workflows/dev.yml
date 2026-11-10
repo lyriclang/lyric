@@ -71,6 +71,7 @@ jobs:
       minisign_version: ${{ steps.stamp.outputs.minisign_version }}
       minisign_sha256: ${{ steps.stamp.outputs.minisign_sha256 }}
       public_key: ${{ steps.stamp.outputs.public_key }}
+      known_hosts: ${{ steps.stamp.outputs.known_hosts }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -88,6 +89,7 @@ jobs:
             echo "minisign_version=$(sed -n 's/^version = //p' tooling/minisign-version)"
             echo "minisign_sha256=$(sed -n 's/^linux = //p' tooling/minisign-version)"
             echo "public_key=$(sed -n 2p tooling/release-keys/dev.pub)"
+            echo "known_hosts=$(cat tooling/mirror/known_hosts)"
           } >> "$GITHUB_OUTPUT"
 
   package:
@@ -116,15 +118,31 @@ jobs:
       - name: Checksums
         run: cd dist && sha256sum * > "$RUNNER_TEMP/SHA256SUMS" && cat "$RUNNER_TEMP/SHA256SUMS"
 
+      # The last ten builds: what the channel offers now and this one. Only the mirror's own index, when
+      # the tool finds it good by its signature: the mirror keeps all ten, GitHub only the newest, so an
+      # index from GitHub names builds the mirror never had, and the gate refuses an index that names a
+      # file it holds nowhere. None at all starts the list afresh, so a mirror that is down or broken
+      # costs old versions, never the build.
       - name: The channel's index
         env:
           VERSION: ${{ needs.stamp.outputs.version }}
           DATE: ${{ needs.stamp.outputs.date }}
           SEQUENCE: ${{ needs.stamp.outputs.sequence }}
         run: |
-          mkdir index
+          mkdir index previous
           cp "$RUNNER_TEMP/SHA256SUMS" index/
-          dotnet run --project tools/Package --configuration Release -- index --channel dev --version "$VERSION" --date "$DATE" --sequence "$SEQUENCE" --archives dist --out index/dev.json
+          build_index() {
+            dotnet run --project tools/Package --configuration Release -- index --channel dev --version "$VERSION" --date "$DATE" --sequence "$SEQUENCE" --archives dist --out index/dev.json --keep 10 "$@"
+          }
+          built=
+          base=https://dl.lyriclang.de
+          if curl -fsSL --retry 2 --max-time 30 -o previous/dev.json "$base/dev.json" \
+            && curl -fsSL --retry 2 --max-time 30 -o previous/dev.json.minisig "$base/dev.json.minisig" \
+            && build_index --previous previous/dev.json; then
+            echo "built on the index from $base"
+            built=1
+          fi
+          [ -n "$built" ] || build_index
           cat index/dev.json
 
       - name: Upload the index
@@ -155,6 +173,27 @@ jobs:
       channel: dev
       version: ${{ needs.stamp.outputs.version }}
       public_key: ${{ needs.sign.outputs.public_key }}
+
+  # From main alone, as below: the two sources do not wait for each other, so that one failing leaves
+  # the other current.
+  mirror-upload:
+    name: Mirror
+    needs: [stamp, install-trial]
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/mirror-upload.yml
+    # an environment's secrets reach a called workflow only through this
+    secrets: inherit
+    with:
+      target: dev
+      known_hosts: ${{ needs.stamp.outputs.known_hosts }}
+
+  channel-check:
+    name: Channel check
+    needs: [stamp, publish, mirror-upload]
+    uses: ./.github/workflows/channel-check.yml
+    with:
+      channel: dev
+      version: ${{ needs.stamp.outputs.version }}
 
   # From main alone: a run dispatched on a branch tries everything and leaves the channel as it is.
   publish:

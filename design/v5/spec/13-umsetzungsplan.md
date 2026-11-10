@@ -2554,6 +2554,24 @@ Die Zählung zeigt rund 100 Kommentare im Frontend, die noch von Bytecode und de
 
 **S7, gebaut:** P4 messbar: `tools/check_coverage.py` im Spec-Repo (Spec 16 §3 r5, CI-Schritt) — jeder nicht zurückgezogene Code des Anhangs hat einen Fall oder steht mit Grund in der Liste (Kommandozeile, Build, Compiler-/Laufzeit-Fehler, Netz, Windows-Gerätename), jeder Abschnitt von 03–13, 15, 16 wird von einem Fall zitiert. Vorher: 77 Codes ohne Fall. 57 Fälle aus den `wrong`-Beispielen des Katalogs, 5 aus seinen Mehrdatei-Beispielen, 3 von Hand; der Läufer liest `exit:` auch bei einer Ablehnung (PKG0009 endet mit 2). `LYR-PAR0006` zurückgezogen: der Lexer lehnt jedes solche Literal zuerst ab.
 
+**S8, Book I:** Kapitel 3–6 nach P6 — Values and types, Functions and closures, Structs, classes and enums, Patterns —, 39 Snippets, jede Behauptung des Texts vorher gegen den Compiler geprüft (Überlauf auch im Release-Profil eine Panik, `?.`/`!`, Grenzen, `mut fn` auch für eine Klasse, Varianten im Muster mit Punkt). `Errors` (Kapitel 7) kommt mit S9; bis dahin führt Patterns auf What the compiler tells you.
+
+**S9, Book II:** Kapitel 7–10 — Errors, Interfaces and generics, Collections and iterators, Modules and packages —, 22 Snippets, die Behauptungen vorher gegen den Compiler geprüft (ein `throw` außerhalb der Liste ist `SEM0034`, ein Fehler aus `main` endet mit 1, `Equatable` ohne Methode vergleicht Feld für Feld, `sort` steht auf `asSlice()`, `Set.insert`, `join` auf einem Array). Modules and packages führt bis zum Projektkapitel (S10) auf What the compiler tells you.
+
+**S10, Book III:** Kapitel 11–15 — Project: a command-line tool, Tasks and coroutines, Files, processes, the network, Project: a server, Testing and tools —, 24 Snippets. Die zwei Projekte gehen durch `examples/logfilter` und `examples/jsonserver`, in Schritten, deren jeder ein Programm für sich ist (die Optionen als Funktion über ein Array, der Handler ohne Netz über eine von Hand gemachte Anfrage). „Die Projekte bauen als Programme in der Suite“: `ExampleTests` las bisher Kopien unter `tests/Lyric5.Tests/programs/`, die sich nur in der Form von `examples/` unterschieden — es liest jetzt `examples/`, die Kopien sind fort. Die Netz-Snippets laufen über Loopback mit Port 0. Die Ausgabe von `lyric test` im Kapitel ist die eines echten Laufs.
+
+**S11, Book IV:** Kapitel 18 Comptime and macros und 19 Coming from Lyric 4; die Durchsicht von vorn nach hinten (jedes Kapitel führt auf das nächste, auch What the compiler tells you und C libraries, die es nicht taten); `SUMMARY` in der Reihenfolge von P6. Die Startseite verlinkt das Book schon (Knopf und Eintrag). Die Snippet-Regel von `Book.cs` nimmt `macro` zu den Deklarationen: ein Makro ist eine Funktion über Syntax, und als Anweisungen in `main` gesetzt verwarf es der Parser. Ein Makro expandiert nicht im eigenen Modul, daher steht seine Verwendung im Kapitel als Text und verweist auf `examples/macros`, das die Suite baut.
+
+**S12, entschieden (2026-11-10):** Die offenen Punkte aus S5 und S6 — zwölf Abweichungen zwischen Bereich und Gebautem (A1–A12), fünfzehn entschiedene, nicht gebaute Zeilen (B1–B15), fünf Stellen, an denen die Spec Unentschiedenes beschrieb (C1–C5), die Reste aus S5 (D) — lagen dem Maintainer je mit Empfehlung vor; er nahm alle an („alle nach Empfehlung“). Die Zeilen stehen je Bereich im Abschnitt „Review 2026-11-10“ von 01, 03, 04, 06, 08, 09, 10 und 11. Zwei Stellen weichen von der Liste ab, beide beim Eintragen gefunden: zu `T.from(…)` zwischen zwei Schranken empfahl sie einen Fehler mit dem Rat, `From<int>.from(…)` zu schreiben — 04 S7 hat diese Form ausgeschlossen, also wählt der Aufruf über die Argumente (03 D1); und der Panik-Haken des Hosts (C3) ist in der Laufzeit gebaut, nur nicht in `lyric.h` zugesagt — der Satz der Spec fällt trotzdem, die Begründung in 01 sagt es. Eine Tür ohne Bereichszeile: die zwei Senkungen einer Lambda (`(x) =>` und `x =>` geben im C verschiedene Namen), folgenlos, nach 5.0. Was die Betriebszeilen nennen (der Spiegel `dl.lyriclang.de`, der Upload von Dev), bleibt beim Maintainer.
+
+| Slice | Inhalt |
+|---|---|
+| **S12a** Text | die Zeilen in den Bereichen; Spec 13 §1.4 ohne den Panik-Haken (C3), Spec 12 mit den Antwortformen und der Panik-Regel als normativem Abschnitt und dem Namensgesetz als informativem (C5), ein Fall dazu |
+| **S12b** Compiler | `I.m(this)` erreicht den Default (04 A1); `++`/`--` nur auf Ganzzahlen (04 A3); `T.from(…)` zwischen zwei Schranken (03 D1); das implizite Member an einem Parameter, dessen Typ ein Typargument festlegt (03 D2); `is` kettet nicht (08 D4) |
+| **S12c** Codec | eine Nutzlast-Variante mit Namen schreibt ihre Felder benannt (10 A6) |
+| **S12d** std.meta, std.syntax | `sizeOf<T>()`, `alignOf<T>()`, `target.endian`, `profile.name`, `warn`, `note` (10 B3, B4, B6) |
+| **S12e** Werkzeug | `lyric lsp --version` (11 B10); die Zeitgrenze von `StdTests` auf macOS, wo das C der std-Tests zweimal 300 s überschritt |
+
 **Nach S7, auf Wort des Maintainers (2026-11-08):** `run -C <dir>` startet das Programm in `<dir>` — `-C` heißt jetzt, was es bei `git -C`, `make -C` und `cargo -C` heißt: der Befehl steht dort, als wäre er dort gestartet (Spec 14 §1.1 r2). Anlass: ein Spiel, dessen Assets neben `src/` liegen, fand sie nicht, wenn es mit `-C` aus einem anderen Verzeichnis lief. Das Verzeichnis von `-C`, nicht die Paketwurzel darüber — wie `cd <dir> && lyric run`. `lyric test` lief schon immer in der Paketwurzel und bleibt so.
 
 ## Nachtrag 2026-11-08 — M15 S6 und S7: was vom Plan abweicht
@@ -2567,15 +2585,26 @@ Plan vom Oktober nicht sah; er nahm am 2026-11-05 alle sechs Abweichungen an. Si
 | E2 | **Environments statt Repository-Secrets**: `sign-dev` nur `main`, `sign-stable` `main` und `v5.*` mit Freigabe; ein Ruleset auf `main` (kein Force-Push, kein Löschen, nur per PR, 0 Freigaben). Der Signier-Job hat keinen Checkout, keinen Bau und keine Action von außerhalb GitHubs; alle Actions per Commit-Hash | Ein Repository-Secret kann jeder Workflow auf jedem Branch lesen. Bleibt offen: ein Admin-Token kann die Regeln ändern |
 | E3 | **Eine Quelle, die Falsches liefert, wird übergangen** (Spec 14 §13, ersetzt „never routed around“): das Paar Index + Signatur wird einmal neu geholt, dann die nächste Quelle mit Warnung; Archive ebenso; `LYR-CLI0024` erst, wenn keine Quelle Haltbares liefert. Ein Download ohne Byte für 60 s zählt als weg, ein Verbindungsaufbau hat 10 s | Annehmbar macht nur Signatur und Hash, eine weitere Quelle kann nichts verschlimmern, aber ein kaputter Mirror hielte sonst jede Installation an. Index und Signatur sind zwei Anfragen, ein Upload dazwischen ergäbe sonst einen harten Fehler. `lyric toolchain install zig` hielt es schon so |
 | E4 | **Upload in zwei Schritten** (P8): nach `incoming/<id>/`, dann `publish <id>` über ein Gate-Skript auf dem Server. `deploy` braucht eine Shell, denn `sshd` startet den erzwungenen Befehl über sie; `restrict` nimmt ihm alles andere. Kommt mit S7 | `rrsync` allein kann weder atomar veröffentlichen noch aufräumen |
-| E6 | **Der Mirror heißt `dl.lyriclang.de`** und läuft auf einem eigenen VPS statt neben den anderen Projekten des Maintainers (P8, 14 C9, P3). Der Name steht im Binary, darum vor der ersten signierten Build. Die Seite bleibt auf `lyric.oil1i.de` | Der Mirror braucht fast nichts (statische Dateien, unter 10 GB). Auf dem gemeinsamen Server hätte „Firewall 22/80/443“ die Gameserver getroffen, und der Upload-Zugang aus der CI läge neben allem anderen. Verworfen: `dl.lyric.oil1i.de` (hängt das Projekt an die private Domain) |
+| E6 | **Der Mirror heißt `dl.lyriclang.de`** und läuft auf einem eigenen VPS statt neben den anderen Projekten des Maintainers (P8, 14 C9, P3). Der Name steht im Binary, darum vor der ersten signierten Build. Die Seite zog am 2026-11-08 nach `lyriclang.de` (GitHub Pages); `lyric.oil1i.de` leitet vom Mirror-Server aus mit Pfad dorthin weiter | Der Mirror braucht fast nichts (statische Dateien, unter 10 GB). Auf dem gemeinsamen Server hätte „Firewall 22/80/443“ die Gameserver getroffen, und der Upload-Zugang aus der CI läge neben allem anderen. Verworfen: `dl.lyric.oil1i.de` (hängt das Projekt an die private Domain) |
 | E5 | **Eine Nummer im Index** (P3): `sequence`, wachsend (Sekunden seit 1970 beim Bau); der Client merkt sich je Kanal und Signierer die höchste unter `~/.lyric/seen/` und lehnt niedrigere ab | Ein Mirror konnte einen alten, gültig signierten Index beliebig lange ausliefern. Eine frische Maschine merkt das weiterhin nicht |
 
 **Was S6 außerdem gefunden hat**: `dev.yml` gab allen Jobs `contents: write`, auch den Tests; ein neuer Push konnte den
 Lauf zwischen `gh release delete` und `create` abbrechen und ließ dann keinen Dev-Release zurück (jetzt: kein Abbruch, die
 neuen Dateien neben die alten, der Index zuletzt, die alten danach); die Version wurde je Matrix-Bein neu gestempelt und
 konnte über Mitternacht auseinanderlaufen; der Rückfall Mirror → GitHub hatte keinen Test, weil `LYRIC_MIRROR` beide
-ersetzt. Der Rückfall auf den echten GitHub-Pfad wartet auf S7.
+ersetzt. Der Rückfall auf den echten GitHub-Pfad kam mit S7.
 
 **Vor dem Veröffentlichen**: Je Lauf installiert der Job `Install trial` auf Linux, Windows und macOS das Signierte von
 einem Mirror auf der Maschine; was sich nicht installiert, wird nicht veröffentlicht. Ein Dispatch auf einem Branch fährt
 die ganze Kette mit einem Wegwerfschlüssel und veröffentlicht nichts.
+
+**Im Betrieb (S9, 2026-11-10)**: Jeder Dev-Build auf `main` wird in `sign-dev` signiert, auf GitHub und über das Gate auf
+`dl.lyriclang.de` veröffentlicht und danach auf Linux, Windows und macOS je einmal mit gesperrtem GitHub und mit gesperrtem
+Mirror installiert. Zwei Fehler zeigten sich erst auf dem echten Weg: Der erste Signierlauf fand die Secrets leer — ein
+wiederverwendbarer Workflow bekommt die eines Environments nur mit `secrets: inherit` (#698). Das Gate lehnte den ersten
+Upload ab, weil der Index auf GitHubs Index gewachsen war und einen Build nannte, den der Mirror nie hatte; der Index wächst
+jetzt nur auf dem des Mirrors (#704). Der Dry-Run von `release.yml` auf `main` hielt an der Freigabe des Maintainers in
+`sign-stable` und lieferte einen Entwurf mit fünf Archiven, `SHA256SUMS` und `stable.json`, signiert mit dem
+stable-Schlüssel (der dev-Schlüssel lehnt sie ab), installiert auf drei Systemen, auf dem Mirror unter `staging/`; der
+öffentliche stable-Kanal blieb leer, der Entwurf ist gelöscht, kein Tag. Unbewiesen bleiben der Tag-Pfad, die Reserve und
+das Vorgehen bei Verlust oder Leck eines Schlüssels.

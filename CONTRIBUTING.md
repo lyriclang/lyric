@@ -214,7 +214,8 @@ Two channels (design/v5/spec/11 T5):
   branch tries the whole pipeline with a throw-away key and publishes nothing.
 
 The keys, and what to do when one is lost or has leaked, are in
-[`tooling/release-keys`](tooling/release-keys/README.md).
+[`tooling/release-keys`](tooling/release-keys/README.md); the mirror, how it is set up and what to do
+when it fails, in [`tooling/mirror`](tooling/mirror/README.md).
 
 **The changelog starts at `v1.0.0`.** A changelog answers "what changed for me
 since last time", and that question presupposes something to be compatible with.
