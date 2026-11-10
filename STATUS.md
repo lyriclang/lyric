@@ -56,7 +56,7 @@ and how the work is done. The decisions themselves live in [`design/v5/spec/`](d
 | M13b | LSP, DAP, clients | XL | **done** 2026-10-26 |
 | M14 | FFI and embedding | L | **done** 2026-10-28 |
 | M14b | C libraries: prebuilt archives, vendored sources, generated bindings, `std.build` | L | **done** 2026-10-29 |
-| M15 | Distribution | M | **done** 2026-10-29 but its halts (S6 signing, S7 mirror: in progress with the maintainer 2026-11-06) |
+| M15 | Distribution | M | **done** 2026-11-10 (S1–S5, S8 on 2026-10-29; the halts S6 signing and S7 mirror with the maintainer) |
 | M16 | Migration (`lyric fix --from-4`) | L | **done** 2026-11-06 |
 | P | std by subject module (design 10 P1–P12, plan in 13) | L | **done** 2026-11-04 |
 | M17 | Spec 5.0, suite, Book; the 4.x remains leave | XL (measured, was L) | open: plan in 13 |
@@ -1442,13 +1442,13 @@ Design 13's addendum "Nachtrag 2026-10-30" holds the table; built and merged the
 - The `dev` prerelease of 2026-10-31 (3bf00f3) holds M0–M14, M14b, M15 without its halts, M16 S1–S2 and all of the
   above.
 
-### M15 — done but its halts (2026-10-29)
+### M15 — done (2026-11-10)
 
 The plan is design 13's addendum "der Plan für M15" (#601). S1–S5 and S8a–c merged (#603–#617): the toolchain
 archive with its runtime prebuilt, minisign signatures and the channel index checked, `lyric toolchain`
 (install, list, switch, remove, `install zig`, `env`), a package's pin hands the command to its toolchain, the ICE
 report, Lyric names in the C, the measured `lyric dap` on Windows. **S6** (signing the releases) and **S7** (the
-mirror) wait for the maintainer's key and DNS; S9 closes after them.
+mirror) waited for the maintainer's keys and server; they closed with S9 on 2026-11-10.
 
 **S6, 2026-11-05**, with the maintainer, who made the keys and the environments. The plan's departures E1–E6 are in
 design 13's addendum of that day; open points 301 and 303 close: a fixture signed by `minisign` itself, zig's key against
@@ -1458,6 +1458,18 @@ pipeline's tag path, which runs only with a real tag.
 **S7, 2026-11-06**, with the maintainer, who ran the setup on the server: `tooling/mirror/` (setup scripts, the gate, how to
 run it), the upload from `dev.yml` and `release.yml`, the channel installed from each source on three systems, the daily
 watch. Decided while setting up: a server of its own beside his other projects, so that no firewall rule meets them.
+
+**S9, 2026-11-10: in operation.** Every dev build on `main` is signed in `sign-dev`, published on GitHub and, through the
+gate, on `dl.lyriclang.de`, then installed on Linux, Windows and macOS once with GitHub blocked and once with the mirror
+blocked. Two faults showed only on the real path: the first signing found its secrets empty, since a reusable workflow
+gets an environment's secrets only through `secrets: inherit` (#698); the gate refused the first upload, whose index had
+grown on GitHub's and named a build the mirror never held, so the index now grows on the mirror's alone (#704). The dry
+run of `release.yml` on `main` stopped at the maintainer's approval in `sign-stable`, then made a draft with five
+archives, `SHA256SUMS` and `stable.json` signed with the stable key (the dev key refuses them), installed it on three
+systems and put it in the mirror's `staging/`; the public stable channel stayed empty, the draft was deleted, no tag was
+made. The website moved to `lyriclang.de` (#701, spec#435); the old name redirects with its path from the mirror's
+server. Still unproven: the tag path (it runs only with a real tag), the reserve key (offline by design) and the
+runbook for a lost or leaked key (`tooling/release-keys/README.md`).
 
 ### M14b — done (2026-10-29)
 
