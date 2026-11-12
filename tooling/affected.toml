@@ -107,7 +107,7 @@ cases = []
 # text), what reads names across modules; the cases that import the touched module.
 paths = ["stdlib5/"]
 tests = ["StdTests", "ExampleTests", "CEmitterTests", "VisibilityTests", "PreludeTests", "PreludeNameTests", "ImportTests",
-         "ImportedFunctionValueTests", "BlockMethodValueTests", "RootModuleTests", "WitnessWordTests", "NativeTests", "UnicodeTests",
+         "ImportedFunctionValueTests", "BlockMethodValueTests", "MethodValueTests", "RootModuleTests", "WitnessWordTests", "NativeTests", "UnicodeTests",
          "FormatterProofTests", "Lyric.Tests.Formatting.Lyric5CorpusTests", "Lyric.Tests.Formatting.Lyric5ProofTests", "DocCommandTests", "ApiCommandTests",
          "SiteTests", "DocTestTests"]
 cases = ["imports"]

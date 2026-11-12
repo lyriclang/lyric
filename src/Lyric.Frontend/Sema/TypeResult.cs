@@ -440,6 +440,14 @@ public sealed class TypeResult
     private static readonly IReadOnlyList<Symbol> NoCaptures = [];
     private readonly Dictionary<Node, (IReadOnlyList<Symbol> Symbols, bool This)> _captures = new(ReferenceEqualityComparer.Instance);
 
+    private readonly Dictionary<MemberExpr, (LambdaExpr Lambda, LocalSymbol Receiver)> _methodValues = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary><c>obj.method</c> as a value: the lambda that calls it on what the local holds.</summary>
+    public void SetMethodValue(MemberExpr member, LambdaExpr lambda, LocalSymbol receiver) =>
+        _methodValues[member] = (lambda, receiver);
+    public (LambdaExpr Lambda, LocalSymbol Receiver)? MethodValueOf(MemberExpr member) =>
+        _methodValues.TryGetValue(member, out var value) ? value : null;
+
     public void SetCaptures(Node lambda, IReadOnlyList<Symbol> symbols, bool capturesThis) =>
         _captures[lambda] = (symbols, capturesThis);
     public (IReadOnlyList<Symbol> Symbols, bool CapturesThis) CapturesOf(Node lambda) =>
