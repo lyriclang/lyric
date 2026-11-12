@@ -79,19 +79,28 @@ public sealed class ToolchainFetch
     /// <summary>A client whose connections give up after 10 s, and whose reads give up when nothing
     /// came for <paramref name="stall"/>: a mirror that drops packets, or one that stops sending, is
     /// told apart from a slow one in time for the source after it. The limit sits on the socket,
-    /// where a synchronous read honours it on every system.</summary>
+    /// where a synchronous read honours it on every system. The connection is made on the calling
+    /// thread too: a fetch is synchronous, and a callback that awaited would block it until a pool
+    /// thread came free to finish the connect — in a busy process, past the client's timeout.</summary>
     public static HttpClient Client(string userAgent, TimeSpan stall, TimeSpan timeout)
     {
         var handler = new SocketsHttpHandler
         {
             ConnectTimeout = TimeSpan.FromSeconds(10),
-            ConnectCallback = async (context, cancel) =>
+            ConnectCallback = (context, cancel) =>
             {
                 var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true, ReceiveTimeout = (int)stall.TotalMilliseconds };
                 try
                 {
-                    await socket.ConnectAsync(context.DnsEndPoint, cancel).ConfigureAwait(false);
-                    return new NetworkStream(socket, ownsSocket: true);
+                    // the connect timeout cancels the token; closing the socket ends the blocked connect
+                    using (cancel.Register(socket.Dispose))
+                        socket.Connect(context.DnsEndPoint);
+                    return ValueTask.FromResult<Stream>(new NetworkStream(socket, ownsSocket: true));
+                }
+                catch (Exception e) when (cancel.IsCancellationRequested)
+                {
+                    socket.Dispose();
+                    throw new OperationCanceledException($"no connection to {context.DnsEndPoint.Host} came", e, cancel);
                 }
                 catch
                 {

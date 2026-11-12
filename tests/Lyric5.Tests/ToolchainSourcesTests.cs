@@ -27,7 +27,7 @@ public class ToolchainSourcesTests
     }
 
     /// <summary>A fetch over mirrors in order, with the fixtures' key; what it warns of lands in <paramref name="warnings"/>.</summary>
-    private static ToolchainFetch Fetch(List<string> warnings, string? seen, params string[] addresses) =>
+    internal static ToolchainFetch Fetch(List<string> warnings, string? seen, params string[] addresses) =>
         new([.. addresses.Select(ToolchainSource.OfMirror)], _ => [MinisignKey.Parse(KeyLine("key.pub"))], "lyric/test", null, warnings.Add, seen);
 
     private static string ArchivePath(string version)
@@ -51,6 +51,37 @@ public class ToolchainSourcesTests
         var index = Fetch(warnings, null, MirrorServer.Unreachable(), second.Address).Index(ChannelIndex.Dev);
         Assert.Equal(Newest, index.Newest!.Version);
         Assert.Empty(warnings);
+    }
+
+    /// <summary>A listener that never accepts, its queue full: where the system drops the next
+    /// handshake, a connection to it neither comes nor fails, and the connect timeout has to end it
+    /// — a connect that blocks the thread too.</summary>
+    [Fact]
+    public void A_mirror_whose_connection_never_comes_is_given_up_for_the_next_source()
+    {
+        using var second = new MirrorServer();
+        var hole = new TcpListener(IPAddress.Loopback, 0);
+        hole.Start(1);
+        var end = (IPEndPoint)hole.LocalEndpoint;
+        var queued = Enumerable.Range(0, 4).Select(_ => new Socket(SocketType.Stream, ProtocolType.Tcp)).ToList();
+        try
+        {
+            foreach (var socket in queued)
+                _ = socket.ConnectAsync(end).ContinueWith(_ => { }, TaskScheduler.Default);
+            Thread.Sleep(300);
+            var warnings = new List<string>();
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var index = Fetch(warnings, null, $"http://127.0.0.1:{end.Port}", second.Address).Index(ChannelIndex.Dev);
+            clock.Stop();
+            Assert.Equal(Newest, index.Newest!.Version);
+            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(30), $"the index took {clock.Elapsed}");
+        }
+        finally
+        {
+            foreach (var socket in queued)
+                socket.Dispose();
+            hole.Stop();
+        }
     }
 
     [Fact]
@@ -355,5 +386,43 @@ public class ToolchainSourcesTests
     {
         Assert.Contains("two archives", Assert.Throws<InvalidDataException>(() => ChannelIndex.ReleaseFrom(Archives("lyric-a-linux-x64.tar.gz", "lyric-b-linux-x64.tar.gz"), "5.0.0", "2026-11-05")).Message);
         Assert.Contains("no archive", Assert.Throws<InvalidDataException>(() => ChannelIndex.ReleaseFrom(Archives("SHA256SUMS"), "5.0.0", "2026-11-05")).Message);
+    }
+}
+
+/// <summary>The tests that fill the process's thread pool: alone, after the others, so that
+/// nothing else waits behind the blocked threads.</summary>
+[CollectionDefinition(nameof(FullThreadPool), DisableParallelization = true)]
+public sealed class FullThreadPool;
+
+[Collection(nameof(FullThreadPool))]
+public class ToolchainFetchOnAFullPoolTests
+{
+    /// <summary>
+    /// An install fetches on its own thread, and nothing it waits for may need another: in a process
+    /// whose pool is busy — a test suite running in parallel, a host embedding the build — a
+    /// connection that waited for a free pool thread ran into the client's minute and failed.
+    /// </summary>
+    [Fact]
+    public void A_busy_thread_pool_does_not_hold_the_fetch()
+    {
+        using var server = new MirrorServer();
+        using var release = new ManualResetEventSlim();
+        ThreadPool.GetMinThreads(out var workers, out _);
+        // More blocked work than the pool has threads: whatever is queued after it waits until the
+        // pool has grown by the difference, at about two threads a second.
+        for (var i = 0; i < workers + 40; i++)
+            ThreadPool.UnsafeQueueUserWorkItem(_ => release.Wait(), null);
+        try
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var index = ToolchainSourcesTests.Fetch([], null, server.Address).Index(ChannelIndex.Dev);
+            clock.Stop();
+            Assert.Equal("9.0.0-dev.20261102+bbbbbbb", index.Newest!.Version);
+            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"the index took {clock.Elapsed}");
+        }
+        finally
+        {
+            release.Set();
+        }
     }
 }
