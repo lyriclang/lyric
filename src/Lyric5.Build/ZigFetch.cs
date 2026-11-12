@@ -34,8 +34,7 @@ public sealed class ZigFetch
         _key = key;
         _progress = progress;
         _shuffle = shuffle ?? Random.Shared;
-        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
+        _http = ToolchainFetch.Client(userAgent, ToolchainFetch.DefaultStall, TimeSpan.FromSeconds(120));
     }
 
     /// <summary>The download page and the key as the environment sets them.</summary>

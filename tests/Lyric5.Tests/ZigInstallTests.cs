@@ -17,7 +17,7 @@ public class ZigInstallTests
 {
     private const string Version = "9.9.0";
 
-    private static readonly string Download = Path.Combine(RuntimeLayout.FindRoot(AppContext.BaseDirectory), "tests", "Lyric5.Tests", "zig", "download");
+    internal static readonly string Download = Path.Combine(RuntimeLayout.FindRoot(AppContext.BaseDirectory), "tests", "Lyric5.Tests", "zig", "download");
 
     private static string File(string version = Version) =>
         $"zig-{ZigFetch.HostKey(Target.Host)}-{version}.{(OperatingSystem.IsWindows() ? "zip" : "tar.xz")}";
@@ -25,7 +25,7 @@ public class ZigInstallTests
     private static MinisignKey Key(string name = "key.pub") => MinisignKey.Parse(System.IO.File.ReadAllText(Path.Combine(Download, "..", name)));
 
     /// <summary>A fetcher of the page <paramref name="server"/> serves, its mirrors listed as given.</summary>
-    private static ZigFetch Fetch(MirrorServer server, params string[] mirrors)
+    internal static ZigFetch Fetch(MirrorServer server, params string[] mirrors)
     {
         if (mirrors.Length > 0) server.Served["/community-mirrors.txt"] = Encoding.ASCII.GetBytes(string.Join("", mirrors.Select(m => $"{server.Address}{m}\n")));
         return new ZigFetch(server.Address, Key(), "lyric/test", progress: null, new Random(7));
@@ -192,5 +192,38 @@ public class ZigInstallTests
         // another version's zig is not the pinned one
         Directory.Move(LyricHome.ZigDirectory(home.Root, LyricHome.ZigVersion), LyricHome.ZigDirectory(home.Root, "0.0.1"));
         Assert.Equal(onPath?.Path, CCompiler.Locate(null, home.Root)?.Path);
+    }
+}
+
+[Collection(nameof(FullThreadPool))]
+public class ZigFetchOnAFullPoolTests
+{
+    /// <summary>
+    /// zig's fetch is synchronous too, so it connects on its own thread like a channel's: on a busy
+    /// pool a connection that waited for a pool thread came after the page had given up on it, and
+    /// the index could not be fetched.
+    /// </summary>
+    [Fact]
+    public void A_busy_thread_pool_does_not_hold_the_fetch()
+    {
+        using var server = new MirrorServer(ZigInstallTests.Download);
+        // Not disposed: blocked work the pool has not started yet waits on it after the test returns.
+        var release = new ManualResetEventSlim();
+        ThreadPool.GetMinThreads(out var workers, out _);
+        for (var i = 0; i < workers + 40; i++)
+            ThreadPool.UnsafeQueueUserWorkItem(_ => release.Wait(), null);
+        try
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            // a version the index lacks: one request, the index, and its answer
+            var e = Assert.Throws<ToolchainException>(() => ZigInstallTests.Fetch(server).Install(new ToolchainHome(TestDirectories.Fresh("lyric5-zig-home-")), "9.8.0"));
+            clock.Stop();
+            Assert.Equal("zig's index has no version 9.8.0", e.Message);
+            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"the index took {clock.Elapsed}");
+        }
+        finally
+        {
+            release.Set();
+        }
     }
 }
