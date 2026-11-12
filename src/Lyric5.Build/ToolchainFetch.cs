@@ -95,6 +95,9 @@ public sealed class ToolchainFetch
                     // the connect timeout cancels the token; closing the socket ends the blocked connect
                     using (cancel.Register(socket.Dispose))
                         socket.Connect(context.DnsEndPoint);
+                    // A connect that came just as the timeout ran out: the registration may have closed
+                    // the socket under it. Leaving the using waits for that, so the token now says.
+                    cancel.ThrowIfCancellationRequested();
                     return ValueTask.FromResult<Stream>(new NetworkStream(socket, ownsSocket: true));
                 }
                 catch (Exception e) when (cancel.IsCancellationRequested)

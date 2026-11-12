@@ -406,7 +406,9 @@ public class ToolchainFetchOnAFullPoolTests
     public void A_busy_thread_pool_does_not_hold_the_fetch()
     {
         using var server = new MirrorServer();
-        using var release = new ManualResetEventSlim();
+        // Not disposed: blocked work the pool has not started yet waits on it after the test returns,
+        // and a disposed event would throw there, on a pool thread, and end the test host.
+        var release = new ManualResetEventSlim();
         ThreadPool.GetMinThreads(out var workers, out _);
         // More blocked work than the pool has threads: whatever is queued after it waits until the
         // pool has grown by the difference, at about two threads a second.
