@@ -97,7 +97,10 @@ by its count:</p>
 }</code></pre>
 <pre class="output"><code>9 12</code></pre>
 <p>That is the only overloading there is: never by the parameters' types. A name means at most one
-function per count, so a call never needs the arguments' types to know which function it calls.</p>
+function per count, so a call never needs the arguments' types to know which function it calls.
+Named without a call, such a name has no count to pick by: the function type it is wanted as
+picks instead, <code>let h: fn(int, int) -&gt; int = area;</code>, and where nothing says which the compiler
+refuses (<code>LYR-SEM0089</code>). A name reached through a value, a type or a module picks the same way.</p>
 <h2 id="functions-are-values">Functions are values</h2>
 <p>A function's type is written <code>fn(int) -&gt; int</code>: what it takes and what it gives. A function by
 its name is a value of such a type, and so is a <strong>lambda</strong>, a function written where it is used —

@@ -247,10 +247,10 @@
 <h1>LYR-SEM0089</h1>
 <p class="code-title">a shared function name used as a value without a type to choose by</p>
 <p class="meta">error · <a href="../../spec/08-expressions/">spec 08-expressions</a></p>
-<p>The bare name of several functions stands where a value is wanted, and no expected function type picks exactly one of them.</p>
+<p>The name of several functions, bare or through an object, a type or a module, stands where a value is wanted, and no expected function type picks exactly one of them.</p>
 <h2 id="explanation">Explanation</h2>
 <p>A call chooses among functions of one name by its arguments; a function value has none, so the type it is wanted as has to choose. Without one, or when none or several of the functions fit it, the name stays ambiguous.</p>
-<p>Give the binding or parameter a function type (<code>let g: fn(int) -&gt; int = step;</code>), or wrap the call in a lambda.</p>
+<p>Give the binding or parameter a function type (<code>let g: fn(int) -&gt; int = step;</code>, <code>let h: fn(int, int) -&gt; int = v.step;</code>), or wrap the call in a lambda.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">fn</span> step(n: <span class="ty">int</span>): <span class="ty">int</span> { <span class="kw">return</span> n; }
 <span class="kw">fn</span> step(a: <span class="ty">int</span>, b: <span class="ty">int</span>): <span class="ty">int</span> { <span class="kw">return</span> a + b; }

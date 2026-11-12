@@ -90,7 +90,8 @@ iterator, so <code>for</code> walks it too, and it may be endless — the caller
 }</code></pre>
 <pre class="output"><code>0, 1, 4, 9, 16</code></pre>
 <p>A coroutine runs on its caller's thread, in its caller's time. Nothing happens in it between two
-<code>next()</code> calls.</p>
+<code>next()</code> calls. Its members are methods like any other: of a coroutine <code>c</code>, <code>let pull = c.next;</code>
+is a function that pulls <code>c</code> when it is called, and what a pull throws is in its type.</p>
 <h2 id="tasks">Tasks</h2>
 <p><code>spawn</code> from <code>std.task</code> starts a function as a task and returns its handle at once. The task runs
 beside the code that started it; <code>await()</code> waits until it has ended and gives its result:</p>

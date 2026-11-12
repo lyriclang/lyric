@@ -79,7 +79,11 @@ answers <strong><code>bool</code></strong>: whether the body stopped at a <code>
 <li><strong><code>result()</code></strong> answers <strong><code>?R</code></strong>: what the body returned, <code>null</code> until it has returned; a
 coroutine whose <code>R</code> is <code>void</code> has no <code>result()</code> (<code>LYR-SEM0012</code>). <strong><code>isDone()</code></strong> answers whether
 the body has ended, without pulling. Whether a value follows only the body knows, by running:
-there is no <code>hasNext</code>.</li>
+there is no <code>hasNext</code>. Named without a call, <code>next</code>, <code>result</code>, <code>isDone</code> and <code>close</code>
+(<a href="#1-coroutines-and-generators">rule 9</a>) are each a value bound to the coroutine
+(<a href="../../spec/03-types/#84-functions-and-methods-as-values">03 §8.4</a> rule 2): naming one pulls nothing
+and throws nothing; what a pull or a close throws (<a href="#1-coroutines-and-generators">rule 6</a>)
+is in the value's type, and the mark stands at the value's call.</li>
 <li>A coroutine function's <strong><code>throws</code></strong> clause belongs to the coroutine's type —
 <code>Coroutine&lt;Y, R&gt; throws E</code> — and so to its pulls, not to the call that makes the coroutine,
 which throws nothing: a <code>next()</code> of a throwing coroutine is marked like a call of a throwing

@@ -101,8 +101,10 @@ static reached through the type's name count among them alike — <code>int8.par
 <li>Two declarations of one name whose counts overlap for any number — a default widens a
 count to a range — are a redeclaration (<code>LYR-SEM0085</code>), at the declaration and never at a
 call. An interface declares a member once (<code>LYR-SEM0088</code>).</li>
-<li>The bare name of a shared one is a value only where the position says which, by its
-function type (<code>LYR-SEM0089</code>).</li>
+<li>The name of a shared one, bare or through an object, a type or a module — <code>of</code>, <code>v.of</code>,
+<code>Point.of</code>, <code>util.of</code> — is a value only where the position says which, by its function type
+(<code>LYR-SEM0089</code>). What can be reached decides first: through a type its statics, through an
+object its methods.</li>
 <li><code>Point(1, 2)</code> is <code>Point.new(1, 2)</code> (Y9): <code>new</code> is an ordinary static function, so <code>Point(4)</code>
 reaches a one-argument factory declared beside the two-argument one.</li>
 </ol>
