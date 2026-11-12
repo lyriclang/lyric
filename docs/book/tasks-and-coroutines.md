@@ -63,7 +63,8 @@ fn main(): void {
 ```
 
 A coroutine runs on its caller's thread, in its caller's time. Nothing happens in it between two
-`next()` calls.
+`next()` calls. Its members are methods like any other: of a coroutine `c`, `let pull = c.next;`
+is a function that pulls `c` when it is called, and what a pull throws is in its type.
 
 ## Tasks
 

@@ -4737,8 +4737,8 @@ public sealed class TypeChecker
             {
                 var before = _de.Count;
                 var type = CheckMember(mem, scope, expected);
-                if (!_calleePosition.Contains(mem) && !type.IsError && _result.RefOf(mem) is FunctionSymbol named)
-                    type = CheckMethodValue(mem, named, type, scope);
+                if (!_calleePosition.Contains(mem) && !type.IsError)
+                    type = CheckMemberValue(mem, type, scope, expected);
                 // a local that hides a module or a prelude name, where the member is the hidden one's
                 if (type is ErrorType && _de.Count > before && ShadowNote(mem) is { } shadow)
                     _de.AddNote(before, d => d.Severity == Severity.Error && d.Span.Start >= mem.Span.Start && d.Span.End <= mem.Span.End, shadow);
@@ -4860,26 +4860,10 @@ public sealed class TypeChecker
 
         if (scope.Overloads(id.Name) is { Count: > 1 } overloads)
         {
-            var wanted = expected as FnType;
-            var matching = wanted is null
-                ? []
-                : overloads.Where(f => FitsFunctionType(FnTypeOf(f), wanted)).ToArray();
-
-            if (matching.Length != 1)
-            {
-                _de.Report("LYR-SEM0089", Severity.Error, id.Span,
-                    $"'{id.Name}' names {overloads.Count} functions, and "
-                    + (wanted is null
-                        ? "nothing here says which — a call chooses by its arguments, a value by "
-                          + "the type it is wanted as"
-                        : $"none of them is a '{TypeFacts.Display(wanted)}'"),
-                    overloads.Select(f => new DiagnosticNote(f.Declaration?.Span ?? default,
-                        $"this one is a '{TypeFacts.Display(FnTypeOf(f))}'")).ToArray());
+            if (ChooseByExpected(id.Span, id.Name, overloads, FnTypeOf, expected) is not { } chosen)
                 return LyrType.Error;
-            }
-
-            _result.BindRef(id, matching[0]);
-            return BareChoice(id, matching[0], scope, called: false) ?? FnTypeOf(matching[0]);
+            _result.BindRef(id, chosen);
+            return BareChoice(id, chosen, scope, called: false) ?? FnTypeOf(chosen);
         }
 
         var sym = NameOf(id, scope); // 'Ordering.Less' through the prelude; 'debugArray(xs)', the compiler's, through std.core
@@ -4919,6 +4903,30 @@ public sealed class TypeChecker
             // has refused them.
             _ => LyrType.Error
         };
+    }
+
+    /// <summary>
+    /// The one of several functions a value means: the one whose type is the function type this
+    /// position expects, an optional's among them, since a function value stands as a <c>?fn(…)</c>.
+    /// None, or nothing to choose by, is <c>LYR-SEM0089</c> with what there is to choose from.
+    /// </summary>
+    private FunctionSymbol? ChooseByExpected(Span span, string name, IReadOnlyList<FunctionSymbol> set,
+        Func<FunctionSymbol, LyrType> typeOf, LyrType? expected)
+    {
+        var wanted = (expected is Optional held ? held.Inner : expected) as FnType;
+        var matching = wanted is null
+            ? []
+            : set.Where(f => typeOf(f) is FnType given && FitsFunctionType(given, wanted)).ToArray();
+        if (matching.Length == 1) return matching[0];
+        _de.Report("LYR-SEM0089", Severity.Error, span,
+            $"'{name}' names {set.Count} functions, and "
+            + (wanted is null
+                ? "nothing here says which — a call chooses by its arguments, a value by "
+                  + "the type it is wanted as"
+                : $"none of them is a '{TypeFacts.Display(wanted)}'"),
+            set.Select(f => new DiagnosticNote(f.Declaration?.Span ?? default,
+                $"this one is a '{TypeFacts.Display(typeOf(f))}'")).ToArray());
+        return null;
     }
 
     // --- a member's bare name ---
@@ -8264,7 +8272,7 @@ public sealed class TypeChecker
             // A PULL, so a throw site. 'next()' is lenient about EXHAUSTION — it answers null for
             // a finished coroutine — and says nothing about an exception from the body, which
             // passes straight through it.
-            if (co.Throws is { } pulled) _result.MarkThrowingPull(mem, pulled);
+            if (co.Throws is { } pulled && _calleePosition.Contains(mem)) _result.MarkThrowingPull(mem, pulled);
             return new FnType([],
                 TypeFacts.IsVoid(co.Yield) ? LyrType.Bool : new Optional(co.Yield));
         }
@@ -8283,7 +8291,7 @@ public sealed class TypeChecker
         // so 'close()' throws what a pull throws, smaller than Closeable's 'Error'.
         if (baseType is CoroutineOf closing && mem.Member == "close" && _cancelled is not null)
         {
-            if (closing.Throws is { } thrown) _result.MarkThrowingPull(mem, thrown);
+            if (closing.Throws is { } thrown && _calleePosition.Contains(mem)) _result.MarkThrowingPull(mem, thrown);
             return new FnType([], LyrType.Void);
         }
 
@@ -8306,6 +8314,43 @@ public sealed class TypeChecker
         return Report(mem.Span, "LYR-SEM0012", $"'{TypeFacts.Display(targetType)}' has no member '{mem.Member}'",
             (TypeFacts.SymbolOf(targetType) is { } owner ? HiddenCandidate(owner, mem.Member) : null)
                 ?? HiddenBlockMember(baseType, mem.Member));
+    }
+
+    /// <summary>
+    /// A member named without a call. Of several functions of the name the position's function
+    /// type chooses, as for a bare name; the receiver decides what can be reached at all: the
+    /// statics through a type, the methods through a value. A coroutine's built-in members have no
+    /// symbol and are methods all the same, and what a pull throws is in the value's type.
+    /// </summary>
+    private LyrType CheckMemberValue(MemberExpr mem, LyrType type, SymbolTable scope, LyrType? expected)
+    {
+        if (_result.RefOf(mem) is FunctionSymbol named)
+        {
+            var throughType = ReceiverTypeOf(mem) is NonValueType { Symbol: TypeSymbol };
+            var throughModule = ReceiverTypeOf(mem) is NonValueType { Symbol: ModuleSymbol };
+            var set = OverloadCandidates(mem, scope).Select(c => c.Fn)
+                .Where(f => throughModule || f.IsStatic == throughType).ToArray();
+            if (set.Length > 1)
+            {
+                if (ChooseByExpected(mem.Span, mem.Member, set, f => OverloadTypeOf(f, mem), expected) is not { } chosen)
+                    return LyrType.Error;
+                _result.BindRef(mem, chosen);
+                named = chosen;
+                type = OverloadTypeOf(chosen, mem);
+                if (mem.IsOptional) type = Optionalized(type);
+            }
+            return CheckMethodValue(mem, named, type, scope);
+        }
+        if (ReceiverTypeOf(mem) is CoroutineOf coroutine
+            && (mem.IsOptional && type is Optional inner ? inner.Inner : type) is FnType builtin)
+        {
+            var signature = mem.Member is "next" or "close" && coroutine.Throws is { } thrown
+                ? builtin with { Throws = [thrown] }
+                : builtin;
+            BindReceiver(mem, coroutine, signature, spreadsLast: false, scope);
+            return mem.IsOptional ? Optionalized(signature) : signature;
+        }
+        return type;
     }
 
     /// <summary>
@@ -8337,6 +8382,14 @@ public sealed class TypeChecker
             || (mem.IsOptional && type is Optional inner ? inner.Inner : type) is not FnType signature)
             return type;
 
+        BindReceiver(mem, receiver, signature, spreadsLast: declaration.Parameters is [.., { IsParams: true }], scope);
+        return type;
+    }
+
+    /// <summary>The closure over a receiver, written as the lambda it is: the receiver held in a
+    /// local, the body the call.</summary>
+    private void BindReceiver(MemberExpr mem, LyrType receiver, FnType signature, bool spreadsLast, SymbolTable scope)
+    {
         var span = mem.Span;
         var holder = new LocalSymbol("$receiver", receiver, false, null);
         var holding = new SymbolTable(scope);
@@ -8353,12 +8406,11 @@ public sealed class TypeChecker
             arguments, span)
         {
             // the rest is one array in the value's type, and handed on as it stands
-            Spreads = declaration.Parameters is [.., { IsParams: true }] ? [(arguments[^1], span)] : null,
+            Spreads = spreadsLast ? [(arguments[^1], span)] : null,
         };
         var lambda = new LambdaExpr(parameters, null, signature.Throws.Length > 0 ? new TryExpr(call, span) { KeywordSpan = span } : call, span);
         CheckExpr(lambda, holding, signature);
         _result.SetMethodValue(mem, lambda, holder);
-        return type;
     }
 
     /// <summary>The clause binding this member is asked of, in its clause and not in a lambda there
@@ -11129,7 +11181,9 @@ public sealed class TypeChecker
         if (sym is FunctionSymbol fs) return CheckInstantiatedFunction(tp, fs, scope, expected);
         if (sym is not TypeSymbol ts)
         {
-            foreach (var a in tp.TypeArguments) ResolveType(a, scope);
+            foreach (var a in tp.TypeArguments) if (!IsPlaceholder(a)) ResolveType(a, scope);
+            if (tp.Path.Length > 1 && scope.Lookup(tp.Path[0]) is LocalSymbol or ParameterSymbol or GlobalSymbol)
+                return RefuseMemberWithArguments(tp, scope);
             return Report(tp.Span, "LYR-SEM0011", $"unknown type '{string.Join('.', tp.Path)}'",
                 tp.Path is [var single]
                     ? NameSuggestion.Note(single, NamesIn(scope, typesOnly: true))
@@ -11151,6 +11205,30 @@ public sealed class TypeChecker
 
         CheckConstraints(ts.Generics, args, tp.Span);
         return new NonValueType(ts, "type", new GenericInstance(ts, args));
+    }
+
+    /// <summary>
+    /// <c>c.gm&lt;int&gt;</c>, read as a path because of the list, whose head is a value: a member
+    /// of that value with type arguments, not a type. Nothing but a call binds a method's
+    /// parameters, so it is no value, and the member is looked up to say what is there.
+    /// </summary>
+    private LyrType RefuseMemberWithArguments(TypePathExpr tp, SymbolTable scope)
+    {
+        Expr target = new IdentifierExpr(tp.Path[0], tp.Span);
+        foreach (var part in tp.Path[1..^1])
+            target = new MemberExpr(target, part, IsOptional: false, tp.Span) { MemberSpan = tp.Span };
+        var member = new MemberExpr(target, tp.Path[^1], IsOptional: false, tp.Span) { MemberSpan = tp.Span };
+        _calleePosition.Add(member);
+        if (CheckExpr(member, scope).IsError) return LyrType.Error;
+        return _result.RefOf(member) switch
+        {
+            FunctionSymbol { Generics.Length: > 0 } generic => Report(tp.Span, "LYR-SEM0052",
+                $"generic method '{generic.Name}' is not a value, also with its type arguments written — "
+                + "only a call binds them on a receiver; call it, or write a lambda that calls it"),
+            FunctionSymbol plain => Report(tp.Span, "LYR-SEM0026",
+                $"'{plain.Name}' is not generic and takes no type arguments"),
+            _ => Report(tp.Span, "LYR-SEM0026", $"'{tp.Path[^1]}' takes no type arguments"),
+        };
     }
 
     /// <summary>
