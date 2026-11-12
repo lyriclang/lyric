@@ -80,6 +80,9 @@ fn main(): void {
 
 That is the only overloading there is: never by the parameters' types. A name means at most one
 function per count, so a call never needs the arguments' types to know which function it calls.
+Named without a call, such a name has no count to pick by: the function type it is wanted as
+picks instead, `let h: fn(int, int) -> int = area;`, and where nothing says which the compiler
+refuses (`LYR-SEM0089`). A name reached through a value, a type or a module picks the same way.
 
 ## Functions are values
 

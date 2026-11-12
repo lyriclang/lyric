@@ -121,9 +121,7 @@ fn main(): int {
 }
 ```
 
-Where no type says which — `let g = describe;` — the compiler refuses rather than guessing. A name
-reached through something chooses the same way: `let h: fn(int, int) -> int = v.step;`, through an
-object, a type or a module.
+Where no type says which — `let g = describe;` — the compiler refuses rather than guessing.
 
 ## Functions as values
 
