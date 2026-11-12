@@ -228,7 +228,8 @@ jobs:
         run: |
           set -euo pipefail
           title="dev ($(date -u +%Y-%m-%d), ${GITHUB_SHA::7})"
-          notes="Lyric 5 in development, built from main at ${GITHUB_SHA::7}. No promise of any kind. The archive holds lyric5, the Lyric 5 command line as it grows, its standard library (stdlib5/) and the runtime's C source (runtime/), prebuilt for the archive's target (a build with another zig, or for another target, builds it from the source on first use). Each archive lists its files in toolchain.json, each file has its minisign signature, and dev.json is the channel's signed index. Building a program needs zig on the PATH."
+          notes="Lyric 5 in development, built from main at ${GITHUB_SHA::7}. No promise of any kind. The archive holds lyric5, the Lyric 5 command line as it grows, its standard library (stdlib5/) and the runtime's C source (runtime/), prebuilt for the archive's target (a build with another zig, or for another target, builds it from the source on first use)."
+          notes=$(printf '%s\n\n%s\n' "$notes" "$(sh tooling/release-notes.sh dev dist)")
           if ! gh release view dev --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release create dev --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes" --prerelease --verify-tag
           fi
