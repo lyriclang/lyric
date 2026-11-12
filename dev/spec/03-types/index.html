@@ -374,7 +374,8 @@ nothing (<a href="../../spec/13-abi/">13 §1.4</a>). On a type that is never <co
 Chains <strong>flatten</strong>: the result is an optional of the member's type, and when the member's
 type is itself an optional, it is that type — <code>a?.b?.c</code> can be absent in one way only and
 is a <code>?C</code>, not a <code>??C</code>. <code>a?.f(args)</code> calls the method under the same rule and evaluates the
-arguments only when <code>a</code> holds a value.</li>
+arguments only when <code>a</code> holds a value. <code>a?.f</code> without a call is the closure bound to that
+value (<a href="#84-functions-and-methods-as-values">§8.4</a>), so a <code>?fn(…)</code>.</li>
 <li>Nothing is assigned through <code>?.</code>: <code>a?.f = v</code> is refused (<code>LYR-SEM0019</code>). Narrow first.</li>
 </ol>
 <h3 id="34-equality-and-hashing">3.4 Equality and hashing</h3>
@@ -688,7 +689,10 @@ until instantiated (<a href="#94-instantiated-functions-as-values">§9.4</a>).</
 <li><code>obj.method</code> without a call is a closure <strong>bound</strong> to <code>obj</code> (F10): it holds the object — a
 class shared, a struct copied at the binding — and calls the method on it; its type is the
 method's without the receiver. It is called like any function value, and a call through it
-on a struct's copy changes the copy.</li>
+on a struct's copy changes the copy. Every instance method is one, whatever reaches it — a
+type's own, a block's, an interface's through its value or a type parameter, a generic type's
+on an instance —, and a call through the value runs what a call on <code>obj</code> runs. A method that
+only a call can bind is no value (<a href="#94-instantiated-functions-as-values">§9.4</a> rule 3).</li>
 <li><code>arrayOf(n, f)</code> of <code>std.core</code> builds an array of <code>n</code> elements, the element at <code>i</code> the value
 of <code>f(i)</code> — fresh elements each, where <code>[x] * n</code> copies one (<a href="#51-t">§5.1</a>).</li>
 </ol>
@@ -870,7 +874,11 @@ its object, <code>obj.method</code> (<a href="#84-functions-and-methods-as-value
 Where the position expects no function type, or one still holding an open parameter of
 its own, the argument is written.</li>
 <li>The bare name of a generic function is no value (<code>LYR-SEM0052</code>): a function value is
-monomorphic.</li>
+monomorphic. Nor is a generic method named through its object or its type, <code>c.convert</code>,
+<code>Counter.make</code>, nor a block's member with a parameter only a call binds
+(<a href="../../spec/05-interfaces/">05 §13</a> rule 9), <code>m.into</code> — also where the position names a function
+type: nothing but a call binds them. A lambda that calls it is the value,
+<code>() =&gt; m.into()</code>.</li>
 <li>The arguments of the value form follow <a href="#91-type-parameters-and-instances">§9.1</a> rule 3 —
 their number, also for a function that is not generic (<code>plain&lt;int&gt;</code>), and their
 constraints.</li>

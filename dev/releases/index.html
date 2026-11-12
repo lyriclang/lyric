@@ -564,6 +564,10 @@ struct parameter, an enum that holds itself, a file without <code>main</code> an
 </li>
 <li><p><strong><code>examples/</code> is Lyric 5</strong>: each program is what <code>lyric fix --from-4</code> makes of its 4.6 form, and prints what 4.6 printed.</p>
 </li>
+<li><p><strong>Every instance method is a value</strong>: an interface's own, through its value or a type parameter, a generic type's on an
+instance, and <code>o?.m</code>, a <code>?fn(…)</code>. They gave <code>LYR-ICE0002</code>. A method only a call can bind is refused with <code>LYR-SEM0052</code>:
+a generic one, <code>c.convert</code>, and a block's with a parameter a call binds, <code>m.into</code>; a lambda that calls it is the value.</p>
+</li>
 <li><p><strong>The language server answers a held hover after the diagnostics</strong> it waited for, not before them.</p>
 </li>
 <li><p><strong><code>unused-import</code> no longer tells you to break the program</strong>, and <code>lyric fix</code> no longer does it: it keeps the

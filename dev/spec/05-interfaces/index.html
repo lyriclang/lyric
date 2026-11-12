@@ -530,7 +530,9 @@ member with <code>U</code> that instance's. At a call of the block's member on a
 it, as it binds the member's own parameters (<a href="../../spec/03-types/">03 §9.2</a>) — from the arguments,
 then from the type the position expects: <code>let c: Centimeters = m.into();</code>. Where nothing
 determines it the call is refused (<code>LYR-SEM0060</code>), and where what binds it fails the block's
-constraints too (<code>LYR-SEM0028</code>). Such a block reaches a type at the instances bound so and at
+constraints too (<code>LYR-SEM0028</code>). The member named without a call on such a receiver is no
+value (<code>LYR-SEM0052</code>, <a href="../../spec/03-types/">03 §9.4</a> rule 3); through the constraint, whose instance
+binds it, it is. Such a block reaches a type at the instances bound so and at
 no other, so it excludes a type's own conformance (rule 8) at those alone, whole-program:
 <code>Meters :: [Into&lt;int&gt;]</code> stands while <code>int</code> is no <code>From&lt;Meters&gt;</code>, and is refused where it is
 one (<code>LYR-SEM0133</code>), said at the type's conformance.</li>
