@@ -280,16 +280,6 @@ public class ToolchainSourcesTests
     }
 
     [Fact]
-    public void An_install_remembers_the_number_under_the_home()
-    {
-        using var server = new MirrorServer();
-        var home = Home(server);
-        Assert.Equal(0, RunToolchain("install", "dev").Exit);
-        var key = MinisignKey.Parse(KeyLine("key.pub"));
-        Assert.Equal("1000", File.ReadAllText(Path.Combine(home.Root, "seen", $"dev-{key.IdText}")).Trim());
-    }
-
-    [Fact]
     public void Each_channel_accepts_its_own_key_and_the_reserve_and_not_the_other_channel_s()
     {
         string Ids(string channel) => string.Join(" ", ToolchainFetch.KeysOf(channel).Select(k => k.IdText));
@@ -426,5 +416,21 @@ public class ToolchainFetchOnAFullPoolTests
         {
             release.Set();
         }
+    }
+}
+
+/// <summary>The source tests that run the command in this process: it writes to the console and
+/// reads LYRIC_HOME, which every command test shares, so they run one after another with those.</summary>
+[Collection("console")]
+public class ToolchainSourcesCommandTests
+{
+    [Fact]
+    public void An_install_remembers_the_number_under_the_home()
+    {
+        using var server = new MirrorServer();
+        var home = Home(server);
+        Assert.Equal(0, RunToolchain("install", "dev").Exit);
+        var key = MinisignKey.Parse(KeyLine("key.pub"));
+        Assert.Equal("1000", File.ReadAllText(Path.Combine(home.Root, "seen", $"dev-{key.IdText}")).Trim());
     }
 }
