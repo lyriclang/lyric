@@ -6041,6 +6041,10 @@ internal sealed class FunctionLowerer
             _ => null,
         };
         if (parameter is null) return null;
+        // of two bounds of one interface, the one the checker chose by the arguments
+        if (_types.ConstraintInstanceOf(member) is { } chosen && SubstituteType(chosen) is GenericInstance asked
+            && ReferenceEquals(asked.Definition, iface))
+            return asked;
         foreach (var constraint in parameter.Constraints)
             if (ReferenceEquals(_typeTable.ConstraintInterface(constraint), iface))
                 return _typeTable.InstanceOf(LiftTargetOf(constraint, span).Type);
@@ -7353,7 +7357,8 @@ internal sealed class FunctionLowerer
                 // for the interface — in its body, or in the block that declares the conformance
                 // — is called as its member. Asked BEFORE the default: the default's instance
                 // ran past the 'walk' the type wrote.
-                if (declaring.Generics.Length == 0
+                // 'I.m(this)' in the type's own 'm' is the default, whatever the type wrote.
+                if (declaring.Generics.Length == 0 && !_types.IsDefaultCall(member)
                     && _types.ConformanceImpl(concrete, declaring, member.Member, null) is { } answered)
                 {
                     calleeName = member.Member;

@@ -469,6 +469,13 @@ promise. This entry fills with the milestones.
 - **`run -C <dir>` starts the program in `<dir>`**, as `cd <dir> && lyric run` does: a relative path
   the program opens — a game's assets beside its `src/` — is the directory's. It ran in the directory
   the toolchain was started in.
+- **`I.m(this)` in a type's own `m` reaches the interface's default**, so an implementation can add
+  to the default instead of repeating it; it called the implementation itself and overflowed the
+  stack. Where the interface has no default, the call is `LYR-SEM0237`. **`++` and `--` take an
+  integer only**: on a `float` they are `LYR-SEM0003`, with `+= 1.0` as the advice. **`x is A is B`
+  is refused** (`LYR-PAR0059`) as `a < b < c` is. **`T.from(x)` through two bounds of one interface**,
+  `T :: [From<int>, From<string>]`, is chosen by its argument, as on the type; it took the first
+  bound. **`show<Signal>(.Red)`** reads the enum from the written type argument; it was `LYR-SEM0113`.
 
 ---
 

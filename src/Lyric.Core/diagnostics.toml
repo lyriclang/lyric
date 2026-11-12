@@ -11980,3 +11980,46 @@ fn main(): void {
     }
 }
 '''
+
+[LYR-SEM0237]
+title = "a default reached where the interface has none"
+severity = "error"
+area = "05-interfaces"
+summary = "`I.m(this)` stands in the type's own implementation of `m`, where it means the interface's default, and `I` declares `m` without one."
+explanation = '''
+In a type's own implementation of an interface member, `I.m(this)` calls the interface's default: it is how an implementation adds to the default instead of repeating it. Everywhere else `I.m(x)` is the implementation of `x`'s type.
+
+Where the interface declares `m` without a body there is no default to reach, and the call would only come back to the implementation it stands in. Write what the implementation does itself, or give the interface's `m` a body.
+'''
+wrong = '''
+interface Greeter {
+    fn greet(): string;
+}
+
+struct Person :: [Greeter] {
+    fn greet(): string {
+        return Greeter.greet(this) + "!";
+    }
+}
+
+fn main(): void {
+    let _ = Person {}.greet();
+}
+'''
+right = '''
+interface Greeter {
+    fn greet(): string {
+        return "hello";
+    }
+}
+
+struct Person :: [Greeter] {
+    fn greet(): string {
+        return Greeter.greet(this) + "!";
+    }
+}
+
+fn main(): void {
+    let _ = Person {}.greet();
+}
+'''
