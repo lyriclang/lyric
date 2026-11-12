@@ -154,11 +154,20 @@ jobs:
       contents: write
 
     steps:
+      # for tooling/release-notes.sh and the keys it names
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
       - name: Download what was signed
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: dist
           merge-multiple: true
+
+      # What every release says after its own text: how to install, what the other files are for,
+      # how to check a download by hand.
+      - name: How to install and check
+        run: sh tooling/release-notes.sh stable dist > "$RUNNER_TEMP/how-to.md" && cat "$RUNNER_TEMP/how-to.md"
 
       - name: A draft, for a dry run
         if: needs.stamp.outputs.dry_run == 'true'
@@ -166,9 +175,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.stamp.outputs.version }}
         run: |
+          printf '%s\n\n' "A dry run of the release pipeline from ${GITHUB_SHA::7}: five archives, their signatures and the channel's index. To be deleted, not published." > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/how-to.md" >> "$RUNNER_TEMP/notes.md"
           gh release create "v$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --draft --prerelease --target "$GITHUB_SHA" \
-            --title "dry run: $VERSION" \
-            --notes "A dry run of the release pipeline from ${GITHUB_SHA::7}: five archives, their signatures and the channel's index. To be deleted, not published."
+            --title "dry run: $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
 
       # The archives first; the channel names them only after they are there.
       - name: The release, then the channel
@@ -181,6 +191,11 @@ jobs:
           rest=$(ls | grep -vxF -e stable.json -e stable.json.minisig)
           # shellcheck disable=SC2086
           gh release create "$GITHUB_REF_NAME" $rest --repo "$GITHUB_REPOSITORY" --verify-tag --notes-from-tag --title "Lyric ${GITHUB_REF_NAME#v}"
+          # the tag's text first, then how to install and check
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json body --jq .body > "$RUNNER_TEMP/notes.md"
+          printf '\n' >> "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/how-to.md" >> "$RUNNER_TEMP/notes.md"
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/notes.md"
           if ! gh release view channels --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release create channels --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false --prerelease \
               --title "Channels" --notes "The signed index of the stable channel, which lyric toolchain reads where the mirror cannot be reached."
