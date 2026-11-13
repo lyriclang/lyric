@@ -1,4 +1,5 @@
 using System.Formats.Tar;
+using System.Net;
 using System.Net.Sockets;
 using System.IO.Compression;
 using System.Security.Cryptography;
@@ -80,41 +81,81 @@ public sealed class ToolchainFetch
     /// came for <paramref name="stall"/>: a mirror that drops packets, or one that stops sending, is
     /// told apart from a slow one in time for the source after it. The limit sits on the socket,
     /// where a synchronous read honours it on every system. The connection is made on the calling
-    /// thread too: a fetch is synchronous, and a callback that awaited would block it until a pool
-    /// thread came free to finish the connect — in a busy process, past the client's timeout.</summary>
+    /// thread too, and waited for there: a fetch is synchronous, and a callback that awaited would
+    /// block it until a pool thread came free to finish the connect — in a busy process, past the
+    /// client's timeout.</summary>
     public static HttpClient Client(string userAgent, TimeSpan stall, TimeSpan timeout)
     {
         var handler = new SocketsHttpHandler
         {
-            ConnectTimeout = TimeSpan.FromSeconds(10),
-            ConnectCallback = (context, cancel) =>
-            {
-                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true, ReceiveTimeout = (int)stall.TotalMilliseconds };
-                try
-                {
-                    // the connect timeout cancels the token; closing the socket ends the blocked connect
-                    using (cancel.Register(socket.Dispose))
-                        socket.Connect(context.DnsEndPoint);
-                    // A connect that came just as the timeout ran out: the registration may have closed
-                    // the socket under it. Leaving the using waits for that, so the token now says.
-                    cancel.ThrowIfCancellationRequested();
-                    return ValueTask.FromResult<Stream>(new NetworkStream(socket, ownsSocket: true));
-                }
-                catch (Exception e) when (cancel.IsCancellationRequested)
-                {
-                    socket.Dispose();
-                    throw new OperationCanceledException($"no connection to {context.DnsEndPoint.Host} came", e, cancel);
-                }
-                catch
-                {
-                    socket.Dispose();
-                    throw;
-                }
-            },
+            ConnectTimeout = ConnectLimit,
+            ConnectCallback = (context, cancel) => ValueTask.FromResult(Connect(context.DnsEndPoint, stall, cancel)),
         };
         var client = new HttpClient(handler) { Timeout = timeout };
         client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
         return client;
+    }
+
+    private static readonly TimeSpan ConnectLimit = TimeSpan.FromSeconds(10);
+
+    /// <summary>A connection to <paramref name="end"/>, its reads giving up after <paramref name="stall"/>.
+    /// The limit is kept here and not by the handler alone: its timer fires on the pool, and on a
+    /// busy pool it came long after the limit, with the fetch waiting for it.</summary>
+    /// <exception cref="SocketException">Every address refused, or none answered within the limit.</exception>
+    private static Stream Connect(DnsEndPoint end, TimeSpan stall, CancellationToken cancel)
+    {
+        var deadline = Environment.TickCount64 + (long)ConnectLimit.TotalMilliseconds;
+        IPAddress[] addresses = IPAddress.TryParse(end.Host, out var literal) ? [literal] : Dns.GetHostAddresses(end.Host);
+        var refused = new SocketException((int)SocketError.HostNotFound);
+        foreach (var address in addresses)
+        {
+            var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true, Blocking = false };
+            try
+            {
+                if (Connected(socket, new IPEndPoint(address, end.Port), deadline, cancel) is { } error)
+                {
+                    refused = error;
+                    socket.Dispose();
+                    continue;
+                }
+                socket.Blocking = true;
+                socket.ReceiveTimeout = (int)stall.TotalMilliseconds;
+                return new NetworkStream(socket, ownsSocket: true);
+            }
+            catch
+            {
+                socket.Dispose();
+                throw;
+            }
+        }
+        throw refused;
+    }
+
+    /// <summary>Null once <paramref name="socket"/>, which does not block, is connected; what the
+    /// system answered if it refused.</summary>
+    /// <exception cref="SocketException">No answer came by <paramref name="deadline"/>.</exception>
+    private static SocketException? Connected(Socket socket, IPEndPoint end, long deadline, CancellationToken cancel)
+    {
+        try
+        {
+            socket.Connect(end);
+            return null;
+        }
+        catch (SocketException e) when (e.SocketErrorCode is SocketError.WouldBlock or SocketError.InProgress) { }
+        while (true)
+        {
+            cancel.ThrowIfCancellationRequested();
+            var left = deadline - Environment.TickCount64;
+            if (left <= 0) throw new SocketException((int)SocketError.TimedOut);
+            // in short steps, so that a cancelled fetch is seen
+            List<Socket> written = [socket], failed = [socket];
+            Socket.Select(null, written, failed, (int)Math.Min(left, 100) * 1000);
+            if (written.Count == 0 && failed.Count == 0) continue;
+            // a refusal shows as writable on Linux and macOS, as an error on Windows
+            var error = (SocketError)(int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Error)!;
+            if (error == SocketError.Success && failed.Count > 0) error = SocketError.ConnectionRefused;
+            return error == SocketError.Success ? null : new SocketException((int)error);
+        }
     }
 
     /// <summary>The keys an index of <paramref name="channel"/> may be signed with: the channel's
