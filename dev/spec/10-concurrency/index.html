@@ -90,7 +90,14 @@ which throws nothing: a <code>next()</code> of a throwing coroutine is marked li
 function (<a href="../../spec/06-errors/#3-the-try-mark-and-coverage">06 §3</a>, <code>LYR-SEM0138</code>). An error the body
 does not catch ends the body and comes out of the <code>next()</code> that ran into it. The coroutine is
 done then: its <code>result()</code> stays <code>null</code>, and every later <code>next()</code> answers <code>null</code> and throws
-nothing.</li>
+nothing. The clause is a <strong>set</strong>, as a function's is (<a href="../../spec/06-errors/#2-the-throws-set">06 §2</a>):
+a pull of a coroutine of <code>throws [A, B]</code> throws <code>A</code> or <code>B</code>, and a clause for each covers it. A
+written type names one, <code>Coroutine&lt;int&gt; throws E</code>, or the root with the bare <code>throws</code>
+(<a href="../../spec/02-grammar/#3-types">02 §3</a>); a coroutine fits where one is expected whose set covers its own —
+one that throws nothing among them —, never the other way (<code>LYR-SEM0001</code>), as a function value
+does (<a href="../../spec/06-errors/#8-function-values-that-throw">06 §8</a> rule 3). As an <code>Iterator</code> its
+<code>Error</code> is one type: the one it throws, <code>never</code> where none, the root <code>Error</code> where several,
+as an inferred <code>E</code> joins them (<a href="../../spec/06-errors/#8-function-values-that-throw">06 §8</a> rule 6).</li>
 <li>A coroutine runs on a stack of its own, on the thread that first pulled it
 (<a href="../../spec/13-abi/#16-coroutines">13 §1.6</a>). Pulling a coroutine that runs — from its own body, or
 from a coroutine it pulled — or one that runs on another thread panics with <code>LYR-RT0014</code>. A

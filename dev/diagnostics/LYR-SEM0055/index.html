@@ -250,7 +250,7 @@
 <p class="meta">error · <a href="../../spec/04-modules/">spec 04-modules</a></p>
 <p>A method or field of a type is named bare inside the type (without <code>this.</code>), an instance member is reached through the type, or a static member through a value; a variant is named bare inside its enum.</p>
 <h2 id="explanation">Explanation</h2>
-<p>Inside a type's body, its methods and fields are not in scope as bare names: an instance method is called on a value, <code>this.get()</code>, and a field is read as <code>this.x</code>. Through the type name only static members are reached (<code>Point.new()</code>), and through a value only instance members. A variant is written <code>.Leaf</code> or <code>Tree.Leaf</code>.</p>
+<p>Inside a type's body, its methods and fields are not in scope as bare names: an instance method is called on a value, <code>this.get()</code>, and a field is read as <code>this.x</code>. Through the type name only static members are reached (<code>Point.new()</code>), and through a value only instance members. A static and a method may share a name with different counts; the count of a call chooses among them, and the one it chooses must be reachable the way the call came. A variant is written <code>.Leaf</code> or <code>Tree.Leaf</code>.</p>
 <p>The rule keeps one way of naming a member, so a bare name always means a local, a parameter or a module-level declaration. Write the receiver, or declare the function <code>static</code> if it needs none.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">struct</span> <span class="ty">Point</span> {
