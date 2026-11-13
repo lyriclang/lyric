@@ -59,6 +59,10 @@ public sealed class TypeChecker
     /// appear (§8.1) — everywhere else it is refused as a value (LYR-SEM0052).</summary>
     private readonly HashSet<MemberExpr> _calleePosition = new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>The call a member callee stands in, with the call's scope: a static through two
+    /// bounds of one generic interface, <c>T.from(x)</c>, is chosen by the call's arguments.</summary>
+    private readonly Dictionary<MemberExpr, (CallExpr Call, SymbolTable Scope)> _callOfCallee = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>
     /// Is a global initializer running? Then a global that has not been computed yet is an ERROR
     /// rather than merely an unknown type.
@@ -5688,7 +5692,7 @@ public sealed class TypeChecker
                 return Report(u.Span, "LYR-SEM0157",
                     "'&' hands a place to a place parameter, and this argument's parameter takes a value");
             default: // PreInc and PreDec
-                if (!TypeFacts.IsNumeric(t)) BadOp(u.Span, "++/--", t);
+                if (!TypeFacts.IsInteger(t)) BadIncrement(u.Span, t);
                 else if (!WriteThroughIndex(u.Operand, u, scope)) return LyrType.Error;
                 return t;
         }
@@ -5732,7 +5736,7 @@ public sealed class TypeChecker
                 _de.Report("LYR-SEM0005", Severity.Error, p.Span, $"cannot force-unwrap non-nullable '{TypeFacts.Display(t)}'");
                 return t;
             default: // Inc and Dec
-                if (!TypeFacts.IsNumeric(t)) BadOp(p.Span, "++/--", t);
+                if (!TypeFacts.IsInteger(t)) BadIncrement(p.Span, t);
                 else if (!WriteThroughIndex(p.Operand, p, scope)) return LyrType.Error;
                 return t;
         }
@@ -7447,6 +7451,7 @@ public sealed class TypeChecker
     /// 'let o: Opt&lt;int&gt; = Opt.Some(7);' names the instance only on the left.</param>
     private LyrType CheckCall(CallExpr call, SymbolTable scope, LyrType? expected = null)
     {
+        if (call.Callee is MemberExpr calledMember) _callOfCallee[calledMember] = (call, scope);
         // The two calls that are not calls of what their callee names: identity, which the
         // compiler answers itself, and a type name, which means its factory.
         // A bare callee is looked up past a field that cannot be called:
@@ -7531,6 +7536,20 @@ public sealed class TypeChecker
                     + $"'{named.Name}.{qualified.Member}' is not one of its members");
 
             var member = new MemberExpr(receiverExpr, qualified.Member, IsOptional: false, qualified.Span) { MemberSpan = qualified.MemberSpan };
+            // In the type's own implementation of the member, 'I.m(this)' is the interface's
+            // default: the implementation is the call it stands in, and the call would only
+            // come back to it.
+            if (receiverExpr is ThisExpr && _outerFunction is { Name: var inside } outer && inside == qualified.Member
+                && outer.Parameters.Length == call.Arguments.Length - 1
+                && _currentThis is { } self && TypeFacts.SymbolOf(self) is { } selfSymbol
+                && ReferenceEquals(selfSymbol, TypeFacts.SymbolOf(receiverType)))
+            {
+                if (promised.Declaration is not FunctionDecl { Body: not null })
+                    return Report(call.Span, "LYR-SEM0237",
+                        $"'{named.Name}.{qualified.Member}' has no default — in the implementation of '{qualified.Member}', "
+                        + $"'{named.Name}.{qualified.Member}(this)' is the default, and '{named.Name}' declares none");
+                _result.MarkDefaultCall(member);
+            }
             var names = call.ArgumentNames is { } all ? all.Skip(1).ToArray() : null;
             // The call as it was written, but for its receiver: what it spreads and the
             // parentheses of its arguments stay with it.
@@ -7672,11 +7691,13 @@ public sealed class TypeChecker
 
         // An array literal at a position whose type the inference is still to answer is checked
         // after the other arguments, with the type they bound as its target: in
-        // 'assertEq(x.toBytesBE(), [2u8, 1u8])' the literal is a 'uint8[2]', on either side.
+        // 'assertEq(x.toBytesBE(), [2u8, 1u8])' the literal is a 'uint8[2]', on either side. An
+        // implicit member alike: 'show<Signal>(.Red)' reads its enum from the written argument.
         var asTarget = new bool[args.Length];
         if (inferable.Length > 0)
             for (var i = 0; i < args.Length && i < fn.Parameters.Length; i++)
-                asTarget[i] = args[i] is ArrayLitExpr && !(decl is { Parameters: [.., { IsParams: true }] } && i >= decl.Parameters.Length - 1)
+                asTarget[i] = args[i] is { } deferred && TakesTheOtherSidesType(deferred)
+                    && !(decl is { Parameters: [.., { IsParams: true }] } && i >= decl.Parameters.Length - 1)
                     && ConcreteExpectation(expecting, decl, i, false) is null;
 
         for (var i = 0; i < args.Length; i++)
@@ -8231,7 +8252,7 @@ public sealed class TypeChecker
 
             // 'T.parse(s)': a static member through the constraint.
             case NonValueType { Symbol: GenericParamSymbol gp }:
-                return BindMember(mem, StaticMemberOfTypeParam(gp, mem.Member, mem.Span));
+                return BindMember(mem, StaticMemberOfTypeParam(gp, mem.Member, mem.Span, mem));
         }
 
         var baseType = mem.IsOptional && targetType is Optional opt ? opt.Inner : targetType;
@@ -8744,26 +8765,63 @@ public sealed class TypeChecker
     /// <summary><c>T.parse(s)</c>: a STATIC member of an interface the type parameter is
     /// constrained by, reachable through the parameter alone — monomorphization makes it the
     /// concrete type's static, a direct call.</summary>
-    private (LyrType, Symbol?) StaticMemberOfTypeParam(GenericParamSymbol gp, string member, Span span)
+    private (LyrType, Symbol?) StaticMemberOfTypeParam(GenericParamSymbol gp, string member, Span span, MemberExpr? at = null)
     {
+        // one answer per bound: 'T :: [From<int>, From<string>]' has two 'from', one per instance
+        var found = new List<(TypeSymbol It, Dictionary<GenericParamSymbol, LyrType> Subst, FunctionSymbol Fn, LyrType Signature)>();
         foreach (var c in gp.Constraints)
         {
             if (c is not NamedType nt) continue;
             foreach (var (it, subst) in ClosureOfNode(nt))
             {
                 // 'T.zero' (05 §7 rule 2): the conformer's constant, read where T is known.
-                if (it.Members.LookupLocal(member) is GlobalSymbol constant)
+                if (found.Count == 0 && it.Members.LookupLocal(member) is GlobalSymbol constant)
                     return (Substitute(GlobalTypeOf(constant), WithSelf(subst, it, new TypeParamType(gp))), constant);
                 if (it.Members.LookupLocal(member) is not FunctionSymbol fn) continue;
                 if (!fn.IsStatic)
                     return (Report(span, "LYR-SEM0055",
                         $"'{member}' is an instance member of '{it.Name}' and needs a receiver — call it on a value of '{gp.Name}'"), fn);
-                return (Substitute(FnTypeOf(fn), WithSelf(subst, it, new TypeParamType(gp))), fn);
+                var signature = Substitute(FnTypeOf(fn), WithSelf(subst, it, new TypeParamType(gp)));
+                if (!found.Any(f => LyrType.Equal(f.Signature, signature))) found.Add((it, subst, fn, signature));
+                break;
             }
         }
-        return (Report(span, "LYR-SEM0027",
-            $"type parameter '{gp.Name}' has no static member '{member}' (no constraint provides it)"), null);
+        if (found.Count == 0)
+            return (Report(span, "LYR-SEM0027",
+                $"type parameter '{gp.Name}' has no static member '{member}' (no constraint provides it)"), null);
+        if (found.Count > 1 && at is not null && found.All(f => ReferenceEquals(f.Fn, found[0].Fn))
+            && _callOfCallee.TryGetValue(at, out var site))
+        {
+            // Bounds that are instances of one generic interface: the call's arguments choose, as
+            // they do on a type that conforms to both — the one whose parameters
+            // take them, of several the one whose parameters are their own types.
+            LyrType?[] given;
+            using (_de.Mute())
+                given = site.Call.Arguments.Select(a => a is LambdaExpr ? null : (LyrType?)CheckExpr(a, site.Scope)).ToArray();
+            bool Takes((TypeSymbol, Dictionary<GenericParamSymbol, LyrType>, FunctionSymbol, LyrType Signature) f, bool exact) =>
+                f.Signature is FnType fn && fn.Parameters.Length == given.Length
+                && given.Select((t, i) => t is null || t.IsError
+                    || (exact ? LyrType.Equal(t, fn.Parameters[i]) : IsAssignable(site.Call.Arguments[i], t, fn.Parameters[i]))).All(ok => ok);
+            var taking = found.Where(f => Takes(f, exact: false)).ToList();
+            if (taking.Count > 1) taking = found.Where(f => Takes(f, exact: true)).ToList() is { Count: 1 } own ? own : taking;
+            if (taking.Count == 1)
+            {
+                var (it, subst, fn, signature) = taking[0];
+                _result.RecordConstraintInstance(at, new GenericInstance(it,
+                    it.Generics.Select(g => subst.TryGetValue(g, out var a) ? a : new TypeParamType(g)).ToArray()));
+                return (signature, fn);
+            }
+            var shown = string.Join(", ", given.Select(t => t is null ? "_" : TypeFacts.Display(t)));
+            _de.Report("LYR-SEM0086", Severity.Error, site.Call.Span, taking.Count == 0
+                    ? $"no '{member}' of the bounds of '{gp.Name}' takes ({shown}) — each bound gives one, and the arguments' types choose"
+                    : $"'{member}' of '{gp.Name}' is ambiguous for ({shown}): {taking.Count} bounds take it and none is the arguments' own type — write it with 'as'",
+                (taking.Count == 0 ? found : taking).Select(f => new DiagnosticNote(span,
+                    $"'{TypeFacts.Display(new GenericInstance(f.It, f.It.Generics.Select(g => f.Subst.TryGetValue(g, out var a) ? a : new TypeParamType(g)).ToArray()))}' gives {TypeFacts.Display(f.Signature)}")).ToArray());
+            return (LyrType.Error, found[0].Fn);
+        }
+        return (found[0].Signature, found[0].Fn);
     }
+
 
     /// <summary>The substitution with the interface's <c>Self</c> bound: to the conforming
     /// type at a conformance, to the type parameter at a constraint, to the type at a lookup.</summary>
@@ -15482,6 +15540,13 @@ public sealed class TypeChecker
                     yield return symbol.Name;
             }
     }
+
+    /// <summary><c>++</c> and <c>--</c> step an integer to its neighbour; a float has none, and
+    /// <c>x += 1.0</c> says what is meant.</summary>
+    private void BadIncrement(Span span, LyrType t) =>
+        _de.Report("LYR-SEM0003", Severity.Error, span, TypeFacts.IsNumeric(t)
+            ? $"operator '++/--' is not applicable to '{TypeFacts.Display(t)}' — it steps an integer; write '+= 1.0' or '-= 1.0'"
+            : $"operator '++/--' is not applicable to '{TypeFacts.Display(t)}'");
 
     private void BadOp(Span span, string op, LyrType t) =>
         _de.Report("LYR-SEM0003", Severity.Error, span, $"operator '{op}' is not applicable to '{TypeFacts.Display(t)}'");

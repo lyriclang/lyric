@@ -59,6 +59,42 @@ method — the circle's `area`, the square's `describe`. Which method runs is de
 while the program runs; a call of a method on a struct or a class of known type is decided by the
 compiler.
 
+An implementation that adds to the default, rather than replacing it, calls it by the interface's
+name. In the type's own `describe`, `Shape.describe(this)` is the default; anywhere else
+`Shape.describe(x)` is the method `x`'s type has:
+
+```lyric
+import std.io { println };
+
+interface Shape {
+    fn area(): float;
+
+    fn describe(): string {
+        return f"a shape of area {this.area()}";
+    }
+}
+
+struct Square :: [Shape] {
+    side: float,
+
+    fn area(): float {
+        return this.side * this.side;
+    }
+
+    fn describe(): string {
+        return Shape.describe(this) + f", a square of side {this.side}";
+    }
+}
+
+fn main(): void {
+    println(Square { side = 2.0 }.describe());
+}
+```
+
+```output
+a shape of area 4.0, a square of side 2.0
+```
+
 ### Which one is it?
 
 A `match` can ask an interface value for its type. `c: Circle` matches a circle and binds it as

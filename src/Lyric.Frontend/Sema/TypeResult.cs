@@ -171,6 +171,12 @@ public sealed class TypeResult
 
     public void RecordConstraintInstance(MemberExpr member, LyrType instance) => _constraintInstances[member] = instance;
 
+    /// <summary>The qualified calls <c>I.m(this)</c> written in the type's own implementation of
+    /// <c>m</c>: they reach the interface's default, not the implementation they stand in.</summary>
+    private readonly HashSet<MemberExpr> _defaultCalls = new(ReferenceEqualityComparer.Instance);
+    public void MarkDefaultCall(MemberExpr member) => _defaultCalls.Add(member);
+    public bool IsDefaultCall(MemberExpr member) => _defaultCalls.Contains(member);
+
     public LyrType? ConstraintInstanceOf(MemberExpr member) => _constraintInstances.GetValueOrDefault(member);
 
     /// <summary>Whether a type conforms to an interface — the sema's answer at an instance the
