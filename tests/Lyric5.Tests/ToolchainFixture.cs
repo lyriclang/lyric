@@ -7,6 +7,15 @@ using static Lyric5.Tests.PackageFixture;
 
 namespace Lyric5.Tests;
 
+/// <summary>
+/// The tests that fetch from a mirror on the loopback: alone, after the others. A fetch gives up a
+/// source that sends nothing for a few seconds, and under the load of the whole suite in parallel a
+/// fixture mirror answered that late now and then — the source counted as failed, and a test went
+/// red on one platform or another without anything being wrong.
+/// </summary>
+[CollectionDefinition(nameof(LoopbackMirror), DisableParallelization = true)]
+public sealed class LoopbackMirror;
+
 /// <summary>What the tests of <c>lyric toolchain</c> and of the switch share: the fixtures of
 /// <c>toolchain/make.py</c>, a mirror serving them on the loopback, a fresh home and the environment
 /// pointing at both.</summary>
