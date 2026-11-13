@@ -12,7 +12,7 @@ namespace Lyric5.Tests;
 /// the file its trusted comment names and the index's hash each refusing an archive; then the zig
 /// installed found before the PATH.
 /// </summary>
-[Collection("console")]
+[Collection(nameof(LoopbackMirror))]
 public class ZigInstallTests
 {
     private const string Version = "9.9.0";

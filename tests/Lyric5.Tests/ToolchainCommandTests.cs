@@ -12,7 +12,7 @@ namespace Lyric5.Tests;
 /// toolchain in place only after the signature, the size, the hash and its own manifest hold; a
 /// refusal leaves nothing behind.
 /// </summary>
-[Collection("console")]
+[Collection(nameof(LoopbackMirror))]
 public class ToolchainCommandTests
 {
     private const string Old = "9.0.0-dev.20261101+aaaaaaa";

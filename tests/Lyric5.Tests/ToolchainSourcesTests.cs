@@ -13,6 +13,7 @@ namespace Lyric5.Tests;
 /// is accepted, wherever it came from; an index older than one this machine has seen is refused; and
 /// the keys in the binary are the ones in <c>tooling/release-keys</c>.
 /// </summary>
+[Collection(nameof(LoopbackMirror))]
 public class ToolchainSourcesTests
 {
     private const string Newest = "9.0.0-dev.20261102+bbbbbbb";
