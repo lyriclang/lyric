@@ -3214,7 +3214,10 @@ internal sealed class FunctionLowerer
         var coroutine = LowerExpr(member.Target);
         var result = IsVoid(yield) ? BoolType : new IrOptionalType(yield);
         var dest = _slots.NewTemp(result);
-        var throws = _types.ThrownByPull(member) is { } pulled && ThrownHere(pulled).Length > 0;
+        // What the pull may throw: the set the checker noted at the pull — or, in a generic body
+        // whose instance made the receiver a coroutine, the instance's own set, which the checker
+        // could not know.
+        var throws = ThrownHere(_types.ThrownByPull(member) ?? type.Throws).Length > 0;
         _b.Emit(new ResumePull(dest, coroutine, yield, span) { Throws = throws });
         _fresh.Add(dest);
         if (throws && !_b.IsSealed) ErrorEdge(span);

@@ -197,7 +197,7 @@ public sealed class SemaRules
             case FieldTypeByInfo byInfo: Names(byInfo.Owner, level, what); break;
             case ThrowingType t:
                 Names(t.Inner, level, what);
-                if (t.Thrown is { } written) Names(written, level, what);
+                foreach (var written in t.Thrown) Names(written, level, what);
                 break;
             case ArrayType a: Names(a.Element, level, what); break;
             case TupleType t: foreach (var e in t.Elements) Names(e, level, what); break;

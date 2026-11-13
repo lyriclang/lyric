@@ -33,11 +33,12 @@ public sealed record ArrayType(TypeNode Element, Span Span) : TypeNode(Span)
 }
 
 /// <remarks><c>Coroutine&lt;int&gt; throws Exception</c> — throwability as part of the TYPE, so it
-/// survives a field, an optional and a parameter. <see cref="Thrown"/> is null for the typeless
-/// form (<c>throws</c> alone), which stands for any Throwable; the absence of this node means the
-/// coroutine cannot throw. Only a coroutine type may carry it (<c>LYR-SEM0084</c>): everything else
-/// runs at its call, where the function's own clause already says so.</remarks>
-public sealed record ThrowingType(TypeNode Inner, TypeNode? Thrown, Span Span) : TypeNode(Span);
+/// survives a field, an optional and a parameter. <see cref="Thrown"/> is the set as written, one
+/// type or several in brackets, and empty for the typeless form (<c>throws</c> alone), which stands
+/// for the root <c>Error</c>; the absence of this node means the coroutine cannot throw. Only a
+/// coroutine or a task type may carry it (<c>LYR-SEM0084</c>): everything else runs at its call,
+/// where the function's own clause already says so.</remarks>
+public sealed record ThrowingType(TypeNode Inner, TypeNode[] Thrown, Span Span) : TypeNode(Span);
 /// <summary><c>(A, B)</c>, or with labels <c>(x: A, y: B)</c>: a label
 /// names an element for <c>.x</c> beside <c>.0</c> and is no part of the type's identity.</summary>
 public sealed record TupleType(TypeNode[] Elements, Span Span) : TypeNode(Span)                        // (A, B[, C])

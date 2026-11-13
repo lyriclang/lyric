@@ -305,7 +305,8 @@ pub enum Pattern :: [Debug] {
 /// arguments that bind an associated type, `""` where positional, none when none is named; then
 /// the module a `quote` wrote the name in, or `null`),
 /// `?T`, `T[]` and `T[N]`, a tuple with its labels (`""` where none), a function type with its
-/// thrown set and which parameters take a place, a throwing type.
+/// thrown set and which parameters take a place, a throwing type with its set (`null` for the
+/// bare `throws`).
 @NonExhaustive
 pub enum Type :: [Debug] {
     Named(string[], Type[], string[], ?string, Span),
@@ -313,7 +314,7 @@ pub enum Type :: [Debug] {
     Array(Box<Type>, ?int, Span),
     Tuple(Type[], string[], Span),
     Fn(Type[], Box<Type>, ?Type[], bool[], Span),
-    Throwing(Box<Type>, ?Box<Type>, Span),
+    Throwing(Box<Type>, ?Type[], Span),
 }
 
 /// An attribute as written: its path and its fields.
@@ -1162,8 +1163,8 @@ extend Type {
             }
             .Throwing(t, e, _) => {
                 k.type(t.value);
-                if (let x = e) {
-                    k.type(x.value);
+                if (let ts = e) {
+                    k.types(ts);
                 }
             }
             _ => { }

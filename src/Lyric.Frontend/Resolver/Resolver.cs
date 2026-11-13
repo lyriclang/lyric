@@ -973,7 +973,7 @@ public sealed class Resolver
             case NullableType nn: BindType(nn.Inner, scope); break;
             case ThrowingType th:
                 BindType(th.Inner, scope);
-                if (th.Thrown is not null) BindType(th.Thrown, scope);
+                foreach (var t in th.Thrown) BindType(t, scope);
                 break;
             case FieldTypeByInfo byInfo: BindType(byInfo.Owner, scope); break; // the field is the round's
             case ArrayType a: BindType(a.Element, scope); break;

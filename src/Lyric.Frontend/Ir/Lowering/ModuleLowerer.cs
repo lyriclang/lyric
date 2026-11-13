@@ -829,8 +829,8 @@ public static class ModuleLowerer
                 return ReferenceEquals(element, arr.Element) ? node : arr with { Element = element };
             case ThrowingType th:
                 var carried = ResolveLocalAliases(th.Inner, aliases, binding)!;
-                var thrown = ResolveLocalAliases(th.Thrown, aliases, binding);
-                return ReferenceEquals(carried, th.Inner) && ReferenceEquals(thrown, th.Thrown)
+                var thrown = th.Thrown.Select(t => ResolveLocalAliases(t, aliases, binding)!).ToArray();
+                return ReferenceEquals(carried, th.Inner) && thrown.Select((t, i) => ReferenceEquals(t, th.Thrown[i])).All(same => same)
                     ? node
                     : th with { Inner = carried, Thrown = thrown };
             default:

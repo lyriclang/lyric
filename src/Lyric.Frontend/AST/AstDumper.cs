@@ -187,9 +187,9 @@ public static class AstDumper
                 Write(n.Owner, indent + 1, sb);
                 break;
             case ThrowingType n:
-                Line(sb, indent, n.Thrown is null ? "Throwing (any)" : "Throwing", n.Span);
+                Line(sb, indent, n.Thrown.Length == 0 ? "Throwing (any)" : "Throwing", n.Span);
                 Write(n.Inner, indent + 1, sb);
-                if (n.Thrown is not null) Write(n.Thrown, indent + 1, sb);
+                foreach (var t in n.Thrown) Write(t, indent + 1, sb);
                 break;
             case NamedType n:
                 Line(sb, indent, $"NamedType {string.Join('.', n.Path)}", n.Span);
