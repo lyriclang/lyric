@@ -6238,7 +6238,7 @@ severity = "error"
 area = "04-modules"
 summary = "A method or field of a type is named bare inside the type (without `this.`), an instance member is reached through the type, or a static member through a value; a variant is named bare inside its enum."
 explanation = '''
-Inside a type's body, its methods and fields are not in scope as bare names: an instance method is called on a value, `this.get()`, and a field is read as `this.x`. Through the type name only static members are reached (`Point.new()`), and through a value only instance members. A variant is written `.Leaf` or `Tree.Leaf`.
+Inside a type's body, its methods and fields are not in scope as bare names: an instance method is called on a value, `this.get()`, and a field is read as `this.x`. Through the type name only static members are reached (`Point.new()`), and through a value only instance members. A static and a method may share a name with different counts; the count of a call chooses among them, and the one it chooses must be reachable the way the call came. A variant is written `.Leaf` or `Tree.Leaf`.
 
 The rule keeps one way of naming a member, so a bare name always means a local, a parameter or a module-level declaration. Write the receiver, or declare the function `static` if it needs none.
 '''

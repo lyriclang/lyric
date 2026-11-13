@@ -61,8 +61,7 @@ public abstract record LyrType
         // Throwability counts: 'Coroutine<int>' and 'Coroutine<int> throws E' are two types, or
         // the second would pass for the first and the demand would be lost again at the binding.
         (CoroutineOf x, CoroutineOf y) => Equal(x.Yield, y.Yield) && Equal(x.Result, y.Result)
-                                          && (x.Throws is null) == (y.Throws is null)
-                                          && (x.Throws is null || Equal(x.Throws, y.Throws!)),
+                                          && SameSet(x.Throws, y.Throws),
         (ErrorType, ErrorType) => true,
         (NullType, NullType) => true,
         (NeverType, NeverType) => true,
@@ -160,18 +159,23 @@ public sealed record FnType(LyrType[] Parameters, LyrType Return) : LyrType
     }
 }
 public sealed record RangeOf(LyrType Element) : LyrType;             // the internal type of 0..9, not a spec type
-/// <param name="Throws">What a PULL of this coroutine may throw: null when it cannot, the
-/// <c>Error</c> of <c>std.core</c> for a typeless <c>throws</c>, otherwise the declared type.
-///
-/// <para>Part of the TYPE since 3.0, and it has to be: the call of a coroutine function runs no
-/// body and cannot throw, so a check at the call is a check at the wrong event. Riding on the
-/// local instead — which is what it did until 3.0 — meant the demand vanished at the first field
-/// or optional, and a coroutine held in a field is the idiom this exists for.</para></param>
-public sealed record CoroutineOf(LyrType Yield, LyrType? Throws = null) : LyrType
+public sealed record CoroutineOf(LyrType Yield) : LyrType
 {
     /// <summary>What the body returns when it ends: <c>Coroutine&lt;Y, R&gt;</c>, read by
     /// <c>result()</c>; <c>void</c> for <c>Coroutine&lt;Y&gt;</c>.</summary>
     public LyrType Result { get; init; } = LyrType.Void;
+
+    /// <summary>
+    /// What a PULL of this coroutine may throw, a set as a function's is: empty when it cannot,
+    /// the <c>Error</c> of <c>std.core</c> for a typeless <c>throws</c>, otherwise the declared
+    /// types, each once.
+    ///
+    /// <para>Part of the TYPE, and it has to be: the call of a coroutine function runs no body and
+    /// cannot throw, so a check at the call is a check at the wrong event. Riding on the local
+    /// instead meant the demand vanished at the first field or optional, and a coroutine held in a
+    /// field is the idiom this exists for.</para>
+    /// </summary>
+    public LyrType[] Throws { get; init; } = [];
 }
 /// <summary>
 /// The recovery sentinel. It means "a diagnostic has already been reported here" — not "unknown",

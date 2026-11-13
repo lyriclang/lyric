@@ -3899,7 +3899,7 @@ public sealed class TypeChecker
         while (carrier is Optional optional) carrier = optional.Inner; // '?Task<int> throws E' is '?(Task<int> throws E)' as a type
         var what = carrier switch
         {
-            CoroutineOf { Throws: null } => "coroutine",
+            CoroutineOf { Throws.Length: 0 } => "coroutine",
             GenericInstance { Definition: var held, Throws: null } when _task is not null && ReferenceEquals(held, _task) => "task",
             _ => null, // nothing to carry a set, or one that carries its own already: '?(Task<int> throws A) throws B'
         };
@@ -5106,10 +5106,10 @@ public sealed class TypeChecker
     /// is not a coroutine function — it cannot yield — so its clause stays its own.</para>
     /// </summary>
     private LyrType CoroutineThrowsOf(FunctionDecl fn, LyrType declared, SymbolTable scope) =>
-        fn.Throws is { } clause && declared is CoroutineOf co && co.Throws is null && CoroutineShape.IsCoroutine(fn)
-            // A coroutine's type carries one thrown type, its pulls': one named stays
-            // itself, several join to the root, as composed sets do.
-            ? co with { Throws = ThrownTypeOf(clause.Types is [var one] ? one : null, scope) }
+        fn.Throws is { } clause && declared is CoroutineOf { Throws.Length: 0 } co && CoroutineShape.IsCoroutine(fn)
+            // A coroutine's type carries its pulls' set as the clause writes it: several stay
+            // several, as a function's do.
+            ? co with { Throws = clause.Types.Length == 0 ? ThrownTypeOf(null, scope) is { } any ? [any] : [] : ResolveThrownSet(clause, scope) }
             : declared;
 
     /// <summary>What a <c>throws</c> names: the written type, or <c>std.core</c>'s <c>Error</c>
@@ -5160,6 +5160,11 @@ public sealed class TypeChecker
             // member is looked up: own members first, then the visible extensions.
             case MemberExpr mem when TypeFacts.SymbolOf(ReceiverTypeOf(mem)) is { } ts:
                 return MemberOverloads(ts, mem.Member, withBlocks: true);
+
+            // A block on a shape, 'extend<T> T[]': its members are the scope, where the
+            // receiver meets the block's target and constraints.
+            case MemberExpr mem when ShapeBlockOverloads(ReceiverTypeOf(mem), mem.Member) is { Count: > 0 } shaped:
+                return shaped;
 
             default:
                 return [];
@@ -5246,10 +5251,29 @@ public sealed class TypeChecker
         return mem.IsOptional && target is Optional opt ? opt.Inner : target ?? LyrType.Error;
     }
 
+    /// <summary>The members of one name of the shape blocks that reach the receiver, its target
+    /// matched and its constraints held, as the single lookup finds them.</summary>
+    private List<OverloadCandidate> ShapeBlockOverloads(LyrType receiver, string member)
+    {
+        var found = new List<OverloadCandidate>();
+        if (!IsShape(receiver)) return found;
+        foreach (var block in _comp.Extensions.Blocks)
+            if (IsShapeBlock(block) && _comp.Reaches(_currentModule, block)
+                && block.MethodScope.OverloadsLocal(member) is { Count: > 0 } named
+                && BlockSubstitution(block, receiver) is not null)
+                found.AddRange(named.Where(MayName).Select(f => new OverloadCandidate(f, FromExtension: true)));
+        return found;
+    }
+
     /// <summary>The chosen overload's type, seen from the call site: through the receiver's
-    /// instance for a method of a generic type, plain otherwise.</summary>
+    /// instance for a method of a generic type, through the block's binding for a shape's block,
+    /// plain otherwise.</summary>
     private LyrType OverloadTypeOf(FunctionSymbol chosen, Expr callee) =>
-        callee is MemberExpr mem && ReceiverTypeOf(mem) is GenericInstance gi
+        callee is MemberExpr shaped && IsShape(ReceiverTypeOf(shaped))
+            && _comp.Extensions.BlockOf(chosen) is { } block && IsShapeBlock(block)
+            && BlockSubstitution(block, ReceiverTypeOf(shaped)) is { } map
+            ? Substitute(FnTypeOf(chosen), map)
+        : callee is MemberExpr mem && ReceiverTypeOf(mem) is GenericInstance gi
             ? Substitute(FnTypeOf(chosen), SubstMap(gi))
             // A static through the instance its receiver names, 'Box<int>.from(1)': the same
             // instance. Without it one of two 'from' was typed in the type's own 'T' — "cannot
@@ -7583,6 +7607,24 @@ public sealed class TypeChecker
             if (call.Callee is IdentifierExpr counted
                 && BareChoice(counted, chosen, calleeScope, called: true) is { } withoutReceiver)
                 calleeType = withoutReceiver;
+            if (call.Callee is MemberExpr chosenMember)
+            {
+                // The count may choose one the way in does not reach: a static through a value,
+                // a method through the type's name.
+                if (ReceiverTypeOf(chosenMember) is var way && way is not NonValueType { Symbol: ModuleSymbol }
+                    && chosen.IsStatic != way is NonValueType { Symbol: TypeSymbol })
+                {
+                    foreach (var a in call.Arguments) CheckOrphanArgument(a, scope);
+                    var shown = TypeFacts.Display(way is NonValueType { Symbol: TypeSymbol typeNamed } ? new NamedRef(typeNamed) : way);
+                    return chosen.IsStatic
+                        ? Report(chosenMember.Span, "LYR-SEM0055",
+                            $"'{chosen.Name}' with {call.Arguments.Length} argument(s) is static — call it on the type: '{shown}.{chosen.Name}(…)'")
+                        : Report(chosenMember.Span, "LYR-SEM0055",
+                            $"'{chosen.Name}' with {call.Arguments.Length} argument(s) is an instance method and needs a receiver — call it on a value");
+                }
+                // 'w?.m(4)': the chosen one is reached through the chain like the first was.
+                if (chosenMember.IsOptional) calleeType = Optionalized(calleeType);
+            }
         }
 
         // 'b?.get()' — optional chaining with a CALL. 'b?.get' is a '?fn() -> int', and without this
@@ -8293,7 +8335,7 @@ public sealed class TypeChecker
             // A PULL, so a throw site. 'next()' is lenient about EXHAUSTION — it answers null for
             // a finished coroutine — and says nothing about an exception from the body, which
             // passes straight through it.
-            if (co.Throws is { } pulled && _calleePosition.Contains(mem)) _result.MarkThrowingPull(mem, pulled);
+            if (co.Throws.Length > 0 && _calleePosition.Contains(mem)) _result.MarkThrowingPull(mem, co.Throws);
             return new FnType([],
                 TypeFacts.IsVoid(co.Yield) ? LyrType.Bool : new Optional(co.Yield));
         }
@@ -8312,7 +8354,7 @@ public sealed class TypeChecker
         // so 'close()' throws what a pull throws, smaller than Closeable's 'Error'.
         if (baseType is CoroutineOf closing && mem.Member == "close" && _cancelled is not null)
         {
-            if (closing.Throws is { } thrown && _calleePosition.Contains(mem)) _result.MarkThrowingPull(mem, thrown);
+            if (closing.Throws.Length > 0 && _calleePosition.Contains(mem)) _result.MarkThrowingPull(mem, closing.Throws);
             return new FnType([], LyrType.Void);
         }
 
@@ -8365,8 +8407,8 @@ public sealed class TypeChecker
         if (ReceiverTypeOf(mem) is CoroutineOf coroutine
             && (mem.IsOptional && type is Optional inner ? inner.Inner : type) is FnType builtin)
         {
-            var signature = mem.Member is "next" or "close" && coroutine.Throws is { } thrown
-                ? builtin with { Throws = [thrown] }
+            var signature = mem.Member is "next" or "close" && coroutine.Throws.Length > 0
+                ? builtin with { Throws = coroutine.Throws }
                 : builtin;
             BindReceiver(mem, coroutine, signature, spreadsLast: false, scope);
             return mem.IsOptional ? Optionalized(signature) : signature;
@@ -8593,7 +8635,7 @@ public sealed class TypeChecker
             // A block on 'Coroutine<Y, R>' reaches a coroutine whatever its pulls throw: where
             // its member names the target, 'equals(o: Coroutine<Y, R>)', it names the receiver, or
             // two throwing coroutines would not compare.
-            if (receiver is CoroutineOf { Throws: not null } && Substitute(BlockTargetType(block), map) is CoroutineOf { Throws: null } written
+            if (receiver is CoroutineOf { Throws.Length: > 0 } && Substitute(BlockTargetType(block), map) is CoroutineOf { Throws.Length: 0 } written
                 && member is FnType signature)
             {
                 LyrType Widened(LyrType type) => LyrType.Equal(type, written) ? receiver : type;
@@ -9808,10 +9850,17 @@ public sealed class TypeChecker
     }
 
     /// <summary>A coroutine's answers as an iterator: its <c>Item</c> what it yields, its
-    /// <c>Error</c> what it throws, <c>never</c> where nothing.</summary>
+    /// <c>Error</c> what it throws, <c>never</c> where nothing. The answer is one type, so of
+    /// several thrown the bound of <c>Error</c> answers, the root, as an inferred <c>E</c> joins
+    /// them; the coroutine's own pulls keep the set.</summary>
     internal static LyrType? CoroutineAnswer(CoroutineOf co, AssociatedTypeSymbol member) =>
         member.Owner is { Name: "Iterator", Kind: TypeSymbolKind.Interface }
-            ? member.Name switch { "Item" => co.Yield, "Error" => co.Throws ?? LyrType.Never, _ => null }
+            ? member.Name switch
+            {
+                "Item" => co.Yield,
+                "Error" => co.Throws switch { [] => LyrType.Never, [var one] => one, _ => member.Bounds.FirstOrDefault() ?? LyrType.Error },
+                _ => null,
+            }
             : null;
 
     /// <summary>
@@ -10246,6 +10295,18 @@ public sealed class TypeChecker
         return found;
     }
 
+    /// <summary>Of a static and a method of one name, the one this way in reaches: a type's name
+    /// reaches its statics, a value its methods. The count of a call's arguments then chooses
+    /// among all of them, and only the chosen one is held to the way in.</summary>
+    private Symbol ReachableThrough(SymbolTable members, string name, Symbol found, Span span, bool statics)
+    {
+        var reached = Reachable(members, name, found, span);
+        return reached is FunctionSymbol fn && fn.IsStatic != statics
+               && members.OverloadsLocal(name).FirstOrDefault(f => f.IsStatic == statics && MayName(f)) is { } other
+            ? other
+            : reached;
+    }
+
     // Member resolution: own members, then visible extensions, then interface default methods.
     private (LyrType, Symbol?) InstanceMember(TypeSymbol ts, string member, Span span)
     {
@@ -10261,7 +10322,7 @@ public sealed class TypeChecker
         }
 
         if (ts.Members.LookupLocal(member) is { } found)
-            return Reachable(ts.Members, member, found, span) switch
+            return ReachableThrough(ts.Members, member, found, span, statics: false) switch
             {
                 FieldSymbol fs => (FieldType(fs), fs),
 
@@ -10536,7 +10597,7 @@ public sealed class TypeChecker
         LyrType Of(LyrType t) => instance is null ? t : Substitute(t, subst);
 
         var own = ts.Members.LookupLocal(member);
-        return (own is null ? null : Reachable(ts.Members, member, own, span)) switch
+        return (own is null ? null : ReachableThrough(ts.Members, member, own, span, statics: true)) switch
         {
             // Without 'static' the method needs a receiver; otherwise the lowering would produce a
             // field access without an object.
@@ -11240,7 +11301,7 @@ public sealed class TypeChecker
         if (sym is not TypeSymbol ts)
         {
             foreach (var a in tp.TypeArguments) if (!IsPlaceholder(a)) ResolveType(a, scope);
-            if (tp.Path.Length > 1 && scope.Lookup(tp.Path[0]) is LocalSymbol or ParameterSymbol or GlobalSymbol)
+            if (tp.Path.Length > 1 && (tp.Path[0] == "this" || scope.Lookup(tp.Path[0]) is LocalSymbol or ParameterSymbol or GlobalSymbol))
                 return RefuseMemberWithArguments(tp, scope);
             return Report(tp.Span, "LYR-SEM0011", $"unknown type '{string.Join('.', tp.Path)}'",
                 tp.Path is [var single]
@@ -11272,7 +11333,8 @@ public sealed class TypeChecker
     /// </summary>
     private LyrType RefuseMemberWithArguments(TypePathExpr tp, SymbolTable scope)
     {
-        Expr target = new IdentifierExpr(tp.Path[0], tp.Span);
+        // 'this' is a keyword, so no name of that spelling heads a path but the receiver itself.
+        Expr target = tp.Path[0] == "this" ? new ThisExpr(tp.Span) : new IdentifierExpr(tp.Path[0], tp.Span);
         foreach (var part in tp.Path[1..^1])
             target = new MemberExpr(target, part, IsOptional: false, tp.Span) { MemberSpan = tp.Span };
         var member = new MemberExpr(target, tp.Path[^1], IsOptional: false, tp.Span) { MemberSpan = tp.Span };
@@ -14224,19 +14286,14 @@ public sealed class TypeChecker
             _de.Report("LYR-SEM0046", Severity.Error, lam.Span,
                 $"a generator lambda whose result is '{TypeFacts.Display(result)}' must return it on every path that ends its body");
 
-        LyrType? thrown;
+        LyrType[] thrown;
         if (lam.Throws is { } written)
-            thrown = ResolveThrownSet(written, outer) switch { [] => null, [var one] => one, _ => ErrorRoot };
-        else if (contextRet is CoroutineOf { Throws: { } expected } && !ContainsTypeParam(expected))
-            thrown = expected;
+            thrown = ResolveThrownSet(written, outer);
+        else if (contextRet is CoroutineOf { Throws.Length: > 0 } expected && !expected.Throws.Any(ContainsTypeParam))
+            thrown = expected.Throws;
         else
-            thrown = EscapingOf(body).Where(t => CancelledType is not { } cancelled || !LyrType.Equal(t, cancelled)).ToArray() switch
-            {
-                [] => null,
-                [var one] => one,
-                _ => ErrorRoot,
-            };
-        return new CoroutineOf(yielded, thrown) { Result = result };
+            thrown = EscapingOf(body).Where(t => CancelledType is not { } cancelled || !LyrType.Equal(t, cancelled)).ToArray();
+        return new CoroutineOf(yielded) { Result = result, Throws = thrown };
     }
 
     /// <summary>What a lambda's body lets escape: the exception analysis's own walk, run
@@ -14634,7 +14691,9 @@ public sealed class TypeChecker
         // its readers a 'try', and a value that never throws keeps that promise. The way back is
         // the hole this rule exists for and stays refused — a throwing coroutine in a plain slot
         // is exactly how the demand used to disappear (#73).
-        if (to is CoroutineOf { Throws: not null } wanted && from is CoroutineOf { Throws: null } given)
+        // So does one whose set the target's covers, as for a function value.
+        if (to is CoroutineOf wanted && from is CoroutineOf given
+            && given.Throws.All(t => wanted.Throws.Any(w => ThrownCoveredBy(t, w, _currentModule))))
             return LyrType.Equal(given.Yield, wanted.Yield) && LyrType.Equal(given.Result, wanted.Result);
 
         // A task that cannot throw fits where one that may is expected (10 §2), for the same reason.
@@ -15149,7 +15208,7 @@ public sealed class TypeChecker
                         + "is neither — a call declares what it throws in its own signature")
                         : LyrType.Error;
 
-                return co with { Throws = ThrownTypeOf(tt.Thrown, scope) };
+                return co with { Throws = ThrownTypeOf(tt.Thrown, scope) is { } one ? [one] : [] };
             }
             case NullableType nn: return new Optional(ResolveType(nn.Inner, scope));
             case ArrayType { Length: { } n } ia: return new InlineArrayOf(ResolveType(ia.Element, scope), n);

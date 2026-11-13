@@ -318,7 +318,7 @@ internal sealed class FunctionLowerer
             CoroutineType = (IrCoroutineType)LowerType(made, lambda.Span);
             _coroutineYield = CoroutineType.Yield;
             _returnType = CoroutineType.Result;
-            _irThrows = made.Throws is { } pulled && ThrownHere([pulled]).Length > 0 || CancelledClass() is not null;
+            _irThrows = ThrownHere(made.Throws).Length > 0 || CancelledClass() is not null;
         }
         else
         {
@@ -3214,7 +3214,7 @@ internal sealed class FunctionLowerer
         var coroutine = LowerExpr(member.Target);
         var result = IsVoid(yield) ? BoolType : new IrOptionalType(yield);
         var dest = _slots.NewTemp(result);
-        var throws = _types.ThrownByPull(member) is { } pulled && ThrownHere([pulled]).Length > 0;
+        var throws = _types.ThrownByPull(member) is { } pulled && ThrownHere(pulled).Length > 0;
         _b.Emit(new ResumePull(dest, coroutine, yield, span) { Throws = throws });
         _fresh.Add(dest);
         if (throws && !_b.IsSealed) ErrorEdge(span);
@@ -3233,7 +3233,7 @@ internal sealed class FunctionLowerer
         // What the close may throw: the coroutine's set, as the checker noted at the pull — or,
         // for the close of a generic loop's iterator that an instance made a coroutine,
         // what it recorded for the call itself.
-        var throws = (_types.ThrownByPull(member) is { } thrown ? ThrownHere([thrown]) : ThrownHere(_types.CallThrows(call))).Length > 0;
+        var throws = ThrownHere(_types.ThrownByPull(member) ?? _types.CallThrows(call)).Length > 0;
         _b.Emit(new CoroutineClose(coroutine, ((IrRefType)_typeTable.RefTo(cancelled)).Type, span) { Throws = throws });
         if (throws && !_b.IsSealed) ErrorEdge(span);
     }
@@ -8618,7 +8618,7 @@ internal sealed class FunctionLowerer
         {
             Yield = SubstituteType(c.Yield),
             Result = SubstituteType(c.Result),
-            Throws = c.Throws is { } thrown ? SubstituteType(thrown) : null,
+            Throws = ThrownHere(c.Throws),
         },
         GenericInstance g => TypeChecker.ReduceJoin(new GenericInstance(g.Definition,
             g.Arguments.Select(SubstituteType).ToArray()) { Fixations = g.Fixations }),

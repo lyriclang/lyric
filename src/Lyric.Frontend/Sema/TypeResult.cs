@@ -301,9 +301,9 @@ public sealed class TypeResult
     /// read by the exception analysis, which is the pass that knows what handles it. The throw
     /// site of a coroutine is the pull, never the call: a call builds a suspended frame and runs
     /// nothing.</para></summary>
-    private readonly Dictionary<Node, LyrType> _throwingPulls = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<Node, LyrType[]> _throwingPulls = new(ReferenceEqualityComparer.Instance);
 
-    public void MarkThrowingPull(Node pull, LyrType thrown) => _throwingPulls[pull] = thrown;
+    public void MarkThrowingPull(Node pull, LyrType[] thrown) => _throwingPulls[pull] = thrown;
 
     /// <summary>The yields of coroutine bodies: where <c>close()</c> finds the coroutine
     /// suspended, such a yield throws <c>Cancelled</c>. Recorded by the checker, which knows whose
@@ -331,7 +331,7 @@ public sealed class TypeResult
 
     public bool IsGeneratorLambda(LambdaExpr lambda) => _generatorLambdas.Contains(lambda);
 
-    public LyrType? ThrownByPull(Node pull) =>
+    public LyrType[]? ThrownByPull(Node pull) =>
         _throwingPulls.TryGetValue(pull, out var t) ? t : null;
 
     /// <summary>The members a clause's binding answers of its record, <c>e.suppressed()</c> and
