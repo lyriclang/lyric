@@ -612,6 +612,14 @@ declaration, built beside an empty <code>main</code>.</p>
 the program opens — a game's assets beside its <code>src/</code> — is the directory's. It ran in the directory
 the toolchain was started in.</p>
 </li>
+<li><p><strong><code>I.m(this)</code> in a type's own <code>m</code> reaches the interface's default</strong>, so an implementation can add
+to the default instead of repeating it; it called the implementation itself and overflowed the
+stack. Where the interface has no default, the call is <code>LYR-SEM0237</code>. <strong><code>++</code> and <code>--</code> take an
+integer only</strong>: on a <code>float</code> they are <code>LYR-SEM0003</code>, with <code>+= 1.0</code> as the advice. <strong><code>x is A is B</code>
+is refused</strong> (<code>LYR-PAR0059</code>) as <code>a &lt; b &lt; c</code> is. <strong><code>T.from(x)</code> through two bounds of one interface</strong>,
+<code>T :: [From&lt;int&gt;, From&lt;string&gt;]</code>, is chosen by its argument, as on the type; it took the first
+bound. <strong><code>show&lt;Signal&gt;(.Red)</code></strong> reads the enum from the written type argument; it was <code>LYR-SEM0113</code>.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>

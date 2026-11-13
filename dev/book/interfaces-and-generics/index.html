@@ -92,6 +92,35 @@ a square of side 2.0</code></pre>
 method — the circle's <code>area</code>, the square's <code>describe</code>. Which method runs is decided by the value,
 while the program runs; a call of a method on a struct or a class of known type is decided by the
 compiler.</p>
+<p>An implementation that adds to the default, rather than replacing it, calls it by the interface's
+name. In the type's own <code>describe</code>, <code>Shape.describe(this)</code> is the default; anywhere else
+<code>Shape.describe(x)</code> is the method <code>x</code>'s type has:</p>
+<pre><code class="language-lyric"><span class="kw">import</span> std.io { println };
+
+<span class="kw">interface</span> <span class="ty">Shape</span> {
+    <span class="kw">fn</span> area(): <span class="ty">float</span>;
+
+    <span class="kw">fn</span> describe(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="str">f"</span><span class="str">a shape of area </span>{<span class="kw">this</span>.area()}<span class="str">"</span>;
+    }
+}
+
+<span class="kw">struct</span> <span class="ty">Square</span> :: [<span class="ty">Shape</span>] {
+    side: <span class="ty">float</span>,
+
+    <span class="kw">fn</span> area(): <span class="ty">float</span> {
+        <span class="kw">return</span> <span class="kw">this</span>.side * <span class="kw">this</span>.side;
+    }
+
+    <span class="kw">fn</span> describe(): <span class="ty">string</span> {
+        <span class="kw">return</span> <span class="ty">Shape</span>.describe(<span class="kw">this</span>) + <span class="str">f"</span><span class="str">, a square of side </span>{<span class="kw">this</span>.side}<span class="str">"</span>;
+    }
+}
+
+<span class="kw">fn</span> main(): <span class="ty">void</span> {
+    println(<span class="ty">Square</span> { side = <span class="num">2.0</span> }.describe());
+}</code></pre>
+<pre class="output"><code>a shape of area 4.0, a square of side 2.0</code></pre>
 <h3 id="which-one-is-it">Which one is it?</h3>
 <p>A <code>match</code> can ask an interface value for its type. <code>c: Circle</code> matches a circle and binds it as
 one, with its fields:</p>

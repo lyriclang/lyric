@@ -427,7 +427,9 @@ variant as it stands, the callee of <code>.Num(3)</code>, the head of <code>.Rec
 position expects an enum where a value of one is required: an initializer with a written
 type, an assignment, an argument, a return, an arm under a context type, a field of an
 initializer, a default, and either side of <code>==</code> and <code>!=</code> when the other side has the enum
-type. An expected <code>?E</code> names <code>E</code>: <code>let o: ?Signal = .Green</code> is a present optional.</li>
+type. An expected <code>?E</code> names <code>E</code>: <code>let o: ?Signal = .Green</code> is a present optional. An argument
+expects its parameter's type; where that is a type parameter, the type argument written for it
+— <code>show&lt;Signal&gt;(.Red)</code> —, and a type parameter the inference is still to bind expects none.</li>
 <li>Where the position expects no particular type, or a type that is not an enum, the form is
 refused (<code>LYR-SEM0113</code>), and the diagnostic says to name the enum. The qualified form
 <code>Signal.Red</code> stands everywhere, whatever the position expects.</li>

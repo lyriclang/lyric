@@ -2306,6 +2306,13 @@ code is no longer reported, and its number is not given again.</p>
 <td>a jump out of a 'defer' body</td>
 <td>A <code>return</code> stands in a <code>defer</code> body, or a <code>break</code> or <code>continue</code> goes to a loop around the <code>defer</code>.</td>
 </tr>
+<tr>
+<td>LYR-SEM0237</td>
+<td>E</td>
+<td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
+<td>a default reached where the interface has none</td>
+<td><code>I.m(this)</code> stands in the type's own implementation of <code>m</code>, where it means the interface's default, and <code>I</code> declares <code>m</code> without one.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a5-mac--macros">A.5 MAC — Macros</h2>

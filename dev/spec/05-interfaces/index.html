@@ -159,7 +159,9 @@ chooses by its arguments' types: the member whose parameters take them, and of s
 one whose parameters are the arguments' own types — <code>Label.from(3)</code> is the <code>From&lt;int&gt;</code> one
 beside <code>From&lt;float&gt;</code>, a literal being its default type. None or several left is refused
 (<code>LYR-SEM0086</code>); the argument is written with <code>as</code>, <code>Label.from(3 as int16)</code>. Through a
-constraint, <code>U :: [From&lt;T&gt;]</code>, the instance the constraint names chooses; through a value of
+constraint, <code>U :: [From&lt;T&gt;]</code>, the instance the constraint names chooses; through two bounds of
+one interface, <code>T :: [From&lt;int&gt;, From&lt;string&gt;]</code>, the arguments choose among them as on a type —
+<code>T.from(&quot;abc&quot;)</code> is the <code>From&lt;string&gt;</code> one —, none or several left refused alike; through a value of
 an interface instance, its table does. There is no qualified form for a static member (§4
 rule 2).</li>
 </ol>
@@ -170,7 +172,11 @@ implementation <code>x</code>'s type has for <code>I</code> (D2 R5). The receive
 otherwise) and comes first (<code>LYR-SEM0014</code>). It is the form that names what the unqualified
 call cannot (§3.4), and it is checked as the member call it is: a <code>mut fn</code> writes <code>x</code>
 itself — no copy of a struct stands in for it —, so <code>x</code> is a place as the receiver of
-<code>x.m(…)</code> is (<code>LYR-SEM0019</code>).</li>
+<code>x.m(…)</code> is (<code>LYR-SEM0019</code>).
+In the type's own implementation of <code>m</code> for <code>I</code> — in its body or in a block —, <code>I.m(this, …)</code>
+is the interface's <strong>default</strong> instead (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/04-abstraktion.md">04 D3</a>): the implementation is the function the
+call stands in, and an implementation that adds to the default reaches it so. Where <code>I</code>
+declares <code>m</code> without a default, that call is refused (<code>LYR-SEM0237</code>).</li>
 <li>A <strong>static</strong> member is not called through its interface: <code>Make.make&lt;Item&gt;(s)</code> is refused
 (<code>LYR-SEM0231</code>) — the interface has no value to call it for, and a type argument written after
 it does not make it one. It is called on a type that conforms, <code>Item.make(s)</code>, or through a

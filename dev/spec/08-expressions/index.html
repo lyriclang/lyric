@@ -201,8 +201,8 @@ is a primary expression, a tree as a value, and <code>#{e}</code> inside it a sp
 <code>n + 1</code>.</p>
 </li>
 <li><p>A level <strong>without associativity does not chain</strong>: <code>a..b..c</code> is refused (<code>LYR-PAR0005</code>), and so
-are <code>a &lt; b &lt; c</code> and <code>a == b == c</code> (<code>LYR-PAR0059</code>) — a chained comparison would compare a <code>bool</code>
-with the third operand, a chained equality would take a <code>bool</code> for what was meant. Parentheses
+are <code>a &lt; b &lt; c</code>, <code>x is A is B</code> and <code>a == b == c</code> (<code>LYR-PAR0059</code>) — a chained comparison would compare a <code>bool</code>
+with the third operand, a chained type test would test the <code>bool</code>, a chained equality would take a <code>bool</code> for what was meant. Parentheses
 say which: <code>(a == b) == c</code>. <em>(Informative.)</em> The diagnostic names the form likely meant,
 <code>a &lt; b &amp;&amp; b &lt; c</code>.</p>
 </li>
@@ -222,8 +222,9 @@ when <code>a</code> is <code>null</code> (§2 rule 3).</li>
 </ol>
 <h2 id="6--and---">6. <code>++</code> and <code>--</code></h2>
 <ol>
-<li><strong><code>++</code> and <code>--</code></strong> add and take one on a place that holds a number — a <code>var</code>, a field, an
-element: <code>x++</code>, <code>p.count--</code>, <code>++xs[i]</code>. A place that cannot be written is refused
+<li><strong><code>++</code> and <code>--</code></strong> add and take one on a place that holds an integer — a <code>var</code>, a field, an
+element: <code>x++</code>, <code>p.count--</code>, <code>++xs[i]</code>. On a <code>float</code> they are refused (<code>LYR-SEM0003</code>): a
+float has no neighbour one step away, and <code>x += 1.0</code> says what is meant (04 D6). A place that cannot be written is refused
 (<code>LYR-SEM0019</code>). The step is checked as <code>+</code> and <code>-</code> are: past the type's range it panics
 (<code>LYR-RT0002</code>, <a href="../../spec/03-types/">03 §1</a>).</li>
 <li><code>x++</code> and <code>x--</code> are worth the <strong>old</strong> value, <code>++x</code> and <code>--x</code> the <strong>new</strong> one (§3 rule 3); what
