@@ -68,7 +68,9 @@ is a function that pulls `c` when it is called, and what a pull throws is in its
 
 A coroutine function's `throws` belongs to its pulls, not to the call that makes the coroutine:
 the call runs nothing. Of `fn read(): Coroutine<Row> throws [IoError, ParseError]` each pull may
-throw either, and a `catch` for each covers it, as for a function of that clause.
+throw either, and a `catch` for each covers it, as for a function of that clause. A field or a
+parameter that holds such a coroutine writes the set the same way,
+`Coroutine<Row> throws [IoError, ParseError]`.
 
 ## Tasks
 

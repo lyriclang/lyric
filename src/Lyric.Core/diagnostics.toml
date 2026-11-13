@@ -12023,3 +12023,39 @@ fn main(): void {
     let _ = Person {}.greet();
 }
 '''
+
+[LYR-SEM0238]
+title = "a task's type that names several thrown types"
+severity = "error"
+area = "10-concurrency"
+summary = "A task's type is written `Task<T> throws [A, B]`; a task names one thrown type, or the bare `throws` for the root."
+explanation = '''
+What a task throws is what its body ends with, and the body's set reaches the task's type through the `E` of `spawn`: one type binds it, several bind the root `Error`. A task's type therefore holds one type, and a written set of several would promise more than any task can carry.
+
+Write the one type the body throws, or the bare `throws` where it throws several. A coroutine's type is different: its set is its function's clause, and `Coroutine<int> throws [A, B]` is written as it is declared.
+'''
+wrong = '''
+import std.task { Task };
+
+struct A :: [Error] { fn message(): string { return "a"; } }
+struct B :: [Error] { fn message(): string { return "b"; } }
+
+fn idle(t: ?(Task<int> throws [A, B])): bool {
+    return t == null;
+}
+
+fn main(): void {
+    let _ = idle(null);
+}
+'''
+right = '''
+import std.task { Task };
+
+fn idle(t: ?(Task<int> throws)): bool {
+    return t == null;
+}
+
+fn main(): void {
+    let _ = idle(null);
+}
+'''

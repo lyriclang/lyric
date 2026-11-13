@@ -552,7 +552,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
             case FunctionType f:
                 return Variant(t, "Fn", Types(f.Parameters), Boxed(bt => Type(f.ReturnType, bt)), OptTypes(f.Throws?.Types), Bools(f.Places), sp);
             case ThrowingType th:
-                return Variant(t, "Throwing", Boxed(bt => Type(th.Inner, bt)), OptOf(th.Thrown is not null, Boxed(bt => Type(th.Thrown!, bt))), sp);
+                return Variant(t, "Throwing", Boxed(bt => Type(th.Inner, bt)), OptTypes(th.Thrown.Length == 0 ? null : th.Thrown), sp);
             default:
                 throw NoForm(n);
         }
@@ -1074,7 +1074,7 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
             case "Fn":
                 return new FunctionType(Many(f[0], ft[0], TypeOf), BoxedType(f[1], ft[1]), NoSpan)
                     { Throws = ThrowsOf(f[2], ft[2]), Places = [.. ArrOf(f[3]).Select(BoolOf)] };
-            case "Throwing": return new ThrowingType(BoxedType(f[0], ft[0]), OptionOf(f[1]) is { } th ? BoxedType(th, Inner(ft[1])) : null, NoSpan);
+            case "Throwing": return new ThrowingType(BoxedType(f[0], ft[0]), ThrowsOf(f[1], ft[1])?.Types ?? [], NoSpan);
             default: throw ComptimeFailure.NotYet($"std.syntax: the type '{name}' has no form in the compiler yet");
         }
     }

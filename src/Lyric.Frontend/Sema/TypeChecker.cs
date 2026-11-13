@@ -3947,6 +3947,10 @@ public sealed class TypeChecker
         return set.Select(s => s.Type).ToArray();
     }
 
+    /// <summary>The clause a written type's set is checked as, one per node, so its diagnostics
+    /// come once however often the type is resolved.</summary>
+    private readonly Dictionary<ThrowingType, ThrowsClause> _writtenSets = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>The written sets whose diagnostics are out (<see cref="ResolveThrownSet"/>).</summary>
     private readonly HashSet<ThrowsClause> _checkedSets = new(ReferenceEqualityComparer.Instance);
 
@@ -15193,8 +15197,14 @@ public sealed class TypeChecker
 
                 // A task carries the error its body may end with (10 §2), as a coroutine
                 // carries what its pulls throw.
+                // A task's is one type: its 'E' is inferred, and several bind the root.
                 if (carried is GenericInstance { Definition: var held } handle && _task is not null && ReferenceEquals(held, _task))
-                    return handle with { Throws = ThrownTypeOf(tt.Thrown, scope) };
+                    return tt.Thrown.Length > 1
+                        ? _reportedThrows.Add(tt) ? Report(tt.Span, "LYR-SEM0238",
+                            $"a task's type names one thrown type, and '{TypeFacts.Display(carried)}' names {tt.Thrown.Length} — "
+                            + "several end its body as 'Error', so write the bare 'throws'")
+                            : LyrType.Error
+                        : handle with { Throws = ThrownTypeOf(tt.Thrown is [var one] ? one : null, scope) };
 
                 // Only a coroutine and a task. Everything else runs at its CALL, and a function's
                 // own 'throws' already says so there; a type-level one would be a second spelling
@@ -15208,7 +15218,10 @@ public sealed class TypeChecker
                         + "is neither — a call declares what it throws in its own signature")
                         : LyrType.Error;
 
-                return co with { Throws = ThrownTypeOf(tt.Thrown, scope) is { } one ? [one] : [] };
+                // A coroutine's is the set as written, under a clause's rules.
+                if (!_writtenSets.TryGetValue(tt, out var written))
+                    _writtenSets[tt] = written = new ThrowsClause(tt.Thrown, tt.Span);
+                return co with { Throws = ResolveThrownSet(written, scope) };
             }
             case NullableType nn: return new Optional(ResolveType(nn.Inner, scope));
             case ArrayType { Length: { } n } ia: return new InlineArrayOf(ResolveType(ia.Element, scope), n);

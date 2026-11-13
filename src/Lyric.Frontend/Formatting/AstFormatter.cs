@@ -1539,9 +1539,7 @@ public sealed class AstFormatter
         NamedType n => Doc.Of(Doc.From(string.Join(".", n.Path)), TypeArgsDoc(n.TypeArguments, n.ArgumentNames)),
         NullableType n => Doc.Of(Doc.From("?"), TypeDoc(n.Inner)),
         FieldTypeByInfo n => Doc.Of(TypeDoc(n.Owner), Doc.From(".[" + n.Info + "]")),
-        ThrowingType n => n.Thrown is { } thrown
-            ? Doc.Of(TypeDoc(n.Inner), Doc.From(" throws "), TypeDoc(thrown))
-            : Doc.Of(TypeDoc(n.Inner), Doc.From(" throws")),
+        ThrowingType n => Doc.Of(TypeDoc(n.Inner), ThrowsDoc(new ThrowsClause(n.Thrown, n.Span))),
         // '(?T)[]', '(fn(..) -> R)[]' and '(Task<T> throws E)[]': without the parentheses the
         // suffix would rebind.
         ArrayType a => Doc.Of(

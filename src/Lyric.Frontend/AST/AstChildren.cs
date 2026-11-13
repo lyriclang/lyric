@@ -508,7 +508,7 @@ public static class AstChildren
 
             case ThrowingType n:
                 yield return n.Inner;
-                if (n.Thrown is not null) yield return n.Thrown;
+                foreach (var t in n.Thrown) yield return t;
                 break;
 
             case FieldTypeByInfo n:

@@ -1917,9 +1917,10 @@ public sealed partial class Parser
         // is a property of the coroutine, and an optional of it is still one value or none.
         if (allowThrows && AtContextual("throws"))
         {
+            // One type, several in brackets as a function's clause writes them, or none for the root.
             var tk = _buffer.Advance();
-            var thrown = StartsType() ? ParseType() : null;
-            type = new ThrowingType(type, thrown, Span.Union(type.Span, thrown?.Span ?? tk.Span));
+            var thrown = _buffer.Check(TokenKind.LBracket) ? ParseThrownList(tk.Span) : StartsType() ? new ThrowsClause([ParseType()], tk.Span) : new ThrowsClause([], tk.Span);
+            type = new ThrowingType(type, thrown.Types, Span.Union(type.Span, thrown.Types is [.., var last] ? last.Span : thrown.Span));
         }
 
         for (var i = 0; i < levels; i++)
