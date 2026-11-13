@@ -194,7 +194,7 @@ variants are separated by <code>,</code> and end with <code>;</code> before the 
 enum's, an interface's or an <code>extend</code> block's <code>::</code> it has no place (<code>LYR-PAR0047</code>).</li>
 </ol>
 <h2 id="3-types">3. Types</h2>
-<pre><code class="language-ebnf">Type            = { '?' | '??' } TypeCore [ 'throws' [ Type ] ] .
+<pre><code class="language-ebnf">Type            = { '?' | '??' } TypeCore [ 'throws' [ Type | '[' Type { ',' Type } [ ',' ] ']' ] ] .
 ReturnType      = { '?' | '??' } TypeCore .
 TypeCore        = TypeAtom [ '.' '[' IDENTIFIER ']' ] { '[' [ INT_LITERAL ] ']' } .
 TypeAtom        = Path [ TypeArgs ]
@@ -217,7 +217,8 @@ array of optionals is <code>(?T)[]</code>; <code>??T</code> is an optional of an
 <li>A function type reaches as far right as it can: <code>fn(int) -&gt; void[]</code> returns <code>void[]</code>, and an
 array of functions is <code>(fn(int) -&gt; void)[]</code>.</li>
 <li><code>throws</code> after a type is the type's own only where a type stands for a value — a field, a
-parameter, a binding, a type argument: <code>Coroutine&lt;int&gt; throws IoError</code>. After the return type
+parameter, a binding, a type argument: <code>Coroutine&lt;int&gt; throws IoError</code>, several in brackets as
+in a function's clause, <code>Coroutine&lt;int&gt; throws [IoError, ParseError]</code>. After the return type
 of a function, a lambda or a function type, the <code>throws</code> belongs to the function; that is why
 a return type is read as <code>ReturnType</code>. Where a function type is itself a return type, a
 <code>throws</code> behind it says neither whose it is, and parentheses must (<code>LYR-PAR0056</code>).</li>

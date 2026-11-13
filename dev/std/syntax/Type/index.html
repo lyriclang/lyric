@@ -74,7 +74,8 @@
 arguments that bind an associated type, <code>&quot;&quot;</code> where positional, none when none is named; then
 the module a <code>quote</code> wrote the name in, or <code>null</code>),
 <code>?T</code>, <code>T[]</code> and <code>T[N]</code>, a tuple with its labels (<code>&quot;&quot;</code> where none), a function type with its
-thrown set and which parameters take a place, a throwing type.</p>
+thrown set and which parameters take a place, a throwing type with its set (<code>null</code> for the
+bare <code>throws</code>).</p>
 <h2 id="variants">Variants</h2>
 <section class="member" id="variant.Named">
 <pre class="signature"><code class="language-lyric"><span class="ty">Named</span>(<span class="ty">string</span>[], <span class="ty">Type</span>[], <span class="ty">string</span>[], ?<span class="ty">string</span>, <span class="ty">Span</span>)</code></pre>
@@ -92,7 +93,7 @@ thrown set and which parameters take a place, a throwing type.</p>
 <pre class="signature"><code class="language-lyric"><span class="ty">Fn</span>(<span class="ty">Type</span>[], <span class="ty">Box</span>&lt;<span class="ty">Type</span>&gt;, ?<span class="ty">Type</span>[], <span class="ty">bool</span>[], <span class="ty">Span</span>)</code></pre>
 </section>
 <section class="member" id="variant.Throwing">
-<pre class="signature"><code class="language-lyric"><span class="ty">Throwing</span>(<span class="ty">Box</span>&lt;<span class="ty">Type</span>&gt;, ?<span class="ty">Box</span>&lt;<span class="ty">Type</span>&gt;, <span class="ty">Span</span>)</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="ty">Throwing</span>(<span class="ty">Box</span>&lt;<span class="ty">Type</span>&gt;, ?<span class="ty">Type</span>[], <span class="ty">Span</span>)</code></pre>
 </section>
 <h2 id="methods">Methods</h2>
 <section class="member" id="method.span">

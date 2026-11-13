@@ -94,7 +94,9 @@ iterator, so <code>for</code> walks it too, and it may be endless — the caller
 is a function that pulls <code>c</code> when it is called, and what a pull throws is in its type.</p>
 <p>A coroutine function's <code>throws</code> belongs to its pulls, not to the call that makes the coroutine:
 the call runs nothing. Of <code>fn read(): Coroutine&lt;Row&gt; throws [IoError, ParseError]</code> each pull may
-throw either, and a <code>catch</code> for each covers it, as for a function of that clause.</p>
+throw either, and a <code>catch</code> for each covers it, as for a function of that clause. A field or a
+parameter that holds such a coroutine writes the set the same way,
+<code>Coroutine&lt;Row&gt; throws [IoError, ParseError]</code>.</p>
 <h2 id="tasks">Tasks</h2>
 <p><code>spawn</code> from <code>std.task</code> starts a function as a task and returns its handle at once. The task runs
 beside the code that started it; <code>await()</code> waits until it has ended and gives its result:</p>

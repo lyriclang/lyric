@@ -2313,6 +2313,13 @@ code is no longer reported, and its number is not given again.</p>
 <td>a default reached where the interface has none</td>
 <td><code>I.m(this)</code> stands in the type's own implementation of <code>m</code>, where it means the interface's default, and <code>I</code> declares <code>m</code> without one.</td>
 </tr>
+<tr>
+<td>LYR-SEM0238</td>
+<td>E</td>
+<td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
+<td>a task's type that names several thrown types</td>
+<td>A task's type is written <code>Task&lt;T&gt; throws [A, B]</code>; a task names one thrown type, or the bare <code>throws</code> for the root.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a5-mac--macros">A.5 MAC — Macros</h2>

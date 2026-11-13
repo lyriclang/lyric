@@ -92,8 +92,9 @@ does not catch ends the body and comes out of the <code>next()</code> that ran i
 done then: its <code>result()</code> stays <code>null</code>, and every later <code>next()</code> answers <code>null</code> and throws
 nothing. The clause is a <strong>set</strong>, as a function's is (<a href="../../spec/06-errors/#2-the-throws-set">06 §2</a>):
 a pull of a coroutine of <code>throws [A, B]</code> throws <code>A</code> or <code>B</code>, and a clause for each covers it. A
-written type names one, <code>Coroutine&lt;int&gt; throws E</code>, or the root with the bare <code>throws</code>
-(<a href="../../spec/02-grammar/#3-types">02 §3</a>); a coroutine fits where one is expected whose set covers its own —
+written type writes it as the clause does, <code>Coroutine&lt;int&gt; throws [A, B]</code>, under the clause's
+rules (<a href="../../spec/02-grammar/#3-types">02 §3</a>, <code>LYR-SEM0030</code>, <code>LYR-SEM0137</code>), and the bare <code>throws</code> for
+the root; a coroutine fits where one is expected whose set covers its own —
 one that throws nothing among them —, never the other way (<code>LYR-SEM0001</code>), as a function value
 does (<a href="../../spec/06-errors/#8-function-values-that-throw">06 §8</a> rule 3). As an <code>Iterator</code> its
 <code>Error</code> is one type: the one it throws, <code>never</code> where none, the root <code>Error</code> where several,
@@ -185,7 +186,10 @@ before it, and gives its <strong>handle</strong>, a <code>Task&lt;T&gt; throws E
 returns — <code>void</code> too (<a href="../../spec/03-types/">03 §9.1</a> rule 7) — and <code>E</code> what it throws. The handle's
 type carries the error as a coroutine's carries what its pulls throw (05 E10); <code>Task&lt;T&gt;</code>
 throws nothing, and fits where a <code>Task&lt;T&gt; throws E</code> is expected, but not the reverse
-(<code>LYR-SEM0001</code>). <code>throws</code> after any other type than a coroutine or a task is refused
+(<code>LYR-SEM0001</code>). A task's <code>E</code> is one type, inferred as every <code>E</code> is
+(<a href="../../spec/06-errors/#8-function-values-that-throw">06 §8</a> rule 6): a body that throws several makes
+a <code>Task&lt;T&gt; throws Error</code>, and a written task type of several, <code>Task&lt;T&gt; throws [A, B]</code>, is
+refused (<code>LYR-SEM0238</code>). <code>throws</code> after any other type than a coroutine or a task is refused
 (<code>LYR-SEM0084</code>). After a <strong>return type</strong> that is a task or a coroutine — with a <code>?</code> before
 it or without — a <code>throws</code> could be the type's or the function's, and without parentheses
 it is refused (<code>LYR-SEM0165</code>): a function that returns a throwing task writes
