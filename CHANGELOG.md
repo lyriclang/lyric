@@ -476,6 +476,10 @@ promise. This entry fills with the milestones.
   is refused** (`LYR-PAR0059`) as `a < b < c` is. **`T.from(x)` through two bounds of one interface**,
   `T :: [From<int>, From<string>]`, is chosen by its argument, as on the type; it took the first
   bound. **`show<Signal>(.Red)`** reads the enum from the written type argument; it was `LYR-SEM0113`.
+- **A hover no longer waits forever in a module opened after another of its package.** The
+  language server took the editor's spelling of the file's URI (`file:///c%3A/…`) and its own
+  (`file:///c:/…`) for two files, dropped the module's analysis as if the file had left the
+  package, and every hover there showed "Loading…" until the next edit.
 
 ---
 
