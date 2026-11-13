@@ -596,11 +596,16 @@ public sealed class AnalysisService : IDisposable
         }
 
         // Withdraw what the last round said about files that are no longer in the project: a
-        // deleted file's squiggles otherwise outlive the file.
+        // deleted file's squiggles otherwise outlive the file. Asked by PATH, not by URI: a file
+        // was published under the URI this server builds while it was closed and under the
+        // editor's once it is open ('file:///c:/…' against 'file:///c%3A/…'), and compared as text
+        // the two spellings made a file that is still there look gone — its fresh analysis was
+        // dropped right after it was made, and a hover there waited for one that never came.
+        var stillThere = new HashSet<string>(roots, DocumentUri.PathComparer);
         if (_published.TryGetValue(unitKey, out var previous))
         {
             foreach (var uri in previous)
-                if (!published.Contains(uri, StringComparer.Ordinal))
+                if (!stillThere.Contains(PathOf(uri)))
                 {
                     _lastGood.TryRemove(PathOf(uri), out _);
                     await _publish(new PublishDiagnosticsParams { Uri = uri, Diagnostics = [] },
