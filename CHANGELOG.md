@@ -491,6 +491,10 @@ promise. This entry fills with the milestones.
   `:: [I, J]` and `:: I, J` are `LYR-PAR0066`; one interface in brackets, `:: [I]`, stays. The
   formatter puts a chain too long for the line one to a line, with the `{` on its own.
   `lyric fix --from-4` joins Lyric 4's lists (rule S13).
+- **A codable enum's variant with named fields writes them by name**: `Rect { w: int, h: int }` is
+  `{"Rect":{"w":2,"h":5}}` in JSON, and `Ring { r: int }` is `{"Ring":{"r":1}}`. It was a sequence,
+  or the bare value for one field, as a positional payload still is (`{"Circle":3}`,
+  `{"Pair":[4,6]}`). Data written before reads no longer for such a variant.
 
 ---
 

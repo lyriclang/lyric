@@ -148,9 +148,9 @@ pub fn variantNames<E>(): string[] {
 pub interface Encode {
     /// Writes this value into `e`. Synthesized for a conformance without the member: a struct's
     /// fields in declaration order under their wire names, a `@Codec { skip }` field left out; an
-    /// enum's variant — a unit one as its name, one payload field as the value, several as a
-    /// sequence — or, under the enum's `@Codec { tag }`, as a struct of the tag and the payload's
-    /// fields.
+    /// enum's variant — a unit one as its name, a payload with names as a struct of its fields, a
+    /// positional one as its value where it has one field and as a sequence where it has several
+    /// — or, under the enum's `@Codec { tag }`, as a struct of the tag and the payload's fields.
     ///
     /// # Errors
     ///
@@ -172,18 +172,47 @@ pub interface Encode {
                     comptime if (v.payload.length() == 0) {
                         try e.encodeUnitVariant(typeName<Self>(), v.name, v.index);
                     } else {
-                        comptime if (v.payload.length() == 1) {
-                            comptime for (p in v.payload) {
-                                try e.encodeVariant(typeName<Self>(), v.name, v.index, this.[v, p]);
+                        // A positional field is named by its position, and no name a payload
+                        // declares starts with a digit: below "A" is a position.
+                        comptime for (p in v.payload) {
+                            comptime if (p.index == 0) {
+                                comptime if (p.name < "A") {
+                                    comptime if (v.payload.length() == 1) {
+                                        try e.encodeVariant(
+                                            typeName<Self>(),
+                                            v.name,
+                                            v.index,
+                                            this.[v, p]
+                                        );
+                                    } else {
+                                        try e.beginVariant(typeName<Self>(), v.name, v.index, true);
+                                        try e.beginSeq(v.payload.length());
+                                    }
+                                } else {
+                                    try e.beginVariant(typeName<Self>(), v.name, v.index, true);
+                                    try e.beginStruct(v.name, v.payload.length());
+                                }
                             }
-                        } else {
-                            try e.beginVariant(typeName<Self>(), v.name, v.index, true);
-                            try e.beginSeq(v.payload.length());
-                            comptime for (p in v.payload) {
-                                try e.element(this.[v, p]);
+                            comptime if (p.name < "A") {
+                                comptime if (v.payload.length() > 1) {
+                                    try e.element(this.[v, p]);
+                                }
+                            } else {
+                                try e.field(p.name, this.[v, p]);
                             }
-                            try e.endSeq();
-                            try e.endVariant();
+                        }
+                        comptime for (p in v.payload) {
+                            comptime if (p.index == 0) {
+                                comptime if (p.name < "A") {
+                                    comptime if (v.payload.length() > 1) {
+                                        try e.endSeq();
+                                        try e.endVariant();
+                                    }
+                                } else {
+                                    try e.endStruct();
+                                    try e.endVariant();
+                                }
+                            }
                         }
                     }
                 }
@@ -250,20 +279,40 @@ pub interface Decode {
                         try d.endVariant();
                         return Self.[v];
                     } else {
-                        comptime if (v.payload.length() == 1) {
-                            let r = Self.[v] {
-                                comptime for (p in v.payload) [p] = try d.payload(),
-                            };
-                            try d.endVariant();
-                            return r;
-                        } else {
-                            let _ = try d.beginSeq();
-                            let r = Self.[v] {
-                                comptime for (p in v.payload) [p] = try d.element(),
-                            };
-                            try d.endSeq();
-                            try d.endVariant();
-                            return r;
+                        comptime for (p in v.payload) {
+                            comptime if (p.index == 0) {
+                                comptime if (p.name < "A") {
+                                    comptime if (v.payload.length() == 1) {
+                                        let r = Self.[v] {
+                                            comptime for (q in v.payload) [q] = try d.payload(),
+                                        };
+                                        try d.endVariant();
+                                        return r;
+                                    } else {
+                                        let _ = try d.beginSeq();
+                                        let r = Self.[v] {
+                                            comptime for (q in v.payload) [q] = try d.element(),
+                                        };
+                                        try d.endSeq();
+                                        try d.endVariant();
+                                        return r;
+                                    }
+                                } else {
+                                    let names = List<string>.new();
+                                    comptime for (q in v.payload) {
+                                        names.push(q.name);
+                                    }
+                                    try d.beginStruct(v.name, names.toArray());
+                                    let r = Self.[v] {
+                                        comptime for (q in v.payload) [q] = try d.field(q.name),
+                                    };
+                                    try d.endStruct(
+                                        typeAttribute<Self, Codec>()?.denyUnknown ?? false
+                                    );
+                                    try d.endVariant();
+                                    return r;
+                                }
+                            }
                         }
                     }
                 }
