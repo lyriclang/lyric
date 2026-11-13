@@ -476,6 +476,10 @@ promise. This entry fills with the milestones.
   is refused** (`LYR-PAR0059`) as `a < b < c` is. **`T.from(x)` through two bounds of one interface**,
   `T :: [From<int>, From<string>]`, is chosen by its argument, as on the type; it took the first
   bound. **`show<Signal>(.Red)`** reads the enum from the written type argument; it was `LYR-SEM0113`.
+- **A codable enum's variant with named fields writes them by name**: `Rect { w: int, h: int }` is
+  `{"Rect":{"w":2,"h":5}}` in JSON, and `Ring { r: int }` is `{"Ring":{"r":1}}`. It was a sequence,
+  or the bare value for one field, as a positional payload still is (`{"Circle":3}`,
+  `{"Pair":[4,6]}`). Data written before reads no longer for such a variant.
 
 ---
 
