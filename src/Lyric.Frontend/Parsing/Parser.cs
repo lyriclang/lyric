@@ -794,6 +794,9 @@ public sealed partial class Parser
             case TokenKind.Hash when _quoteDepth > 0 && _buffer.Peek(1).TokenKind == TokenKind.LBrace:
                 return ParseSplice();
             case TokenKind.This:
+                // 'this.gm<int>' with nothing to call: read as the path 'c.gm<int>' is, so the
+                // checker refuses it as a member with type arguments and not as a comparison.
+                if (_buffer.Peek(1).TokenKind == TokenKind.Dot && IsTypePathAhead()) return ParseTypePath();
                 _buffer.Advance();
                 return new ThisExpr(cur.Span);
             case TokenKind.AtIdentifier:
@@ -1123,7 +1126,7 @@ public sealed partial class Parser
         var path = new List<string> { _sm.Slice(first.Span).ToString() };
         var nameSpan = first.Span;
 
-        // The lookahead guaranteed 'IDENT (. IDENT)* <', so the loop ends at the '<'.
+        // The lookahead guaranteed '(IDENT or this) (. IDENT)* <', so the loop ends at the '<'.
         while (_buffer.Match(TokenKind.Dot))
         {
             var segment = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0026",

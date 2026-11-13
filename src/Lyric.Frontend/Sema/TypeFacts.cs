@@ -211,7 +211,8 @@ public static class TypeFacts
             // those, as identity asks nothing of the pulls.
             case CoroutineOf pc when actual is CoroutineOf ac:
                 return Match(pc.Yield, ac.Yield, map) && Match(pc.Result, ac.Result, map)
-                    && (pc.Throws is null || ac.Throws is { } thrown && Match(pc.Throws, thrown, map));
+                    && (pc.Throws.Length == 0 || pc.Throws.Length == ac.Throws.Length
+                        && pc.Throws.Zip(ac.Throws).All(pair => Match(pair.First, pair.Second, map)));
             // A function type (05 §13 rule 6): its parameters, its places, its return and its set.
             case FnType pf when actual is FnType af && pf.Parameters.Length == af.Parameters.Length
                                 && pf.Throws.Length == af.Throws.Length && FnType.SamePlaces(pf, af):
@@ -256,7 +257,7 @@ public static class TypeFacts
     private static bool EndsInASet(LyrType type) => type switch
     {
         Optional optional => EndsInASet(optional.Inner),
-        FnType { Throws.Length: > 0 } or GenericInstance { Throws: not null } or CoroutineOf { Throws: not null } => true,
+        FnType { Throws.Length: > 0 } or GenericInstance { Throws: not null } or CoroutineOf { Throws.Length: > 0 } => true,
         _ => false,
     };
 
@@ -341,10 +342,9 @@ public static class TypeFacts
                            ? $"({Render(f.Return, name)})" : Render(f.Return, name))
                        + ThrownText(f.Throws, name);
             case RangeOf r: return "range<" + Render(r.Element, name) + ">";
-            case CoroutineOf { Throws: null } co: return "Coroutine<" + Render(co.Yield, name) + ResultText(co, name) + ">";
             case CoroutineOf co:
-                return "Coroutine<" + Render(co.Yield, name) + ResultText(co, name) + "> throws"
-                       + (co.Throws is NamedRef { Symbol.Name: "Error" } ? "" : " " + Render(co.Throws!, name));
+                return "Coroutine<" + Render(co.Yield, name) + ResultText(co, name) + ">"
+                       + (co.Throws is [NamedRef { Symbol.Name: "Error" }] ? " throws" : ThrownText(co.Throws, name));
             case NullType: return "null";
             case NeverType: return "never";
             case ErrorType: return "<error>";

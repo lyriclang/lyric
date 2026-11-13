@@ -331,7 +331,7 @@ internal sealed class ExceptionAnalyzer
                 // A pull — 'c.next()' — is the throw site of a coroutine, never the call that
                 // built it (#73); the checker marked it, knowing the receiver's type.
                 if (_types.ThrownByPull(call.Callee) is { } pulled)
-                    Site([pulled], call.Span, "'next()'");
+                    Site(pulled, call.Span, "'next()'");
                 else
                 {
                     // 'Walker.walk(d)' stands for the member call it was checked as.
@@ -430,7 +430,7 @@ internal sealed class ExceptionAnalyzer
     private LyrType[] LambdaThrows(LambdaExpr lam) => _types.TypeOf(lam) switch
     {
         FnType { Return: CoroutineOf made } when _types.IsGeneratorLambda(lam) =>
-            BodyCovers(made.Throws is { } pulled ? [pulled] : [], coroutine: true),
+            BodyCovers(made.Throws, coroutine: true),
         FnType { Throws: var lambdaSet } => lambdaSet,
         _ => [],
     };
@@ -493,7 +493,7 @@ internal sealed class ExceptionAnalyzer
         Site(_types.CallThrows(walk.IterCall), head, "the loop's 'iter()'");
         // A coroutine's pull throws what its body throws, which the checker noted (#73).
         var pulled = _types.ThrownByPull(walk.NextCall.Callee);
-        Site(pulled is { } thrown ? [thrown] : _types.CallThrows(walk.NextCall), head, "the loop's 'next()'");
+        Site(pulled ?? _types.CallThrows(walk.NextCall), head, "the loop's 'next()'");
         if (walk.Close is { Body: ExprStmt { Expr: CallExpr close } })
             Site(_types.CallThrows(close), head, "the loop's 'close()'");
     }

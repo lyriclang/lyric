@@ -66,6 +66,10 @@ A coroutine runs on its caller's thread, in its caller's time. Nothing happens i
 `next()` calls. Its members are methods like any other: of a coroutine `c`, `let pull = c.next;`
 is a function that pulls `c` when it is called, and what a pull throws is in its type.
 
+A coroutine function's `throws` belongs to its pulls, not to the call that makes the coroutine:
+the call runs nothing. Of `fn read(): Coroutine<Row> throws [IoError, ParseError]` each pull may
+throw either, and a `catch` for each covers it, as for a function of that clause.
+
 ## Tasks
 
 `spawn` from `std.task` starts a function as a task and returns its handle at once. The task runs
