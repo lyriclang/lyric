@@ -80,10 +80,10 @@ public sealed class ToolchainFetch
     /// <summary>A client whose connections give up after 10 s, and whose reads give up when nothing
     /// came for <paramref name="stall"/>: a mirror that drops packets, or one that stops sending, is
     /// told apart from a slow one in time for the source after it. The limit sits on the socket,
-    /// where a synchronous read honours it on every system. The connection is made on the calling
-    /// thread too, and waited for there: a fetch is synchronous, and a callback that awaited would
-    /// block it until a pool thread came free to finish the connect — in a busy process, past the
-    /// client's timeout.</summary>
+    /// where a synchronous read honours it on every system. The connect is waited for on the thread
+    /// that makes it, not awaited. That thread is not the caller's: the handler hands every new
+    /// connection to a pool thread first, so a fetch in a process whose pool is busy waits for one,
+    /// however the connect is made.</summary>
     public static HttpClient Client(string userAgent, TimeSpan stall, TimeSpan timeout)
     {
         var handler = new SocketsHttpHandler
