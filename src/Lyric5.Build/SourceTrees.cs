@@ -148,11 +148,15 @@ public sealed class SourceTrees(string lockFile, GitCache git, string cache, boo
         {
             var uri = new Uri(url);
             if (uri.IsFile) return File.ReadAllBytes(uri.LocalPath);
-            using var client = new HttpClient { Timeout = LoadTime };
-            using var response = client.GetAsync(uri).GetAwaiter().GetResult();
+            // synchronous throughout: a build waits for the tree, and a load that awaited inside
+            // would wait for a pool thread to come free as well
+            using var client = ToolchainFetch.Client("lyric", ToolchainFetch.DefaultStall, LoadTime);
+            using var response = client.Send(new HttpRequestMessage(HttpMethod.Get, uri));
             if (!response.IsSuccessStatusCode)
                 throw new HttpRequestException($"the server answers {(int)response.StatusCode} {response.ReasonPhrase}");
-            return response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+            using var body = new MemoryStream();
+            response.Content.ReadAsStream().CopyTo(body);
+            return body.ToArray();
         }
         catch (Exception e) when (e is HttpRequestException or IOException or UnauthorizedAccessException or UriFormatException
                                       or TaskCanceledException)

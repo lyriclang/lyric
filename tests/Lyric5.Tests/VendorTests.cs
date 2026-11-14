@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using Lyric5.Build;
 using Lyric5.Toolchain;
 using static Lyric5.Tests.PackageFixture;
 
@@ -383,6 +384,38 @@ public class VendorTests
             if (!_listener.IsListening) return;
             try { _listener.Close(); }
             catch (HttpListenerException) { }
+        }
+    }
+}
+
+[Collection(nameof(FullThreadPool))]
+public class SourceTreeLoadOnAFullPoolTests
+{
+    /// <summary>
+    /// A tree's URL is loaded by a build that waits for it, so the load connects and reads on that
+    /// thread: on a busy pool a load that awaited inside waited for a pool thread to come free.
+    /// </summary>
+    [Fact]
+    public void A_busy_thread_pool_does_not_hold_the_load()
+    {
+        using var server = new ToolchainFixture.MirrorServer();
+        // Not disposed: blocked work the pool has not started yet waits on it after the test returns.
+        var release = new ManualResetEventSlim();
+        ThreadPool.GetMinThreads(out var workers, out _);
+        for (var i = 0; i < workers + 40; i++)
+            ThreadPool.UnsafeQueueUserWorkItem(_ => release.Wait(), null);
+        try
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            // a file the server lacks: one request and its answer, nothing kept
+            var e = Assert.Throws<ManifestException>(() => SourceTrees.Hash($"{server.Address}/nothing-here", offline: false, "lyric.json"));
+            clock.Stop();
+            Assert.Contains("the server answers 404", e.Message);
+            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"the load took {clock.Elapsed}");
+        }
+        finally
+        {
+            release.Set();
         }
     }
 }
