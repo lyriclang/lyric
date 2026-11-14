@@ -82,6 +82,45 @@ public class NestingLimitTests
     }
 
     /// <summary>
+    /// Whatever the depth and whatever the thread, the answer is a diagnostic.
+    ///
+    /// <para>The bound alone did not give that. A level costs what the build makes of it, so a Debug
+    /// build on Windows died at level 178 of 192, and a stack of 256 KiB dies below the bound in
+    /// every build, which is why this pin holds where the tests run in Release. The shapes past the
+    /// parentheses are not counted at all: they end where the stack ends, and until they asked for
+    /// it they took the process down in every build.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("return {0}1{1};", "(", ")", "LYR-PAR0045")]
+    [InlineData("return {0}1{1};", "!", "", "LYR-PAR0045")]
+    [InlineData("return 1 + {0}1{1};", "try ", "", "LYR-PAR0045")]
+    [InlineData("{0}{1}", "{", "}", "LYR-PAR0045")]
+    [InlineData("{0}{1}", "if (true) {", "}", "LYR-PAR0045")]
+    [InlineData("if (true) {{}}{0}{1}", " else if (true) {}", "", "LYR-PAR0045")]
+    [InlineData("let {0}a, b{1} = 1;", "(", ")", "LYR-PAR0045")]
+    [InlineData("return a{0}{1};", ".b", "", "LYR-SEM0105")]
+    [InlineData("return a{0}{1};", "()", "", "LYR-SEM0105")]
+    public void Past_the_stack_is_a_diagnostic(string statement, string open, string close, string code)
+    {
+        var source = "fn main(): int {\n    "
+                     + string.Format(statement, string.Concat(Enumerable.Repeat(open, 20_000)),
+                                     string.Concat(Enumerable.Repeat(close, 20_000)))
+                     + "\n    return 0;\n}\n";
+        DiagnosticEngine? de = null;
+        Exception? failed = null;
+        var thread = new Thread(() =>
+        {
+            try { de = Check(source); }
+            catch (Exception e) { failed = e; }
+        }, maxStackSize: 256 * 1024);
+        thread.Start();
+        thread.Join();
+
+        Assert.Null(failed);
+        Assert.Contains(de!.Diagnostics, d => d.Code == code);
+    }
+
+    /// <summary>
     /// The bound is the implementation's and the message says so.
     ///
     /// <para>§12.4 leaves the depth unspecified on purpose — it belongs to a thread's stack, not

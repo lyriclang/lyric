@@ -46,7 +46,13 @@ public sealed partial class Parser
         return stmt;
     }
 
-    private Stmt ParseStmt() => _buffer.Current.TokenKind switch
+    private Stmt ParseStmt()
+    {
+        NeedStack();
+        return ParseStmtInner();
+    }
+
+    private Stmt ParseStmtInner() => _buffer.Current.TokenKind switch
     {
         // 'name:' at the start of a statement is a loop label — nothing else begins that way
         // (§6.8: an expression statement is a call, an assignment or 'resume').
