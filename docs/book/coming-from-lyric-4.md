@@ -8,6 +8,11 @@ found wrong. This chapter is for a reader who knows Lyric 4: what to unlearn, an
 Much stays as it was: `?T` and `x!`, `throws T` and `catch (e: T)`, `Coroutine<T>` with
 `next()`, `List<int>.of`, `push`, interfaces with `::`, `@Test` and `assertEq`.
 
+**Several interfaces after `::` are joined with `&`**: `struct Item :: Codable & Equatable`, and
+`<T :: Ordered & Display>`. Lyric 4 wrote them as a list, `:: [Codable, Equatable]`; in Lyric 5 a
+list of types in brackets is a set — one of them, as in `throws [A, B]` — so a conformance is not
+written that way. One interface may still stand in brackets, `:: [Codable]`.
+
 ## The first hour
 
 **Imports name the module, not a submodule.** `println` is `std.io`'s:
@@ -151,7 +156,7 @@ module as in Lyric 4. `private` keeps it to its module.
 ## Moving a program
 
 `lyric fix --from-4` rewrites what can be rewritten mechanically — imports, the module header,
-fields that are written, `try` marks, patterns — and leaves a note for what needs a person: a
+fields that are written, `try` marks, patterns, interfaces joined with `&` — and leaves a note for what needs a person: a
 place where wrapping arithmetic was relied on, a string indexed by character. The result is a
 start, not a promise; build it and read what `lyric check` says next. [What the compiler tells
 you](diagnostics.md) explains how.
