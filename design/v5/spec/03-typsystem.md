@@ -175,6 +175,9 @@ mit Definite Assignment bleibt, **`var x;` ohne Typ nein**.
 
 ## T9 — Vereinigungstypen gegen Enum ohne Zeremonie: **entschieden** (2026-09-28)
 
+> **Teilweise überholt 2026-11-18** durch TM1–TM6 ([Runde Typ und Typmenge](#runde-2026-11-18--typ-und-typmenge)):
+> `[A, B]` ist eine Typmenge, die anonyme Form des `sealed interface`. `?T` bleibt eigen.
+
 **Keine Vereinigungstypen `A | B` in 5.0.** Enum-Ergonomie stattdessen; die Union bleibt eine
 **Tür, die rein additiv ist**: sie käme nach T3 nur als Koerzion (kein Subtyp-Gitter, kein LUB),
 also verbaut nichts, was 5.0 entscheidet.
@@ -406,6 +409,75 @@ die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, N
 | D1 | **`T.from(…)` zwischen zwei Schranken desselben Interfaces wählt über die Argumente**, wie der Aufruf auf einem Typ (04 S7, entschieden 2026-10-22: über eine Schranke wählt die Instanz der Schranke): `<T :: [From<int>, From<string>]>` mit `T.from("abc")` nimmt `From<string>`. Heute findet die Suche die Überladung nicht. *Die Liste empfahl einen Fehler mit dem Rat, `From<int>.from(…)` zu schreiben; diese Form gibt es nach 04 S7 nicht, also folgt die Zeile 04 S7.* Uhr: M17 S12b | T18 |
 | D2 | **Ein implizites Member an einem Parameter, dessen Typ ein Typargument festlegt** (`f<Signal>(.Red)` für `fn f<T>(x: T)`): die Position erwartet `Signal`, also gilt `.Red` dort wie an jeder Position mit einem Enum-Typ (`LYR-SEM0113` nur, wo keiner erwartet wird). Uhr: M17 S12b — prüfen, gebaut, wo es fehlt | T8 |
 | D3 | **Wo die Unifikation eines Aufrufs scheitert, meldet sie** (T8, `same(1, "s")`): heute bindet das erste Argument `T`, die Meldung steht am zweiten. Beide Formen lehnen dasselbe Programm ab; der Ort der Meldung ist eine Tür nach 5.0 | T8 |
+
+## Runde 2026-11-18 — Typ und Typmenge
+
+Anlass: Wurfmengen (`throws [A, B]`) gab es an Funktionen, Coroutinen und `catch`, jeweils mit
+eigener Regel und nur für Fehler; ein Typparameter konnte keine binden (`E` von `spawn`,
+`Iterator.Error`). Grundsatz des Maintainers: **was die Sprache einführt, ist nicht exklusiv für
+eine Sache.** Entschieden „alle nach Empfehlung“. Wo eine ältere Zeile widerspricht, gilt die
+Zeile hier; **T9 ist damit teilweise überholt** (unten).
+
+**Bestand, als Mengen gelesen.** Lyric hatte Typmengen schon, unter anderen Namen: das
+Interface (offen, über Verhalten), das `sealed interface` (geschlossen, benannt, Spec 05 §10),
+`Any` (alle), `never` (keine), die Catch-Bindung `catch (e in [A, B])` (geschlossen, anonym —
+die einzige anonyme, und nur für Fehler, Spec 06 §4 Regel 6). Die Analogie: **`[A, B]` verhält
+sich zu `sealed interface` wie das Tupel zum `struct`** — dasselbe, ohne Namen.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| TM1 | **Ein Typ** sind Werte, Darstellung, Verhalten. Jeder Wert hat zur Laufzeit genau einen **konkreten Typ** (Skalar, `string`, Struct, Klasse, Enum, Tupel, Array, Funktion, `?T`). Eine Menge ist nie der Typ eines Werts, nur der statische Typ einer Stelle | T1, T10 |
+| TM2 | **Eine Typmenge** ist eine Menge konkreter Typen, geschrieben als `interface` (offen, über Verhalten), `sealed interface` (geschlossen, benannt), `[A, B]` (geschlossen, aufgezählt, anonym), `Any` (alle), `[]` = `never` (keine). Ein konkreter Typ ist die Menge mit einem Glied: `[A]` ist `A` | T9, T10 |
+| TM3 | **Ein Wert einer Menge kann, was jedes Glied kann**: jedes Interface, dem alle Glieder genügen — `[IoError, ParseError]` ist ein `Error`, `e.message()` geht (die Catch-Regel, verallgemeinert). Den Typ erfragen `is` und `match` (T11); über einer geschlossenen Menge ist `match` ohne `_` erschöpfend. Darstellung: die Box des Interface-Werts (V7) | T11 |
+| TM4 | **Glieder**: jeder Typ außer `void` und `never`, ein Interface eingeschlossen. Mengen flachen ab (`[[A, B], C]` ist `[A, B, C]`); ein geschriebenes Doppel ist ein Fehler (`LYR-SEM0137`). **`?T` bleibt ein eigener, schachtelnder Konstruktor** (T4, `??T` ≠ `?T`) und ist als Glied ein Typ wie jeder: `[int, ?string]` | T4 |
+| TM5 | **Wohin es passt**: `A` in `[A, B]`; `[A, B]` in `[A, B, C]` und in jedes Interface, dem alle Glieder genügen — als **Koerzion** an den Stellen von T3, nie als Subtyp, nie in einem Behälter (`A[]` ist kein `[A, B][]`, Spec 05 §11) | T3 |
+| TM6 | **Überall, wo ein Typ steht**: Anmerkung, Parameter, Feld, Rückgabe, Typargument (`List<[int, string]>`), `throws`, `catch`; ein Typparameter bindet eine Menge | T18, Bereich 5 |
+
+**Bewusst nicht.** `int8` ist kein Glied von `int`: zwei konkrete Typen, die Weitung (T1c) ist
+eine Umwandlung, keine Mitgliedschaft. „Ganzzahl“ wäre eine eigene Menge (ein
+`sealed interface` in std oder `[int8, …, int]`) — Thema der Schranken-Runde. `int64` bleibt
+`int` (Alias). `string` und `StringView` bleiben zwei Typen.
+
+**T9, gegen diese Zeilen gelesen.** T9 lehnte `A | B` ab; die Gründe, Stück für Stück:
+
+| T9-Grund | mit TM1–TM6 |
+|---|---|
+| zweiter Summenmechanismus neben `enum` | `[A, B]` ist die anonyme Form des `sealed interface`, kein neuer Mechanismus; `enum` bleibt die Summe mit eigenem Namen und eigenen Varianten |
+| `?T` als `T \| null` macht `??T` unmöglich | gilt nicht: `?T` bleibt eigen (TM4) |
+| kein Gitter, kein LUB | gilt weiter: Koerzion (TM5), Inferenz ohne LUB (T3, T8) |
+| Abflachung in Generics (`[T, string]` mit `T = string`) | **offen**, siehe unten |
+| Überladung wächst um eine Dimension | ein Aufruf mit `[int, string]` passt auf `f(int)` und `f(string)` nicht; nur ein Parameter, der die Menge abdeckt, nimmt sie |
+| rekursive Unionen brauchen rekursive Aliase | gilt weiter; `Json` bleibt ein rekursives Enum |
+
+**`∩` und `∪` (entschieden 2026-11-18, nach Empfehlung).** `throws`/`catch` lasen `[A, B]` als
+„eines davon“, jede `::`-Liste als „alle davon“ — mit TM2 kann `[…]` nur eines heißen.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| TM7 | **`[A, B]` ist immer die Vereinigung, `A & B` der Schnitt.** `::` nimmt einen Typ (eine Menge), mehrere Anforderungen verbindet `&`: `struct S :: Display & Hash`, `fn f<T :: Display & Hash>`. `:: [Codable]` bleibt gültig, weil `[A]` `A` ist (TM2); eine `::`-Liste mit mehreren Gliedern wird abgelehnt, mit dem Hinweis auf `&` | 08 D5/D6 (Listenregel), Spec 02 §1 Regel 5, 05, 08 |
+| TM8 | **`A & B` ist ein Typ wie jeder (TM6)**: ein Wert davon genügt beiden — ein Parameter `x: Display & Hash`, ein Interface-Wert, der beide Tabellen trägt. Operanden sind Mengen (Interfaces, `[…]`, `Any`); ein konkreter Typ als Operand ist er selbst, wenn er genügt, sonst `never` — als Fehler gemeldet. `&` bindet stärker als die Liste: `[A & B, C]` | 05 §2, T3 |
+
+Kosten: die `::`-Listen mit mehreren Gliedern (Stand 2026-11-18 rund 160 in std, Book, Beispielen,
+Konformanz) stellen mechanisch um; der Formatter kann es. Zu prüfen in der Spec-Runde: `&` in
+Typargumenten eines Ausdrucks (`f<Display & Hash>(x)`) gegen die `<`-Auflösung (Spec 02 §6.3).
+Die Attributliste `@[A, B]` ist keine Typliste und bleibt, wie sie ist.
+
+**Offen, als Nächstes.**
+
+1. ~~`∩` oder `∪` in Listen~~ — TM7.
+2. ~~Doppel durch Einsetzen~~ — TM9.
+3. ~~Zeitpunkt~~ — TM10.
+
+**Doppel und Zeitpunkt (entschieden 2026-11-18, nach Empfehlung).**
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| TM9 | **Doppel durch Einsetzen verschmelzen still**: `[T, string]` mit `T = string` ist `[string]`, also `string` — es ist eine Menge. Nur ein **geschriebenes** Doppel bleibt ein Fehler (`LYR-SEM0137`) | TM4, T19 |
+| TM10 | **Vor 5.0 nur, was 5.0 braucht**: (a) `&` statt Listen hinter `::` (TM7), damit die Schreibweise mit dem Release feststeht; (b) Mengen als Typargumente (TM6) — `E` von `spawn` bindet `[A, B]`, `Task<T> throws [A, B]` wird schreibbar (`LYR-SEM0238` fällt), `Iterator.Error` einer Coroutine mit Menge antwortet die Menge statt der Wurzel. **Nach 5.0, als Tür**: Mengen als Werttypen (TM3, TM5) und `A & B` außerhalb von `::` (TM8) | Plan 13, Spec 02/05/06/08/10 |
+
+**Slices (spec-first).** TS1 — `&` hinter `::`: Grammatik, Ablehnung der Liste mit Hinweis,
+Umstellung von std/Book/Beispielen/Konformanz, Formatter. TS2 — Mengen als Typargumente:
+Bindung von `E`, Task-Menge, `Iterator.Error`; `LYR-SEM0238` retiriert mit seinem Pin.
 
 ---
 
