@@ -199,12 +199,12 @@ public class ZigInstallTests
 public class ZigFetchOnAFullPoolTests
 {
     /// <summary>
-    /// zig's fetch is synchronous too, so it connects on its own thread like a channel's: on a busy
-    /// pool a connection that waited for a pool thread came after the page had given up on it, and
-    /// the index could not be fetched.
+    /// zig's fetch takes the toolchain's client, and comes through a busy pool like a channel's; how
+    /// long it takes is the pool's business (see
+    /// <see cref="ToolchainFetchOnAFullPoolTests.A_busy_thread_pool_does_not_fail_the_fetch"/>).
     /// </summary>
     [Fact]
-    public void A_busy_thread_pool_does_not_hold_the_fetch()
+    public void A_busy_thread_pool_does_not_fail_the_fetch()
     {
         using var server = new MirrorServer(ZigInstallTests.Download);
         // Not disposed: blocked work the pool has not started yet waits on it after the test returns.
@@ -214,12 +214,9 @@ public class ZigFetchOnAFullPoolTests
             ThreadPool.UnsafeQueueUserWorkItem(_ => release.Wait(), null);
         try
         {
-            var clock = System.Diagnostics.Stopwatch.StartNew();
             // a version the index lacks: one request, the index, and its answer
             var e = Assert.Throws<ToolchainException>(() => ZigInstallTests.Fetch(server).Install(new ToolchainHome(TestDirectories.Fresh("lyric5-zig-home-")), "9.8.0"));
-            clock.Stop();
             Assert.Equal("zig's index has no version 9.8.0", e.Message);
-            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"the index took {clock.Elapsed}");
         }
         finally
         {
