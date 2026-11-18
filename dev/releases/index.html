@@ -620,6 +620,11 @@ is refused</strong> (<code>LYR-PAR0059</code>) as <code>a &lt; b &lt; c</code> i
 <code>T :: [From&lt;int&gt;, From&lt;string&gt;]</code>, is chosen by its argument, as on the type; it took the first
 bound. <strong><code>show&lt;Signal&gt;(.Red)</code></strong> reads the enum from the written type argument; it was <code>LYR-SEM0113</code>.</p>
 </li>
+<li><p><strong>A hover no longer waits forever in a module opened after another of its package.</strong> The
+language server took the editor's spelling of the file's URI (<code>file:///c%3A/…</code>) and its own
+(<code>file:///c:/…</code>) for two files, dropped the module's analysis as if the file had left the
+package, and every hover there showed &quot;Loading…&quot; until the next edit.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
