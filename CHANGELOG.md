@@ -476,6 +476,15 @@ promise. This entry fills with the milestones.
   is refused** (`LYR-PAR0059`) as `a < b < c` is. **`T.from(x)` through two bounds of one interface**,
   `T :: [From<int>, From<string>]`, is chosen by its argument, as on the type; it took the first
   bound. **`show<Signal>(.Red)`** reads the enum from the written type argument; it was `LYR-SEM0113`.
+- **A hover no longer waits forever in a module opened after another of its package.** The
+  language server took the editor's spelling of the file's URI (`file:///c%3A/…`) and its own
+  (`file:///c:/…`) for two files, dropped the module's analysis as if the file had left the
+  package, and every hover there showed "Loading…" until the next edit.
+- **Macros work in the toolchain as it is installed.** The native `lyric5` expanded no macro: a
+  site stayed where it was ("did not end after 32 rounds", `LYR-CT0007`) or the build stopped with
+  an internal error. The expander reaches the syntax tree by reflection, and the trimmer of the
+  native build had removed what it reaches; the tests run on .NET and never saw it. The CI now runs
+  `examples/macros` with the published binary on every platform.
 - **Several interfaces after `::` are joined with `&`** (design 03 TM7, spec 02 §1 rule 6):
   `struct Item :: Codable & Equatable`, `<T :: Ordered & Display>`, `class Dog :: Walker by legs &
   Named`. A list of types in brackets is a set — one of them, as in `throws [A, B]` — so

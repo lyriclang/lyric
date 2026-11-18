@@ -11,6 +11,11 @@
     <ProjectReference Include="..\Lyric.Core\Lyric.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The AST's members for AstRewriter's reflection, kept in a native build (see the file). -->
+    <EmbeddedResource Include="ILLink.Descriptors.xml" LogicalName="ILLink.Descriptors.xml" />
+  </ItemGroup>
+
   <!--
     Eight areas in one assembly: Lexing, AST, Parsing, Resolver, Sema, Ir, Emit, Compiler.
 
