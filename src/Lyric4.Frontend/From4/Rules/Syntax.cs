@@ -503,7 +503,7 @@ internal readonly record struct BoundList(int Open, int Close, int TrailStart, (
     }
 }
 
-/// <summary>S13 (design 03 TM7): several interfaces after <c>::</c> are joined with <c>&amp;</c>,
+/// <summary>S13: several interfaces after <c>::</c> are joined with <c>&amp;</c>,
 /// <c>:: [I, J]</c> → <c>:: I &amp; J</c>; in Lyric 5 <c>[I, J]</c> is a set — one of them, not
 /// both. One in brackets, <c>:: [I]</c>, stays: it is the set of one. T04 joins its own.</summary>
 internal sealed class JoinedBounds : IRule

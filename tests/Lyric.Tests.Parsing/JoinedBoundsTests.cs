@@ -6,7 +6,7 @@ using Xunit;
 namespace Lyric.Tests.Parsing;
 
 /// <summary>
-/// What follows <c>::</c> (design 03 TM7, spec 02 §1 rule 5): one interface, or several joined by
+/// What follows <c>::</c> (spec 02 §1 rule 6): one interface, or several joined by
 /// <c>&amp;</c>; one in brackets is the set of one. Several as a list — in brackets or not — are
 /// <c>LYR-PAR0066</c>, read as joined so that the checker still sees each.
 /// </summary>

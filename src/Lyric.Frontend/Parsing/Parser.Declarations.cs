@@ -1199,7 +1199,7 @@ public sealed partial class Parser
     /// <c>:: [I]</c>, for the node that holds it.</summary>
     private bool _listBracketed = true;
 
-    /// <summary>What follows <c>::</c> (design 03 TM7): one interface, or several joined by
+    /// <summary>What follows <c>::</c>: one interface, or several joined by
     /// <c>&amp;</c> — <c>:: I</c>, <c>:: I &amp; J</c>; one in brackets, <c>:: [I]</c>, is the set
     /// of one and so the interface. Several in a list, <c>:: [I, J]</c> or <c>:: I, J</c>, are
     /// refused (<c>LYR-PAR0066</c>) and read as joined. An entry may delegate, <c>Walker by legs</c>;

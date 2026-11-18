@@ -609,7 +609,7 @@ public sealed class AstFormatter
             : interfaces.Length == 1 ? Doc.Of(Doc.From(" :: "), BoundsDoc(interfaces, delegates, bracketed), Doc.Space)
             : Doc.GroupOf(Doc.From(" :: "), BoundsDoc(interfaces, delegates, bracketed, grouped: false), Doc.LineOrSpace);
 
-    /// <summary>What follows <c>::</c> (design 03 TM7): one interface as written, <c>I</c> or
+    /// <summary>What follows <c>::</c>: one interface as written, <c>I</c> or
     /// <c>[I]</c>; several joined by <c>&amp;</c>, broken before each <c>&amp;</c> when the line
     /// is too long.</summary>
     private Doc BoundsDoc(TypeNode[] types, string?[]? delegates, bool bracketed, bool grouped = true)

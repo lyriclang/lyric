@@ -243,7 +243,7 @@ internal sealed class Compare : IRule
                     var otherType = Conformances.Text(text, other.Type);
                     context.Replace(Id, method.Span.File, method.Span.End, method.Span.End,
                         $"\n{indent}fn totalCompare({other.Name}: {otherType}): Ordering {{\n{indent}    return this.compare({other.Name})!;\n{indent}}}");
-                    // joined with '&' (design 03 TM7); a list of one loses its brackets, one of
+                    // joined with '&'; a list of one loses its brackets, one of
                     // several loses them to S13
                     context.Replace(Id, written.Interface.Span.File, written.Interface.Span.End, written.Interface.Span.End, " & TotalOrder");
                     foreach (var list in BoundList.In(text, module.Span.Start, module.Span.End))

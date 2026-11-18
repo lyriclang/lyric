@@ -82,7 +82,7 @@ public sealed record GenericParam(string Name, TypeNode[] Constraints, Span Span
 {
     /// <summary>Whether the one constraint after <c>::</c> stood in brackets, <c>T :: [I]</c>; the
     /// formatter writes what was written, and a node built rather than parsed has them. Several are
-    /// joined by <c>&amp;</c> (design 03 TM7).</summary>
+    /// joined by <c>&amp;</c>.</summary>
     public bool ConstraintsBracketed { get; init; } = true;
 
     public required Span NameSpan { get; init; }
@@ -228,7 +228,7 @@ public sealed record StructDecl(VisibilityWord Visibility, string Name, GenericP
 {
     /// <summary>Whether the one interface after <c>::</c> stood in brackets, <c>:: [I]</c> — the
     /// formatter writes what was written, and a node built rather than parsed has them. Several are
-    /// joined by <c>&amp;</c> (design 03 TM7).</summary>
+    /// joined by <c>&amp;</c>.</summary>
     public bool InterfacesBracketed { get; init; } = true;
 
     public bool IsPublic => Visibility == VisibilityWord.Pub;
@@ -247,7 +247,7 @@ public sealed record ClassDecl(VisibilityWord Visibility, string Name, GenericPa
 {
     /// <summary>Whether the one interface after <c>::</c> stood in brackets, <c>:: [I]</c> — the
     /// formatter writes what was written, and a node built rather than parsed has them. Several are
-    /// joined by <c>&amp;</c> (design 03 TM7).</summary>
+    /// joined by <c>&amp;</c>.</summary>
     public bool InterfacesBracketed { get; init; } = true;
 
     public bool IsPublic => Visibility == VisibilityWord.Pub;
@@ -266,7 +266,7 @@ public sealed record EnumDecl(VisibilityWord Visibility, string Name, GenericPar
 {
     /// <summary>Whether the one interface after <c>::</c> stood in brackets, <c>:: [I]</c> — the
     /// formatter writes what was written, and a node built rather than parsed has them. Several are
-    /// joined by <c>&amp;</c> (design 03 TM7).</summary>
+    /// joined by <c>&amp;</c>.</summary>
     public bool InterfacesBracketed { get; init; } = true;
 
     public bool IsPublic => Visibility == VisibilityWord.Pub;
@@ -300,7 +300,7 @@ public sealed record InterfaceDecl(VisibilityWord Visibility, string Name, Gener
 {
     /// <summary>Whether the one interface after <c>::</c> stood in brackets, <c>:: [I]</c> — the
     /// formatter writes what was written, and a node built rather than parsed has them. Several are
-    /// joined by <c>&amp;</c> (design 03 TM7).</summary>
+    /// joined by <c>&amp;</c>.</summary>
     public bool InterfacesBracketed { get; init; } = true;
 
     public bool IsPublic => Visibility == VisibilityWord.Pub;
@@ -326,7 +326,7 @@ public sealed record ExtendDecl(VisibilityWord Visibility, TypeNode Target, Type
 {
     /// <summary>Whether the one interface after <c>::</c> stood in brackets, <c>:: [I]</c> — the
     /// formatter writes what was written, and a node built rather than parsed has them. Several are
-    /// joined by <c>&amp;</c> (design 03 TM7).</summary>
+    /// joined by <c>&amp;</c>.</summary>
     public bool InterfacesBracketed { get; init; } = true;
 
     public bool IsPublic => Visibility == VisibilityWord.Pub;
@@ -356,7 +356,7 @@ public sealed record AssociatedTypeDecl(string Name, TypeNode? Type, Span Span) 
 {
     /// <summary>Whether the one bound after <c>::</c> stood in brackets; the formatter writes what
     /// was written, and a node built rather than parsed has them. Several are joined by
-    /// <c>&amp;</c> (design 03 TM7).</summary>
+    /// <c>&amp;</c>.</summary>
     public bool BoundsBracketed { get; init; } = true;
 
     public required Span NameSpan { get; init; }
