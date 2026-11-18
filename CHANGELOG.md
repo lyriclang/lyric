@@ -499,6 +499,11 @@ promise. This entry fills with the milestones.
   `e is Column<T>` and `_ in [Column<T>, Cell<T>]` in a generic function or in a method of
   `class Store<T>` test each instance's own type: `Column<int>` in `pick<int>`. The checker accepted
   them and the build stopped with `LYR-ICE0002: this type argument`.
+- **`try` in a macro's body is judged as the caller wrote it.** In `retry!(3) { result = try
+  fetch(); }` the macro's own `try { … }` around the body made the caller's mark look doubled
+  (`LYR-SEM0139`), though without the macro it is needed; a mark is counted against the program's
+  own `try`s only. Where the caller does double a mark in such a body, the help takes the whole
+  keyword out — it took the `t` alone (`result = ry fetch();`).
 
 ---
 

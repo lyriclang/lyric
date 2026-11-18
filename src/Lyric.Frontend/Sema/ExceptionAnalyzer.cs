@@ -81,6 +81,9 @@ internal sealed class ExceptionAnalyzer
 
         /// <summary>Where the types that reach the frame are kept, for <see cref="Escaping"/>.</summary>
         public List<LyrType>? Kept { get; init; }
+
+        /// <summary>Opened by a macro's own <c>try</c>, which the program does not see.</summary>
+        public bool Expanded { get; init; }
     }
 
     private Context _context = new([], "the program", canDeclare: false);
@@ -248,7 +251,7 @@ internal sealed class ExceptionAnalyzer
                 {
                     // In a 'try' block the loop's calls are marked already: the head's mark
                     // says nothing new, and that is the one thing said about it.
-                    var again = Marked(head.KeywordSpan.Start);
+                    var again = MarkedInTheProgram(head.KeywordSpan.Start);
                     if (again) MarksAgain(head);
                     var frame = Open(head.Catches, takesAll: false);
                     try
@@ -293,7 +296,7 @@ internal sealed class ExceptionAnalyzer
             {
                 // The block form marks its whole body (the block form of the same thing);
                 // a clause is not covered by its own try, only by those around it.
-                var frame = Open(tr.Catches, takesAll: false);
+                var frame = Open(tr.Catches, takesAll: false, expanded: Synthesized(tr.Span));
                 try { AnalyzeStmt(tr.Body); }
                 finally { Close(); }
                 if (!frame.Reached)
@@ -357,21 +360,21 @@ internal sealed class ExceptionAnalyzer
             // mark, behind one that stands to its left in the same expression: it says nothing
             // the other does not. Not the close a 'using let' writes for itself.
             case TryExpr { Kind: TryKind.Propagate, Catches.Length: 0 } again
-                when Marked(again.KeywordSpan.Start) && !ReferenceEquals(again, _closing):
+                when MarkedInTheProgram(again.KeywordSpan.Start) && !ReferenceEquals(again, _closing):
                 MarksAgain(again);
                 AnalyzeExpr(again.Value);
                 break;
             // A mark to the right of an operator: it covers from where it stands to the end
             // of the expression it stands in — its operand, and what the walk meets behind it.
             case TryExpr { Reach: not null } rightward:
-                _context.Rightward.Add((rightward, new Frame([], takesAll: false)));
+                _context.Rightward.Add((rightward, new Frame([], takesAll: false) { Expanded = Synthesized(rightward.KeywordSpan) }));
                 AnalyzeExpr(rightward.Value);
                 break;
             case TryExpr tried:
             {
                 // 'try?' and 'try!' take every error themselves; the expression form's clauses take
                 // what they cover and are not inside their own try, as the block's are not.
-                var frame = Open(tried.Catches, takesAll: tried.Kind != TryKind.Propagate);
+                var frame = Open(tried.Catches, takesAll: tried.Kind != TryKind.Propagate, expanded: Synthesized(tried.KeywordSpan));
                 try { AnalyzeExpr(tried.Value); }
                 finally { Close(); }
                 if (!frame.Reached && !ReferenceEquals(tried, _closing))
@@ -604,6 +607,17 @@ internal sealed class ExceptionAnalyzer
     private bool Marked(int position) =>
         _context.Frames.Count > 0 || _context.Rightward.Any(r => Covers(r.Mark, position));
 
+    /// <summary><see cref="Marked"/>, counting only what the program wrote: under a macro's own
+    /// <c>try</c>, a mark the caller wrote is the one the caller needs — the body of
+    /// <c>retry!(3) { result = try fetch(); }</c> is marked as it would be without the macro, and
+    /// taking the mark out would make the caller's code depend on how the macro is written.</summary>
+    /// <summary>Whether a span lies in a synthesized file: a macro's own result, written as source and
+    /// read back, rather than what the program wrote.</summary>
+    private bool Synthesized(Span span) => span != default && _comp.Sources.OriginOf(span.File) is not null;
+
+    private bool MarkedInTheProgram(int position) =>
+        _context.Frames.Any(f => !f.Expanded) || _context.Rightward.Any(r => !r.Frame.Expanded && Covers(r.Mark, position));
+
     private static bool Covers(TryExpr mark, int position) =>
         mark.Reach is { } reach && position >= mark.KeywordSpan.Start && position < reach.End;
 
@@ -645,9 +659,9 @@ internal sealed class ExceptionAnalyzer
     private static string Spelled(TryKind kind) =>
         kind switch { TryKind.Optional => "try?", TryKind.Force => "try!", _ => "try" };
 
-    private Frame Open(CatchClause[] catches, bool takesAll)
+    private Frame Open(CatchClause[] catches, bool takesAll, bool expanded = false)
     {
-        var frame = new Frame(catches, takesAll);
+        var frame = new Frame(catches, takesAll) { Expanded = expanded };
         _context.Frames.Add(frame);
         return frame;
     }
