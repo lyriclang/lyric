@@ -465,8 +465,19 @@ Die Attributliste `@[A, B]` ist keine Typliste und bleibt, wie sie ist.
 **Offen, als Nächstes.**
 
 1. ~~`∩` oder `∪` in Listen~~ — TM7.
-2. **Doppel durch Einsetzen**: `[T, string]` mit `T = string` — verschmelzen (Menge) oder ablehnen.
-3. **Zeitpunkt**: welche Zeilen 5.0 braucht (Wurfmengen in Typargumenten) und welche eine Tür danach sind (Mengen als Werttypen).
+2. ~~Doppel durch Einsetzen~~ — TM9.
+3. ~~Zeitpunkt~~ — TM10.
+
+**Doppel und Zeitpunkt (entschieden 2026-11-18, nach Empfehlung).**
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| TM9 | **Doppel durch Einsetzen verschmelzen still**: `[T, string]` mit `T = string` ist `[string]`, also `string` — es ist eine Menge. Nur ein **geschriebenes** Doppel bleibt ein Fehler (`LYR-SEM0137`) | TM4, T19 |
+| TM10 | **Vor 5.0 nur, was 5.0 braucht**: (a) `&` statt Listen hinter `::` (TM7), damit die Schreibweise mit dem Release feststeht; (b) Mengen als Typargumente (TM6) — `E` von `spawn` bindet `[A, B]`, `Task<T> throws [A, B]` wird schreibbar (`LYR-SEM0238` fällt), `Iterator.Error` einer Coroutine mit Menge antwortet die Menge statt der Wurzel. **Nach 5.0, als Tür**: Mengen als Werttypen (TM3, TM5) und `A & B` außerhalb von `::` (TM8) | Plan 13, Spec 02/05/06/08/10 |
+
+**Slices (spec-first).** TS1 — `&` hinter `::`: Grammatik, Ablehnung der Liste mit Hinweis,
+Umstellung von std/Book/Beispielen/Konformanz, Formatter. TS2 — Mengen als Typargumente:
+Bindung von `E`, Task-Menge, `Iterator.Error`; `LYR-SEM0238` retiriert mit seinem Pin.
 
 ---
 
