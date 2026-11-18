@@ -48,7 +48,7 @@ import std.os;
 
 /// What a package is built for: its triple, such as `x86_64-linux-gnu`, its system and its machine
 /// as the prelude names them, and whether it is the machine the script runs on.
-pub struct BuildTarget :: [Equatable, Debug] {
+pub struct BuildTarget :: Equatable & Debug {
     pub triple: string,
     pub os: Platform,
     pub arch: Arch,

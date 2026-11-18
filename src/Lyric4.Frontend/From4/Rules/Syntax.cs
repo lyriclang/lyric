@@ -439,3 +439,105 @@ internal sealed class GenericInterfaces : IRule
 
     private static string Text(string text, Node node) => text[node.Span.Start..node.Span.End];
 }
+
+/// <summary>A list after <c>::</c> as it stands in the text: its brackets, the separators between its
+/// entries and how many entries it holds. Brackets, parentheses and angle brackets inside an entry
+/// — <c>Iterator&lt;Item = (K, V)&gt;</c> — are its own; <c>-&gt;</c> of a function type closes nothing.</summary>
+internal readonly record struct BoundList(int Open, int Close, int TrailStart, (int Start, int End)[] Separators)
+{
+    public int Entries => Separators.Length + 1;
+
+    public static IEnumerable<BoundList> In(string text, int from = 0, int to = -1)
+    {
+        if (to < 0) to = text.Length;
+        for (var at = text.IndexOf("::", from, StringComparison.Ordinal); at >= 0 && at < to; at = text.IndexOf("::", at + 2, StringComparison.Ordinal))
+        {
+            if (at > 0 && text[at - 1] == ':' || at + 2 < text.Length && text[at + 2] == ':') continue;
+            var open = at + 2;
+            while (open < to && char.IsWhiteSpace(text[open])) open++;
+            if (open >= to || text[open] != '[') continue;
+            if (Scan(text, open, to) is { } list) yield return list;
+        }
+    }
+
+    private static BoundList? Scan(string text, int open, int to)
+    {
+        var closers = new Stack<char>();
+        var separators = new List<(int, int)>();
+        var lastContent = open + 1;
+        for (var p = open + 1; p < to; p++)
+        {
+            var c = text[p];
+            if (c == '-' && p + 1 < to && text[p + 1] == '>') { p++; lastContent = p + 1; continue; }
+            switch (c)
+            {
+                case '(': closers.Push(')'); break;
+                case '[': closers.Push(']'); break;
+                case '{': closers.Push('}'); break;
+                case '<': closers.Push('>'); break;
+                case ')' or ']' or '}' or '>':
+                    if (closers.Count == 0)
+                    {
+                        if (c != ']') return null;
+                        // a ',' before the ']' ends the list, it separates nothing
+                        var trail = lastContent;
+                        if (separators.Count > 0 && separators[^1].Item1 >= trail - 1 && text[separators[^1].Item1] == ','
+                            && text.AsSpan(separators[^1].Item1 + 1, p - separators[^1].Item1 - 1).IsWhiteSpace())
+                        {
+                            trail = separators[^1].Item1;
+                            separators.RemoveAt(separators.Count - 1);
+                        }
+                        return new BoundList(open, p, trail, separators.ToArray());
+                    }
+                    if (closers.Pop() != c) return null;
+                    break;
+                case ',' when closers.Count == 0:
+                    var end = p + 1;
+                    while (end < to && char.IsWhiteSpace(text[end])) end++;
+                    separators.Add((p, end));
+                    break;
+            }
+            if (!char.IsWhiteSpace(c)) lastContent = p + 1;
+        }
+        return null;
+    }
+}
+
+/// <summary>S13 (design 03 TM7): several interfaces after <c>::</c> are joined with <c>&amp;</c>,
+/// <c>:: [I, J]</c> → <c>:: I &amp; J</c>; in Lyric 5 <c>[I, J]</c> is a set — one of them, not
+/// both. One in brackets, <c>:: [I]</c>, stays: it is the set of one. T04 joins its own.</summary>
+internal sealed class JoinedBounds : IRule
+{
+    public string Id => "S13";
+
+    public void Apply(RuleContext context)
+    {
+        foreach (var module in context.Modules)
+        {
+            var text = context.TextOf(module);
+            var strings = Tree.Below(module).Where(n => n is StringLiteralExpr or InterpolatedStringExpr).Select(n => n.Span).ToList();
+            foreach (var list in BoundList.In(text, module.Span.Start, module.Span.End))
+            {
+                if (list.Entries < 2 || strings.Any(s => s.Start <= list.Open && list.Open < s.End)) continue;
+                Unbracket(context, Id, module.Span.File, text, list);
+                foreach (var (start, end) in list.Separators)
+                    context.Replace(Id, module.Span.File, Back(text, start), end, " & ");
+            }
+        }
+    }
+
+    /// <summary>Drops a list's brackets, the space just inside them and a ',' that ends it.</summary>
+    public static void Unbracket(RuleContext context, string id, FileId file, string text, BoundList list)
+    {
+        var first = list.Open + 1;
+        while (first < list.Close && char.IsWhiteSpace(text[first])) first++;
+        context.Replace(id, file, list.Open, first, "");
+        context.Replace(id, file, Back(text, list.TrailStart), list.Close + 1, "");
+    }
+
+    private static int Back(string text, int at)
+    {
+        while (at > 0 && char.IsWhiteSpace(text[at - 1])) at--;
+        return at;
+    }
+}

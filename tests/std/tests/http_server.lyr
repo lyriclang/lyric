@@ -13,12 +13,12 @@ import std.codec { Codable };
 import std.compress { Gzip };
 import std.test { assertEq, assertTrue, assertNull, fail };
 
-struct Item :: [Codable, Equatable, Debug] {
+struct Item :: Codable & Equatable & Debug {
     id: int,
     name: string,
 }
 
-struct Echo :: [Codable, Equatable, Debug] {
+struct Echo :: Codable & Equatable & Debug {
     method: string,
     path: string,
     query: ?string,

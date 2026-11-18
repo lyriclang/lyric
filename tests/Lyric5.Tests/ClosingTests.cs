@@ -200,7 +200,7 @@ public class ClosingTests
     [Fact]
     public void A_closeable_iterator_s_close_throws_within_its_error() =>
         Refused("""
-            struct Bad :: [Iterator, Closeable] {
+            struct Bad :: Iterator & Closeable {
                 type Item = int;
                 var n: int = 0,
 
@@ -220,7 +220,7 @@ public class ClosingTests
     public void A_closeable_iterator_whose_close_throws_its_error_is_fine()
     {
         Assert.Equal("closing\n0\n", Output("""
-            struct Fine :: [Iterator, Closeable] {
+            struct Fine :: Iterator & Closeable {
                 type Item = int;
                 type Error = First;
                 var n: int = 0,

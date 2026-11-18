@@ -89,8 +89,8 @@ public class ConformanceListTests
     // ------------------------------------------------------------------ a list may not repeat itself
 
     [Theory]
-    [InlineData("pub struct S :: [Equatable, Equatable] { x: int, pub fn equals(other: S): bool { return this.x == other.x; } }")]
-    [InlineData("pub extend S2 :: [Equatable, Equatable] { pub fn equals(other: S2): bool { return true; } }")]
+    [InlineData("pub struct S :: Equatable & Equatable { x: int, pub fn equals(other: S): bool { return this.x == other.x; } }")]
+    [InlineData("pub extend S2 :: Equatable & Equatable { pub fn equals(other: S2): bool { return true; } }")]
     public void A_duplicate_entry_in_one_list_is_refused(string declaration)
     {
         // Through 3.5 the duplicate was deduplicated in silence — the 2.15 class of defect: a
@@ -111,7 +111,7 @@ public class ConformanceListTests
                 fn ping(): int;
             }
 
-            pub interface I :: [P, P] {
+            pub interface I :: P & P {
                 fn pong(): int;
             }
 
@@ -132,7 +132,7 @@ public class ConformanceListTests
         var de = Check("""
             import std.core { Hashable, Equatable };
 
-            pub struct S :: [Hashable, Equatable] {
+            pub struct S :: Hashable & Equatable {
                 x: int,
                 pub fn equals(other: S): bool {
                     return this.x == other.x;

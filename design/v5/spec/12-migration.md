@@ -72,6 +72,7 @@ D5/D6): einzelne `[I]` bleiben gültig — `fix` fasst sie nicht an.
 | S10 | `xs.length` (Array-**Feld**, guide 02) vs `s.length()` | `length()` überall (N8) | M | Typ |
 | S11 | `x` mit `Iterator<T>`/`Iterable<T>`, `Indexable<T>` als Typargument (guide 13) | `Iterator<Item = T>`, `Iterable<Item = T>`; Konformanz `:: Iterator { type Item = T; … }`; `Indexable<T>` → `Index<int> { type Output = T }` + `IndexSet<int>` | M/R | Methodenrümpfe |
 | S12 | `fn main(args: string[])` (guide 12) | `fn main()`, darin `let args = os.args()[1..].iter().toArray();`; `args()` nennt zuerst das Programm selbst, 4.6 ließ es aus | M | — |
+| S13 | `:: [I, J]` — mehrere Interfaces hinter `::` (Konformanz, Schranke) | `:: I & J` (03 TM7: `[I, J]` ist eine Menge, eines davon); `:: [I]` bleibt; T04 fügt `TotalOrder` mit `&` an | M | — |
 | **Interfaces / Werte** (guide 05, 07, 08) | | | | |
 | T01 | Felder ohne Modifikator, beschrieben (`b.x = 99`) | `var` an jedem geschriebenen Feld (02) | R | Schreibstellen |
 | T02 | `Equatable<Point>`, `Ordered<Version>`, `Hashable<K>` (guide 07/08) | `Equatable`, `Ordered`, `Hashable` (`Self`, T-Reihe) | M | — |

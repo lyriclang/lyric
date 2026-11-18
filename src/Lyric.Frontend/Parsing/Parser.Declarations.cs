@@ -1096,19 +1096,8 @@ public sealed partial class Parser
         var boundsBracketed = true;
         if (_buffer.Match(TokenKind.ColonColon))
         {
-            // the list rule: one interface also without the brackets, several in them
-            if (_buffer.Match(TokenKind.LBracket))
-            {
-                var list = new List<TypeNode>();
-                do { list.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RBracket));
-                _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close the bound");
-                bounds = list.ToArray();
-            }
-            else
-            {
-                bounds = ParseUnbracketed("a bound");
-                boundsBracketed = false;
-            }
+            bounds = ParseBounds("in an associated type's bound", commaEnds: false, out var delegates, out var bySpan, out boundsBracketed);
+            ReportBy(delegates, bySpan);
         }
         TypeNode? type = null;
         if (_buffer.Match(TokenKind.Equal)) type = ParseType();
@@ -1169,23 +1158,11 @@ public sealed partial class Parser
             TypeNode[] constraints = [];
             var constraintsBracketed = true;
             var end = nameTok.Span;
-            if (_buffer.Match(TokenKind.ColonColon)) // T :: [I1, I2], or T :: I alone
+            if (_buffer.Match(TokenKind.ColonColon)) // T :: I, T :: I & J; a ',' begins the next parameter
             {
-                if (_buffer.Match(TokenKind.LBracket))
-                {
-                    var cs = new List<TypeNode>();
-                    do { cs.Add(ParseType()); } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RBracket));
-                    end = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close constraint list").Span;
-                    constraints = cs.ToArray();
-                }
-                else
-                {
-                    // one constraint: a ',' after it begins the next type parameter
-                    var only = ParseType();
-                    end = only.Span;
-                    constraints = [only];
-                    constraintsBracketed = false;
-                }
+                constraints = ParseBounds("in a constraint", commaEnds: true, out var delegates, out var bySpan, out constraintsBracketed);
+                ReportBy(delegates, bySpan);
+                end = _boundsEnd;
             }
             // 'Rhs = Self': a default type argument.
             TypeNode? fallback = null;
@@ -1210,71 +1187,86 @@ public sealed partial class Parser
     private TypeNode[] ParseInterfaceList(out string?[]? delegates, out Span bySpan)
     {
         _buffer.Advance(); // '::'
-        var interfaces = new List<TypeNode>();
+        var interfaces = ParseBounds("after '::'", commaEnds: false, out delegates, out bySpan, out var bracketed);
+        _listBracketed = bracketed;
+        return interfaces;
+    }
+
+    /// <summary>Where the last bound after <c>::</c> ended: its type, or the <c>]</c> around it.</summary>
+    private Span _boundsEnd;
+
+    /// <summary>Whether the last interface list after <c>::</c> was one interface in brackets,
+    /// <c>:: [I]</c>, for the node that holds it.</summary>
+    private bool _listBracketed = true;
+
+    /// <summary>What follows <c>::</c> (design 03 TM7): one interface, or several joined by
+    /// <c>&amp;</c> — <c>:: I</c>, <c>:: I &amp; J</c>; one in brackets, <c>:: [I]</c>, is the set
+    /// of one and so the interface. Several in a list, <c>:: [I, J]</c> or <c>:: I, J</c>, are
+    /// refused (<c>LYR-PAR0066</c>) and read as joined. An entry may delegate, <c>Walker by legs</c>;
+    /// where that has no place the caller says so.</summary>
+    /// <param name="commaEnds">In a type parameter's constraint a <c>,</c> begins the next parameter.</param>
+    /// <param name="bracketed">Whether it was one interface in brackets.</param>
+    private TypeNode[] ParseBounds(string where, bool commaEnds, out string?[]? delegates, out Span bySpan, out bool bracketed)
+    {
+        var types = new List<TypeNode>();
         List<string?>? fields = null;
-        bySpan = default;
-        // the list rule: one interface also without the brackets — 'struct S :: I', 'class D :: Walker by legs'
-        _listBracketed = _buffer.Check(TokenKind.LBracket);
-        if (!_buffer.Match(TokenKind.LBracket))
+        var by = default(Span);
+        var listed = default(Span);
+        var inBrackets = 0;
+        void Entry()
         {
-            var only = ParseType();
-            string?[]? field = null;
-            if (AtContextual("by"))
-            {
-                bySpan = _buffer.Advance().Span;
-                field = [ExpectName("LYR-PAR0026", "the field to delegate to")];
-            }
-            delegates = field;
-            if (_buffer.Check(TokenKind.Comma))
-            {
-                var comma = _buffer.Current.Span;
-                var rest = ParseUnbracketedRest();
-                _de.Report("LYR-PAR0066", Severity.Error, comma,
-                    "several interfaces after '::' are written in brackets: ':: [I, J]'");
-                return [only, .. rest];
-            }
-            return [only];
-        }
-        do
-        {
-            interfaces.Add(ParseType());
+            types.Add(ParseType());
+            _boundsEnd = types[^1].Span;
             string? field = null;
             if (AtContextual("by"))
             {
-                var by = _buffer.Advance();
-                if (bySpan == default) bySpan = by.Span;
+                var at = _buffer.Advance().Span;
+                if (by == default) by = at;
                 field = ExpectName("LYR-PAR0026", "the field to delegate to");
             }
-            if (field is not null) fields ??= new List<string?>(Enumerable.Repeat<string?>(null, interfaces.Count - 1));
+            if (field is not null) fields ??= new List<string?>(Enumerable.Repeat<string?>(null, types.Count - 1));
             fields?.Add(field);
-        } while (_buffer.Match(TokenKind.Comma) && !_buffer.Check(TokenKind.RBracket));
-        _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' to close interface list");
+        }
+        do
+        {
+            if (_buffer.Match(TokenKind.LBracket))
+            {
+                inBrackets++;
+                Entry();
+                while (_buffer.Check(TokenKind.Comma))
+                {
+                    var comma = _buffer.Advance().Span;
+                    if (_buffer.Check(TokenKind.RBracket)) break; // ':: [I,]': still one
+                    if (listed == default) listed = comma;
+                    Entry();
+                }
+                _boundsEnd = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' after the interface").Span;
+            }
+            else Entry();
+            if (!commaEnds)
+                while (_buffer.Check(TokenKind.Comma))
+                {
+                    var comma = _buffer.Advance().Span;
+                    if (listed == default) listed = comma;
+                    Entry();
+                }
+        } while (_buffer.Match(TokenKind.Amp));
+        if (listed != default)
+            _de.Report("LYR-PAR0066", Severity.Error, listed,
+                $"several interfaces {where} are joined with '&': ':: I & J' — '[I, J]' is a set, one of them, not both");
         delegates = fields?.ToArray();
-        return interfaces.ToArray();
+        bySpan = by;
+        bracketed = types.Count == 1 && inBrackets == 1;
+        return types.ToArray();
     }
 
-    /// <summary>Whether the last interface list after <c>::</c> stood in brackets, for the node
-    /// that holds it.</summary>
-    private bool _listBracketed = true;
-
-    /// <summary>A bound without brackets: one interface; a ',' after it would be a second, which the
-    /// list rule writes in brackets (<c>LYR-PAR0066</c>) — the rest is read for the recovery.</summary>
-    private TypeNode[] ParseUnbracketed(string where)
+    /// <summary><c>by</c> after a bound that delegates nothing: a type parameter's constraint, an
+    /// associated type's bound.</summary>
+    private void ReportBy(string?[]? delegates, Span bySpan)
     {
-        var only = ParseType();
-        if (!_buffer.Check(TokenKind.Comma)) return [only];
-        var comma = _buffer.Current.Span;
-        var rest = ParseUnbracketedRest();
-        _de.Report("LYR-PAR0066", Severity.Error, comma, $"several interfaces in {where} are written in brackets: ':: [I, J]'");
-        return [only, .. rest];
-    }
-
-    /// <summary>The types after a ',' that should have stood in brackets.</summary>
-    private List<TypeNode> ParseUnbracketedRest()
-    {
-        var rest = new List<TypeNode>();
-        while (_buffer.Match(TokenKind.Comma)) rest.Add(ParseType());
-        return rest;
+        if (delegates is not null)
+            _de.Report("LYR-PAR0047", Severity.Error, bySpan,
+                "'by' delegates a conformance of a struct or a class to one of its fields; it has no place here");
     }
 
     /// <summary>An interface list where <c>by</c> has no place: an enum, an interface's parents,

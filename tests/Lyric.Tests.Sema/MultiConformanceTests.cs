@@ -56,7 +56,7 @@ public class MultiConformanceTests
         var de = Check("""
             import std.core { Mul };
 
-            struct Vec2 :: [Mul<Vec2, Vec2>, Mul<int, Vec2>] {
+            struct Vec2 :: Mul<Vec2, Vec2> & Mul<int, Vec2> {
                 x: int,
                 fn mul(other: Vec2): Vec2 { return Vec2 { x = this.x * other.x }; }
             }

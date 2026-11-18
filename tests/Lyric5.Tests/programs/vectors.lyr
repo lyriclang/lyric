@@ -11,7 +11,7 @@
 import std.core { Add, Sub, Mul, Neg, Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr };
 import std.io { println };
 
-struct V :: [Add, Sub, Mul<int>, Neg, Equatable, Ordered, Display] {
+struct V :: Add & Sub & Mul<int> & Neg & Equatable & Ordered & Display {
     x: int,
     y: int,
     fn add(rhs: V): V { return V { x = this.x + rhs.x, y = this.y + rhs.y }; }
@@ -34,7 +34,7 @@ extend V :: [Mul<float>] {
     fn mul(rhs: float): float { return (this.x as float) * rhs; }
 }
 
-struct Bits :: [Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
+struct Bits :: Rem & BitAnd & BitOr & BitXor & BitNot & Shl & Shr {
     n: int,
     fn rem(rhs: Bits): Bits { return Bits { n = this.n % rhs.n }; }
     fn bitAnd(rhs: Bits): Bits { return Bits { n = this.n & rhs.n }; }
@@ -45,7 +45,7 @@ struct Bits :: [Rem, BitAnd, BitOr, BitXor, BitNot, Shl, Shr] {
     fn shr(rhs: int): Bits { return Bits { n = this.n >> rhs }; }
 }
 
-struct Partial :: [Equatable, Ordered] {
+struct Partial :: Equatable & Ordered {
     v: int,
     fn equals(o: Partial): bool { return this.v == o.v; }
     fn compare(o: Partial): ?Ordering { return null; }

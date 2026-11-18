@@ -15,7 +15,7 @@ import std.collections { List, Map, Set, Deque };
 import std.test { assertEq, assertTrue, fail };
 import std.time { Instant, Duration, Date, Time, DateTime, Zone };
 
-struct User :: [Codable, Equatable] {
+struct User :: Codable & Equatable {
     id: int,
     name: string,
     mail: ?string,
@@ -61,7 +61,7 @@ struct Strict :: [Codable] {
     }
 }
 
-enum Shape :: [Codable, Equatable, Debug] {
+enum Shape :: Codable & Equatable & Debug {
     Dot,
     Circle(int),
     Rect(int, int);

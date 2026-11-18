@@ -3,7 +3,7 @@
 import std.fmt { format };
 import std.test { assertEq };
 
-struct Point :: [Display, Debug] {
+struct Point :: Display & Debug {
     x: int,
     y: int,
 

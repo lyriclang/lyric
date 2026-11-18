@@ -112,7 +112,7 @@ public class AttributeTests
         AssertClean("""
             import std.core { OnType, OnFunction };
 
-            struct Tag :: [OnFunction, OnType] { }
+            struct Tag :: OnFunction & OnType { }
 
             @Tag
             struct S { v: int }

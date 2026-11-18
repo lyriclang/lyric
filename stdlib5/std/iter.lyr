@@ -279,9 +279,7 @@ pub struct MapNotNullIter<I :: [Iterator], U, E :: [Error] = never> :: [Iterator
 /// by `it.flatMap(f)`.
 ///
 /// `f` may return any `Iterable` — an array or a list as well as an iterator.
-pub struct FlatMapIter<I :: [Iterator], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error] = never> :: [
-    Iterator
-] {
+pub struct FlatMapIter<I :: [Iterator], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error] = never> :: [Iterator] {
     type Item = J.Item;
     type Error = Join<Join<I.Error, E>, J.Error>;
     var inner: I,
@@ -310,9 +308,7 @@ pub struct FlatMapIter<I :: [Iterator], B :: [Iterable<Iter = J>], J :: [Iterato
 
 /// Yields the values of the iterables an iterator gives, one after the other; made by
 /// `it.flatten()`.
-pub struct FlattenIter<I :: [Iterator<Item = B>], B :: [Iterable<Iter = J>], J :: [Iterator]> :: [
-    Iterator
-] {
+pub struct FlattenIter<I :: [Iterator<Item = B>], B :: [Iterable<Iter = J>], J :: [Iterator]> :: [Iterator] {
     type Item = J.Item;
     type Error = Join<I.Error, J.Error>;
     var inner: I,
@@ -437,7 +433,7 @@ pub struct RevIter<I :: [DoubleEnded]> :: [Iterator] {
 /// Yields the values of an iterator over and over; made by `it.cycle()`.
 ///
 /// Each round walks a fresh clone of the original iterator. An empty iterator yields nothing.
-pub struct CycleIter<I :: [Iterator, Clone]> :: [Iterator] {
+pub struct CycleIter<I :: Iterator & Clone> :: [Iterator] {
     type Item = I.Item;
     type Error = I.Error;
     origin: I,
@@ -460,111 +456,108 @@ pub struct CycleIter<I :: [Iterator, Clone]> :: [Iterator] {
 // (LYR-SEM0174). The two over two iterators close both; where both throw, the first error wins
 // and the second is suppressed into it.
 
-extend<I :: [Iterator, Closeable], U, E :: [Error]> MapIter<I, U, E> :: [Closeable] {
+extend<I :: Iterator & Closeable, U, E :: [Error]> MapIter<I, U, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable], E :: [Error]> FilterIter<I, E> :: [Closeable] {
+extend<I :: Iterator & Closeable, E :: [Error]> FilterIter<I, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> TakeIter<I> :: [Closeable] {
+extend<I :: Iterator & Closeable> TakeIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> SkipIter<I> :: [Closeable] {
+extend<I :: Iterator & Closeable> SkipIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable], E :: [Error]> TakeWhileIter<I, E> :: [Closeable] {
+extend<I :: Iterator & Closeable, E :: [Error]> TakeWhileIter<I, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable], E :: [Error]> SkipWhileIter<I, E> :: [Closeable] {
+extend<I :: Iterator & Closeable, E :: [Error]> SkipWhileIter<I, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> StepByIter<I> :: [Closeable] {
+extend<I :: Iterator & Closeable> StepByIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> EnumerateIter<I> :: [Closeable] {
+extend<I :: Iterator & Closeable> EnumerateIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable], E :: [Error]> InspectIter<I, E> :: [Closeable] {
+extend<I :: Iterator & Closeable, E :: [Error]> InspectIter<I, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable], U, E :: [Error]> MapNotNullIter<I, U, E> :: [Closeable] {
+extend<I :: Iterator & Closeable, U, E :: [Error]> MapNotNullIter<I, U, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable], E :: [Error]> DedupIter<I, E> :: [Closeable] {
+extend<I :: Iterator & Closeable, E :: [Error]> DedupIter<I, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable], A, E :: [Error]> ScanIter<I, A, E> :: [Closeable] {
+extend<I :: Iterator & Closeable, A, E :: [Error]> ScanIter<I, A, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> PeekableIter<I> :: [Closeable] {
+extend<I :: Iterator & Closeable> PeekableIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
 // The outer iterator closed; a part `f` or the source gave is the walk's own, closed by none.
-extend<I :: [Iterator, Closeable], B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error]> FlatMapIter<I, B, J, E> :: [
-    Closeable
-] {
+extend<I :: Iterator
+    & Closeable, B :: [Iterable<Iter = J>], J :: [Iterator], E :: [Error]> FlatMapIter<I, B, J, E> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator<Item = B>, Closeable], B :: [Iterable<Iter = J>], J :: [Iterator]> FlattenIter<I, B, J> :: [
-    Closeable
-] {
+extend<I :: Iterator<Item = B>
+    & Closeable, B :: [Iterable<Iter = J>], J :: [Iterator]> FlattenIter<I, B, J> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<A :: [Iterator, Closeable], B :: [Iterator, Closeable]> ZipIter<A, B> :: [Closeable] {
+extend<A :: Iterator & Closeable, B :: Iterator & Closeable> ZipIter<A, B> :: [Closeable] {
     fn close(): void throws Join<A.Error, B.Error> {
         defer try this.b.close();
         try this.a.close();
     }
 }
 
-extend<A :: [Iterator, Closeable], B :: [Iterator<Item = A.Item>, Closeable]> ChainIter<A, B> :: [
-    Closeable
-] {
+extend<A :: Iterator & Closeable, B :: Iterator<Item = A.Item>
+    & Closeable> ChainIter<A, B> :: [Closeable] {
     fn close(): void throws Join<A.Error, B.Error> {
         defer try this.b.close();
         try this.a.close();
@@ -973,7 +966,7 @@ extend<I :: [DoubleEnded]> I {
     }
 }
 
-extend<I :: [Iterator, Clone]> I {
+extend<I :: Iterator & Clone> I {
     /// Returns an iterator over the values, repeated without end.
     ///
     /// Each round starts from a clone of this iterator as it was; an empty iterator yields nothing.

@@ -88,7 +88,7 @@ let wouldBlock = -(64 << 32);
 let signalled = 1 << 40;
 
 /// What a child's standard stream is connected to: the parent's, a pipe to the parent, or nothing.
-pub enum Stdio :: [Equatable, Debug] {
+pub enum Stdio :: Equatable & Debug {
     Inherit,
     Piped,
     Null,
@@ -283,7 +283,7 @@ pub class Child {
 
 /// How a child ended: with an exit code — 0 to 255 on POSIX, any 32 bits on Windows —, or, on
 /// POSIX, by a signal.
-pub struct ExitStatus :: [Equatable, Debug] {
+pub struct ExitStatus :: Equatable & Debug {
     /// The runtime's answer (lyr/process.h): the code, or bit 40 and the signal's number.
     raw: int,
 
@@ -345,7 +345,7 @@ fn closePipe(fd: int, waits: Waits): void throws IoError {
 
 /// The parent's end of a child's output or error pipe: a `Reader` that waits until bytes come, and
 /// returns 0 once the child has closed its end.
-pub class PipeReader :: [Reader, Closeable] {
+pub class PipeReader :: Reader & Closeable {
     fd: int,
     var closed: bool = false,
     waits: Waits = Waits { },
@@ -396,7 +396,7 @@ pub class PipeReader :: [Reader, Closeable] {
 /// The parent's end of a child's input pipe: a `Writer` that waits until the pipe takes some;
 /// writing after the child has closed its end throws `BrokenPipe`. Closing it ends the child's
 /// input.
-pub class PipeWriter :: [Writer, Closeable] {
+pub class PipeWriter :: Writer & Closeable {
     fd: int,
     var closed: bool = false,
     waits: Waits = Waits { },

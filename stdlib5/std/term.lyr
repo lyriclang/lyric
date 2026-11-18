@@ -24,7 +24,7 @@ extern "C" fn consoleIsTerminal(stream: int): int = "lyr_console_is_terminal";
 extern "C" fn consoleSize(stream: int): int = "lyr_console_size";
 
 /// One of the three standard streams of the process.
-pub enum StdStream :: [Equatable, Debug] {
+pub enum StdStream :: Equatable & Debug {
     Stdin,
     Stdout,
     Stderr,
@@ -83,7 +83,7 @@ pub fn colorsEnabled(): bool {
 /// A terminal color: one of the 16 of ECMA-48 and aixterm, one of the 256, or RGB.
 ///
 /// Out-of-range components of [Color.Index] and [Color.Rgb] are clamped to 0..255.
-pub enum Color :: [Equatable, Debug] {
+pub enum Color :: Equatable & Debug {
     Black,
     Red,
     Green,
@@ -145,7 +145,7 @@ pub fn reset(): string {
 }
 
 /// A set of attributes to put on a text: colors and SGR flags, all off by default.
-pub struct Style :: [Equatable, Debug] {
+pub struct Style :: Equatable & Debug {
     pub fg: ?Color = null,
     pub bg: ?Color = null,
     pub bold: bool = false,

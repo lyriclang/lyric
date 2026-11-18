@@ -164,7 +164,7 @@ public class ExtendConformanceTests
         AssertCode(Diags("""
             interface A { fn tag(): string { return "a"; } }
             interface B { fn tag(): string { return "b"; } }
-            struct S :: [A, B] {
+            struct S :: A & B {
                 fn use(): string { return this.tag(); }
             }
             """), "LYR-SEM0043");

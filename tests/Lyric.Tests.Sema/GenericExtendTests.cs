@@ -108,7 +108,7 @@ public class GenericExtendTests
 
     [Fact]
     public void A_parent_written_out_beside_its_child_is_one_conformance() =>
-        Allowed("interface P { fn p(): int; }\ninterface C :: [P] { fn c(): int; }\nstruct S :: [P, C] { n: int, fn p(): int { return 1; } fn c(): int { return 2; } }\nfn f(): int { return 0; }");
+        Allowed("interface P { fn p(): int; }\ninterface C :: [P] { fn c(): int; }\nstruct S :: P & C { n: int, fn p(): int { return 1; } fn c(): int { return 2; } }\nfn f(): int { return 0; }");
 
     // ------------------------------------------------------------------ the target
 

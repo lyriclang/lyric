@@ -39,7 +39,7 @@ public class SeesConformerTests
             import std.io { println };
             import app.args { Whole, Seen };
 
-            struct Start :: [Whole, Seen] {
+            struct Start :: Whole & Seen {
                 pub a: int,
                 b: int,
                 private c: int,

@@ -9,7 +9,7 @@ struct Tagged {
 }
 
 /// An order by `key` alone: equal keys, different tags — what makes `sort()`'s stability visible.
-struct Ranked :: [Equatable, Ordered, TotalOrder] {
+struct Ranked :: Equatable & Ordered & TotalOrder {
     key: int,
     tag: int,
 

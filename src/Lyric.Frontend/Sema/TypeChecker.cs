@@ -8813,7 +8813,7 @@ public sealed class TypeChecker
     /// concrete type's static, a direct call.</summary>
     private (LyrType, Symbol?) StaticMemberOfTypeParam(GenericParamSymbol gp, string member, Span span, MemberExpr? at = null)
     {
-        // one answer per bound: 'T :: [From<int>, From<string>]' has two 'from', one per instance
+        // one answer per bound: 'T :: From<int> & From<string>' has two 'from', one per instance
         var found = new List<(TypeSymbol It, Dictionary<GenericParamSymbol, LyrType> Subst, FunctionSymbol Fn, LyrType Signature)>();
         foreach (var c in gp.Constraints)
         {

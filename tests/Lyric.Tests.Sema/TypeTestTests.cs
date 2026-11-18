@@ -16,7 +16,7 @@ public class TypeTestTests
         interface Shape { fn area(): int; }
         interface Named { fn name(): string; }
         interface Parse { static fn parse(s: string): Self; }
-        struct Circle :: [Shape, Named] { r: int, fn area(): int { return 1; } fn name(): string { return "c"; } }
+        struct Circle :: Shape & Named { r: int, fn area(): int { return 1; } fn name(): string { return "c"; } }
         class Rect :: [Shape] { w: int, fn area(): int { return 2; } }
         enum Dir :: [Shape] { Up, Down; fn area(): int { return 0; } }
 

@@ -28,7 +28,7 @@ public class Lyric5FormatterTests
     private static void Keeps(string formatted) => Assert.Equal(formatted, Format(formatted));
 
     [Fact]
-    public void A_long_list_of_interfaces_puts_one_to_a_line()
+    public void A_long_chain_of_interfaces_puts_one_to_a_line()
     {
         Keeps("""
             interface Equatable { }
@@ -37,19 +37,22 @@ public class Lyric5FormatterTests
                 n: int,
             }
 
-            struct Wide :: [
-                Equatable,
-                Ordered,
-                TotalOrder,
-                Hashable,
-                Display,
-                Debug,
-                Encode,
-                Decode,
-                Default,
-                Clone,
-                Copy
-            ] {
+            struct Wide :: Equatable
+                & Ordered
+                & TotalOrder
+                & Hashable
+                & Display
+                & Debug
+                & Encode
+                & Decode
+                & Default
+                & Clone
+                & Copy
+            {
+                n: int,
+            }
+
+            struct Two :: Equatable & Ordered {
                 n: int,
             }
 

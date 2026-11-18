@@ -115,7 +115,7 @@ public class SyntaxTests
     }
 
     [Theory]
-    [InlineData("@Derive(ToJson)\npub struct P<T :: [Display] = int> :: [Debug, Walker by legs] { pub x: int, var legs: T = 0, static let zero: int = 0; fn f(): void { } }")]
+    [InlineData("@Derive(ToJson)\npub struct P<T :: [Display] = int> :: Debug & Walker by legs { pub x: int, var legs: T = 0, static let zero: int = 0; fn f(): void { } }")]
     [InlineData("pub enum E<T> :: [Equatable] { A, B(int, T), C { x: int }; type Item = T; static let all: E<T>[] = []; fn g(): void { } }")]
     [InlineData("sealed interface Shape :: [Debug] { type Out :: [Display]; static let sides: int; fn area(): float; private fn h(): int { return 1; } }")]
     [InlineData("extend<T :: [Display]> List<T> :: [Show] { type Item = T; static let k: int = 1; fn show(): string { return \"\"; } }")]

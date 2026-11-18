@@ -9,19 +9,19 @@ import std.string { StringBuilder };
 import std.test { assertEq, assertTrue, assertNull, fail };
 import std.time { Instant };
 
-struct Server :: [Codable, Equatable] {
+struct Server :: Codable & Equatable {
     host: string,
     port: int,
     tags: string[],
 }
 
-struct Owner :: [Codable, Equatable] {
+struct Owner :: Codable & Equatable {
     name: string,
     bio: ?string,
 }
 
 @Codec { rename = .SnakeCase }
-struct Config :: [Codable, Equatable] {
+struct Config :: Codable & Equatable {
     title: string,
     debugMode: bool,
     ratio: float,
@@ -31,13 +31,13 @@ struct Config :: [Codable, Equatable] {
     raw: Bytes,
 }
 
-enum Shape :: [Codable, Equatable, Debug] {
+enum Shape :: Codable & Equatable & Debug {
     Dot,
     Circle(int),
     Rect(int, int),
 }
 
-struct Holder :: [Codable, Equatable] {
+struct Holder :: Codable & Equatable {
     shapes: Shape[],
     one: Shape,
 }

@@ -237,7 +237,7 @@ public class InterfaceInheritanceTests
                 fn b(): int;
             }
 
-            interface C :: [A, B] {
+            interface C :: A & B {
                 fn c(): int;
             }
 
@@ -269,7 +269,7 @@ public class InterfaceInheritanceTests
                 fn go(): int;
             }
 
-            interface C :: [A, B] {
+            interface C :: A & B {
             }
 
             fn main(): int {
@@ -300,7 +300,7 @@ public class InterfaceInheritanceTests
             interface Right :: [Base] {
             }
 
-            interface Both :: [Left, Right] {
+            interface Both :: Left & Right {
             }
 
             fn main(): int {
@@ -326,7 +326,7 @@ public class InterfaceInheritanceTests
                 fn other(): int;
             }
 
-            interface C :: [A, B] {
+            interface C :: A & B {
                 fn go(): int;
             }
 
@@ -425,7 +425,7 @@ public class InterfaceInheritanceTests
             """
             import std.core { Mul };
 
-            struct Vec2 :: [Mul<Vec2, Vec2>, Mul<float, Vec2>] {
+            struct Vec2 :: Mul<Vec2, Vec2> & Mul<float, Vec2> {
                 x: float,
 
                 fn mul(other: Vec2): Vec2 {
@@ -447,7 +447,7 @@ public class InterfaceInheritanceTests
         // one error, not one per mention.
         var de = Check(Chain +
             """
-            struct Tag :: [Labeled, Named] {
+            struct Tag :: Labeled & Named {
                 x: int,
             }
 

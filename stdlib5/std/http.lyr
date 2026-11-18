@@ -41,7 +41,7 @@ import std.compress { GzipReader, ZlibReader };
 // Errors.
 // ---------------------------------------------------------------------------------------------
 
-pub enum HttpErrorKind :: [Equatable, Debug] {
+pub enum HttpErrorKind :: Equatable & Debug {
     /// The peer did not speak HTTP/1.1 as RFC 9112 writes it.
     Protocol,
     /// More redirects than allowed, or one that cannot be followed.
@@ -69,7 +69,7 @@ pub struct HttpError :: [Error] {
 // ---------------------------------------------------------------------------------------------
 
 /// A request's method; `Other` for a token beyond the common ones.
-pub enum Method :: [Equatable, Debug] {
+pub enum Method :: Equatable & Debug {
     Get,
     Head,
     Post,
@@ -111,7 +111,7 @@ extend Method :: [Display] {
 }
 
 /// A status: the code and its reason phrase.
-pub struct Status :: [Equatable, Debug] {
+pub struct Status :: Equatable & Debug {
     pub code: int,
     pub reason: string = "",
 
@@ -486,7 +486,7 @@ fn jsonText<T :: [Encode]>(value: T): string throws EncodeError {
 // ---------------------------------------------------------------------------------------------
 
 /// A connection a transport gives: read, written and closed.
-pub interface Stream :: [Reader, Writer, Closeable] { }
+pub interface Stream :: Reader & Writer & Closeable { }
 
 extend TcpStream :: [Stream] { }
 

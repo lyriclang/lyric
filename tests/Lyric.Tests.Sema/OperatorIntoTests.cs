@@ -109,7 +109,7 @@ public class OperatorIntoTests
             struct B { n: int, }
             struct C { n: int, }
 
-            struct A :: [Into<B>, Into<C>] {
+            struct A :: Into<B> & Into<C> {
                 n: int,
                 fn into(): B { return B { n = this.n }; }
                 fn into(): C { return C { n = this.n }; }

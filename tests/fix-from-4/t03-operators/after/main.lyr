@@ -1,7 +1,7 @@
 import std.core { Add, Sub, Mul, Div };
 import std.io { println };
 
-struct Vec2 :: [Add, Sub] {
+struct Vec2 :: Add & Sub {
     x: float,
     y: float,
     fn add(other: Vec2): Vec2 {

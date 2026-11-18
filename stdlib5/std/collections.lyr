@@ -62,7 +62,7 @@ import std.math { trailingZeros };
 /// # Panics
 ///
 /// `list[i]` and `list[i] = v` panic outside `0 ≤ i < length()`.
-pub class List<T> :: [IndexSet<int>, Length, Iterable, AsSlice<T>] {
+pub class List<T> :: IndexSet<int> & Length & Iterable & AsSlice<T> {
     type Output = T;
     type Iter = ListIter<T>;
     var buffer: T[],
@@ -858,7 +858,7 @@ extern "C" fn changedWhileWalked(what: string): never = "lyr_panic_walked";
 /// constant time. `x in set` is `set.contains(x)`. The set operations — [Set.union],
 /// [Set.intersect], [Set.difference], [Set.symmetricDifference] — are methods that return a new
 /// set. Not safe across threads.
-pub class Set<T :: [Hashable], H :: [Hasher] = DefaultHasher> :: [Iterable, Contains<T>] {
+pub class Set<T :: [Hashable], H :: [Hasher] = DefaultHasher> :: Iterable & Contains<T> {
     type Iter = MapKeysIter<T, bool, H>;
     var table: Map<T, bool, H>,
 
@@ -1159,13 +1159,13 @@ pub struct WindowsIter<I :: [Iterator]> :: [Iterator] {
     }
 }
 
-extend<I :: [Iterator, Closeable]> ChunksIter<I> :: [Closeable] {
+extend<I :: Iterator & Closeable> ChunksIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
 }
 
-extend<I :: [Iterator, Closeable]> WindowsIter<I> :: [Closeable] {
+extend<I :: Iterator & Closeable> WindowsIter<I> :: [Closeable] {
     fn close(): void throws I.Error {
         try this.inner.close();
     }
@@ -1327,7 +1327,7 @@ extend<K :: [Hashable], V> Map<K, V, DefaultHasher> {
 /// # Panics
 ///
 /// `deque[i]` panics outside `0 ≤ i < length()`.
-pub class Deque<T> :: [Index<int>, Length, Iterable] {
+pub class Deque<T> :: Index<int> & Length & Iterable {
     type Output = T;
     type Iter = DequeIter<T>;
     var slots: (?T)[],
@@ -1615,7 +1615,7 @@ extend<T :: [Equatable]> List<T> :: [Equatable] {
     }
 }
 
-extend<T :: [Debug]> List<T> :: [Debug, Display] {
+extend<T :: [Debug]> List<T> :: Debug & Display {
     fn debug(): string {
         return this.asSlice().debug();
     }
@@ -1647,7 +1647,7 @@ extend<T :: [Equatable]> Deque<T> :: [Equatable] {
     }
 }
 
-extend<T :: [Debug]> Deque<T> :: [Debug, Display] {
+extend<T :: [Debug]> Deque<T> :: Debug & Display {
     fn debug(): string {
         let out = StringBuilder.new();
         this.debugTo(out);
@@ -1688,7 +1688,7 @@ extend<T :: [Hashable], H :: [Hasher]> Set<T, H> :: [Equatable] {
     }
 }
 
-extend<T :: [Hashable, Debug], H :: [Hasher]> Set<T, H> :: [Debug, Display] {
+extend<T :: Hashable & Debug, H :: [Hasher]> Set<T, H> :: Debug & Display {
     fn debug(): string {
         let out = StringBuilder.new();
         this.debugTo(out);
@@ -1736,7 +1736,7 @@ extend<K :: [Hashable], V :: [Equatable], H :: [Hasher]> Map<K, V, H> :: [Equata
     }
 }
 
-extend<K :: [Hashable, Debug], V :: [Debug], H :: [Hasher]> Map<K, V, H> :: [Debug, Display] {
+extend<K :: Hashable & Debug, V :: [Debug], H :: [Hasher]> Map<K, V, H> :: Debug & Display {
     fn debug(): string {
         let out = StringBuilder.new();
         this.debugTo(out);
@@ -1768,7 +1768,7 @@ extend<K :: [Hashable, Debug], V :: [Debug], H :: [Hasher]> Map<K, V, H> :: [Deb
     }
 }
 
-extend<T :: [TotalOrder, Debug]> Heap<T> :: [Debug] {
+extend<T :: TotalOrder & Debug> Heap<T> :: [Debug] {
     fn debug(): string {
         return this.items.debug();
     }
@@ -1886,7 +1886,7 @@ extend<T :: [Clone]> List<T> :: [Clone] {
     }
 }
 
-extend<K :: [Hashable, Clone], V :: [Clone], H :: [Hasher]> Map<K, V, H> :: [Clone] {
+extend<K :: Hashable & Clone, V :: [Clone], H :: [Hasher]> Map<K, V, H> :: [Clone] {
     fn clone(): Map<K, V, H> {
         let out = Map<K, V, H>.withHasher(this.seed);
         for (entry in this) {
@@ -1896,7 +1896,7 @@ extend<K :: [Hashable, Clone], V :: [Clone], H :: [Hasher]> Map<K, V, H> :: [Clo
     }
 }
 
-extend<T :: [Hashable, Clone], H :: [Hasher]> Set<T, H> :: [Clone] {
+extend<T :: Hashable & Clone, H :: [Hasher]> Set<T, H> :: [Clone] {
     fn clone(): Set<T, H> {
         return Set<T, H> { table = this.table.clone() };
     }
@@ -1912,7 +1912,7 @@ extend<T :: [Clone]> Deque<T> :: [Clone] {
     }
 }
 
-extend<T :: [TotalOrder, Clone]> Heap<T> :: [Clone] {
+extend<T :: TotalOrder & Clone> Heap<T> :: [Clone] {
     fn clone(): Heap<T> {
         return Heap<T> { items = this.items.clone() };
     }

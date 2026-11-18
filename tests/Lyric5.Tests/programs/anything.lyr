@@ -9,7 +9,7 @@ import std.io { println };
 
 interface Shape { fn area(): int; }
 interface Named { fn name(): string; }
-struct Circle :: [Shape, Named] {
+struct Circle :: Shape & Named {
     r: int,
     fn area(): int { return 3 * this.r * this.r; }
     fn name(): string { return "circle"; }

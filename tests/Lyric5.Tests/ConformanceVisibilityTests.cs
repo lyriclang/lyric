@@ -12,7 +12,7 @@ namespace Lyric5.Tests;
 public class ConformanceVisibilityTests
 {
     private const string Lib = """
-        pub enum CliErrorKind :: [Equatable, Hashable, Ordered, Clone, Debug] { NoCommand, UnknownOption }
+        pub enum CliErrorKind :: Equatable & Hashable & Ordered & Clone & Debug { NoCommand, UnknownOption }
 
         pub struct Thing :: [Default] { pub n: int = 3 }
 
@@ -52,7 +52,7 @@ public class ConformanceVisibilityTests
             fn orders<T :: [Ordered]>(x: T): bool { return true; }
             fn shows<T :: [Display]>(x: T): bool { return true; }
 
-            pub struct Start :: [Fill, Default] { pub port: int = 8080 }
+            pub struct Start :: Fill & Default { pub port: int = 8080 }
 
             fn main(): void {
                 let k = CliErrorKind.NoCommand;
