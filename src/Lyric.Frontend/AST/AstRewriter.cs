@@ -25,6 +25,8 @@ public static class AstRewriter
     private static readonly Dictionary<Type, PropertyInfo[]> Properties = new();
     private static readonly Dictionary<Type, MethodInfo> Clones = new();
 
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2070:UnrecognizedReflectionPattern", Justification = "ILLink.Descriptors.xml keeps every member of Lyric.AST")]
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2075:UnrecognizedReflectionPattern", Justification = "ILLink.Descriptors.xml keeps every member of Lyric.AST")]
     private static PropertyInfo[] PropertiesOf(Type type)
     {
         lock (Properties)
@@ -48,6 +50,8 @@ public static class AstRewriter
         type.IsGenericType && type.FullName!.StartsWith("System.ValueTuple`", StringComparison.Ordinal)
         && type.GetGenericArguments().Any(a => typeof(Node).IsAssignableFrom(a));
 
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2070:UnrecognizedReflectionPattern", Justification = "ILLink.Descriptors.xml keeps every member of Lyric.AST")]
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2075:UnrecognizedReflectionPattern", Justification = "ILLink.Descriptors.xml keeps every member of Lyric.AST")]
     private static Node Clone(Node node)
     {
         var type = node.GetType();

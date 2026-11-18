@@ -315,6 +315,12 @@ jobs:
           grep -qx "Hello, Lyric!" hello.out
           code=0; "$lyric5" run tests/Lyric5.Tests/programs/fib.lyr --profile release || code=$?
           [ "$code" -eq 55 ]
+          # Macros in the native binary: the expander reaches the AST by reflection, which the
+          # trimmer removed until ILLink.Descriptors.xml kept it. The tests run on the JIT and
+          # cannot see that; only the published binary can.
+          "$lyric5" run -C examples/macros | tee macros.out
+          grep -qx "point 3 4" macros.out
+          grep -qx "66" macros.out
 
       # Measurement point 1 on this runner, for the record (the ratchets are the Linux tests in
       # Lyric5.Tests): the program's own start and a warm `run`, the minimum of several.

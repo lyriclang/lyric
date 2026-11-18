@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the trimmer of a native build must keep although no code names it: AstRewriter reaches the
+  nodes of Lyric.AST by reflection - their properties, to find and set the children, and the
+  records' clone method, to copy a node before a child changes. Trimmed away, a native lyric5
+  expanded no macro: a site was never replaced ("did not end after 32 rounds") or the copy was
+  null (an ICE). The tests run on the JIT and never saw it.
+-->
+<linker>
+  <assembly fullname="lyrfe">
+    <namespace fullname="Lyric.AST" preserve="all" />
+  </assembly>
+</linker>
