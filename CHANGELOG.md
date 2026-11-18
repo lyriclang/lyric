@@ -480,6 +480,11 @@ promise. This entry fills with the milestones.
   language server took the editor's spelling of the file's URI (`file:///c%3A/…`) and its own
   (`file:///c:/…`) for two files, dropped the module's analysis as if the file had left the
   package, and every hover there showed "Loading…" until the next edit.
+- **Macros work in the toolchain as it is installed.** The native `lyric5` expanded no macro: a
+  site stayed where it was ("did not end after 32 rounds", `LYR-CT0007`) or the build stopped with
+  an internal error. The expander reaches the syntax tree by reflection, and the trimmer of the
+  native build had removed what it reaches; the tests run on .NET and never saw it. The CI now runs
+  `examples/macros` with the published binary on every platform.
 
 ---
 
