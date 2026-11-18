@@ -625,6 +625,12 @@ language server took the editor's spelling of the file's URI (<code>file:///c%3A
 (<code>file:///c:/…</code>) for two files, dropped the module's analysis as if the file had left the
 package, and every hover there showed &quot;Loading…&quot; until the next edit.</p>
 </li>
+<li><p><strong>Macros work in the toolchain as it is installed.</strong> The native <code>lyric5</code> expanded no macro: a
+site stayed where it was (&quot;did not end after 32 rounds&quot;, <code>LYR-CT0007</code>) or the build stopped with
+an internal error. The expander reaches the syntax tree by reflection, and the trimmer of the
+native build had removed what it reaches; the tests run on .NET and never saw it. The CI now runs
+<code>examples/macros</code> with the published binary on every platform.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
