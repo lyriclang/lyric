@@ -55,9 +55,11 @@ directory, so a wrong secret stops a run before anything is published.
 
 The secret half is gone, nobody else has it, and the channel cannot be signed.
 
-1. Sign with the reserve: put its key and passphrase in the channel's environment and change the
-   channel's public key in the workflow (`tooling/release-keys/reserve.pub`). Toolchains already out
-   there accept it.
+1. Sign with the reserve: put its key and passphrase in the channel's environment and, in the
+   workflow's stamp step, read the public key from `tooling/release-keys/reserve.pub` in place of
+   the channel's (`dev.pub` in `dev.yml`, `stable.pub` in `release.yml`). Toolchains already out
+   there accept it. The release text follows by itself: `tooling/release-notes.sh` names the key
+   whose id the archive's signature carries, and stops a release signed by any other.
 2. Make a new channel key and a new reserve (see above), and put the public halves here and in
    `ToolchainFetch.cs`, the old reserve remaining as the channel's key until the release after.
 3. Ship a toolchain carrying them; from it on, the new channel key signs.

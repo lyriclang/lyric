@@ -1469,7 +1469,9 @@ archives, `SHA256SUMS` and `stable.json` signed with the stable key (the dev key
 systems and put it in the mirror's `staging/`; the public stable channel stayed empty, the draft was deleted, no tag was
 made. The website moved to `lyriclang.de` (#701, spec#435); the old name redirects with its path from the mirror's
 server. Still unproven: the tag path (it runs only with a real tag), the reserve key (offline by design) and the
-runbook for a lost or leaked key (`tooling/release-keys/README.md`).
+runbook for a lost or leaked key (`tooling/release-keys/README.md`). A drill of its first step with throwaway keys
+(2026-11-18) found the release text naming the channel's key after a switch to the reserve, so that the check it printed
+failed; the text now names the key that signed, read from the signature, and refuses an unknown one.
 
 ### M14b — done (2026-10-29)
 
