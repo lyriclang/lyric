@@ -449,9 +449,22 @@ eine Umwandlung, keine Mitgliedschaft. „Ganzzahl“ wäre eine eigene Menge (e
 | Überladung wächst um eine Dimension | ein Aufruf mit `[int, string]` passt auf `f(int)` und `f(string)` nicht; nur ein Parameter, der die Menge abdeckt, nimmt sie |
 | rekursive Unionen brauchen rekursive Aliase | gilt weiter; `Json` bleibt ein rekursives Enum |
 
+**`∩` und `∪` (entschieden 2026-11-18, nach Empfehlung).** `throws`/`catch` lasen `[A, B]` als
+„eines davon“, jede `::`-Liste als „alle davon“ — mit TM2 kann `[…]` nur eines heißen.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| TM7 | **`[A, B]` ist immer die Vereinigung, `A & B` der Schnitt.** `::` nimmt einen Typ (eine Menge), mehrere Anforderungen verbindet `&`: `struct S :: Display & Hash`, `fn f<T :: Display & Hash>`. `:: [Codable]` bleibt gültig, weil `[A]` `A` ist (TM2); eine `::`-Liste mit mehreren Gliedern wird abgelehnt, mit dem Hinweis auf `&` | 08 D5/D6 (Listenregel), Spec 02 §1 Regel 5, 05, 08 |
+| TM8 | **`A & B` ist ein Typ wie jeder (TM6)**: ein Wert davon genügt beiden — ein Parameter `x: Display & Hash`, ein Interface-Wert, der beide Tabellen trägt. Operanden sind Mengen (Interfaces, `[…]`, `Any`); ein konkreter Typ als Operand ist er selbst, wenn er genügt, sonst `never` — als Fehler gemeldet. `&` bindet stärker als die Liste: `[A & B, C]` | 05 §2, T3 |
+
+Kosten: die `::`-Listen mit mehreren Gliedern (Stand 2026-11-18 rund 160 in std, Book, Beispielen,
+Konformanz) stellen mechanisch um; der Formatter kann es. Zu prüfen in der Spec-Runde: `&` in
+Typargumenten eines Ausdrucks (`f<Display & Hash>(x)`) gegen die `<`-Auflösung (Spec 02 §6.3).
+Die Attributliste `@[A, B]` ist keine Typliste und bleibt, wie sie ist.
+
 **Offen, als Nächstes.**
 
-1. **`∩` oder `∪` in Listen**: `throws`/`catch` lesen `[A, B]` als „eines davon“, `T :: [Display, Hash]` als „alle davon“. Mit TM2 braucht eine der beiden Stellen eine andere Form.
+1. ~~`∩` oder `∪` in Listen~~ — TM7.
 2. **Doppel durch Einsetzen**: `[T, string]` mit `T = string` — verschmelzen (Menge) oder ablehnen.
 3. **Zeitpunkt**: welche Zeilen 5.0 braucht (Wurfmengen in Typargumenten) und welche eine Tür danach sind (Mengen als Werttypen).
 
