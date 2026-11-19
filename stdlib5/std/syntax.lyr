@@ -29,7 +29,7 @@ import std.collections { List };
 
 /// Where a node stands: a file as the diagnostics name it, a line and a column from 1; `""` and
 /// `0` where the node was built, not read.
-pub struct Span :: [Equatable, Debug] {
+pub struct Span :: Equatable & Debug {
     pub file: string,
     pub line: int,
     pub column: int,
@@ -45,7 +45,7 @@ extend Span {
 /// A name as written, with where it was written. `from` is the module a `quote` wrote the name
 /// in: such a name is that module's wherever the tree ends up; `null` for a name a
 /// program wrote, or one built here.
-pub struct Ident :: [Equatable, Debug] {
+pub struct Ident :: Equatable & Debug {
     pub name: string,
     pub span: Span,
     pub from: ?string,
@@ -65,7 +65,7 @@ extend Ident {
 }
 
 /// The word in front of a declaration: none, `private`, `internal`, `pub`.
-pub enum Visibility :: [Equatable, Debug] {
+pub enum Visibility :: Equatable & Debug {
     None,
     Private,
     Internal,
@@ -86,7 +86,7 @@ pub enum Literal :: [Debug] {
 }
 
 @NonExhaustive
-pub enum UnaryOp :: [Equatable, Debug] {
+pub enum UnaryOp :: Equatable & Debug {
     Not,
     Neg,
     BitNot,
@@ -97,14 +97,14 @@ pub enum UnaryOp :: [Equatable, Debug] {
 }
 
 @NonExhaustive
-pub enum PostfixOp :: [Equatable, Debug] {
+pub enum PostfixOp :: Equatable & Debug {
     Inc,
     Dec,
     Unwrap,
 }
 
 @NonExhaustive
-pub enum BinaryOp :: [Equatable, Debug] {
+pub enum BinaryOp :: Equatable & Debug {
     Add,
     Sub,
     Mul,
@@ -133,7 +133,7 @@ pub enum BinaryOp :: [Equatable, Debug] {
 
 /// How a lambda was written: `(x) => e`, `x => e`, or as a trailing block `f { ... }`.
 @NonExhaustive
-pub enum LambdaForm :: [Equatable, Debug] {
+pub enum LambdaForm :: Equatable & Debug {
     Paren,
     Bare,
     Trailing,
@@ -141,7 +141,7 @@ pub enum LambdaForm :: [Equatable, Debug] {
 
 /// The mark on a `try`: `try e`, `try? e`, `try! e`.
 @NonExhaustive
-pub enum TryKind :: [Equatable, Debug] {
+pub enum TryKind :: Equatable & Debug {
     Plain,
     Optional,
     Force,
@@ -324,7 +324,7 @@ pub struct Attribute :: [Debug] {
     pub span: Span,
 }
 
-/// A type parameter, `T`, `T :: [I, J]`, `T = Self`.
+/// A type parameter, `T`, `T :: I & J`, `T = Self`.
 pub struct GenericParam :: [Debug] {
     pub name: Ident,
     pub constraints: Type[],

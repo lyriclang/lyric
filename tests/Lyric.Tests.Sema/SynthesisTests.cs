@@ -50,7 +50,7 @@ public class SynthesisTests
     [Fact]
     public void The_family_is_synthesized_for_a_struct() =>
         Allowed("""
-            struct P :: [Equatable, Hashable, Ordered, TotalOrder, Clone, Default, Display] { x: int, y: string }
+            struct P :: Equatable & Hashable & Ordered & TotalOrder & Clone & Default & Display { x: int, y: string }
             fn f(p: P, q: P): bool {
                 let h: bool = hashes(p);
                 let c: P = p.clone();
@@ -64,21 +64,21 @@ public class SynthesisTests
     [Fact]
     public void A_class_with_reference_fields_is_synthesized() =>
         Allowed("""
-            class C :: [Equatable, Clone] { items: int[], o: ?int, t: (int, string) }
+            class C :: Equatable & Clone { items: int[], o: ?int, t: (int, string) }
             fn f(a: C, b: C): bool { let c: C = a.clone(); return a == b; }
             """);
 
     [Fact]
     public void An_enum_is_synthesized_variant_by_variant() =>
         Allowed("""
-            enum E :: [Equatable, Hashable, Ordered, Clone] { A, B(int), R { w: int } }
+            enum E :: Equatable & Hashable & Ordered & Clone { A, B(int), R { w: int } }
             fn f(a: E, b: E): bool { let c: E = a.clone(); return a == b && a < b && hashes(a); }
             """);
 
     [Fact]
     public void A_written_member_replaces_the_synthesis() =>
         Allowed("""
-            struct W :: [Equatable, Hashable] { x: int, y: int,
+            struct W :: Equatable & Hashable { x: int, y: int,
                 fn equals(o: W): bool { return this.x == o.x; }
             }
             fn f(a: W, b: W): bool { return a == b && hashes(a) && hashes(b); }
@@ -97,7 +97,7 @@ public class SynthesisTests
     [Fact]
     public void A_generic_type_is_synthesized_conditionally() =>
         Allowed("""
-            struct Pair<T> :: [Equatable, Hashable, Default] { a: T, b: T }
+            struct Pair<T> :: Equatable & Hashable & Default { a: T, b: T }
             fn f(p: Pair<int>, q: Pair<int>): bool { let d: Pair<int> = Pair<int>.default(); return p == q && hashes(p); }
             """);
 

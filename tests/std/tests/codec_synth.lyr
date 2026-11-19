@@ -16,7 +16,7 @@ import std.collections { List, Map };
 import std.core { ParseError };
 import std.test { assertEq, assertTrue, fail };
 
-struct Plain :: [Codable, Equatable] {
+struct Plain :: Codable & Equatable {
     id: int,
     name: string,
     mail: ?string,
@@ -24,7 +24,7 @@ struct Plain :: [Codable, Equatable] {
 }
 
 @Codec { rename = .SnakeCase, denyUnknown = true }
-struct User :: [Codable, Equatable] {
+struct User :: Codable & Equatable {
     userId: int,
     @Codec { name = "mail" }
     eMail: ?string,
@@ -34,33 +34,33 @@ struct User :: [Codable, Equatable] {
 }
 
 @Codec { rename = .CamelCase }
-struct Snaky :: [Codable, Equatable] {
+struct Snaky :: Codable & Equatable {
     @Allow("naming")
     first_name: string,
     @Allow("naming")
     last_name: string,
 }
 
-struct Team :: [Codable, Equatable] {
+struct Team :: Codable & Equatable {
     lead: User,
     members: User[],
     scores: Map<string, int>,
 }
 
-enum Shape :: [Codable, Equatable, Debug] {
+enum Shape :: Codable & Equatable & Debug {
     Dot,
     Circle(int),
     Rect(int, int),
 }
 
 @Codec { tag = "kind" }
-enum Event :: [Codable, Equatable, Debug] {
+enum Event :: Codable & Equatable & Debug {
     Started,
     Moved(int, int),
 }
 
 /// Writes itself as a string: an own pair replaces the synthesis.
-struct Celsius :: [Codable, Equatable, Debug] {
+struct Celsius :: Codable & Equatable & Debug {
     degrees: float,
 
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {

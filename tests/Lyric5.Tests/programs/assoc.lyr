@@ -15,7 +15,7 @@ interface Mapper {
     fn mapped(): Self.Out;
 }
 
-struct IntBox :: [Container, Mapper] {
+struct IntBox :: Container & Mapper {
     type Item = int;
     v: int,
     fn first(): int { return this.v; }

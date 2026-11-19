@@ -562,7 +562,7 @@ pub fn copy<R :: [Reader], W :: [Writer]>(r: R, w: W): int throws [IoError, Canc
 /// # Panics
 ///
 /// `seek` panics on a position before the start.
-pub class ByteReader :: [Reader, Seek] {
+pub class ByteReader :: Reader & Seek {
     bytes: Slice<uint8>,
     var at: int = 0,
 
@@ -602,7 +602,7 @@ pub class ByteReader :: [Reader, Seek] {
 
 /// A growing buffer of bytes in memory: a `Writer` that appends, a `Reader` that takes from
 /// the front what was written and not yet read.
-pub class ByteBuffer :: [Reader, Writer] {
+pub class ByteBuffer :: Reader & Writer {
     var data: uint8[] = [],
     var start: int = 0,
     var end: int = 0,
@@ -728,7 +728,7 @@ pub class BufReader<R :: [Reader]> :: [Reader] {
 /// in the buffer. Closing flushes and leaves the inner writer open — it is the caller's
 /// (`using let f = …; using let w = BufWriter.new(f);` closes `w` first). It throws what its inner
 /// writer may (`Writer`).
-pub class BufWriter<W :: [Writer]> :: [Writer, Closeable] {
+pub class BufWriter<W :: [Writer]> :: Writer & Closeable {
     var inner: W,
     held: uint8[],
     var used: int = 0,

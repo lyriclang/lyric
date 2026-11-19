@@ -393,11 +393,11 @@ public sealed class AstFormatter
         EnumDecl d => EnumDoc(d),
         InterfaceDecl d => MethodBodyDoc(
             Doc.Of(Pub(d.Visibility), Doc.From($"{(d.IsSealed ? "sealed " : "")}interface {d.Name}"), GenericsDoc(d.Generics),
-                InterfaceListDoc(d.Interfaces, bracketed: d.InterfacesBracketed), Doc.Space),
+                InterfaceListDoc(d.Interfaces, bracketed: d.InterfacesBracketed)),
             InOrder(d.Types, d.Members, d.Statics), d.Span),
         ExtendDecl d => MethodBodyDoc(
             Doc.Of(Pub(d.Visibility), Doc.From("extend"), GenericsDoc(d.Generics), Doc.Space, TypeDoc(d.Target),
-                InterfaceListDoc(d.Interfaces, bracketed: d.InterfacesBracketed), Doc.Space),
+                InterfaceListDoc(d.Interfaces, bracketed: d.InterfacesBracketed)),
             InOrder(d.Types, d.Methods, d.Statics), d.Span),
         GlobalBindingDecl d => Doc.Of(Pub(d.Visibility), StmtDoc(d.Binding)),
         StaticBindingDecl d => Doc.Of(Pub(d.Visibility), Doc.From("static "), StmtDoc(d.Binding)),
@@ -407,9 +407,7 @@ public sealed class AstFormatter
         // 'type Item;' declares, 'type Item = int;' answers or defaults; 'type Iter ::
         // [Iterator];' bounds.
         AssociatedTypeDecl d => Doc.Of(Doc.From($"type {d.Name}"),
-            d.Bounds.Length == 0 ? Doc.Nil
-                : d.Bounds is [var bound1] && !d.BoundsBracketed ? Doc.Of(Doc.From(" :: "), TypeDoc(bound1))
-                : Doc.Of(Doc.From(" :: ["), Doc.Join(Doc.From(", "), d.Bounds.Select(TypeDoc).ToArray()), Doc.From("]")),
+            d.Bounds.Length == 0 ? Doc.Nil : Doc.Of(Doc.From(" :: "), BoundsDoc(d.Bounds, null, d.BoundsBracketed)),
             d.Type is { } bound ? Doc.Of(Doc.From(" = "), TypeDoc(bound)) : Doc.Nil, Doc.From(";")),
         FieldDecl d => FieldDoc(d),
         _ => throw new InternalCompilationException($"unreachable: unformatted {decl.GetType().Name}"),
@@ -523,10 +521,7 @@ public sealed class AstFormatter
 
         var parts = generics.Select(g => Doc.Of(g.Constraints.Length == 0
             ? Doc.From(g.Name)
-            : g.Constraints is [var only] && !g.ConstraintsBracketed ? Doc.Of(Doc.From($"{g.Name} :: "), TypeDoc(only))
-            : Doc.Of(Doc.From($"{g.Name} :: ["),
-                Doc.Join(Doc.From(", "), g.Constraints.Select(TypeDoc).ToArray()),
-                Doc.From("]")),
+            : Doc.Of(Doc.From($"{g.Name} :: "), BoundsDoc(g.Constraints, null, g.ConstraintsBracketed)),
             g.Default is { } fallback ? Doc.Of(Doc.From(" = "), TypeDoc(fallback)) : Doc.Nil));
         return Doc.Of(Doc.From("<"), Doc.Join(Doc.From(", "), parts.ToArray()), Doc.From(">"));
     }
@@ -570,7 +565,7 @@ public sealed class AstFormatter
         GenericParam[] generics, TypeNode[] interfaces, Decl[] members, Span whole, string?[]? delegates = null, bool bracketed = true)
     {
         var head = Doc.Of(attributes, Pub(isPublic), Doc.From($"{keyword} {name}"),
-            GenericsDoc(generics), InterfaceListDoc(interfaces, delegates, bracketed), Doc.Space);
+            GenericsDoc(generics), InterfaceListDoc(interfaces, delegates, bracketed));
 
         var closing = whole.End - 1;
         return BracedDoc(head, members.Length == 0 && !AnyCommentBefore(closing),
@@ -606,24 +601,33 @@ public sealed class AstFormatter
     /// <param name="delegates">The field an entry delegates to (<c>Walker by legs</c>).</param>
     /// <param name="bracketed">Whether the list stood in brackets: one interface written without
     /// them is written without them again.</param>
+    /// <summary>A declaration's <c>::</c> and the space before its <c>{</c>. Several interfaces
+    /// too long for the line go one to a line, and the <c>{</c> then stands on its own, apart from
+    /// the members below.</summary>
     private Doc InterfaceListDoc(TypeNode[] interfaces, string?[]? delegates = null, bool bracketed = true) =>
-        interfaces.Length == 0
-            ? Doc.Nil
-            : interfaces is [var only] && !bracketed
-                ? Doc.Of(Doc.From(" :: "), TypeDoc(only), delegates is [{ } field] ? Doc.From($" by {field}") : Doc.Nil)
-            : Doc.Of(Doc.From(" :: "), Doc.GroupOf(Doc.From("["),
-                Doc.IndentOf(Doc.LineOrNothing,
-                    Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace), interfaces.Select((t, i) =>
-                        delegates is not null && i < delegates.Length && delegates[i] is { } field
-                            ? Doc.Of(TypeDoc(t), Doc.From($" by {field}"))
-                            : TypeDoc(t)).ToArray())),
-                Doc.LineOrNothing, Doc.From("]")));
+        interfaces.Length == 0 ? Doc.Space
+            : interfaces.Length == 1 ? Doc.Of(Doc.From(" :: "), BoundsDoc(interfaces, delegates, bracketed), Doc.Space)
+            : Doc.GroupOf(Doc.From(" :: "), BoundsDoc(interfaces, delegates, bracketed, grouped: false), Doc.LineOrSpace);
+
+    /// <summary>What follows <c>::</c>: one interface as written, <c>I</c> or
+    /// <c>[I]</c>; several joined by <c>&amp;</c>, broken before each <c>&amp;</c> when the line
+    /// is too long.</summary>
+    private Doc BoundsDoc(TypeNode[] types, string?[]? delegates, bool bracketed, bool grouped = true)
+    {
+        Doc Entry(int i) => delegates is not null && i < delegates.Length && delegates[i] is { } field
+            ? Doc.Of(TypeDoc(types[i]), Doc.From($" by {field}"))
+            : TypeDoc(types[i]);
+        if (types.Length == 1) return bracketed ? Doc.Of(Doc.From("["), Entry(0), Doc.From("]")) : Entry(0);
+        var joined = Doc.Of(Entry(0), Doc.IndentOf(Enumerable.Range(1, types.Length - 1)
+            .Select(i => Doc.Of(Doc.LineOrSpace, Doc.From("& "), Entry(i))).ToArray()));
+        return grouped ? Doc.GroupOf(joined) : joined;
+    }
 
     private Doc EnumDoc(EnumDecl decl)
     {
         var head = Doc.Of(Attributes(decl.Attributes), Pub(decl.Visibility),
             Doc.From($"enum {decl.Name}"), GenericsDoc(decl.Generics),
-            InterfaceListDoc(decl.Interfaces, bracketed: decl.InterfacesBracketed), Doc.Space);
+            InterfaceListDoc(decl.Interfaces, bracketed: decl.InterfacesBracketed));
 
         var members = InOrder(decl.Types, decl.Methods, decl.Statics);
         var closing = decl.Span.End - 1;

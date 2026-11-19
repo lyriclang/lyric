@@ -128,7 +128,7 @@ let backlog = 128;
 // ---------------------------------------------------------------------------------------------
 
 /// An IP address: version 4's four bytes, or version 6's eight groups of 16 bits.
-pub enum IpAddr :: [Equatable, Debug] {
+pub enum IpAddr :: Equatable & Debug {
     V4(uint8, uint8, uint8, uint8),
     V6(uint16, uint16, uint16, uint16, uint16, uint16, uint16, uint16),
 }
@@ -173,7 +173,7 @@ extend IpAddr :: [Parse] {
 }
 
 /// An IP address and a port.
-pub struct SocketAddr :: [Equatable, Debug] {
+pub struct SocketAddr :: Equatable & Debug {
     pub ip: IpAddr,
     pub port: uint16,
 }
@@ -649,7 +649,7 @@ pub class TcpListener :: [Closeable] {
 }
 
 /// How much of a stream [TcpStream.shutdown] ends: its reading, its writing, or both.
-pub enum Shutdown :: [Equatable, Debug] {
+pub enum Shutdown :: Equatable & Debug {
     Read,
     Write,
     Both,
@@ -657,7 +657,7 @@ pub enum Shutdown :: [Equatable, Debug] {
 
 /// A TCP connection: a `Reader` and a `Writer` whose calls wait for the socket — a read until
 /// bytes come, a write until the system takes some.
-pub class TcpStream :: [Reader, Writer, Closeable] {
+pub class TcpStream :: Reader & Writer & Closeable {
     fd: int,
     var closed: bool = false,
     waits: Waits = Waits { },

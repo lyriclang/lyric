@@ -21,7 +21,7 @@ import std.uri { Uri };
 import std.codec { Codable };
 import std.test { assertEq, assertTrue, assertNull, fail };
 
-struct Info :: [Codable, Equatable, Debug] {
+struct Info :: Codable & Equatable & Debug {
     name: string,
     n: int,
 }

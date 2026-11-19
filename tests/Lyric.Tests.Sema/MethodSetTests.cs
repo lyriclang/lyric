@@ -63,8 +63,8 @@ public class MethodSetTests
     [InlineData("struct Cat :: [Named] { fn name(): string { return \"cat\"; } fn greeting(): string { return \"meow\"; } }", "'Cat.greeting' hides")]
     [InlineData("struct Cat :: [Named] { fn name(): string { return \"cat\"; } }\nextend Cat { fn greeting(): string { return \"meow\"; } }", "'Cat.greeting' hides")]
     [InlineData("interface Loud { fn greeting(): string; }\nstruct Cat :: [Named] { fn name(): string { return \"cat\"; } }\nextend Cat :: [Loud] { fn greeting(): string { return \"meow\"; } }", "'Cat.greeting' hides")]
-    [InlineData("interface Loud { fn greeting(): string { return \"loud\"; } }\nstruct Cat :: [Named, Loud] { fn name(): string { return \"cat\"; } }", "'greeting', a default of 'Loud', hides")]
-    [InlineData("interface Loud { fn greeting(): string; }\nstruct Voice :: [Loud] { fn greeting(): string { return \"v\"; } }\nstruct Cat :: [Named, Loud by voice] { voice: Voice, fn name(): string { return \"cat\"; } }", "'greeting', which 'Cat' leaves to 'voice', hides")]
+    [InlineData("interface Loud { fn greeting(): string { return \"loud\"; } }\nstruct Cat :: Named & Loud { fn name(): string { return \"cat\"; } }", "'greeting', a default of 'Loud', hides")]
+    [InlineData("interface Loud { fn greeting(): string; }\nstruct Voice :: [Loud] { fn greeting(): string { return \"v\"; } }\nstruct Cat :: Named & Loud by voice { voice: Voice, fn name(): string { return \"cat\"; } }", "'greeting', which 'Cat' leaves to 'voice', hides")]
     public void A_types_member_hides_a_blanket_member_and_says_so(string types, string says)
     {
         var warnings = Hidden(types + "\nfn main(): int { return 0; }");
@@ -89,7 +89,7 @@ public class MethodSetTests
         Assert.Contains("twice", Rejected(Greeters + """
             interface Seen { fn seen(): bool; }
             extend<T :: [Seen]> T { fn greeting(): string { return "seen"; } }
-            struct Cat :: [Named, Seen] { fn name(): string { return "cat"; } fn seen(): bool { return true; } }
+            struct Cat :: Named & Seen { fn name(): string { return "cat"; } fn seen(): bool { return true; } }
             fn main(): int { return 0; }
             """, "LYR-SEM0121"));
 
@@ -126,7 +126,7 @@ public class MethodSetTests
         Allowed("""
             interface A { fn tag(): int { return 1; } }
             interface B { fn tag(): int; }
-            struct V :: [A, B] { x: int, fn tag(): int { return 3; } }
+            struct V :: A & B { x: int, fn tag(): int { return 3; } }
             fn main(): int { return V { x = 1 }.tag(); }
             """);
 
@@ -135,7 +135,7 @@ public class MethodSetTests
         Assert.Contains("one function for both", Rejected("""
             interface A { fn tag(): int { return 1; } }
             interface B { fn tag(): int { return 2; } }
-            struct V :: [A, B] { x: int }
+            struct V :: A & B { x: int }
             fn main(): int { return 0; }
             """, "LYR-SEM0043"));
 
@@ -278,7 +278,7 @@ public class MethodSetTests
         Assert.Contains("delegated twice", Rejected(Walking + """
             interface Runner { fn walk(): string; }
             class Wheels :: [Runner] { fn walk(): string { return "run"; } }
-            class Dog :: [Walker by legs, Runner by wheels] { var legs: Legs, var wheels: Wheels }
+            class Dog :: Walker by legs & Runner by wheels { var legs: Legs, var wheels: Wheels }
             fn main(): int { return 0; }
             """, "LYR-SEM0121"));
 

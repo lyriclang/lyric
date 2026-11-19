@@ -15,7 +15,7 @@ public class OperatorInterfaceTests
     // The seed of std.core 5, as far as the operators go.
     private const string Prelude = """
         import std.core { Add, Sub, Mul, Neg, BitAnd, BitNot, Shl, Rem };
-        struct V :: [Add, Sub, Mul<int>, Neg, Equatable, Ordered, Display] {
+        struct V :: Add & Sub & Mul<int> & Neg & Equatable & Ordered & Display {
             x: int,
             fn add(rhs: V): V { return V { x = this.x + rhs.x }; }
             fn sub(rhs: V): V { return V { x = this.x - rhs.x }; }
@@ -87,7 +87,7 @@ public class OperatorInterfaceTests
 
     [Fact]
     public void The_bit_operators_and_the_shifts_have_interfaces() =>
-        Allowed("struct B :: [BitAnd, BitNot, Shl, Rem] { n: int, fn bitAnd(r: B): B { return r; } fn bitNot(): B { return this; } fn shl(r: int): B { return this; } fn rem(r: B): B { return r; } }\n"
+        Allowed("struct B :: BitAnd & BitNot & Shl & Rem { n: int, fn bitAnd(r: B): B { return r; } fn bitNot(): B { return this; } fn shl(r: int): B { return this; } fn rem(r: B): B { return r; } }\n"
                 + "fn f(a: B, b: B): B { return (a & b) % ~b << 2; }");
 
     // ------------------------------------------------------------------ equality and ordering

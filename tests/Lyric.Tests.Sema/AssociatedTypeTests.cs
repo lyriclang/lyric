@@ -15,7 +15,7 @@ public class AssociatedTypeTests
     private const string Prelude = """
         interface Container { type Item; fn first(): Self.Item; }
         interface Mapper { type Out = Self; fn mapped(): Self.Out; }
-        struct IntBox :: [Container, Mapper] {
+        struct IntBox :: Container & Mapper {
             type Item = int;
             v: int,
             fn first(): int { return this.v; }

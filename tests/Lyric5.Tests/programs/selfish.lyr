@@ -9,7 +9,7 @@ interface Equatable { fn equals(o: Self): bool; }
 interface Parse { static fn parse(s: string): Self; }
 interface Add<Rhs = Self> { fn add(o: Rhs): Self; }
 
-struct P :: [Equatable, Parse, Add] {
+struct P :: Equatable & Parse & Add {
     n: int,
     fn equals(o: P): bool { return this.n == o.n; }
     static fn parse(s: string): P { return P { n = 7 }; }

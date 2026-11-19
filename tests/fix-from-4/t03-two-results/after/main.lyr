@@ -1,6 +1,6 @@
 import std.core { Div, Mul };
 
-struct Money :: [Div, Mul<int>] {
+struct Money :: Div & Mul<int> {
     type Out = float;
     cents: int,
     fn div(other: Money): float {

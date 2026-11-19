@@ -60,7 +60,7 @@ import std.time { Instant, Duration, Date, Time, DateTime };
 // ------------------------------------------------------------------ the attribute
 
 /// Selects how a field name is rewritten on the wire: as written, `camelCase`, or `snake_case`.
-pub enum Case :: [Equatable, Debug] {
+pub enum Case :: Equatable & Debug {
     Same,
     CamelCase,
     SnakeCase,
@@ -72,7 +72,7 @@ pub enum Case :: [Equatable, Debug] {
 /// the tag beside the payload's fields (internally tagged); on a struct or a class,
 /// `@Codec { rename = .SnakeCase }` rewrites every field's name and `@Codec { denyUnknown = true }`
 /// refuses a field the data has and the type has not.
-pub struct Codec :: [OnField, OnType] {
+pub struct Codec :: OnField & OnType {
     pub name: string = "",
     pub skip: bool = false,
     pub tag: string = "",
@@ -305,12 +305,12 @@ pub interface Decode {
 
 /// A value that is both `Encode` and `Decode`: what `std.json.encode` takes and
 /// `std.json.decode<T>` gives.
-pub interface Codable :: [Encode, Decode] { }
+pub interface Codable :: Encode & Decode { }
 
 // ------------------------------------------------------------------ the errors
 
 /// Classifies why a value could not be read: what was missing, mismatched, invalid or unknown.
-pub enum DecodeErrorKind :: [Equatable, Hashable, Debug] {
+pub enum DecodeErrorKind :: Equatable & Hashable & Debug {
     /// A field the type needs is not in the data.
     Missing,
     /// The data holds another form than the type reads: a string where an int stands.
@@ -953,7 +953,7 @@ extend<T :: [Encode]> Slice<T> :: [Encode] {
 
 /// Bytes in the format's own byte form: what `encodeBytes`/`decodeBytes` carry — Base64 in JSON,
 /// an array of numbers in TOML, the bytes themselves in a binary format.
-pub struct Bytes :: [Codable, Equatable, Debug] {
+pub struct Bytes :: Codable & Equatable & Debug {
     pub value: uint8[],
 
     pub fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
@@ -1018,7 +1018,7 @@ extend<T :: [Decode]> Deque<T> :: [Decode] {
 }
 
 /// Encodes a set as a sequence, in the set's own (unspecified) order.
-extend<T :: [Hashable, Encode], H :: [Hasher]> Set<T, H> :: [Encode] {
+extend<T :: Hashable & Encode, H :: [Hasher]> Set<T, H> :: [Encode] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         try e.beginSeq(this.length());
         for (x in this) {
@@ -1028,7 +1028,7 @@ extend<T :: [Hashable, Encode], H :: [Hasher]> Set<T, H> :: [Encode] {
     }
 }
 
-extend<T :: [Hashable, Decode]> Set<T, DefaultHasher> :: [Decode] {
+extend<T :: Hashable & Decode> Set<T, DefaultHasher> :: [Decode] {
     static fn decode<D :: [Decoder]>(&d: D): Set<T, DefaultHasher> throws DecodeError {
         let _ = try d.beginSeq();
         let out = Set<T>.new();
@@ -1046,7 +1046,7 @@ extend<T :: [Hashable, Decode]> Set<T, DefaultHasher> :: [Decode] {
 
 /// Encodes a map as a map; its keys go to the format as values, and a format that holds only text
 /// keys (JSON) writes a number as its digits and refuses the rest.
-extend<K :: [Hashable, Encode], V :: [Encode], H :: [Hasher]> Map<K, V, H> :: [Encode] {
+extend<K :: Hashable & Encode, V :: [Encode], H :: [Hasher]> Map<K, V, H> :: [Encode] {
     fn encode<E :: [Encoder]>(&e: E): void throws EncodeError {
         try e.beginMap(this.length());
         for ((k, v) in this) {
@@ -1056,7 +1056,7 @@ extend<K :: [Hashable, Encode], V :: [Encode], H :: [Hasher]> Map<K, V, H> :: [E
     }
 }
 
-extend<K :: [Hashable, Decode], V :: [Decode]> Map<K, V, DefaultHasher> :: [Decode] {
+extend<K :: Hashable & Decode, V :: [Decode]> Map<K, V, DefaultHasher> :: [Decode] {
     static fn decode<D :: [Decoder]>(&d: D): Map<K, V, DefaultHasher> throws DecodeError {
         let _ = try d.beginMap();
         let out = Map<K, V>.new();
@@ -1130,7 +1130,7 @@ fn tupleElement<T :: [Decode], D :: [Decoder]>(&d: D, index: int): T throws Deco
 /// `Value.of(v)` is the tree a value writes, `tree.read<T>()` the value a tree reads as. A struct
 /// is its name and its fields in order, a variant its enum's name, its own, its index and its
 /// payload where it has one; a map is its entries in the order written.
-pub enum Value :: [Equatable, Debug] {
+pub enum Value :: Equatable & Debug {
     Null,
     Bool(bool),
     Int(int),

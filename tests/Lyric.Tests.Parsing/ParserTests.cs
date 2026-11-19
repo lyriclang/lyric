@@ -616,7 +616,7 @@ public class ParserTests
     [Fact]
     public void Generic_constraints_parse()
     {
-        var fn = Assert.IsType<FunctionDecl>(ParseModule("fn f<T :: [Ord, Eq]>(): void { }").module.Declarations[0]);
+        var fn = Assert.IsType<FunctionDecl>(ParseModule("fn f<T :: Ord & Eq>(): void { }").module.Declarations[0]);
         Assert.Equal(2, Assert.Single(fn.Generics).Constraints.Length);
     }
 

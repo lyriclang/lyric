@@ -122,7 +122,7 @@ pub struct OpenOptions {
 /// An open file: read from its position, written there — at the end, where it was opened to
 /// append —, its position moved. `close()` releases it; a call after it throws `Closed`, and a
 /// second `close()` does nothing.
-pub class File :: [Reader, Writer, Seek, Closeable] {
+pub class File :: Reader & Writer & Seek & Closeable {
     var handle: int,
     name: string,
     var closed: bool = false,
@@ -352,7 +352,7 @@ pub fn appendText(path: StringView, text: StringView): void throws IoError {
 
 /// The lines of a file, from [lines]. After its end or an error it gives no more; after `close()`
 /// a call throws `Closed`, as the file's would.
-pub class FileLinesIter :: [Iterator, Closeable] {
+pub class FileLinesIter :: Iterator & Closeable {
     type Item = string;
     type Error = IoError;
     file: File,
@@ -544,7 +544,7 @@ pub struct DirEntry {
 
 /// A directory's entries, from [readDir]. After its end or an error it gives no more; after
 /// `close()` a call throws `Closed`.
-pub class ReadDirIter :: [Iterator, Closeable] {
+pub class ReadDirIter :: Iterator & Closeable {
     type Item = DirEntry;
     type Error = IoError;
     handle: int,

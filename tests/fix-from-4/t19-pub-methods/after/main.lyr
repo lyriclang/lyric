@@ -6,7 +6,7 @@ interface Hidden {
     fn secret(): int;
 }
 
-pub class Square :: [Shape, Hidden] {
+pub class Square :: Shape & Hidden {
     side: int,
 
     pub fn area(): int {

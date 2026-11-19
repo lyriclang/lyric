@@ -1256,7 +1256,7 @@ fn wordHere(c: ?char): bool {
 
 /// A match: where it is in the text (byte offsets), its text, and its groups — group 0 the whole,
 /// a group that took no part `null`.
-pub struct Match :: [Equatable, Debug] {
+pub struct Match :: Equatable & Debug {
     pub start: int,
     pub end: int,
     /// The matched text.

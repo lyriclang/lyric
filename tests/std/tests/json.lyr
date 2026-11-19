@@ -9,26 +9,26 @@ import std.test { assertEq, assertTrue, assertNull, fail };
 import std.time { Instant };
 
 @Codec { rename = .SnakeCase }
-struct User :: [Codable, Equatable] {
+struct User :: Codable & Equatable {
     userId: int,
     name: string,
     mail: ?string,
     tags: string[],
 }
 
-enum Shape :: [Codable, Equatable, Debug] {
+enum Shape :: Codable & Equatable & Debug {
     Dot,
     Circle(int),
     Rect(int, int),
 }
 
 @Codec { tag = "kind" }
-enum Event :: [Codable, Equatable, Debug] {
+enum Event :: Codable & Equatable & Debug {
     Started,
     Moved(int, int),
 }
 
-struct Team :: [Codable, Equatable] {
+struct Team :: Codable & Equatable {
     lead: User,
     members: User[],
     scores: Map<string, int>,

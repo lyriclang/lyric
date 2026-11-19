@@ -2496,7 +2496,7 @@ title = "a list after '::' without its '['"
 severity = "error"
 area = "05-interfaces"
 summary = "The interfaces after `::` did not open with `[`."
-retired = "the list rule: one interface after '::' stands without brackets, 'struct S :: I'; several without them are LYR-PAR0066"
+retired = "the list rule: one interface after '::' stands without brackets, 'struct S :: I'; several are joined with '&', and a list of several is LYR-PAR0066"
 
 [LYR-PAR0031]
 title = "a parameter or field without ':' before its type"
@@ -3438,14 +3438,14 @@ fn main(): void {
 '''
 
 [LYR-PAR0066]
-title = "several interfaces after '::' without brackets"
+title = "several interfaces after '::' in a list"
 severity = "error"
 area = "05-interfaces"
-summary = "Several interfaces follow `::` — of a struct, class, enum, interface or extend block, or of an associated type's bound — without brackets around them. One interface stands without them, several in them."
+summary = "Several interfaces follow `::` — of a struct, class, enum, interface or extend block, of a type parameter's constraint or of an associated type's bound — as a list, `[I, J]` or `I, J`. Several are joined with `&`: `:: I & J`."
 explanation = '''
-After `::` one interface may stand alone, `struct User :: Named`, and several stand in brackets, `struct User :: [Named, Shown]` — the list rule, the same as for `throws` and `catch`. Without the brackets the `,` after the first would leave it open what the list holds.
+After `::` stands what the type is: one interface, `struct User :: Named`, or several joined with `&`, `struct User :: Named & Shown` — it is a `Named` and a `Shown`. A list in brackets is a set of types, and a set means one of them, as `throws [A, B]` and `catch (e in [A, B])` do; a conformance or a constraint needs all of them, so it is not written as a list. One interface may still stand in brackets, `:: [Named]`: a set of one is that interface.
 
-Put the interfaces in brackets. In a type parameter's constraint a `,` after one interface begins the next parameter: `<T :: Named, U>` has the parameters `T` and `U`; `<T :: [Named, Shown]>` constrains `T` twice.
+Join the interfaces with `&`. In a type parameter's constraint a `,` after one interface begins the next parameter: `<T :: Named, U>` has the parameters `T` and `U`; `<T :: Named & Shown>` constrains `T` twice.
 '''
 wrong = '''
 interface Named {
@@ -3456,7 +3456,7 @@ interface Shown {
     fn show(): string;
 }
 
-struct User :: Named, Shown {
+struct User :: [Named, Shown] {
     fn name(): string { return "u"; }
     fn show(): string { return "U"; }
 }
@@ -3473,7 +3473,7 @@ interface Shown {
     fn show(): string;
 }
 
-struct User :: [Named, Shown] {
+struct User :: Named & Shown {
     fn name(): string { return "u"; }
     fn show(): string { return "U"; }
 }
@@ -5988,7 +5988,7 @@ wrong = '''
 interface A { fn tag(): int { return 1; } }
 interface B { fn tag(): int { return 2; } }
 
-struct V :: [A, B] { x: int }
+struct V :: A & B { x: int }
 
 fn main(): void {
     let _ = V { x = 0 }.x;
@@ -5998,7 +5998,7 @@ right = '''
 interface A { fn tag(): int { return 1; } }
 interface B { fn tag(): int { return 2; } }
 
-struct V :: [A, B] {
+struct V :: A & B {
     x: int,
     fn tag(): int { return 3; }
 }
@@ -6954,7 +6954,7 @@ interface Titled {
     fn name(): string;
 }
 
-interface Labelled :: [Named, Titled] {
+interface Labelled :: Named & Titled {
 }
 
 fn main(): void {
@@ -6969,7 +6969,7 @@ interface Titled {
     fn title(): string;
 }
 
-interface Labelled :: [Named, Titled] {
+interface Labelled :: Named & Titled {
 }
 
 fn main(): void {
@@ -9959,7 +9959,7 @@ class Broken :: [Error] {
     fn message(): string { return "broken"; }
 }
 
-struct Empty :: [Iterator, Closeable] {
+struct Empty :: Iterator & Closeable {
     type Item = int;
 
     mut fn next(): ?int {
@@ -9974,7 +9974,7 @@ fn main(): void {
 }
 '''
 right = '''
-struct Empty :: [Iterator, Closeable] {
+struct Empty :: Iterator & Closeable {
     type Item = int;
 
     mut fn next(): ?int {

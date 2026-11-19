@@ -1,5 +1,5 @@
 
-struct Size :: [Ordered, TotalOrder] {
+struct Size :: Ordered & TotalOrder {
     n: int,
     fn compare(other: Size): ?Ordering {
         return (this.n - other.n).compare(0);

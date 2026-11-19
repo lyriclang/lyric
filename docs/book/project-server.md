@@ -19,7 +19,7 @@ import std.codec { Codable };
 import std.io { println };
 import std.json { encode, decode };
 
-struct Item :: [Codable, Equatable] {
+struct Item :: Codable & Equatable {
     id: int,
     name: string,
     price: float,

@@ -424,7 +424,7 @@ public class IndexAssignmentTests
     public void From_the_end_writes_a_struct_in_place()
     {
         Assert.Equal("1 9 | 9 1\n", Output("""
-            struct Pair :: [IndexSet<int>, Length] {
+            struct Pair :: IndexSet<int> & Length {
                 type Output = int;
                 var a: int,
                 var b: int,

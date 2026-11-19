@@ -176,7 +176,7 @@ extend JsonValue :: [Equatable] {
     }
 }
 
-extend JsonValue :: [Display, Debug] {
+extend JsonValue :: Display & Debug {
     /// Returns the compact text. A `NaN` or an infinity ends the text where it stands.
     fn show(): string {
         var e = JsonWriter { opts = JsonOptions { } };

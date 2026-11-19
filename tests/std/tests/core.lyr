@@ -4,12 +4,12 @@ import std.test { assertEq, assertTrue, assertFalse };
 import std.core { arrayOf };
 import std.hash { FixedHasher };
 
-struct Row :: [Equatable, Debug, Clone] {
+struct Row :: Equatable & Debug & Clone {
     cells: int[],
     note: ?int,
 }
 
-struct Note :: [Equatable, Hashable] {
+struct Note :: Equatable & Hashable {
     value: ?int,
 }
 

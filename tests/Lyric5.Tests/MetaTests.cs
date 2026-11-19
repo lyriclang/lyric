@@ -104,7 +104,7 @@ public class MetaTests
                 fn show2(): string { return f"{this}"; }
             }
 
-            struct Counter :: [Show2, Reset] {
+            struct Counter :: Show2 & Reset {
                 var a: int,
                 var b: int,
             }
@@ -215,7 +215,7 @@ public class MetaTests
                     }
                 }
 
-                struct P :: [Keys, LocalKeys, HereKeys] {
+                struct P :: Keys & LocalKeys & HereKeys {
                     pub a: int,
                     b: int,
                     private c: int,

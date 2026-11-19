@@ -16,7 +16,7 @@ import std.os { args, signals, Signal };
 import std.task { spawn };
 import std.uri { Uri };
 
-struct Item :: [Codable, Equatable] {
+struct Item :: Codable & Equatable {
     id: int,
     name: string,
     price: float,

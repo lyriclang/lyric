@@ -485,6 +485,12 @@ promise. This entry fills with the milestones.
   an internal error. The expander reaches the syntax tree by reflection, and the trimmer of the
   native build had removed what it reaches; the tests run on .NET and never saw it. The CI now runs
   `examples/macros` with the published binary on every platform.
+- **Several interfaces after `::` are joined with `&`** (design 03 TM7, spec 02 §1 rule 6):
+  `struct Item :: Codable & Equatable`, `<T :: Ordered & Display>`, `class Dog :: Walker by legs &
+  Named`. A list of types in brackets is a set — one of them, as in `throws [A, B]` — so
+  `:: [I, J]` and `:: I, J` are `LYR-PAR0066`; one interface in brackets, `:: [I]`, stays. The
+  formatter puts a chain too long for the line one to a line, with the `{` on its own.
+  `lyric fix --from-4` joins Lyric 4's lists (rule S13).
 
 ---
 

@@ -18,7 +18,7 @@ public class VariantsTests
         var dir = App("""
             import std.io { println };
 
-            enum Level :: [Variants, Equatable] { Low, Mid, High }
+            enum Level :: Variants & Equatable { Low, Mid, High }
 
             fn table<T :: [Variants]>(): string {
                 var out = "";

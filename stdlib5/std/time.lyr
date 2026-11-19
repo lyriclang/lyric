@@ -58,19 +58,18 @@ extern "C" fn zoneEnvRaw(name: string, intoAt: uint, intoLength: int): int = "ly
 /// # Panics
 ///
 /// Arithmetic that leaves that range panics with an overflow (RT0002), as `int`'s does.
-pub struct Duration :: [
-    Equatable,
-    Ordered,
-    TotalOrder,
-    Hashable,
-    Default,
-    Display,
-    Parse,
-    Add,
-    Sub,
-    Mul<int>,
-    Div<int>
-] {
+pub struct Duration :: Equatable
+    & Ordered
+    & TotalOrder
+    & Hashable
+    & Default
+    & Display
+    & Parse
+    & Add
+    & Sub
+    & Mul<int>
+    & Div<int>
+{
     ns: int,
 
     pub static fn ofNanos(n: int): Duration {
@@ -311,7 +310,14 @@ fn unitNanos(name: string): uint {
 /// A moment on the wall clock, in nanoseconds since 1970-01-01T00:00:00Z — POSIX time, no leap
 /// seconds counted: the years 1677 to 2262. Two compare and order as the moments they are.
 /// Its text is RFC 3339 in UTC, `2026-10-08T12:34:56.5Z`, the fraction without trailing zeros.
-pub struct Instant :: [Equatable, Ordered, TotalOrder, Hashable, Add<Duration>, Display, Parse] {
+pub struct Instant :: Equatable
+    & Ordered
+    & TotalOrder
+    & Hashable
+    & Add<Duration>
+    & Display
+    & Parse
+{
     ns: int,
 
     /// Returns the current moment on the system's wall clock, which the system may set back; to
@@ -427,7 +433,7 @@ pub struct Monotonic {
 
 /// The reason for a `TimeError`: a value that does not exist; no zone database on the system; a
 /// zone the database does not have.
-pub enum TimeErrorKind :: [Equatable, Debug] {
+pub enum TimeErrorKind :: Equatable & Debug {
     Invalid,
     NoZoneData,
     NoSuchZone,
@@ -445,7 +451,7 @@ pub struct TimeError :: [Error] {
 }
 
 /// The days of the week, Monday first (ISO 8601).
-pub enum Weekday :: [Equatable, Debug] {
+pub enum Weekday :: Equatable & Debug {
     Monday,
     Tuesday,
     Wednesday,
@@ -472,7 +478,7 @@ extend Weekday :: [Display] {
 /// A day of the proleptic Gregorian calendar. Its text is ISO 8601's, `2026-10-08`; a year
 /// outside 0000–9999 shows its sign and its digits, `+10000-01-01`, which RFC 3339 does not read
 /// back.
-pub struct Date :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
+pub struct Date :: Equatable & Ordered & TotalOrder & Hashable & Display & Parse {
     y: int,
     m: int,
     d: int,
@@ -555,7 +561,7 @@ pub struct Date :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
 
 /// A time of day: hours 0–23, minutes and seconds 0–59 — no leap second, which POSIX time
 /// does not count —, nanoseconds. Its text is `HH:MM:SS` and the fraction, without trailing zeros.
-pub struct Time :: [Equatable, Ordered, TotalOrder, Hashable, Display, Parse] {
+pub struct Time :: Equatable & Ordered & TotalOrder & Hashable & Display & Parse {
     h: int,
     mi: int,
     s: int,
@@ -832,7 +838,7 @@ extend Zone :: [Equatable] {
 }
 
 /// What a zone says about a moment.
-pub struct ZoneInfo :: [Equatable, Debug] {
+pub struct ZoneInfo :: Equatable & Debug {
     pub offset: Duration,
     pub isDst: bool,
     pub abbreviation: string,
@@ -1361,7 +1367,7 @@ fn envText(name: string): ?string {
 /// written. Its text is RFC 3339, `2026-10-08T12:34:56.5+02:00`, `Z` for no offset. Two compare
 /// field by field: the same moment at two offsets is two date-times — `toInstant()` compares them
 /// as moments.
-pub struct DateTime :: [Display, Parse] {
+pub struct DateTime :: Display & Parse {
     d: Date,
     t: Time,
     off: int,

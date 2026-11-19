@@ -135,7 +135,7 @@ public sealed class Resolver
             // each element in its debug text, the display text the same. A source of its own, so
             // the first one's name — in the #line of a lowered 'equals' — stays as it was.
             var shown = $$"""
-                extend<T :: [Debug]> T[{{n}}] :: [Debug, Display] {
+                extend<T :: [Debug]> T[{{n}}] :: Debug & Display {
                     fn debug(): string {
                         let out = StringBuilder.new();
                         this.debugTo(out);

@@ -175,6 +175,10 @@ fn main(): void {
 (1, 2) true
 ```
 
+A type that conforms to several interfaces joins them with `&`: `struct Point :: Equatable &
+Display { … }` is an `Equatable` and a `Display`. Brackets would say something else — `[A, B]` is
+one of them, as in `throws [A, B]` — so a conformance is never written as a list.
+
 `Equatable` gives `==` and `!=`. For a struct whose fields are all equatable, naming the interface
 is enough: the comparison is field by field, and nothing has to be written. `Ordered` gives `<` and
 the other comparisons, `Hashable` makes a value a key of a `Map`, and `Closeable` is what
@@ -210,6 +214,9 @@ fn main(): void {
 The call does not name `T`: the compiler finds it from the argument. The body is checked once,
 against the bound — `>` is there because `Ordered` gives it — and the compiler then makes a copy of
 the function for each type it is called with, so a generic call costs what a plain one costs.
+
+Several bounds are joined with `&` as well: `<T :: Ordered & Display>` takes a type that conforms
+to both.
 
 ## Generic types
 

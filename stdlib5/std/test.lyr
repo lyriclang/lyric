@@ -368,7 +368,7 @@ pub fn assertPanics(f: fn() -> void throws Error, message: string = ""): PanicIn
 /// Fails the test unless `actual` equals `expected`: `xs.length() = 2, expected 3` — the
 /// expression the call wrote for `actual`, where it is not the value itself —, then `message`,
 /// then, for values too long to compare by eye, their first difference.
-pub fn assertEq<T :: [Equatable, Debug]>(
+pub fn assertEq<T :: Equatable & Debug>(
     actual: T,
     expected: T,
     message: string = "",
@@ -386,7 +386,7 @@ pub fn assertEq<T :: [Equatable, Debug]>(
 
 /// Fails the test where `actual` equals `unexpected` — the assertion for "it changed", where
 /// `assertEq` says "it is".
-pub fn assertNotEq<T :: [Equatable, Debug]>(
+pub fn assertNotEq<T :: Equatable & Debug>(
     actual: T,
     unexpected: T,
     message: string = "",
@@ -461,7 +461,7 @@ pub fn assertClose(
 }
 
 /// Fails the test unless `actual` is less than `bound`.
-pub fn assertLess<T :: [Ordered, Debug]>(
+pub fn assertLess<T :: Ordered & Debug>(
     actual: T,
     bound: T,
     message: string = "",
@@ -475,7 +475,7 @@ pub fn assertLess<T :: [Ordered, Debug]>(
 }
 
 /// Fails the test unless `actual` is greater than `bound`.
-pub fn assertGreater<T :: [Ordered, Debug]>(
+pub fn assertGreater<T :: Ordered & Debug>(
     actual: T,
     bound: T,
     message: string = "",
@@ -493,7 +493,7 @@ pub fn assertGreater<T :: [Ordered, Debug]>(
 
 /// Fails the test unless `container` holds `x` — what `x in container` asks (`Contains`):
 /// `assertContains("abc", 'b')`, `assertContains(xs, 3)`.
-pub fn assertContains<T :: [Debug], C :: [Contains<T>, Debug]>(
+pub fn assertContains<T :: [Debug], C :: Contains<T> & Debug>(
     container: C,
     x: T,
     message: string = "",
@@ -511,7 +511,7 @@ pub fn assertContains<T :: [Debug], C :: [Contains<T>, Debug]>(
 ///
 /// # Errors
 /// Throws what the iterator of `c` throws — nothing, for the collections above.
-pub fn assertEmpty<C :: [Iterable, Debug]>(
+pub fn assertEmpty<C :: Iterable & Debug>(
     c: C,
     message: string = "",
     @callerExpr(c) written: string = ""

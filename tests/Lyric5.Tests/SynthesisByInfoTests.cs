@@ -25,7 +25,7 @@ public class SynthesisByInfoTests
             import std.io { println };
             import std.collections { Set };
 
-            struct P :: [Equatable, Hashable, Ordered, Clone, Default] {
+            struct P :: Equatable & Hashable & Ordered & Clone & Default {
                 x: int,
                 name: string,
                 internal n: int = 7,
@@ -58,7 +58,7 @@ public class SynthesisByInfoTests
             import std.io { println };
             import std.collections { Set };
 
-            enum E :: [Equatable, Ordered, Clone, Hashable] { A, B(int, string), C { w: int } }
+            enum E :: Equatable & Ordered & Clone & Hashable { A, B(int, string), C { w: int } }
 
             fn main(): void {
                 let a = E.A;
@@ -170,8 +170,8 @@ public class SynthesisByInfoTests
             import std.io { println };
             import std.meta { fields, variants, isEnum };
 
-            enum Shape :: [Equatable, Named, Sum, Copy] { Dot, Circle(int, string), Rect { w: int, h: int } }
-            struct P :: [Equatable, Copy] { x: int, name: string }
+            enum Shape :: Equatable & Named & Sum & Copy { Dot, Circle(int, string), Rect { w: int, h: int } }
+            struct P :: Equatable & Copy { x: int, name: string }
 
             interface Named {
                 fn name(): string {

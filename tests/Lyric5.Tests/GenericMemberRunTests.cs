@@ -173,7 +173,7 @@ public class GenericMemberRunTests
                 fn n(): int;
             }
 
-            struct Crate<T> :: [Tagger, Made] {
+            struct Crate<T> :: Tagger & Made {
                 v: int,
                 fn tag<U :: [Display]>(u: U): string { return f"crate {u}"; }
                 static fn make(): Crate<T> { return Crate<T> { v = 7 }; }

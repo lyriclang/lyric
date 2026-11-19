@@ -1,7 +1,7 @@
 // A struct with a large inline array field: its synthesized equality, hash and debug text take
 // the field whole (M8c S17; design 04 "Review 2026-10-09" S3b) — one call each through the
 // length's blocks, not a branch per element. Exits 0 when the comparisons and the set agree.
-struct Page :: [Equatable, Hashable] { id: int, bytes: uint8[4096] }
+struct Page :: Equatable & Hashable { id: int, bytes: uint8[4096] }
 
 fn main(): int {
     var a: uint8[4096] = [0u8] * 4096;

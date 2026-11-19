@@ -39,7 +39,7 @@ public class ImpliedSynthesisTests
                 n: int,
             }
 
-            struct Both :: [Args, Default] {
+            struct Both :: Args & Default {
                 port: int = 1,
             }
 

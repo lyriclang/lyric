@@ -17,7 +17,7 @@ public class SelfTests
         interface Parse { static fn parse(s: string): Self; }
         interface Add<Rhs = Self> { fn add(o: Rhs): Self; }
         interface Show { fn show(): string; }
-        struct P :: [Equatable, Parse, Add, Show] {
+        struct P :: Equatable & Parse & Add & Show {
             n: int,
             fn equals(o: P): bool { return this.n == o.n; }
             static fn parse(s: string): P { return P { n = 1 }; }

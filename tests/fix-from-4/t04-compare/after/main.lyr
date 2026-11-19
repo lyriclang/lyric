@@ -1,6 +1,6 @@
 import std.io { println };
 
-struct Version :: [Ordered, TotalOrder] {
+struct Version :: Ordered & TotalOrder {
     major: int,
     minor: int,
     fn compare(other: Version): ?Ordering {
@@ -14,7 +14,7 @@ struct Version :: [Ordered, TotalOrder] {
     }
 }
 
-struct Name :: [Ordered, TotalOrder] {
+struct Name :: Ordered & TotalOrder {
     text: string,
     fn compare(other: Name): ?Ordering {
         return this.text.compare(other.text);

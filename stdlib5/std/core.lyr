@@ -484,7 +484,7 @@ pub struct callerFile :: [OnParameter] { }
 /// attribute (`LYR-SEM0081`). `replacement` is what the use should become, for the tools. It
 /// stands on a module, on what stands at a module's top level (an `extend` block for its
 /// members) and on a member; not on a parameter.
-pub struct Deprecated :: [OnModule, OnTopLevel, OnMember] {
+pub struct Deprecated :: OnModule & OnTopLevel & OnMember {
     pub message: string = "",
     pub until: string = "",
     pub replacement: string = "",
@@ -507,7 +507,7 @@ pub struct Cold :: [OnCallable] { }
 ///
 /// A call of a function marked so, or a call whose value is of a type marked so, warns where it
 /// stands as a statement and its value goes nowhere.
-pub struct MustUse :: [OnCallable, OnType] { }
+pub struct MustUse :: OnCallable & OnType { }
 
 /// Lays the type out as C does, so it crosses into a C function as C's own.
 ///
@@ -532,7 +532,7 @@ pub struct Export :: [OnFunction] { }
 ///
 /// A `match` over it outside its package needs a `_` arm, so a new variant or conformer breaks
 /// nobody there.
-pub struct NonExhaustive :: [OnType, OnInterface] { }
+pub struct NonExhaustive :: OnType & OnInterface { }
 
 /// Silences a lint where this attribute stands.
 ///
@@ -680,7 +680,7 @@ pub interface Equatable {
 }
 
 /// The answer of a comparison; equatable, hashable and printable like any plain enum.
-pub enum Ordering :: [Equatable, Hashable, Debug] {
+pub enum Ordering :: Equatable & Hashable & Debug {
     Less,
     Equal,
     Greater,
@@ -974,25 +974,24 @@ pub interface Display {
 }
 
 // --- the scalars ------------------------------------------------------------------------------
-extend int :: [
-    Equatable,
-    Ordered,
-    TotalOrder,
-    Hashable,
-    Display,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    Neg,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitNot,
-    Shl,
-    Shr
-] {
+extend int :: Equatable
+    & Ordered
+    & TotalOrder
+    & Hashable
+    & Display
+    & Add
+    & Sub
+    & Mul
+    & Div
+    & Rem
+    & Neg
+    & BitAnd
+    & BitOr
+    & BitXor
+    & BitNot
+    & Shl
+    & Shr
+{
     fn equals(o: int): bool {
         return this == o;
     }
@@ -1078,25 +1077,24 @@ extend int :: [
     }
 }
 
-extend int8 :: [
-    Equatable,
-    Ordered,
-    TotalOrder,
-    Hashable,
-    Display,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    Neg,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitNot,
-    Shl,
-    Shr
-] {
+extend int8 :: Equatable
+    & Ordered
+    & TotalOrder
+    & Hashable
+    & Display
+    & Add
+    & Sub
+    & Mul
+    & Div
+    & Rem
+    & Neg
+    & BitAnd
+    & BitOr
+    & BitXor
+    & BitNot
+    & Shl
+    & Shr
+{
     fn equals(o: int8): bool {
         return this == o;
     }
@@ -1182,25 +1180,24 @@ extend int8 :: [
     }
 }
 
-extend int16 :: [
-    Equatable,
-    Ordered,
-    TotalOrder,
-    Hashable,
-    Display,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    Neg,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitNot,
-    Shl,
-    Shr
-] {
+extend int16 :: Equatable
+    & Ordered
+    & TotalOrder
+    & Hashable
+    & Display
+    & Add
+    & Sub
+    & Mul
+    & Div
+    & Rem
+    & Neg
+    & BitAnd
+    & BitOr
+    & BitXor
+    & BitNot
+    & Shl
+    & Shr
+{
     fn equals(o: int16): bool {
         return this == o;
     }
@@ -1286,25 +1283,24 @@ extend int16 :: [
     }
 }
 
-extend int32 :: [
-    Equatable,
-    Ordered,
-    TotalOrder,
-    Hashable,
-    Display,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    Neg,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitNot,
-    Shl,
-    Shr
-] {
+extend int32 :: Equatable
+    & Ordered
+    & TotalOrder
+    & Hashable
+    & Display
+    & Add
+    & Sub
+    & Mul
+    & Div
+    & Rem
+    & Neg
+    & BitAnd
+    & BitOr
+    & BitXor
+    & BitNot
+    & Shl
+    & Shr
+{
     fn equals(o: int32): bool {
         return this == o;
     }
@@ -1390,24 +1386,23 @@ extend int32 :: [
     }
 }
 
-extend uint :: [
-    Equatable,
-    Ordered,
-    TotalOrder,
-    Hashable,
-    Display,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitNot,
-    Shl,
-    Shr
-] {
+extend uint :: Equatable
+    & Ordered
+    & TotalOrder
+    & Hashable
+    & Display
+    & Add
+    & Sub
+    & Mul
+    & Div
+    & Rem
+    & BitAnd
+    & BitOr
+    & BitXor
+    & BitNot
+    & Shl
+    & Shr
+{
     fn equals(o: uint): bool {
         return this == o;
     }
@@ -1489,24 +1484,23 @@ extend uint :: [
     }
 }
 
-extend uint8 :: [
-    Equatable,
-    Ordered,
-    TotalOrder,
-    Hashable,
-    Display,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitNot,
-    Shl,
-    Shr
-] {
+extend uint8 :: Equatable
+    & Ordered
+    & TotalOrder
+    & Hashable
+    & Display
+    & Add
+    & Sub
+    & Mul
+    & Div
+    & Rem
+    & BitAnd
+    & BitOr
+    & BitXor
+    & BitNot
+    & Shl
+    & Shr
+{
     fn equals(o: uint8): bool {
         return this == o;
     }
@@ -1588,24 +1582,23 @@ extend uint8 :: [
     }
 }
 
-extend uint16 :: [
-    Equatable,
-    Ordered,
-    TotalOrder,
-    Hashable,
-    Display,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitNot,
-    Shl,
-    Shr
-] {
+extend uint16 :: Equatable
+    & Ordered
+    & TotalOrder
+    & Hashable
+    & Display
+    & Add
+    & Sub
+    & Mul
+    & Div
+    & Rem
+    & BitAnd
+    & BitOr
+    & BitXor
+    & BitNot
+    & Shl
+    & Shr
+{
     fn equals(o: uint16): bool {
         return this == o;
     }
@@ -1687,24 +1680,23 @@ extend uint16 :: [
     }
 }
 
-extend uint32 :: [
-    Equatable,
-    Ordered,
-    TotalOrder,
-    Hashable,
-    Display,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitNot,
-    Shl,
-    Shr
-] {
+extend uint32 :: Equatable
+    & Ordered
+    & TotalOrder
+    & Hashable
+    & Display
+    & Add
+    & Sub
+    & Mul
+    & Div
+    & Rem
+    & BitAnd
+    & BitOr
+    & BitXor
+    & BitNot
+    & Shl
+    & Shr
+{
     fn equals(o: uint32): bool {
         return this == o;
     }
@@ -1786,7 +1778,7 @@ extend uint32 :: [
     }
 }
 
-extend float :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
+extend float :: Equatable & Ordered & Display & Add & Sub & Mul & Div & Rem & Neg {
     fn equals(o: float): bool {
         return this == o;
     }
@@ -1837,7 +1829,7 @@ extend float :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
     }
 }
 
-extend float32 :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
+extend float32 :: Equatable & Ordered & Display & Add & Sub & Mul & Div & Rem & Neg {
     fn equals(o: float32): bool {
         return this == o;
     }
@@ -1888,7 +1880,7 @@ extend float32 :: [Equatable, Ordered, Display, Add, Sub, Mul, Div, Rem, Neg] {
     }
 }
 
-extend bool :: [Equatable, Hashable, Display] {
+extend bool :: Equatable & Hashable & Display {
     fn equals(o: bool): bool {
         return this == o;
     }
@@ -1906,7 +1898,7 @@ extend bool :: [Equatable, Hashable, Display] {
     }
 }
 
-extend char :: [Equatable, Ordered, TotalOrder, Hashable, Display] {
+extend char :: Equatable & Ordered & TotalOrder & Hashable & Display {
     fn equals(o: char): bool {
         return this == o;
     }
@@ -1944,7 +1936,7 @@ extend char :: [Equatable, Ordered, TotalOrder, Hashable, Display] {
     }
 }
 
-extend string :: [Equatable, Display, Add] {
+extend string :: Equatable & Display & Add {
     fn equals(o: string): bool {
         return this == o;
     }
@@ -2039,7 +2031,7 @@ extend<T, U :: [From<T>]> T :: [Into<U>] {
     }
 }
 
-extend int :: [Debug, Clone, Default] {
+extend int :: Debug & Clone & Default {
     fn debug(): string {
         return f"{this}";
     }
@@ -2053,7 +2045,7 @@ extend int :: [Debug, Clone, Default] {
     }
 }
 
-extend int8 :: [Debug, Clone, Default] {
+extend int8 :: Debug & Clone & Default {
     fn debug(): string {
         return f"{this}";
     }
@@ -2067,7 +2059,7 @@ extend int8 :: [Debug, Clone, Default] {
     }
 }
 
-extend int16 :: [Debug, Clone, Default] {
+extend int16 :: Debug & Clone & Default {
     fn debug(): string {
         return f"{this}";
     }
@@ -2081,7 +2073,7 @@ extend int16 :: [Debug, Clone, Default] {
     }
 }
 
-extend int32 :: [Debug, Clone, Default] {
+extend int32 :: Debug & Clone & Default {
     fn debug(): string {
         return f"{this}";
     }
@@ -2095,7 +2087,7 @@ extend int32 :: [Debug, Clone, Default] {
     }
 }
 
-extend uint :: [Debug, Clone, Default] {
+extend uint :: Debug & Clone & Default {
     fn debug(): string {
         return f"{this}";
     }
@@ -2109,7 +2101,7 @@ extend uint :: [Debug, Clone, Default] {
     }
 }
 
-extend uint8 :: [Debug, Clone, Default] {
+extend uint8 :: Debug & Clone & Default {
     fn debug(): string {
         return f"{this}";
     }
@@ -2123,7 +2115,7 @@ extend uint8 :: [Debug, Clone, Default] {
     }
 }
 
-extend uint16 :: [Debug, Clone, Default] {
+extend uint16 :: Debug & Clone & Default {
     fn debug(): string {
         return f"{this}";
     }
@@ -2137,7 +2129,7 @@ extend uint16 :: [Debug, Clone, Default] {
     }
 }
 
-extend uint32 :: [Debug, Clone, Default] {
+extend uint32 :: Debug & Clone & Default {
     fn debug(): string {
         return f"{this}";
     }
@@ -2151,7 +2143,7 @@ extend uint32 :: [Debug, Clone, Default] {
     }
 }
 
-extend float :: [Debug, Clone, Default] {
+extend float :: Debug & Clone & Default {
     fn debug(): string {
         return f"{this}";
     }
@@ -2165,7 +2157,7 @@ extend float :: [Debug, Clone, Default] {
     }
 }
 
-extend float32 :: [Debug, Clone, Default] {
+extend float32 :: Debug & Clone & Default {
     fn debug(): string {
         return f"{this}";
     }
@@ -2179,7 +2171,7 @@ extend float32 :: [Debug, Clone, Default] {
     }
 }
 
-extend bool :: [Debug, Clone, Default] {
+extend bool :: Debug & Clone & Default {
     fn debug(): string {
         return f"{this}";
     }
@@ -2193,7 +2185,7 @@ extend bool :: [Debug, Clone, Default] {
     }
 }
 
-extend char :: [Debug, Clone] {
+extend char :: Debug & Clone {
     /// Returns the character between `'`, escaped as a text's characters are: `'\''`, `'\n'`,
     /// `'\u{200b}'`.
     fn debug(): string {
@@ -2226,7 +2218,7 @@ extend char {
 ///
 /// No `char` is a `Surrogate`, since the halves of a UTF-16 pair are no scalar values; the
 /// variant is there because the standard lists it.
-pub enum UnicodeCategory :: [Equatable, Hashable, Debug] {
+pub enum UnicodeCategory :: Equatable & Hashable & Debug {
     UppercaseLetter,
     LowercaseLetter,
     TitlecaseLetter,
@@ -2422,7 +2414,7 @@ fn hashText<H :: [Hasher]>(s: StringView, &h: H): void {
     h.writeByte(255);
 }
 
-extend string :: [Debug, Clone, Default] {
+extend string :: Debug & Clone & Default {
     /// Returns the text between `"`, escaped as it would be written.
     ///
     /// `["a\"b", "c"]` prints as it is written, and the quotes keep the boundaries between the
@@ -2530,19 +2522,18 @@ extend string {
 // ---------------------------------------------------------------------------------------------
 
 /// Every number type: its zero and its one, arithmetic that stays in the type.
-pub interface Num :: [
-    Equatable,
-    Ordered,
-    Add<Out = Self>,
-    Sub<Out = Self>,
-    Mul<Out = Self>,
-    Div<Out = Self>,
-    Rem<Out = Self>,
-    Display,
-    Debug,
-    Parse,
-    Default
-] {
+pub interface Num :: Equatable
+    & Ordered
+    & Add<Out = Self>
+    & Sub<Out = Self>
+    & Mul<Out = Self>
+    & Div<Out = Self>
+    & Rem<Out = Self>
+    & Display
+    & Debug
+    & Parse
+    & Default
+{
     static let zero: Self;
     static let one: Self;
 
@@ -2554,20 +2545,19 @@ pub interface Num :: [
 
 /// A number with a sign: the signed integers and the floats — what `std.math`'s `abs` and
 /// `signum` take; `uint` has neither.
-pub interface Signed :: [Num, Neg<Out = Self>] { }
+pub interface Signed :: Num & Neg<Out = Self> { }
 
 /// The eight integer types: their range, a total order, a hash, the bit operators.
-pub interface Integer :: [
-    Num,
-    TotalOrder,
-    Hashable,
-    BitAnd<Out = Self>,
-    BitOr<Out = Self>,
-    BitXor<Out = Self>,
-    BitNot<Out = Self>,
-    Shl<Out = Self>,
-    Shr<Out = Self>
-] {
+pub interface Integer :: Num
+    & TotalOrder
+    & Hashable
+    & BitAnd<Out = Self>
+    & BitOr<Out = Self>
+    & BitXor<Out = Self>
+    & BitNot<Out = Self>
+    & Shl<Out = Self>
+    & Shr<Out = Self>
+{
     static let min: Self;
     static let max: Self;
     static let bitWidth: int;
@@ -2656,7 +2646,7 @@ fn floatBits<T>(x: T): uint64;
 fn floatFromBits<T>(b: uint64, like: T): T;
 fn totalOrderKey<T>(x: T): uint64;
 
-extend int :: [Num, Signed, Integer] {
+extend int :: Num & Signed & Integer {
     static let zero: int = 0;
     static let one: int = 1;
     static let min: int = -9223372036854775808;
@@ -2694,7 +2684,7 @@ extend int :: [Num, Signed, Integer] {
     }
 }
 
-extend int8 :: [Num, Signed, Integer] {
+extend int8 :: Num & Signed & Integer {
     static let zero: int8 = 0;
     static let one: int8 = 1;
     static let min: int8 = -128;
@@ -2732,7 +2722,7 @@ extend int8 :: [Num, Signed, Integer] {
     }
 }
 
-extend int16 :: [Num, Signed, Integer] {
+extend int16 :: Num & Signed & Integer {
     static let zero: int16 = 0;
     static let one: int16 = 1;
     static let min: int16 = -32768;
@@ -2770,7 +2760,7 @@ extend int16 :: [Num, Signed, Integer] {
     }
 }
 
-extend int32 :: [Num, Signed, Integer] {
+extend int32 :: Num & Signed & Integer {
     static let zero: int32 = 0;
     static let one: int32 = 1;
     static let min: int32 = -2147483648;
@@ -2808,7 +2798,7 @@ extend int32 :: [Num, Signed, Integer] {
     }
 }
 
-extend uint :: [Num, Integer] {
+extend uint :: Num & Integer {
     static let zero: uint = 0;
     static let one: uint = 1;
     static let min: uint = 0;
@@ -2846,7 +2836,7 @@ extend uint :: [Num, Integer] {
     }
 }
 
-extend uint8 :: [Num, Integer] {
+extend uint8 :: Num & Integer {
     static let zero: uint8 = 0;
     static let one: uint8 = 1;
     static let min: uint8 = 0;
@@ -2884,7 +2874,7 @@ extend uint8 :: [Num, Integer] {
     }
 }
 
-extend uint16 :: [Num, Integer] {
+extend uint16 :: Num & Integer {
     static let zero: uint16 = 0;
     static let one: uint16 = 1;
     static let min: uint16 = 0;
@@ -2922,7 +2912,7 @@ extend uint16 :: [Num, Integer] {
     }
 }
 
-extend uint32 :: [Num, Integer] {
+extend uint32 :: Num & Integer {
     static let zero: uint32 = 0;
     static let one: uint32 = 1;
     static let min: uint32 = 0;
@@ -2960,7 +2950,7 @@ extend uint32 :: [Num, Integer] {
     }
 }
 
-extend float :: [Num, Signed, Float] {
+extend float :: Num & Signed & Float {
     static let zero: float = 0.0;
     static let one: float = 1.0;
     static let epsilon: float = 2.220446049250313e-16;
@@ -2984,7 +2974,7 @@ extend float :: [Num, Signed, Float] {
     }
 }
 
-extend float32 :: [Num, Signed, Float] {
+extend float32 :: Num & Signed & Float {
     static let zero: float32 = 0.0;
     static let one: float32 = 1.0;
     static let epsilon: float32 = 1.1920928955078125e-7;
@@ -3015,7 +3005,7 @@ extend float32 :: [Num, Signed, Float] {
 // ---------------------------------------------------------------------------------------------
 
 /// Why a text is not a value of the type.
-pub enum ParseErrorKind :: [Equatable, Debug] {
+pub enum ParseErrorKind :: Equatable & Debug {
     Empty,
     Invalid,
     Overflow,
@@ -3303,7 +3293,7 @@ extern "C" fn stringOfBytes(bytes: uint8[], count: int): string = "lyr_str_from_
 // reaches through a view of all of itself: what cuts gives a view, no copy; what builds gives a
 // string. The search takes a `Pattern`: a view or a string, a character, a test of characters.
 
-extend string :: [Ordered, TotalOrder] {
+extend string :: Ordered & TotalOrder {
     /// Compares byte by byte, which is the order of the code points.
     fn compare(o: string): ?Ordering {
         return this.totalCompare(o);
@@ -3834,7 +3824,7 @@ extend StringView {
 ///
 /// A view equals the string it shows and hashes as it does; it shows its text and debugs
 /// quoted.
-extend StringView :: [Equatable, Hashable, Ordered, TotalOrder, Display, Debug, Index<int>] {
+extend StringView :: Equatable & Hashable & Ordered & TotalOrder & Display & Debug & Index<int> {
     type Output = char;
 
     fn equals(o: StringView): bool {
@@ -4520,7 +4510,7 @@ extend bool :: [Format] {
 /// Iterates over a string's characters, decoded from its UTF-8 bytes.
 ///
 /// From the front by `next`, from the back by `nextBack`, the two meeting in the middle.
-pub struct CharsIter :: [Iterator, DoubleEnded] {
+pub struct CharsIter :: Iterator & DoubleEnded {
     type Item = char;
     s: StringView,
     var at: int,
@@ -4634,7 +4624,7 @@ extend<I :: [Iterator]> I :: [Iterable<Iter = I>] {
 
 // A range is an iterator of its own values, from both ends: the value changes as it is
 // walked — a 'let' range is walked through a copy, as `for` takes one.
-extend<T :: [Step]> Range<T> :: [Iterator, DoubleEnded] {
+extend<T :: [Step]> Range<T> :: Iterator & DoubleEnded {
     type Item = T;
 
     mut fn next(): ?T {
@@ -4838,7 +4828,7 @@ pub struct SliceIter<T> {
     var back: int,
 }
 
-extend<T> SliceIter<T> :: [Iterator, DoubleEnded] {
+extend<T> SliceIter<T> :: Iterator & DoubleEnded {
     type Item = T;
 
     mut fn next(): ?T {
@@ -5457,7 +5447,7 @@ extend CharsIter :: [Clone] {
 // before `start` where that value is the type's last (its first from the back), so neither bound
 // leaves the type. A range of characters walks the scalar values, the surrogates passed over
 // (`Step` above).
-extend<T :: [Step]> RangeInclusive<T> :: [Iterator, DoubleEnded] {
+extend<T :: [Step]> RangeInclusive<T> :: Iterator & DoubleEnded {
     type Item = T;
 
     mut fn next(): ?T {
@@ -5605,7 +5595,7 @@ extend<T :: [Equatable]> Slice<T> :: [Equatable] {
     }
 }
 
-extend<T :: [Debug]> T[] :: [Debug, Display] {
+extend<T :: [Debug]> T[] :: Debug & Display {
     fn debug(): string {
         return debugText(this);
     }
@@ -5623,7 +5613,7 @@ extend<T :: [Debug]> T[] :: [Debug, Display] {
     }
 }
 
-extend<T :: [Debug]> Slice<T> :: [Debug, Display] {
+extend<T :: [Debug]> Slice<T> :: Debug & Display {
     fn debug(): string {
         return debugText(this);
     }
@@ -5829,17 +5819,13 @@ extend<T0 :: [Display], T1 :: [Display], T2 :: [Display]> (T0, T1, T2) :: [Displ
     }
 }
 
-extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable]> (T0, T1, T2, T3) :: [
-    Equatable
-] {
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable]> (T0, T1, T2, T3) :: [Equatable] {
     fn equals(o: (T0, T1, T2, T3)): bool {
         return this.0 == o.0 && this.1 == o.1 && this.2 == o.2 && this.3 == o.3;
     }
 }
 
-extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable]> (T0, T1, T2, T3) :: [
-    Hashable
-] {
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable]> (T0, T1, T2, T3) :: [Hashable] {
     fn hash<H :: [Hasher]>(&h: H): void {
         this.0.hash(&h);
         this.1.hash(&h);
@@ -5868,9 +5854,7 @@ extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug]> (T0, T1, T2, 
     }
 }
 
-extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display]> (T0, T1, T2, T3) :: [
-    Display
-] {
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display]> (T0, T1, T2, T3) :: [Display] {
     fn show(): string {
         let out = StringBuilder.new();
         this.showTo(out);
@@ -5890,17 +5874,13 @@ extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display]> (T0, 
     }
 }
 
-extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable]> (T0, T1, T2, T3, T4) :: [
-    Equatable
-] {
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable]> (T0, T1, T2, T3, T4) :: [Equatable] {
     fn equals(o: (T0, T1, T2, T3, T4)): bool {
         return this.0 == o.0 && this.1 == o.1 && this.2 == o.2 && this.3 == o.3 && this.4 == o.4;
     }
 }
 
-extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable]> (T0, T1, T2, T3, T4) :: [
-    Hashable
-] {
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable]> (T0, T1, T2, T3, T4) :: [Hashable] {
     fn hash<H :: [Hasher]>(&h: H): void {
         this.0.hash(&h);
         this.1.hash(&h);
@@ -5910,9 +5890,7 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T
     }
 }
 
-extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]> (T0, T1, T2, T3, T4) :: [
-    Debug
-] {
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]> (T0, T1, T2, T3, T4) :: [Debug] {
     fn debug(): string {
         let out = StringBuilder.new();
         this.debugTo(out);
@@ -5934,9 +5912,7 @@ extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]
     }
 }
 
-extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display]> (T0, T1, T2, T3, T4) :: [
-    Display
-] {
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display]> (T0, T1, T2, T3, T4) :: [Display] {
     fn show(): string {
         let out = StringBuilder.new();
         this.showTo(out);
@@ -5958,9 +5934,7 @@ extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 ::
     }
 }
 
-extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable]> (T0, T1, T2, T3, T4, T5) :: [
-    Equatable
-] {
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable]> (T0, T1, T2, T3, T4, T5) :: [Equatable] {
     fn equals(o: (T0, T1, T2, T3, T4, T5)): bool {
         return this.0 == o.0
             && this.1 == o.1
@@ -5971,9 +5945,7 @@ extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable
     }
 }
 
-extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable]> (T0, T1, T2, T3, T4, T5) :: [
-    Hashable
-] {
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable]> (T0, T1, T2, T3, T4, T5) :: [Hashable] {
     fn hash<H :: [Hasher]>(&h: H): void {
         this.0.hash(&h);
         this.1.hash(&h);
@@ -5984,9 +5956,7 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T
     }
 }
 
-extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug]> (T0, T1, T2, T3, T4, T5) :: [
-    Debug
-] {
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug]> (T0, T1, T2, T3, T4, T5) :: [Debug] {
     fn debug(): string {
         let out = StringBuilder.new();
         this.debugTo(out);
@@ -6010,9 +5980,7 @@ extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]
     }
 }
 
-extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display]> (T0, T1, T2, T3, T4, T5) :: [
-    Display
-] {
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display]> (T0, T1, T2, T3, T4, T5) :: [Display] {
     fn show(): string {
         let out = StringBuilder.new();
         this.showTo(out);
@@ -6036,9 +6004,7 @@ extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 ::
     }
 }
 
-extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable], T6 :: [Equatable]> (T0, T1, T2, T3, T4, T5, T6) :: [
-    Equatable
-] {
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable], T6 :: [Equatable]> (T0, T1, T2, T3, T4, T5, T6) :: [Equatable] {
     fn equals(o: (T0, T1, T2, T3, T4, T5, T6)): bool {
         return this.0 == o.0
             && this.1 == o.1
@@ -6050,9 +6016,7 @@ extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable
     }
 }
 
-extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable], T6 :: [Hashable]> (T0, T1, T2, T3, T4, T5, T6) :: [
-    Hashable
-] {
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable], T6 :: [Hashable]> (T0, T1, T2, T3, T4, T5, T6) :: [Hashable] {
     fn hash<H :: [Hasher]>(&h: H): void {
         this.0.hash(&h);
         this.1.hash(&h);
@@ -6064,9 +6028,7 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T
     }
 }
 
-extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug], T6 :: [Debug]> (T0, T1, T2, T3, T4, T5, T6) :: [
-    Debug
-] {
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug], T6 :: [Debug]> (T0, T1, T2, T3, T4, T5, T6) :: [Debug] {
     fn debug(): string {
         let out = StringBuilder.new();
         this.debugTo(out);
@@ -6092,9 +6054,7 @@ extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]
     }
 }
 
-extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display], T6 :: [Display]> (T0, T1, T2, T3, T4, T5, T6) :: [
-    Display
-] {
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display], T6 :: [Display]> (T0, T1, T2, T3, T4, T5, T6) :: [Display] {
     fn show(): string {
         let out = StringBuilder.new();
         this.showTo(out);
@@ -6120,9 +6080,7 @@ extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 ::
     }
 }
 
-extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable], T6 :: [Equatable], T7 :: [Equatable]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [
-    Equatable
-] {
+extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable], T4 :: [Equatable], T5 :: [Equatable], T6 :: [Equatable], T7 :: [Equatable]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Equatable] {
     fn equals(o: (T0, T1, T2, T3, T4, T5, T6, T7)): bool {
         return this.0 == o.0
             && this.1 == o.1
@@ -6135,9 +6093,7 @@ extend<T0 :: [Equatable], T1 :: [Equatable], T2 :: [Equatable], T3 :: [Equatable
     }
 }
 
-extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable], T6 :: [Hashable], T7 :: [Hashable]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [
-    Hashable
-] {
+extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T4 :: [Hashable], T5 :: [Hashable], T6 :: [Hashable], T7 :: [Hashable]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Hashable] {
     fn hash<H :: [Hasher]>(&h: H): void {
         this.0.hash(&h);
         this.1.hash(&h);
@@ -6150,9 +6106,7 @@ extend<T0 :: [Hashable], T1 :: [Hashable], T2 :: [Hashable], T3 :: [Hashable], T
     }
 }
 
-extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug], T6 :: [Debug], T7 :: [Debug]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [
-    Debug
-] {
+extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug], T5 :: [Debug], T6 :: [Debug], T7 :: [Debug]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Debug] {
     fn debug(): string {
         let out = StringBuilder.new();
         this.debugTo(out);
@@ -6180,9 +6134,7 @@ extend<T0 :: [Debug], T1 :: [Debug], T2 :: [Debug], T3 :: [Debug], T4 :: [Debug]
     }
 }
 
-extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display], T6 :: [Display], T7 :: [Display]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [
-    Display
-] {
+extend<T0 :: [Display], T1 :: [Display], T2 :: [Display], T3 :: [Display], T4 :: [Display], T5 :: [Display], T6 :: [Display], T7 :: [Display]> (T0, T1, T2, T3, T4, T5, T6, T7) :: [Display] {
     fn show(): string {
         let out = StringBuilder.new();
         this.showTo(out);
@@ -6235,7 +6187,7 @@ extend<Y, R> Coroutine<Y, R> :: [Identity] {
 ///
 /// One of the Tier 1 targets' systems, or `Other` for another POSIX system the runtime was
 /// built for.
-pub enum Platform :: [Equatable, Debug] {
+pub enum Platform :: Equatable & Debug {
     Linux,
     MacOS,
     Windows,
@@ -6254,7 +6206,7 @@ extend Platform :: [Display] {
 }
 
 /// The machine a program runs on, as the target triples name it.
-pub enum Arch :: [Equatable, Debug] {
+pub enum Arch :: Equatable & Debug {
     X86_64,
     Aarch64,
     Other,
@@ -6272,7 +6224,7 @@ extend Arch :: [Display] {
 
 /// Describes what a program is built for: its system, its machine, the width of a pointer in
 /// bits.
-pub struct Target :: [Equatable, Debug] {
+pub struct Target :: Equatable & Debug {
     pub os: Platform,
     pub arch: Arch,
     pub pointerWidth: int,
@@ -6281,7 +6233,7 @@ pub struct Target :: [Equatable, Debug] {
 /// Describes what a program is built as.
 ///
 /// `debug` is true where the profile is the built-in `debug` or one that inherits from it.
-pub struct Profile :: [Equatable, Debug] {
+pub struct Profile :: Equatable & Debug {
     pub debug: bool,
 }
 
@@ -6303,7 +6255,7 @@ pub let profile: Profile = comptime Profile { debug = buildDebug() };
 /// declaration is checked as every other and nothing of it is built; a use the program would
 /// run is refused (`LYR-CT0006`), while a use in the branch a `comptime if` does not take is
 /// allowed. On a module's header it holds for all the module declares: one module per system.
-pub struct When :: [OnTopLevel, OnModule] {
+pub struct When :: OnTopLevel & OnModule {
     pub cond: bool,
 }
 
@@ -6350,7 +6302,7 @@ pub struct SeesConformer :: [OnInterface] { }
 // by name.
 
 /// Who may name a declaration.
-pub enum Visibility :: [Equatable, Debug] {
+pub enum Visibility :: Equatable & Debug {
     Pub,
     Internal,
     Private,
@@ -6361,7 +6313,7 @@ pub enum Visibility :: [Equatable, Debug] {
 /// A struct, a class, an enum, an interface; `Primitive` for the built-in scalars and `string`;
 /// the shapes `?T`, `T[]`, `T[N]`, a view, a tuple, a function; a
 /// type parameter in a generic body; `Other` for what none of these names.
-pub enum TypeKind :: [Equatable, Debug] {
+pub enum TypeKind :: Equatable & Debug {
     Primitive,
     Struct,
     Class,
@@ -6378,7 +6330,7 @@ pub enum TypeKind :: [Equatable, Debug] {
 }
 
 /// A type as a value while compiling: its name, as [typeName] gives it, and its kind.
-pub struct Type :: [Equatable, Debug] {
+pub struct Type :: Equatable & Debug {
     pub name: string,
     pub kind: TypeKind,
 }
@@ -6388,7 +6340,7 @@ pub struct Type :: [Equatable, Debug] {
 /// In a `comptime for` over it, `f.type` names its type and `e.[f]` is the field. `hasDefault`
 /// is whether the declaration writes an initializer (the type's own default does not count,
 /// and a payload's field has none), so a loop tells an optional argument from a required one.
-pub struct FieldInfo :: [Equatable, Debug] {
+pub struct FieldInfo :: Equatable & Debug {
     pub name: string,
     pub type: Type,
     pub index: int,
@@ -6402,7 +6354,7 @@ pub struct FieldInfo :: [Equatable, Debug] {
 /// A positional field is named by its position, `0`, `1`, …. `value` is the integer C holds for
 /// the variant of an enum with `@Layout` — written after `=`, or one more than the variant
 /// before —, and its index in any other enum.
-pub struct VariantInfo :: [Equatable, Debug] {
+pub struct VariantInfo :: Equatable & Debug {
     pub name: string,
     pub index: int,
     pub payload: FieldInfo[],
@@ -6411,7 +6363,7 @@ pub struct VariantInfo :: [Equatable, Debug] {
 
 /// The kind of a member of a type's own body: a function, a constant (a `static let`), an
 /// associated type.
-pub enum MemberKind :: [Equatable, Debug] {
+pub enum MemberKind :: Equatable & Debug {
     Function,
     Constant,
     AssociatedType,
@@ -6421,7 +6373,7 @@ pub enum MemberKind :: [Equatable, Debug] {
 ///
 /// Its name, its type, its place, and whether its declaration writes a default; in a
 /// `comptime for` over it, `parameterAttribute<A>(p)` reads what it carries.
-pub struct ParameterInfo :: [Equatable, Debug] {
+pub struct ParameterInfo :: Equatable & Debug {
     pub name: string,
     pub type: Type,
     pub index: int,
@@ -6432,7 +6384,7 @@ pub struct ParameterInfo :: [Equatable, Debug] {
 ///
 /// Its name, its visibility, whether it is static, whether it is `mut`, its kind, and a
 /// function's parameters; none for a constant or an associated type, both of which are static.
-pub struct MemberInfo :: [Equatable, Debug] {
+pub struct MemberInfo :: Equatable & Debug {
     pub name: string,
     pub visibility: Visibility,
     pub isStatic: bool,

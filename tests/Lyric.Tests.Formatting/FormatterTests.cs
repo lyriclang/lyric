@@ -673,8 +673,8 @@ public class FormatterTests
     [Fact]
     public void A_delegated_conformance_keeps_its_by()
     {
-        var formatted = Format("class Dog :: [Walker by legs,Named] { var legs: Legs }");
-        Assert.Contains(":: [Walker by legs, Named]", formatted);
+        var formatted = Format("class Dog :: Walker by legs & Named { var legs: Legs }");
+        Assert.Contains(":: Walker by legs & Named", formatted);
     }
 
     [Fact]

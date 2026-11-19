@@ -10,9 +10,9 @@ fn hashOf<T :: [Hashable]>(x: T): uint64 {
     return h.finish();
 }
 
-struct P :: [Equatable, Hashable, Ordered, Clone, Default, Display] { x: int, y: int }
-struct Pair<T> :: [Equatable, Debug] { a: T, b: T }
-enum E :: [Equatable, Clone] { A, B(int), R { w: int } }
+struct P :: Equatable & Hashable & Ordered & Clone & Default & Display { x: int, y: int }
+struct Pair<T> :: Equatable & Debug { a: T, b: T }
+enum E :: Equatable & Clone { A, B(int), R { w: int } }
 class C :: [Clone] { items: int[], o: ?int, t: (int, string) }
 
 // a written member replaces the synthesis for that member (Swift)
@@ -20,8 +20,8 @@ struct W :: [Equatable] { x: int, y: int,
     fn equals(o: W): bool { return this.x == o.x; }
 }
 // Ordered and Hashable alone: the Equatable they imply comes along
-enum Color :: [Ordered, Hashable, Clone] { Red, Green, Blue }
-struct Inner :: [Equatable, Debug] { v: int }
+enum Color :: Ordered & Hashable & Clone { Red, Green, Blue }
+struct Inner :: Equatable & Debug { v: int }
 struct Outer :: [Equatable] { i: Inner, s: string, c: char, b: bool, f: float }
 enum Opt<T> :: [Equatable] { None, Some(T) }
 struct D :: [Default] { n: int, label: string = "lbl" }
@@ -30,7 +30,7 @@ struct TO :: [TotalOrder] { a: int, b: int }
 enum Sh :: [Ordered] { Dot, Box(int), Rect { w: int, h: int } }
 struct Box<T> :: [Default] { v: T }
 // an inline array field is unrolled — a view of it is not taken in a frame
-struct Mat :: [Equatable, Clone] { m: int[4] }
+struct Mat :: Equatable & Clone { m: int[4] }
 struct Buf :: [Default] { b: int[2] }
 // the implicit Debug is withdrawn where a field has none to give: this class still compiles
 interface Walker { fn walk(): int; }

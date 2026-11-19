@@ -145,6 +145,7 @@ public static class Migrator
         new Rules.FormatSpecs(),
         new Rules.Length(),
         new Rules.GenericInterfaces(),
+        new Rules.JoinedBounds(),
         new Rules.Fields(),
         new Rules.MethodModifiers(),
         new Rules.WrittenParameters(),

@@ -89,7 +89,7 @@ fn isSchemeChar(b: uint8): bool {
 
 /// A component of a URI, for percent-encoding: each keeps a different set of characters as they
 /// are.
-pub enum Component :: [Equatable, Debug] {
+pub enum Component :: Equatable & Debug {
     /// Before the `@`: unreserved, sub-delims and `:`.
     Userinfo,
     /// A registered name: unreserved and sub-delims.
@@ -225,7 +225,7 @@ pub struct Percent {
 /// without its brackets — `show` puts them around an address with a `:` —; a `null` host means no
 /// authority, an empty one the empty authority of `file:///etc`. `port` is `null` where none or an
 /// empty one was written.
-pub struct Uri :: [Equatable, Hashable, Debug] {
+pub struct Uri :: Equatable & Hashable & Debug {
     pub scheme: ?string = null,
     pub userinfo: ?string = null,
     pub host: ?string = null,
