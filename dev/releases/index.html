@@ -647,6 +647,11 @@ or the bare value for one field, as a positional payload still is (<code>{&quot;
 <code>class Store&lt;T&gt;</code> test each instance's own type: <code>Column&lt;int&gt;</code> in <code>pick&lt;int&gt;</code>. The checker accepted
 them and the build stopped with <code>LYR-ICE0002: this type argument</code>.</p>
 </li>
+<li><p><strong><code>try</code> in a macro's body is judged as the caller wrote it.</strong> In <code>retry!(3) { result = try fetch(); }</code> the macro's own <code>try { … }</code> around the body made the caller's mark look doubled
+(<code>LYR-SEM0139</code>), though without the macro it is needed; a mark is counted against the program's
+own <code>try</code>s only. Where the caller does double a mark in such a body, the help takes the whole
+keyword out — it took the <code>t</code> alone (<code>result = ry fetch();</code>).</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
