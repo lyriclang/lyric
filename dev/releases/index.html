@@ -642,6 +642,11 @@ formatter puts a chain too long for the line one to a line, with the <code>{</co
 or the bare value for one field, as a positional payload still is (<code>{&quot;Circle&quot;:3}</code>,
 <code>{&quot;Pair&quot;:[4,6]}</code>). Data written before reads no longer for such a variant.</p>
 </li>
+<li><p><strong>A type test can name a type parameter of the code around it.</strong> <code>c: Column&lt;T&gt;</code>,
+<code>e is Column&lt;T&gt;</code> and <code>_ in [Column&lt;T&gt;, Cell&lt;T&gt;]</code> in a generic function or in a method of
+<code>class Store&lt;T&gt;</code> test each instance's own type: <code>Column&lt;int&gt;</code> in <code>pick&lt;int&gt;</code>. The checker accepted
+them and the build stopped with <code>LYR-ICE0002: this type argument</code>.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
