@@ -539,6 +539,14 @@ fn freshName(hint: string): string;
 /// `error(e.span(), "...")` - and a note at the site's `!`.
 pub fn error(at: Span, msg: string): never;
 
+/// Reports a warning about the site and goes on: the message at `at`, a node of the site, and a
+/// note at the site's `!`. The expansion stands; the warning is the user's to act on.
+pub fn warn(at: Span, msg: string): void;
+
+/// Reports a note about the site and goes on, as [warn] does: what the macro made of its
+/// arguments, where a reader would ask.
+pub fn note(at: Span, msg: string): void;
+
 extend Expr {
     /// Returns where this expression stands: its span, or an `Ident`'s.
     pub fn span(): Span {

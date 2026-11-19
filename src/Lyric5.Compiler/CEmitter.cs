@@ -2080,7 +2080,7 @@ public sealed partial class CEmitter
         // std.ffi's memory: a place at an address C gave, the size C gives a type, where an
         // array's or a slice's elements begin
         PlaceAt p => $"{Temp(p.Dest)} = ({CType(p.Type)} *)(uintptr_t){Temp(p.Address)};",
-        SizeOf s => $"{Temp(s.Dest)} = (uint64_t)sizeof({CType(s.Type)});",
+        SizeOf s => $"{Temp(s.Dest)} = (uint64_t){(s.Align ? "_Alignof" : "sizeof")}({CType(s.Type)});",
         DataAddress d => $"{Temp(d.Dest)} = (uint64_t)(uintptr_t){Elements(d.Value, d.Element)};",
         // 'x is T': the descriptor the value's table begins with, or the conformance
         // list behind that descriptor for an interface.

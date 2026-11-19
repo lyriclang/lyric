@@ -25,7 +25,7 @@ import std.thread { Thread, processorCount };
 import std.core { sliceAddress };
 
 /// The system and machine kinds, defined in std.core beside the build's `target`.
-pub import std.core { Platform, Arch };
+pub import std.core { Platform, Arch, Endian };
 
 // ---------------------------------------------------------------------------------------------
 // The program and its system. A text comes from the runtime through a buffer (lyr/os.h); one that

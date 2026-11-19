@@ -67,4 +67,6 @@ pub import std.core {
     isClass,
     isEnum,
     isInterface,
+    sizeOf,
+    alignOf,
 };

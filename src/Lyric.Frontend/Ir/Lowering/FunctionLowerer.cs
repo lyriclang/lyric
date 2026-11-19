@@ -8217,11 +8217,11 @@ internal sealed class FunctionLowerer
         result = null;
         var ffi = _typeTable.Compilation?.FindModule(["std", "ffi"])?.Members;
         // where elements begin is std.core's, which every module of std may ask without std.ffi
-        var host = symbol.Name is "dataAddress" or "sliceAddress"
+        var host = symbol.Name is "dataAddress" or "sliceAddress" or "byteSizeOf" or "byteAlignOf"
             ? _typeTable.Compilation?.FindModule(["std", "core"])?.Members
             : ffi;
         if (host is null || symbol.Name is not ("load" or "store" or "sizeOf" or "dataAddress" or "sliceAddress"
-                or "rootObject" or "rootedObject")
+                or "rootObject" or "rootedObject" or "byteSizeOf" or "byteAlignOf")
             || !ReferenceEquals(host.LookupLocal(symbol.Name), symbol))
             return false;
         result = FfiMemory(symbol.Name, expr);
@@ -8265,10 +8265,11 @@ internal sealed class FunctionLowerer
                 _b.Emit(new RootedObject(held, LowerExprAs(expr.Arguments[0], u64), type, span));
                 return held;
             }
-            case "sizeOf":
+            case "sizeOf" or "byteSizeOf" or "byteAlignOf":
             {
                 var size = _slots.NewTemp(u64);
-                _b.Emit(new SizeOf(size, LowerType(SubstituteType(_types.TypeArgumentsOf(expr)[0]), span), span));
+                _b.Emit(new SizeOf(size, LowerType(SubstituteType(_types.TypeArgumentsOf(expr)[0]), span), span,
+                    Align: name == "byteAlignOf"));
                 return size;
             }
             default:

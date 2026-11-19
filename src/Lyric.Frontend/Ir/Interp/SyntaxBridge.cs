@@ -259,6 +259,9 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
     /// <summary>The failure <c>error(at, msg)</c> raises.</summary>
     public ComptimeFailure MacroError(string file, int line, int column, string message) => ComptimeFailure.Macro(SpanAt(file, line, column), message);
 
+    /// <summary>Where a <c>Span</c> value of a site points: what <c>warn</c> and <c>note</c> name.</summary>
+    public Span SpanOf(string file, int line, int column) => SpanAt(file, line, column);
+
     /// <summary>The name <paramref name="name"/> as an <c>Ident</c> value, for a macro's parameter.</summary>
     public Value IdentValue(string name, Span span, IrType t) => Ident(name, span, t);
 

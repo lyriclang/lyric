@@ -254,8 +254,8 @@ typedef struct { LyrObj header; lyr_ty_app_main_Pair_string__80f539ca value; } l
 _Static_assert(sizeof(lyr_box_ty_app_main_Pair_string__80f539ca) == 24, "layout of lyr_box_ty_app_main_Pair_string__80f539ca");
 _Static_assert(offsetof(lyr_box_ty_app_main_Pair_string__80f539ca, value) == 8, "layout of lyr_box_ty_app_main_Pair_string__80f539ca");
 extern const LyrItable lyr_itab_ty_app_main_Pair_string__80f539ca[];
-static const uint64_t lyr_refmap_box44[] = { UINT64_C(0x6) };
-const LyrDesc lyr_desc_box_ty_app_main_Pair_string__80f539ca = { sizeof(lyr_box_ty_app_main_Pair_string__80f539ca), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box44, "box<app.main.Pair<string>>", lyr_itab_ty_app_main_Pair_string__80f539ca };
+static const uint64_t lyr_refmap_box47[] = { UINT64_C(0x6) };
+const LyrDesc lyr_desc_box_ty_app_main_Pair_string__80f539ca = { sizeof(lyr_box_ty_app_main_Pair_string__80f539ca), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box47, "box<app.main.Pair<string>>", lyr_itab_ty_app_main_Pair_string__80f539ca };
 typedef struct { LyrObj header; lyr_ty_app_main_E value; } lyr_box_ty_app_main_E;
 _Static_assert(sizeof(lyr_box_ty_app_main_E) == 24, "layout of lyr_box_ty_app_main_E");
 _Static_assert(offsetof(lyr_box_ty_app_main_E, value) == 8, "layout of lyr_box_ty_app_main_E");
@@ -270,8 +270,8 @@ typedef struct { LyrObj header; lyr_ty_app_main_Outer value; } lyr_box_ty_app_ma
 _Static_assert(sizeof(lyr_box_ty_app_main_Outer) == 40, "layout of lyr_box_ty_app_main_Outer");
 _Static_assert(offsetof(lyr_box_ty_app_main_Outer, value) == 8, "layout of lyr_box_ty_app_main_Outer");
 extern const LyrItable lyr_itab_ty_app_main_Outer[];
-static const uint64_t lyr_refmap_box56[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_box_ty_app_main_Outer = { sizeof(lyr_box_ty_app_main_Outer), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box56, "box<app.main.Outer>", lyr_itab_ty_app_main_Outer };
+static const uint64_t lyr_refmap_box59[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_box_ty_app_main_Outer = { sizeof(lyr_box_ty_app_main_Outer), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box59, "box<app.main.Outer>", lyr_itab_ty_app_main_Outer };
 typedef struct { LyrObj header; lyr_ty_app_main_Inner value; } lyr_box_ty_app_main_Inner;
 _Static_assert(sizeof(lyr_box_ty_app_main_Inner) == 16, "layout of lyr_box_ty_app_main_Inner");
 _Static_assert(offsetof(lyr_box_ty_app_main_Inner, value) == 8, "layout of lyr_box_ty_app_main_Inner");
@@ -286,8 +286,8 @@ typedef struct { LyrObj header; lyr_ty_app_main_D value; } lyr_box_ty_app_main_D
 _Static_assert(sizeof(lyr_box_ty_app_main_D) == 24, "layout of lyr_box_ty_app_main_D");
 _Static_assert(offsetof(lyr_box_ty_app_main_D, value) == 8, "layout of lyr_box_ty_app_main_D");
 extern const LyrItable lyr_itab_ty_app_main_D[];
-static const uint64_t lyr_refmap_box61[] = { UINT64_C(0x4) };
-const LyrDesc lyr_desc_box_ty_app_main_D = { sizeof(lyr_box_ty_app_main_D), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box61, "box<app.main.D>", lyr_itab_ty_app_main_D };
+static const uint64_t lyr_refmap_box64[] = { UINT64_C(0x4) };
+const LyrDesc lyr_desc_box_ty_app_main_D = { sizeof(lyr_box_ty_app_main_D), LYR_DESC_HAS_REFS, 0, 1, lyr_refmap_box64, "box<app.main.D>", lyr_itab_ty_app_main_D };
 typedef struct { LyrObj header; lyr_ty_app_main_Box_int__d6d5d265 value; } lyr_box_ty_app_main_Box_int__d6d5d265;
 _Static_assert(sizeof(lyr_box_ty_app_main_Box_int__d6d5d265) == 16, "layout of lyr_box_ty_app_main_Box_int__d6d5d265");
 _Static_assert(offsetof(lyr_box_ty_app_main_Box_int__d6d5d265, value) == 8, "layout of lyr_box_ty_app_main_Box_int__d6d5d265");
