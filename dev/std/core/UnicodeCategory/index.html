@@ -162,7 +162,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>enum UnicodeCategory</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">enum</span> <span class="ty">UnicodeCategory</span> :: [<span class="ty">Equatable</span>, <span class="ty">Hashable</span>, <span class="ty">Debug</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">enum</span> <span class="ty">UnicodeCategory</span> :: <span class="ty">Equatable</span> &amp; <span class="ty">Hashable</span> &amp; <span class="ty">Debug</span></code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>, <code>Hashable</code>, <code>Debug</code>.</p>
 <p>A character's general category (UAX #44), in the standard's order.</p>
 <p>No <code>char</code> is a <code>Surrogate</code>, since the halves of a UTF-16 pair are no scalar values; the

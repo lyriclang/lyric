@@ -262,7 +262,7 @@
     <span class="kw">fn</span> name(): <span class="ty">string</span>;
 }
 
-<span class="kw">interface</span> <span class="ty">Labelled</span> :: [<span class="ty">Named</span>, <span class="ty">Titled</span>] {
+<span class="kw">interface</span> <span class="ty">Labelled</span> :: <span class="ty">Named</span> &amp; <span class="ty">Titled</span> {
 }
 
 <span class="kw">fn</span> main(): <span class="ty">void</span> {
@@ -276,7 +276,7 @@
     <span class="kw">fn</span> title(): <span class="ty">string</span>;
 }
 
-<span class="kw">interface</span> <span class="ty">Labelled</span> :: [<span class="ty">Named</span>, <span class="ty">Titled</span>] {
+<span class="kw">interface</span> <span class="ty">Labelled</span> :: <span class="ty">Named</span> &amp; <span class="ty">Titled</span> {
 }
 
 <span class="kw">fn</span> main(): <span class="ty">void</span> {

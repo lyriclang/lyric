@@ -43,9 +43,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct FlatMapIter</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">FlatMapIter</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>], <span class="ty">B</span> :: [<span class="ty">Iterable</span>&lt;<span class="ty">Iter</span> = <span class="ty">J</span>&gt;], <span class="ty">J</span> :: [<span class="ty">Iterator</span>], <span class="ty">E</span> :: [<span class="ty">Error</span>] = <span class="ty">never</span>&gt; :: [
-    <span class="ty">Iterator</span>
-]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">FlatMapIter</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>], <span class="ty">B</span> :: [<span class="ty">Iterable</span>&lt;<span class="ty">Iter</span> = <span class="ty">J</span>&gt;], <span class="ty">J</span> :: [<span class="ty">Iterator</span>], <span class="ty">E</span> :: [<span class="ty">Error</span>] = <span class="ty">never</span>&gt; :: [<span class="ty">Iterator</span>]</code></pre>
 <p class="conforms">Conforms to <code>Iterator</code>, <code>Closeable</code>.</p>
 <p>Yields the values of what <code>f</code> returns for each value of an iterator, one after the other; made
 by <code>it.flatMap(f)</code>.</p>

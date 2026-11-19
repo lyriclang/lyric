@@ -162,7 +162,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct MustUse</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">MustUse</span> :: [<span class="ty">OnCallable</span>, <span class="ty">OnType</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">MustUse</span> :: <span class="ty">OnCallable</span> &amp; <span class="ty">OnType</span></code></pre>
 <p class="conforms">Conforms to <code>OnCallable</code>, <code>OnType</code>.</p>
 <p>Marks a value nobody should drop.</p>
 <p>A call of a function marked so, or a call whose value is of a type marked so, warns where it

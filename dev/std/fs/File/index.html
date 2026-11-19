@@ -52,7 +52,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>class File</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">File</span> :: [<span class="ty">Reader</span>, <span class="ty">Writer</span>, <span class="ty">Seek</span>, <span class="ty">Closeable</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">File</span> :: <span class="ty">Reader</span> &amp; <span class="ty">Writer</span> &amp; <span class="ty">Seek</span> &amp; <span class="ty">Closeable</span></code></pre>
 <p class="conforms">Conforms to <code>Reader</code>, <code>Writer</code>, <code>Seek</code>, <code>Closeable</code>.</p>
 <p>An open file: read from its position, written there — at the end, where it was opened to
 append —, its position moved. <code>close()</code> releases it; a call after it throws <code>Closed</code>, and a

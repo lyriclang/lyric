@@ -49,6 +49,10 @@ stacks of their own. The surface kept much of what worked, and changed what the 
 found wrong. This chapter is for a reader who knows Lyric 4: what to unlearn, and why.</p>
 <p>Much stays as it was: <code>?T</code> and <code>x!</code>, <code>throws T</code> and <code>catch (e: T)</code>, <code>Coroutine&lt;T&gt;</code> with
 <code>next()</code>, <code>List&lt;int&gt;.of</code>, <code>push</code>, interfaces with <code>::</code>, <code>@Test</code> and <code>assertEq</code>.</p>
+<p><strong>Several interfaces after <code>::</code> are joined with <code>&amp;</code></strong>: <code>struct Item :: Codable &amp; Equatable</code>, and
+<code>&lt;T :: Ordered &amp; Display&gt;</code>. Lyric 4 wrote them as a list, <code>:: [Codable, Equatable]</code>; in Lyric 5 a
+list of types in brackets is a set — one of them, as in <code>throws [A, B]</code> — so a conformance is not
+written that way. One interface may still stand in brackets, <code>:: [Codable]</code>.</p>
 <h2 id="the-first-hour">The first hour</h2>
 <p><strong>Imports name the module, not a submodule.</strong> <code>println</code> is <code>std.io</code>'s:</p>
 <pre><code class="language-text">import std.io.console { println };     // Lyric 4</code></pre>
@@ -144,7 +148,7 @@ the operating system's job, or the job of the embedding host.</li>
 </ul>
 <h2 id="moving-a-program">Moving a program</h2>
 <p><code>lyric fix --from-4</code> rewrites what can be rewritten mechanically — imports, the module header,
-fields that are written, <code>try</code> marks, patterns — and leaves a note for what needs a person: a
+fields that are written, <code>try</code> marks, patterns, interfaces joined with <code>&amp;</code> — and leaves a note for what needs a person: a
 place where wrapping arithmetic was relied on, a string indexed by character. The result is a
 start, not a promise; build it and read what <code>lyric check</code> says next. <a href="../../book/diagnostics/">What the compiler tells
 you</a> explains how.</p>

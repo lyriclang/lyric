@@ -35,7 +35,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct Date</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Date</span> :: [<span class="ty">Equatable</span>, <span class="ty">Ordered</span>, <span class="ty">TotalOrder</span>, <span class="ty">Hashable</span>, <span class="ty">Display</span>, <span class="ty">Parse</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Date</span> :: <span class="ty">Equatable</span> &amp; <span class="ty">Ordered</span> &amp; <span class="ty">TotalOrder</span> &amp; <span class="ty">Hashable</span> &amp; <span class="ty">Display</span> &amp; <span class="ty">Parse</span></code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>, <code>Ordered</code>, <code>TotalOrder</code>, <code>Hashable</code>, <code>Display</code>, <code>Parse</code>.</p>
 <p>A day of the proleptic Gregorian calendar. Its text is ISO 8601's, <code>2026-10-08</code>; a year
 outside 0000–9999 shows its sign and its digits, <code>+10000-01-01</code>, which RFC 3339 does not read

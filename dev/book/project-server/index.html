@@ -57,7 +57,7 @@ by field, by name — the compiler writes that code from the declaration:</p>
 <span class="kw">import</span> std.io { println };
 <span class="kw">import</span> std.json { encode, decode };
 
-<span class="kw">struct</span> <span class="ty">Item</span> :: [<span class="ty">Codable</span>, <span class="ty">Equatable</span>] {
+<span class="kw">struct</span> <span class="ty">Item</span> :: <span class="ty">Codable</span> &amp; <span class="ty">Equatable</span> {
     id: <span class="ty">int</span>,
     name: <span class="ty">string</span>,
     price: <span class="ty">float</span>,

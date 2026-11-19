@@ -184,6 +184,8 @@ after the fact — your own type, or one of the library's:</p>
     println(<span class="str">f"</span>{a}<span class="str"> </span>{a == <span class="ty">Point</span> { x = <span class="num">1</span>, y = <span class="num">2</span> }}<span class="str">"</span>);
 }</code></pre>
 <pre class="output"><code>(1, 2) true</code></pre>
+<p>A type that conforms to several interfaces joins them with <code>&amp;</code>: <code>struct Point :: Equatable &amp; Display { … }</code> is an <code>Equatable</code> and a <code>Display</code>. Brackets would say something else — <code>[A, B]</code> is
+one of them, as in <code>throws [A, B]</code> — so a conformance is never written as a list.</p>
 <p><code>Equatable</code> gives <code>==</code> and <code>!=</code>. For a struct whose fields are all equatable, naming the interface
 is enough: the comparison is field by field, and nothing has to be written. <code>Ordered</code> gives <code>&lt;</code> and
 the other comparisons, <code>Hashable</code> makes a value a key of a <code>Map</code>, and <code>Closeable</code> is what
@@ -210,6 +212,8 @@ an argument's type must conform to, and only what those interfaces give can be u
 <p>The call does not name <code>T</code>: the compiler finds it from the argument. The body is checked once,
 against the bound — <code>&gt;</code> is there because <code>Ordered</code> gives it — and the compiler then makes a copy of
 the function for each type it is called with, so a generic call costs what a plain one costs.</p>
+<p>Several bounds are joined with <code>&amp;</code> as well: <code>&lt;T :: Ordered &amp; Display&gt;</code> takes a type that conforms
+to both.</p>
 <h2 id="generic-types">Generic types</h2>
 <p>A struct, a class, an enum or an interface can take type parameters too:</p>
 <pre><code class="language-lyric"><span class="kw">import</span> std.io { println };

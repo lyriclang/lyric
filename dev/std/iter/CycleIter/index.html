@@ -43,7 +43,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct CycleIter</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">CycleIter</span>&lt;<span class="ty">I</span> :: [<span class="ty">Iterator</span>, <span class="ty">Clone</span>]&gt; :: [<span class="ty">Iterator</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">CycleIter</span>&lt;<span class="ty">I</span> :: <span class="ty">Iterator</span> &amp; <span class="ty">Clone</span>&gt; :: [<span class="ty">Iterator</span>]</code></pre>
 <p class="conforms">Conforms to <code>Iterator</code>.</p>
 <p>Yields the values of an iterator over and over; made by <code>it.cycle()</code>.</p>
 <p>Each round walks a fresh clone of the original iterator. An empty iterator yields nothing.</p>

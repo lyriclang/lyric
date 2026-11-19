@@ -162,7 +162,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct NonExhaustive</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">NonExhaustive</span> :: [<span class="ty">OnType</span>, <span class="ty">OnInterface</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">NonExhaustive</span> :: <span class="ty">OnType</span> &amp; <span class="ty">OnInterface</span></code></pre>
 <p class="conforms">Conforms to <code>OnType</code>, <code>OnInterface</code>.</p>
 <p>Marks an enum or a <code>sealed</code> interface that may grow.</p>
 <p>A <code>match</code> over it outside its package needs a <code>_</code> arm, so a new variant or conformer breaks

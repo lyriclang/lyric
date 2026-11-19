@@ -94,7 +94,7 @@ for the test to look at.</p>
 <p>Fails the test unless <code>f</code>, run in a task of its own, panics; returns what the panic left.</p>
 </section>
 <section class="member" id="fn.assertEq">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> assertEq&lt;<span class="ty">T</span> :: [<span class="ty">Equatable</span>, <span class="ty">Debug</span>]&gt;(
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> assertEq&lt;<span class="ty">T</span> :: <span class="ty">Equatable</span> &amp; <span class="ty">Debug</span>&gt;(
     actual: <span class="ty">T</span>,
     expected: <span class="ty">T</span>,
     message: <span class="ty">string</span> = <span class="str">""</span>,
@@ -105,7 +105,7 @@ expression the call wrote for <code>actual</code>, where it is not the value its
 then, for values too long to compare by eye, their first difference.</p>
 </section>
 <section class="member" id="fn.assertNotEq">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> assertNotEq&lt;<span class="ty">T</span> :: [<span class="ty">Equatable</span>, <span class="ty">Debug</span>]&gt;(
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> assertNotEq&lt;<span class="ty">T</span> :: <span class="ty">Equatable</span> &amp; <span class="ty">Debug</span>&gt;(
     actual: <span class="ty">T</span>,
     unexpected: <span class="ty">T</span>,
     message: <span class="ty">string</span> = <span class="str">""</span>,
@@ -159,7 +159,7 @@ then, for values too long to compare by eye, their first difference.</p>
 fails: it is close to nothing.</p>
 </section>
 <section class="member" id="fn.assertLess">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> assertLess&lt;<span class="ty">T</span> :: [<span class="ty">Ordered</span>, <span class="ty">Debug</span>]&gt;(
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> assertLess&lt;<span class="ty">T</span> :: <span class="ty">Ordered</span> &amp; <span class="ty">Debug</span>&gt;(
     actual: <span class="ty">T</span>,
     bound: <span class="ty">T</span>,
     message: <span class="ty">string</span> = <span class="str">""</span>,
@@ -168,7 +168,7 @@ fails: it is close to nothing.</p>
 <p>Fails the test unless <code>actual</code> is less than <code>bound</code>.</p>
 </section>
 <section class="member" id="fn.assertGreater">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> assertGreater&lt;<span class="ty">T</span> :: [<span class="ty">Ordered</span>, <span class="ty">Debug</span>]&gt;(
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> assertGreater&lt;<span class="ty">T</span> :: <span class="ty">Ordered</span> &amp; <span class="ty">Debug</span>&gt;(
     actual: <span class="ty">T</span>,
     bound: <span class="ty">T</span>,
     message: <span class="ty">string</span> = <span class="str">""</span>,
@@ -177,7 +177,7 @@ fails: it is close to nothing.</p>
 <p>Fails the test unless <code>actual</code> is greater than <code>bound</code>.</p>
 </section>
 <section class="member" id="fn.assertContains">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> assertContains&lt;<span class="ty">T</span> :: [<span class="ty">Debug</span>], <span class="ty">C</span> :: [<span class="ty">Contains</span>&lt;<span class="ty">T</span>&gt;, <span class="ty">Debug</span>]&gt;(
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> assertContains&lt;<span class="ty">T</span> :: [<span class="ty">Debug</span>], <span class="ty">C</span> :: <span class="ty">Contains</span>&lt;<span class="ty">T</span>&gt; &amp; <span class="ty">Debug</span>&gt;(
     container: <span class="ty">C</span>,
     x: <span class="ty">T</span>,
     message: <span class="ty">string</span> = <span class="str">""</span>,
@@ -187,7 +187,7 @@ fails: it is close to nothing.</p>
 <code>assertContains(&quot;abc&quot;, 'b')</code>, <code>assertContains(xs, 3)</code>.</p>
 </section>
 <section class="member" id="fn.assertEmpty">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> assertEmpty&lt;<span class="ty">C</span> :: [<span class="ty">Iterable</span>, <span class="ty">Debug</span>]&gt;(
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> assertEmpty&lt;<span class="ty">C</span> :: <span class="ty">Iterable</span> &amp; <span class="ty">Debug</span>&gt;(
     c: <span class="ty">C</span>,
     message: <span class="ty">string</span> = <span class="str">""</span>,
     @callerExpr(c) written: <span class="ty">string</span> = <span class="str">""</span>

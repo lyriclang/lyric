@@ -31,7 +31,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>class PipeReader</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">PipeReader</span> :: [<span class="ty">Reader</span>, <span class="ty">Closeable</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">PipeReader</span> :: <span class="ty">Reader</span> &amp; <span class="ty">Closeable</span></code></pre>
 <p class="conforms">Conforms to <code>Reader</code>, <code>Closeable</code>.</p>
 <p>The parent's end of a child's output or error pipe: a <code>Reader</code> that waits until bytes come, and
 returns 0 once the child has closed its end.</p>

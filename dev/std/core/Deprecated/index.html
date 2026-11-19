@@ -162,7 +162,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct Deprecated</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Deprecated</span> :: [<span class="ty">OnModule</span>, <span class="ty">OnTopLevel</span>, <span class="ty">OnMember</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Deprecated</span> :: <span class="ty">OnModule</span> &amp; <span class="ty">OnTopLevel</span> &amp; <span class="ty">OnMember</span></code></pre>
 <p class="conforms">Conforms to <code>OnModule</code>, <code>OnTopLevel</code>, <code>OnMember</code>.</p>
 <p>Marks a declaration as deprecated.</p>
 <p>Every use outside a deprecated declaration warns (<code>LYR-SEM0076</code>) with <code>message</code>. <code>until</code>

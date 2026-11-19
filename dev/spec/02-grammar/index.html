@@ -64,10 +64,17 @@ closes two lists, <code>type Pair&lt;T&gt;= (T, T);</code> closes one before its
 be refused by a rule beside it — a name that resolves to nothing, a type that does not fit, a
 pattern where none may bind — and where the grammar leaves two readings of one text, §7 says
 which one the parser takes.</li>
-<li><strong>The list rule</strong> (08 D5/D6): a list of one element may stand without its brackets — <code>struct S :: I</code>, <code>throws E</code>, <code>catch (e in E)</code>, <code>&lt;T :: Display&gt;</code>, <code>@Test</code> —; a list of several stands in
-brackets — <code>:: [I, J]</code>, <code>throws [A, B]</code>, <code>catch (e in [A, B])</code>, <code>@[A, B]</code>. <strong>A list may end
-in a comma</strong> (08 Y9) wherever it stands between brackets, parentheses, braces or angle
-brackets; a tuple keeps its two elements before it.</li>
+<li><strong>The list rule</strong> (08 D5/D6): a list of one element may stand without its brackets —
+<code>throws E</code>, <code>catch (e in E)</code>, <code>@Test</code> —; a list of several stands in brackets — <code>throws [A, B]</code>,
+<code>catch (e in [A, B])</code>, <code>@[A, B]</code>. A list of types is a <strong>set</strong>: one of them (design 03 TM2,
+TM7). <strong>A list may end in a comma</strong> (08 Y9) wherever it stands between brackets, parentheses,
+braces or angle brackets; a tuple keeps its two elements before it.</li>
+<li><strong>After <code>::</code> stands no list</strong> (design 03 TM7): what follows is what a type is — one interface,
+<code>struct S :: I</code>, <code>&lt;T :: Display&gt;</code>, or several joined by <code>&amp;</code>, <code>struct S :: I &amp; J</code>,
+<code>&lt;T :: Display &amp; Hash&gt;</code>, each of which it is. One in brackets, <code>:: [I]</code>, is the set of one and
+so that interface. Several as a list, <code>:: [I, J]</code> or <code>:: I, J</code>, are refused (<code>LYR-PAR0066</code>):
+in brackets they would be one of them, not each. In a type parameter's constraint a <code>,</code> after
+the last interface begins the next parameter.</li>
 </ol>
 <p>The token classes:</p>
 <table>
@@ -138,7 +145,7 @@ FunctionHead    = [ 'inline' ] [ 'mut' ] ( 'fn' | 'macro' ) Name [ GenericParams
                   '(' [ Params ] ')' [ ':' ReturnType ] [ ThrowsClause ] .
 Params          = Param { ',' Param } [ ',' ] .
 Param           = { Attribute } [ '&amp;' ] Name ':' Type [ '...' ] [ '=' Expr ] .
-ThrowsClause    = 'throws' [ Type | '[' Type { ',' Type } [ ',' ] ']' ] .
+ThrowsClause    = 'throws' [ TypeSet ] .
 
 ExternDecl      = 'extern' STRING_LITERAL ExternFunction .
 ExternBlock     = 'extern' STRING_LITERAL '{' ExternMember { ExternMember } '}' .
@@ -152,7 +159,9 @@ TypeAlias       = 'type' Name [ GenericParams ] '=' Type ';' .
 
 GenericParams   = '&lt;' GenericParam { ',' GenericParam } [ ',' ] '&gt;' .
 GenericParam    = IDENTIFIER [ '::' Bounds ] [ '=' Type ] .
-Bounds          = Type | '[' Type { ',' Type } [ ',' ] ']' .</code></pre>
+Bounds          = Bound { '&amp;' Bound } .
+Bound           = Type | '[' Type [ ',' ] ']' .
+TypeSet         = Type | '[' Type { ',' Type } [ ',' ] ']' .</code></pre>
 <ol start="3">
 <li>A function's <code>throws</code> is the function's own, written after its return type; <code>throws</code> alone
 is <code>Error</code> (<a href="../../spec/06-errors/">06</a>). In a member, <code>static</code> stands before <code>inline</code> and <code>mut</code>
@@ -163,8 +172,8 @@ function alone (<a href="../../spec/13-abi/">13</a>).</li>
 </ol>
 <pre><code class="language-ebnf">StructDecl      = 'struct' Name [ GenericParams ] [ '::' Conformances ] TypeBody .
 ClassDecl       = 'class' Name [ GenericParams ] [ '::' Conformances ] TypeBody .
-Conformances    = Conformance | '[' Conformance { ',' Conformance } [ ',' ] ']' .
-Conformance     = Type [ 'by' IDENTIFIER ] .
+Conformances    = Conformance { '&amp;' Conformance } .
+Conformance     = ( Type [ 'by' IDENTIFIER ] | '[' Type [ 'by' IDENTIFIER ] [ ',' ] ']' ) .
 TypeBody        = '{' { TypeMember } [ { Attribute } FieldDecl ] '}' .
 TypeMember      = { Attribute } ( FieldDecl ',' | MemberBody [ ',' ] ) .
 FieldDecl       = [ Visibility ] [ 'var' ] Name ':' Type [ '=' Expr ] .
@@ -194,7 +203,7 @@ variants are separated by <code>,</code> and end with <code>;</code> before the 
 enum's, an interface's or an <code>extend</code> block's <code>::</code> it has no place (<code>LYR-PAR0047</code>).</li>
 </ol>
 <h2 id="3-types">3. Types</h2>
-<pre><code class="language-ebnf">Type            = { '?' | '??' } TypeCore [ 'throws' [ Type | '[' Type { ',' Type } [ ',' ] ']' ] ] .
+<pre><code class="language-ebnf">Type            = { '?' | '??' } TypeCore [ 'throws' [ TypeSet ] ] .
 ReturnType      = { '?' | '??' } TypeCore .
 TypeCore        = TypeAtom [ '.' '[' IDENTIFIER ']' ] { '[' [ INT_LITERAL ] ']' } .
 TypeAtom        = Path [ TypeArgs ]
@@ -255,7 +264,7 @@ WhileStmt       = 'while' '(' Condition ')' Block .
 DoStmt          = 'do' Block 'while' '(' Expr ')' ';' .
 ForStmt         = 'for' '(' ( IDENTIFIER | TuplePattern ) 'in' Expr ')' Block .
 CatchClause     = 'catch' '(' CatchBinding ')' Block .
-CatchBinding    = IDENTIFIER [ ':' Type | 'in' Bounds ] .
+CatchBinding    = IDENTIFIER [ ':' Type | 'in' TypeSet ] .
 
 ExprStmt        = Expr ';'
                 | BlockEnded [ ';' ] .
@@ -484,7 +493,7 @@ of an initializer reach fields and variants by a compile-time info
 <h2 id="6-patterns">6. Patterns</h2>
 <pre><code class="language-ebnf">Pattern         = PatternTerm { '|' PatternTerm } .
 PatternTerm     = PatternLiteral [ ( '..' | '..=' ) PatternLiteral ]
-                | IDENTIFIER ( ':' Type | 'in' Bounds )
+                | IDENTIFIER ( ':' Type | 'in' TypeSet )
                 | Path [ Payload ]
                 | '.' IDENTIFIER [ Payload ]
                 | '(' Pattern { ',' Pattern } [ ',' ] ')'

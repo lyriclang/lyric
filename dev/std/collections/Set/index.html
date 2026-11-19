@@ -36,7 +36,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>class Set</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">Set</span>&lt;<span class="ty">T</span> :: [<span class="ty">Hashable</span>], <span class="ty">H</span> :: [<span class="ty">Hasher</span>] = <span class="ty">DefaultHasher</span>&gt; :: [<span class="ty">Iterable</span>, <span class="ty">Contains</span>&lt;<span class="ty">T</span>&gt;]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">Set</span>&lt;<span class="ty">T</span> :: [<span class="ty">Hashable</span>], <span class="ty">H</span> :: [<span class="ty">Hasher</span>] = <span class="ty">DefaultHasher</span>&gt; :: <span class="ty">Iterable</span> &amp; <span class="ty">Contains</span>&lt;<span class="ty">T</span>&gt;</code></pre>
 <p class="conforms">Conforms to <code>Iterable</code>, <code>Contains&lt;T&gt;</code>, <code>FromArrayLiteral&lt;T&gt;</code>, <code>Equatable</code>, <code>Debug</code>, <code>Display</code>, <code>FromIterator&lt;T&gt;</code>, <code>Clone</code>.</p>
 <p>A hash set: values, each once, in no order of its own.</p>
 <p>It is a <a href="../../../std/collections/Map/">Map</a>'s keys over the same table, so membership, insertion and removal take expected

@@ -162,7 +162,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct When</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">When</span> :: [<span class="ty">OnTopLevel</span>, <span class="ty">OnModule</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">When</span> :: <span class="ty">OnTopLevel</span> &amp; <span class="ty">OnModule</span></code></pre>
 <p class="conforms">Conforms to <code>OnTopLevel</code>, <code>OnModule</code>.</p>
 <p>Builds the declaration only where <code>cond</code> holds: <code>@When(cond)</code>.</p>
 <p><code>cond</code> is computed while compiling, over <a href="../../../std/core/#const.target">target</a> and <a href="../../../std/core/#const.profile">profile</a>. Where it does not hold, the

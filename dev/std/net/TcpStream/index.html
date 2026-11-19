@@ -31,7 +31,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>class TcpStream</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">TcpStream</span> :: [<span class="ty">Reader</span>, <span class="ty">Writer</span>, <span class="ty">Closeable</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">TcpStream</span> :: <span class="ty">Reader</span> &amp; <span class="ty">Writer</span> &amp; <span class="ty">Closeable</span></code></pre>
 <p class="conforms">Conforms to <code>Reader</code>, <code>Writer</code>, <code>Closeable</code>.</p>
 <p>A TCP connection: a <code>Reader</code> and a <code>Writer</code> whose calls wait for the socket — a read until
 bytes come, a write until the system takes some.</p>

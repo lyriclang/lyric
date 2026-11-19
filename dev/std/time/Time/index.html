@@ -35,7 +35,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct Time</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Time</span> :: [<span class="ty">Equatable</span>, <span class="ty">Ordered</span>, <span class="ty">TotalOrder</span>, <span class="ty">Hashable</span>, <span class="ty">Display</span>, <span class="ty">Parse</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Time</span> :: <span class="ty">Equatable</span> &amp; <span class="ty">Ordered</span> &amp; <span class="ty">TotalOrder</span> &amp; <span class="ty">Hashable</span> &amp; <span class="ty">Display</span> &amp; <span class="ty">Parse</span></code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>, <code>Ordered</code>, <code>TotalOrder</code>, <code>Hashable</code>, <code>Display</code>, <code>Parse</code>.</p>
 <p>A time of day: hours 0–23, minutes and seconds 0–59 — no leap second, which POSIX time
 does not count —, nanoseconds. Its text is <code>HH:MM:SS</code> and the fraction, without trailing zeros.</p>

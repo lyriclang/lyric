@@ -42,7 +42,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>interface Codable</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">interface</span> <span class="ty">Codable</span> :: [<span class="ty">Encode</span>, <span class="ty">Decode</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">interface</span> <span class="ty">Codable</span> :: <span class="ty">Encode</span> &amp; <span class="ty">Decode</span></code></pre>
 <p class="conforms">Conforms to <code>Encode</code>, <code>Decode</code>.</p>
 <p>A value that is both <code>Encode</code> and <code>Decode</code>: what <code>std.json.encode</code> takes and
 <code>std.json.decode&lt;T&gt;</code> gives.</p>

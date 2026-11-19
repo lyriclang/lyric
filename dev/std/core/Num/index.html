@@ -162,19 +162,17 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>interface Num</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">interface</span> <span class="ty">Num</span> :: [
-    <span class="ty">Equatable</span>,
-    <span class="ty">Ordered</span>,
-    <span class="ty">Add</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;,
-    <span class="ty">Sub</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;,
-    <span class="ty">Mul</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;,
-    <span class="ty">Div</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;,
-    <span class="ty">Rem</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;,
-    <span class="ty">Display</span>,
-    <span class="ty">Debug</span>,
-    <span class="ty">Parse</span>,
-    <span class="ty">Default</span>
-]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">interface</span> <span class="ty">Num</span> :: <span class="ty">Equatable</span>
+    &amp; <span class="ty">Ordered</span>
+    &amp; <span class="ty">Add</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;
+    &amp; <span class="ty">Sub</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;
+    &amp; <span class="ty">Mul</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;
+    &amp; <span class="ty">Div</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;
+    &amp; <span class="ty">Rem</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;
+    &amp; <span class="ty">Display</span>
+    &amp; <span class="ty">Debug</span>
+    &amp; <span class="ty">Parse</span>
+    &amp; <span class="ty">Default</span></code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>, <code>Ordered</code>, <code>Add&lt;Out = Self&gt;</code>, <code>Sub&lt;Out = Self&gt;</code>, <code>Mul&lt;Out = Self&gt;</code>, <code>Div&lt;Out = Self&gt;</code>, <code>Rem&lt;Out = Self&gt;</code>, <code>Display</code>, <code>Debug</code>, <code>Parse</code>, <code>Default</code>.</p>
 <p>Every number type: its zero and its one, arithmetic that stays in the type.</p>
 <h2 id="methods">Methods</h2>

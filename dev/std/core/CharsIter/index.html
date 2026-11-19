@@ -162,7 +162,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct CharsIter</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">CharsIter</span> :: [<span class="ty">Iterator</span>, <span class="ty">DoubleEnded</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">CharsIter</span> :: <span class="ty">Iterator</span> &amp; <span class="ty">DoubleEnded</span></code></pre>
 <p class="conforms">Conforms to <code>Iterator</code>, <code>DoubleEnded</code>, <code>Clone</code>.</p>
 <p>Iterates over a string's characters, decoded from its UTF-8 bytes.</p>
 <p>From the front by <code>next</code>, from the back by <code>nextBack</code>, the two meeting in the middle.</p>

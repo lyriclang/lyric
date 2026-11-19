@@ -51,7 +51,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>class ByteReader</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">ByteReader</span> :: [<span class="ty">Reader</span>, <span class="ty">Seek</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">ByteReader</span> :: <span class="ty">Reader</span> &amp; <span class="ty">Seek</span></code></pre>
 <p class="conforms">Conforms to <code>Reader</code>, <code>Seek</code>.</p>
 <p>A <code>Reader</code> over bytes in memory: it reads them from the front, and <code>seek</code> moves it. A position
 past the end reads nothing.</p>

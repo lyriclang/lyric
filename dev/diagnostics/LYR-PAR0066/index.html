@@ -85,12 +85,12 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
 <h1>LYR-PAR0066</h1>
-<p class="code-title">several interfaces after '::' without brackets</p>
+<p class="code-title">several interfaces after '::' in a list</p>
 <p class="meta">error · <a href="../../spec/05-interfaces/">spec 05-interfaces</a></p>
-<p>Several interfaces follow <code>::</code> — of a struct, class, enum, interface or extend block, or of an associated type's bound — without brackets around them. One interface stands without them, several in them.</p>
+<p>Several interfaces follow <code>::</code> — of a struct, class, enum, interface or extend block, of a type parameter's constraint or of an associated type's bound — as a list, <code>[I, J]</code> or <code>I, J</code>. Several are joined with <code>&amp;</code>: <code>:: I &amp; J</code>.</p>
 <h2 id="explanation">Explanation</h2>
-<p>After <code>::</code> one interface may stand alone, <code>struct User :: Named</code>, and several stand in brackets, <code>struct User :: [Named, Shown]</code> — the list rule, the same as for <code>throws</code> and <code>catch</code>. Without the brackets the <code>,</code> after the first would leave it open what the list holds.</p>
-<p>Put the interfaces in brackets. In a type parameter's constraint a <code>,</code> after one interface begins the next parameter: <code>&lt;T :: Named, U&gt;</code> has the parameters <code>T</code> and <code>U</code>; <code>&lt;T :: [Named, Shown]&gt;</code> constrains <code>T</code> twice.</p>
+<p>After <code>::</code> stands what the type is: one interface, <code>struct User :: Named</code>, or several joined with <code>&amp;</code>, <code>struct User :: Named &amp; Shown</code> — it is a <code>Named</code> and a <code>Shown</code>. A list in brackets is a set of types, and a set means one of them, as <code>throws [A, B]</code> and <code>catch (e in [A, B])</code> do; a conformance or a constraint needs all of them, so it is not written as a list. One interface may still stand in brackets, <code>:: [Named]</code>: a set of one is that interface.</p>
+<p>Join the interfaces with <code>&amp;</code>. In a type parameter's constraint a <code>,</code> after one interface begins the next parameter: <code>&lt;T :: Named, U&gt;</code> has the parameters <code>T</code> and <code>U</code>; <code>&lt;T :: Named &amp; Shown&gt;</code> constrains <code>T</code> twice.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">interface</span> <span class="ty">Named</span> {
     <span class="kw">fn</span> name(): <span class="ty">string</span>;
@@ -100,7 +100,7 @@
     <span class="kw">fn</span> show(): <span class="ty">string</span>;
 }
 
-<span class="kw">struct</span> <span class="ty">User</span> :: <span class="ty">Named</span>, <span class="ty">Shown</span> {
+<span class="kw">struct</span> <span class="ty">User</span> :: [<span class="ty">Named</span>, <span class="ty">Shown</span>] {
     <span class="kw">fn</span> name(): <span class="ty">string</span> { <span class="kw">return</span> <span class="str">"u"</span>; }
     <span class="kw">fn</span> show(): <span class="ty">string</span> { <span class="kw">return</span> <span class="str">"U"</span>; }
 }
@@ -116,7 +116,7 @@
     <span class="kw">fn</span> show(): <span class="ty">string</span>;
 }
 
-<span class="kw">struct</span> <span class="ty">User</span> :: [<span class="ty">Named</span>, <span class="ty">Shown</span>] {
+<span class="kw">struct</span> <span class="ty">User</span> :: <span class="ty">Named</span> &amp; <span class="ty">Shown</span> {
     <span class="kw">fn</span> name(): <span class="ty">string</span> { <span class="kw">return</span> <span class="str">"u"</span>; }
     <span class="kw">fn</span> show(): <span class="ty">string</span> { <span class="kw">return</span> <span class="str">"U"</span>; }
 }

@@ -60,10 +60,10 @@ their blanket under <a href="#13-generic-extends">§13</a> rule 9. What is not w
 <li><code>interface I { … }</code> declares <strong>instance methods</strong>: abstract, <code>fn area(): int;</code>, or with a
 <strong>default</strong> body. A member carries no <code>pub</code> (<code>LYR-SEM0118</code>): an interface's members are
 public always (D14).</li>
-<li>A struct, a class or an enum <strong>conforms</strong> in its interface list, <code>struct S :: [I, J] { … }</code>,
-or through an extend block, <code>extend T :: [I] { … }</code> — one interface also without the brackets,
-<code>struct S :: I</code>, <code>extend T :: I</code>, the list rule (<a href="../../spec/02-grammar/">02</a>); several without them are refused
-(<code>LYR-PAR0066</code>) —; every entry names an interface
+<li>A struct, a class or an enum <strong>conforms</strong> to what follows its <code>::</code>, <code>struct S :: I { … }</code>,
+several joined by <code>&amp;</code>, <code>struct S :: I &amp; J { … }</code>, or through an extend block,
+<code>extend T :: I { … }</code> — one interface also in brackets, <code>:: [I]</code>; several as a list are
+refused (<code>LYR-PAR0066</code>), <a href="../../spec/02-grammar/">02 §1</a> rule 6 —; every entry names an interface
 (<code>LYR-SEM0078</code>). A conformance implements every abstract member of the interface's chain with
 an exact signature — arity, parameter types, return type, <code>mut</code> (<code>LYR-SEM0020</code>,
 <code>LYR-SEM0042</code>); a default may be left as it is, and an own member of the name overrides it.
@@ -152,15 +152,16 @@ interface calling the member on <code>this</code>, and through the qualified cal
 reached — a static member through the type parameter its interface bounds, <code>T.make(s)</code>. One block that
 holds a name at two counts holds an overload set (<a href="../../spec/08-expressions/">08 §1.2</a>), not two
 scopes; blocks that give instances of one generic interface hold one set as well (rule 5).</li>
-<li>A type may conform to <strong>several instances</strong> of one generic interface, <code>struct Label :: [From&lt;int&gt;, From&lt;string&gt;]</code> — in its list, or each in a block of its own. Members of one name
-and count stand side by side where each answers its own instance, <code>from(v: int)</code> beside
+<li>A type may conform to <strong>several instances</strong> of one generic interface,
+<code>struct Label :: From&lt;int&gt; &amp; From&lt;string&gt;</code> — after its <code>::</code>, or each in a block of its own.
+Members of one name and count stand side by side where each answers its own instance, <code>from(v: int)</code> beside
 <code>from(v: string)</code> (D4 holds per conformance; <code>LYR-SEM0085</code> where they answer one). A call
 chooses by its arguments' types: the member whose parameters take them, and of several the
 one whose parameters are the arguments' own types — <code>Label.from(3)</code> is the <code>From&lt;int&gt;</code> one
 beside <code>From&lt;float&gt;</code>, a literal being its default type. None or several left is refused
 (<code>LYR-SEM0086</code>); the argument is written with <code>as</code>, <code>Label.from(3 as int16)</code>. Through a
 constraint, <code>U :: [From&lt;T&gt;]</code>, the instance the constraint names chooses; through two bounds of
-one interface, <code>T :: [From&lt;int&gt;, From&lt;string&gt;]</code>, the arguments choose among them as on a type —
+one interface, <code>T :: From&lt;int&gt; &amp; From&lt;string&gt;</code>, the arguments choose among them as on a type —
 <code>T.from(&quot;abc&quot;)</code> is the <code>From&lt;string&gt;</code> one —, none or several left refused alike; through a value of
 an interface instance, its table does. There is no qualified form for a static member (§4
 rule 2).</li>
@@ -184,7 +185,8 @@ type parameter the interface bounds, <code>T.make(s)</code> (<a href="#7-self-an
 </ol>
 <h2 id="5-delegation">5. Delegation</h2>
 <ol>
-<li>A struct or a class may conform <strong>by delegating</strong> to one of its fields: <code>class Dog :: [Walker by legs] { var legs: Legs, … }</code> (D1). The field exists and conforms to the
+<li>A struct or a class may conform <strong>by delegating</strong> to one of its fields: <code>class Dog :: Walker by legs { var legs: Legs, … }</code> (D1), each of several on its own,
+<code>class Dog :: Walker by legs &amp; Named</code>. The field exists and conforms to the
 interface, or holds a value of it or of a child of it (<code>LYR-SEM0123</code> otherwise) — a child's
 value is one of the parent (<a href="#11-the-child-interface-value-as-a-parent-value">§11</a>). Every
 abstract member of the interface's chain that the type does not write itself is <strong>forwarded</strong>
@@ -402,7 +404,7 @@ answer is; there is no <code>AddAssign</code>. <code>++</code> and <code>--</cod
 and the scalars compare natively. Without the conformance <code>==</code> is refused (<code>LYR-SEM0059</code>).</li>
 <li><strong>Ordering.</strong> <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code> and <code>&gt;=</code> read <code>a.compare(b)</code> through
 <code>Ordered :: [Equatable] { fn compare(o: Self): ?Ordering; }</code> with
-<code>enum Ordering :: [Equatable, Hashable, Debug] { Less, Equal, Greater }</code> (the review's
+<code>enum Ordering :: Equatable &amp; Hashable &amp; Debug { Less, Equal, Greater }</code> (the review's
 M8a-10: an answer can be compared, keyed and printed): <code>&lt;</code> is <code>.Less</code>, <code>&gt;</code> is <code>.Greater</code>, <code>&lt;=</code> is not
 <code>.Greater</code>, <code>&gt;=</code> is not <code>.Less</code>; <strong><code>null</code></strong> — the two are not ordered, as <code>float</code> with NaN —
 makes all four <strong>false</strong>. <code>TotalOrder :: [Ordered] { fn totalCompare(o: Self): Ordering; }</code>
@@ -546,8 +548,10 @@ one (<code>LYR-SEM0133</code>), said at the type's conformance.</li>
 <h2 id="14-conformance-synthesis">14. Conformance synthesis</h2>
 <ol>
 <li>A conformance to one of the <strong>family</strong> — <code>Equatable</code>, <code>Hashable</code>, <code>Ordered</code>, <code>TotalOrder</code>,
-<code>Clone</code>, <code>Default</code>, <code>Display</code>, <code>Debug</code> — written in a struct's, class's or enum's own list
-<strong>without the member</strong> is <strong>synthesized</strong> from the fields (04 D7): <code>struct P :: [Equatable, Hashable] { x: int, y: string }</code> compares and hashes field by field, in declaration order.
+<code>Clone</code>, <code>Default</code>, <code>Display</code>, <code>Debug</code> — written after a struct's, class's or enum's own <code>::</code>
+<strong>without the member</strong> is <strong>synthesized</strong> from the fields (04 D7):
+<code>struct P :: Equatable &amp; Hashable { x: int, y: string }</code> compares and hashes field by field, in
+declaration order.
 There is no <code>derive</code> word. A member the type writes itself replaces the synthesis for that
 member; the others are still synthesized. The list is fixed in 5.0; a synthesis of the
 program's own interfaces is <a href="../../spec/11-metaprogramming/">11</a>'s question. <code>Equatable</code>, <code>Hashable</code>,

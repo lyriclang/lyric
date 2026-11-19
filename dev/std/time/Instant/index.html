@@ -35,7 +35,13 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct Instant</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Instant</span> :: [<span class="ty">Equatable</span>, <span class="ty">Ordered</span>, <span class="ty">TotalOrder</span>, <span class="ty">Hashable</span>, <span class="ty">Add</span>&lt;<span class="ty">Duration</span>&gt;, <span class="ty">Display</span>, <span class="ty">Parse</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Instant</span> :: <span class="ty">Equatable</span>
+    &amp; <span class="ty">Ordered</span>
+    &amp; <span class="ty">TotalOrder</span>
+    &amp; <span class="ty">Hashable</span>
+    &amp; <span class="ty">Add</span>&lt;<span class="ty">Duration</span>&gt;
+    &amp; <span class="ty">Display</span>
+    &amp; <span class="ty">Parse</span></code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>, <code>Ordered</code>, <code>TotalOrder</code>, <code>Hashable</code>, <code>Add&lt;Duration&gt;</code>, <code>Display</code>, <code>Parse</code>.</p>
 <p>A moment on the wall clock, in nanoseconds since 1970-01-01T00:00:00Z — POSIX time, no leap
 seconds counted: the years 1677 to 2262. Two compare and order as the moments they are.

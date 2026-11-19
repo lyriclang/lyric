@@ -465,28 +465,28 @@ the value throws.</p>
 <pre class="signature"><code class="language-lyric"><span class="kw">static</span> <span class="kw">fn</span> decode&lt;<span class="ty">D</span> :: [<span class="ty">Decoder</span>]&gt;(&amp;d: <span class="ty">D</span>): <span class="ty">Deque</span>&lt;<span class="ty">T</span>&gt; <span class="kw">throws</span> <span class="ty">DecodeError</span></code></pre>
 </section>
 <section class="member" id="ext.SetTH">
-<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">Hashable</span>, <span class="ty">Encode</span>], <span class="ty">H</span> :: [<span class="ty">Hasher</span>]&gt; <span class="ty">Set</span>&lt;<span class="ty">T</span>, <span class="ty">H</span>&gt; :: [<span class="ty">Encode</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: <span class="ty">Hashable</span> &amp; <span class="ty">Encode</span>, <span class="ty">H</span> :: [<span class="ty">Hasher</span>]&gt; <span class="ty">Set</span>&lt;<span class="ty">T</span>, <span class="ty">H</span>&gt; :: [<span class="ty">Encode</span>]</code></pre>
 <p class="conforms">Conforms to <code>Encode</code>.</p>
 </section>
 <section class="member" id="ext.SetTH.method.encode">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> encode&lt;<span class="ty">E</span> :: [<span class="ty">Encoder</span>]&gt;(&amp;e: <span class="ty">E</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
 </section>
 <section class="member" id="ext.SetTDefaultHasher">
-<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: [<span class="ty">Hashable</span>, <span class="ty">Decode</span>]&gt; <span class="ty">Set</span>&lt;<span class="ty">T</span>, <span class="ty">DefaultHasher</span>&gt; :: [<span class="ty">Decode</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">T</span> :: <span class="ty">Hashable</span> &amp; <span class="ty">Decode</span>&gt; <span class="ty">Set</span>&lt;<span class="ty">T</span>, <span class="ty">DefaultHasher</span>&gt; :: [<span class="ty">Decode</span>]</code></pre>
 <p class="conforms">Conforms to <code>Decode</code>.</p>
 </section>
 <section class="member" id="ext.SetTDefaultHasher.method.decode">
 <pre class="signature"><code class="language-lyric"><span class="kw">static</span> <span class="kw">fn</span> decode&lt;<span class="ty">D</span> :: [<span class="ty">Decoder</span>]&gt;(&amp;d: <span class="ty">D</span>): <span class="ty">Set</span>&lt;<span class="ty">T</span>, <span class="ty">DefaultHasher</span>&gt; <span class="kw">throws</span> <span class="ty">DecodeError</span></code></pre>
 </section>
 <section class="member" id="ext.MapKVH">
-<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">K</span> :: [<span class="ty">Hashable</span>, <span class="ty">Encode</span>], <span class="ty">V</span> :: [<span class="ty">Encode</span>], <span class="ty">H</span> :: [<span class="ty">Hasher</span>]&gt; <span class="ty">Map</span>&lt;<span class="ty">K</span>, <span class="ty">V</span>, <span class="ty">H</span>&gt; :: [<span class="ty">Encode</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">K</span> :: <span class="ty">Hashable</span> &amp; <span class="ty">Encode</span>, <span class="ty">V</span> :: [<span class="ty">Encode</span>], <span class="ty">H</span> :: [<span class="ty">Hasher</span>]&gt; <span class="ty">Map</span>&lt;<span class="ty">K</span>, <span class="ty">V</span>, <span class="ty">H</span>&gt; :: [<span class="ty">Encode</span>]</code></pre>
 <p class="conforms">Conforms to <code>Encode</code>.</p>
 </section>
 <section class="member" id="ext.MapKVH.method.encode">
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> encode&lt;<span class="ty">E</span> :: [<span class="ty">Encoder</span>]&gt;(&amp;e: <span class="ty">E</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
 </section>
 <section class="member" id="ext.MapKVDefaultHasher">
-<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">K</span> :: [<span class="ty">Hashable</span>, <span class="ty">Decode</span>], <span class="ty">V</span> :: [<span class="ty">Decode</span>]&gt; <span class="ty">Map</span>&lt;<span class="ty">K</span>, <span class="ty">V</span>, <span class="ty">DefaultHasher</span>&gt; :: [<span class="ty">Decode</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">extend</span>&lt;<span class="ty">K</span> :: <span class="ty">Hashable</span> &amp; <span class="ty">Decode</span>, <span class="ty">V</span> :: [<span class="ty">Decode</span>]&gt; <span class="ty">Map</span>&lt;<span class="ty">K</span>, <span class="ty">V</span>, <span class="ty">DefaultHasher</span>&gt; :: [<span class="ty">Decode</span>]</code></pre>
 <p class="conforms">Conforms to <code>Decode</code>.</p>
 </section>
 <section class="member" id="ext.MapKVDefaultHasher.method.decode">

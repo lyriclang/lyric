@@ -162,7 +162,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct FieldInfo</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">FieldInfo</span> :: [<span class="ty">Equatable</span>, <span class="ty">Debug</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">FieldInfo</span> :: <span class="ty">Equatable</span> &amp; <span class="ty">Debug</span></code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>, <code>Debug</code>.</p>
 <p>Describes a field of a struct or a class, in declaration order.</p>
 <p>In a <code>comptime for</code> over it, <code>f.type</code> names its type and <code>e.[f]</code> is the field. <code>hasDefault</code>

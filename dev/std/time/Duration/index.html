@@ -35,19 +35,17 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct Duration</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Duration</span> :: [
-    <span class="ty">Equatable</span>,
-    <span class="ty">Ordered</span>,
-    <span class="ty">TotalOrder</span>,
-    <span class="ty">Hashable</span>,
-    <span class="ty">Default</span>,
-    <span class="ty">Display</span>,
-    <span class="ty">Parse</span>,
-    <span class="ty">Add</span>,
-    <span class="ty">Sub</span>,
-    <span class="ty">Mul</span>&lt;<span class="ty">int</span>&gt;,
-    <span class="ty">Div</span>&lt;<span class="ty">int</span>&gt;
-]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Duration</span> :: <span class="ty">Equatable</span>
+    &amp; <span class="ty">Ordered</span>
+    &amp; <span class="ty">TotalOrder</span>
+    &amp; <span class="ty">Hashable</span>
+    &amp; <span class="ty">Default</span>
+    &amp; <span class="ty">Display</span>
+    &amp; <span class="ty">Parse</span>
+    &amp; <span class="ty">Add</span>
+    &amp; <span class="ty">Sub</span>
+    &amp; <span class="ty">Mul</span>&lt;<span class="ty">int</span>&gt;
+    &amp; <span class="ty">Div</span>&lt;<span class="ty">int</span>&gt;</code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>, <code>Ordered</code>, <code>TotalOrder</code>, <code>Hashable</code>, <code>Default</code>, <code>Display</code>, <code>Parse</code>, <code>Add</code>, <code>Sub</code>, <code>Mul&lt;int&gt;</code>, <code>Div&lt;int&gt;</code>.</p>
 <p>A span of time in whole nanoseconds, negative or not: some 292 years either way.</p>
 <h4 id="panics">Panics</h4>

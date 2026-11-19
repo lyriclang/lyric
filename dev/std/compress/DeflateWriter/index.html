@@ -34,7 +34,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>class DeflateWriter</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">DeflateWriter</span>&lt;<span class="ty">W</span> :: [<span class="ty">Writer</span>]&gt; :: [<span class="ty">Writer</span>, <span class="ty">Closeable</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">class</span> <span class="ty">DeflateWriter</span>&lt;<span class="ty">W</span> :: [<span class="ty">Writer</span>]&gt; :: <span class="ty">Writer</span> &amp; <span class="ty">Closeable</span></code></pre>
 <p class="conforms">Conforms to <code>Writer</code>, <code>Closeable</code>.</p>
 <p>A <code>Writer</code> that compresses the bytes given into raw DEFLATE blocks written to <code>inner</code>; <code>close</code>
 writes the final block. Level 0 stores, 1 uses the fixed tables over a greedy LZ77, 2 and up

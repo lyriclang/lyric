@@ -29,7 +29,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct Uri</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Uri</span> :: [<span class="ty">Equatable</span>, <span class="ty">Hashable</span>, <span class="ty">Debug</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Uri</span> :: <span class="ty">Equatable</span> &amp; <span class="ty">Hashable</span> &amp; <span class="ty">Debug</span></code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>, <code>Hashable</code>, <code>Debug</code>, <code>Display</code>, <code>Parse</code>, <code>Codable</code>.</p>
 <p>A URI reference (§4.1): absolute where it has a scheme, relative otherwise. The host is held
 without its brackets — <code>show</code> puts them around an address with a <code>:</code> —; a <code>null</code> host means no

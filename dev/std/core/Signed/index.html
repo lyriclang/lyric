@@ -162,7 +162,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>interface Signed</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">interface</span> <span class="ty">Signed</span> :: [<span class="ty">Num</span>, <span class="ty">Neg</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">interface</span> <span class="ty">Signed</span> :: <span class="ty">Num</span> &amp; <span class="ty">Neg</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;</code></pre>
 <p class="conforms">Conforms to <code>Num</code>, <code>Neg&lt;Out = Self&gt;</code>.</p>
 <p>A number with a sign: the signed integers and the floats — what <code>std.math</code>'s <code>abs</code> and
 <code>signum</code> take; <code>uint</code> has neither.</p>

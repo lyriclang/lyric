@@ -162,17 +162,15 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>interface Integer</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">interface</span> <span class="ty">Integer</span> :: [
-    <span class="ty">Num</span>,
-    <span class="ty">TotalOrder</span>,
-    <span class="ty">Hashable</span>,
-    <span class="ty">BitAnd</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;,
-    <span class="ty">BitOr</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;,
-    <span class="ty">BitXor</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;,
-    <span class="ty">BitNot</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;,
-    <span class="ty">Shl</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;,
-    <span class="ty">Shr</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;
-]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">interface</span> <span class="ty">Integer</span> :: <span class="ty">Num</span>
+    &amp; <span class="ty">TotalOrder</span>
+    &amp; <span class="ty">Hashable</span>
+    &amp; <span class="ty">BitAnd</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;
+    &amp; <span class="ty">BitOr</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;
+    &amp; <span class="ty">BitXor</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;
+    &amp; <span class="ty">BitNot</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;
+    &amp; <span class="ty">Shl</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;
+    &amp; <span class="ty">Shr</span>&lt;<span class="ty">Out</span> = <span class="ty">Self</span>&gt;</code></pre>
 <p class="conforms">Conforms to <code>Num</code>, <code>TotalOrder</code>, <code>Hashable</code>, <code>BitAnd&lt;Out = Self&gt;</code>, <code>BitOr&lt;Out = Self&gt;</code>, <code>BitXor&lt;Out = Self&gt;</code>, <code>BitNot&lt;Out = Self&gt;</code>, <code>Shl&lt;Out = Self&gt;</code>, <code>Shr&lt;Out = Self&gt;</code>.</p>
 <p>The eight integer types: their range, a total order, a hash, the bit operators.</p>
 <h2 id="methods">Methods</h2>

@@ -258,7 +258,7 @@
     <span class="kw">fn</span> message(): <span class="ty">string</span> { <span class="kw">return</span> <span class="str">"broken"</span>; }
 }
 
-<span class="kw">struct</span> <span class="ty">Empty</span> :: [<span class="ty">Iterator</span>, <span class="ty">Closeable</span>] {
+<span class="kw">struct</span> <span class="ty">Empty</span> :: <span class="ty">Iterator</span> &amp; <span class="ty">Closeable</span> {
     type <span class="ty">Item</span> = <span class="ty">int</span>;
 
     <span class="kw">mut</span> <span class="kw">fn</span> next(): ?<span class="ty">int</span> {
@@ -272,7 +272,7 @@
 <span class="kw">fn</span> main(): <span class="ty">void</span> {
 }</code></pre>
 <h2 id="right">Right</h2>
-<pre><code class="language-lyric"><span class="kw">struct</span> <span class="ty">Empty</span> :: [<span class="ty">Iterator</span>, <span class="ty">Closeable</span>] {
+<pre><code class="language-lyric"><span class="kw">struct</span> <span class="ty">Empty</span> :: <span class="ty">Iterator</span> &amp; <span class="ty">Closeable</span> {
     type <span class="ty">Item</span> = <span class="ty">int</span>;
 
     <span class="kw">mut</span> <span class="kw">fn</span> next(): ?<span class="ty">int</span> {

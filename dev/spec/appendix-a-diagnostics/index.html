@@ -377,7 +377,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
 <td>a list after '::' without its '[' <em>(retired)</em></td>
-<td>The interfaces after <code>::</code> did not open with <code>[</code>. Retired: the list rule: one interface after '::' stands without brackets, 'struct S :: I'; several without them are LYR-PAR0066</td>
+<td>The interfaces after <code>::</code> did not open with <code>[</code>. Retired: the list rule: one interface after '::' stands without brackets, 'struct S :: I'; several are joined with '&amp;', and a list of several is LYR-PAR0066</td>
 </tr>
 <tr>
 <td>LYR-PAR0031</td>
@@ -607,8 +607,8 @@ code is no longer reported, and its number is not given again.</p>
 <td>LYR-PAR0066</td>
 <td>E</td>
 <td><a href="../../spec/05-interfaces/">05-interfaces</a></td>
-<td>several interfaces after '::' without brackets</td>
-<td>Several interfaces follow <code>::</code> — of a struct, class, enum, interface or extend block, or of an associated type's bound — without brackets around them. One interface stands without them, several in them.</td>
+<td>several interfaces after '::' in a list</td>
+<td>Several interfaces follow <code>::</code> — of a struct, class, enum, interface or extend block, of a type parameter's constraint or of an associated type's bound — as a list, <code>[I, J]</code> or <code>I, J</code>. Several are joined with <code>&amp;</code>: <code>:: I &amp; J</code>.</td>
 </tr>
 <tr>
 <td>LYR-PAR0067</td>

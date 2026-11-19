@@ -631,6 +631,12 @@ an internal error. The expander reaches the syntax tree by reflection, and the t
 native build had removed what it reaches; the tests run on .NET and never saw it. The CI now runs
 <code>examples/macros</code> with the published binary on every platform.</p>
 </li>
+<li><p><strong>Several interfaces after <code>::</code> are joined with <code>&amp;</code></strong> (design 03 TM7, spec 02 §1 rule 6):
+<code>struct Item :: Codable &amp; Equatable</code>, <code>&lt;T :: Ordered &amp; Display&gt;</code>, <code>class Dog :: Walker by legs &amp; Named</code>. A list of types in brackets is a set — one of them, as in <code>throws [A, B]</code> — so
+<code>:: [I, J]</code> and <code>:: I, J</code> are <code>LYR-PAR0066</code>; one interface in brackets, <code>:: [I]</code>, stays. The
+formatter puts a chain too long for the line one to a line, with the <code>{</code> on its own.
+<code>lyric fix --from-4</code> joins Lyric 4's lists (rule S13).</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>

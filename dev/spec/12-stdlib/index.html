@@ -1109,7 +1109,7 @@ tried again on a new one (a request without a body). <code>client.close()</code>
 POST, go on as a GET without the body; a 307 or 308 keep the method, and with a body are
 refused (it cannot be sent again). <code>timeout</code> spans the whole exchange — the connection, the
 request, the head — and ends it with <code>TimedOut</code>, the connection closed. <code>transport</code> is a
-<code>fn(host, port) -&gt; Stream</code> (<code>Stream :: [Reader, Writer, Closeable]</code>; a <code>TcpStream</code> is one)
+<code>fn(host, port) -&gt; Stream</code> (<code>Stream :: Reader &amp; Writer &amp; Closeable</code>; a <code>TcpStream</code> is one)
 that makes the connection; <code>http</code> connects over TCP where it is <code>null</code>, <code>https</code> needs one.
 What is refused: a scheme that is neither (<code>HttpError { kind = .Unsupported }</code>), a URI
 without a host, a status line or header line that is not HTTP/1.1's (<code>.Protocol</code>: a version
@@ -1521,8 +1521,9 @@ pair, the model a format implements, the layer a conformance writes with, the er
 conformances of the core types, and <code>Value</code>, the tree of the forms that any format could write.</p>
 <ol>
 <li><strong>The pair.</strong> <code>Encode { fn encode&lt;E :: [Encoder]&gt;(&amp;e: E): void throws EncodeError; }</code>,
-<code>Decode { static fn decode&lt;D :: [Decoder]&gt;(&amp;d: D): Self throws DecodeError; }</code>, <code>Codable :: [Encode, Decode]</code>. A conformance is generic over the format's type, and the format is passed by
-reference, as a hasher is (<a href="#hashing">§Hashing</a>): the format keeps its state, and a <code>mut</code>
+<code>Decode { static fn decode&lt;D :: [Decoder]&gt;(&amp;d: D): Self throws DecodeError; }</code>,
+<code>Codable :: Encode &amp; Decode</code>. A conformance is generic over the format's type, and the format is
+passed by reference, as a hasher is (<a href="#hashing">§Hashing</a>): the format keeps its state, and a <code>mut</code>
 method of the layer hands <code>&amp;this</code> on.</li>
 <li><strong>The model has ten forms</strong>, and a format implements them as primitives: <code>encodeNull</code>,
 <code>encodeBool</code>, <code>encodeInt</code>, <code>encodeUint</code>, <code>encodeFloat</code>, <code>encodeString</code>, <code>encodeBytes</code>, and

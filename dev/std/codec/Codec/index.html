@@ -42,7 +42,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>struct Codec</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Codec</span> :: [<span class="ty">OnField</span>, <span class="ty">OnType</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Codec</span> :: <span class="ty">OnField</span> &amp; <span class="ty">OnType</span></code></pre>
 <p class="conforms">Conforms to <code>OnField</code>, <code>OnType</code>.</p>
 <p>Steers the synthesized <code>encode</code> and <code>decode</code>. On a field, <code>@Codec { name = &quot;user_id&quot; }</code> writes
 the field under that name, <code>@Codec { skip = true }</code> leaves it out (it reads as <code>null</code>, so it

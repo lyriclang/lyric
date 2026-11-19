@@ -45,7 +45,7 @@
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
 <h1>enum Color</h1>
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">enum</span> <span class="ty">Color</span> :: [<span class="ty">Equatable</span>, <span class="ty">Debug</span>]</code></pre>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">enum</span> <span class="ty">Color</span> :: <span class="ty">Equatable</span> &amp; <span class="ty">Debug</span></code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>, <code>Debug</code>.</p>
 <p>A terminal color: one of the 16 of ECMA-48 and aixterm, one of the 256, or RGB.</p>
 <p>Out-of-range components of <a href="../../../std/term/Color/#variant.Index">Color.Index</a> and <a href="../../../std/term/Color/#variant.Rgb">Color.Rgb</a> are clamped to 0..255.</p>
