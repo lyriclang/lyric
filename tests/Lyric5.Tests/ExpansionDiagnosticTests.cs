@@ -117,6 +117,63 @@ public class ExpansionDiagnosticTests
         Assert.DoesNotContain(lines, l => l.Contains("'dead'"));
     }
 
+    private const string Flaky = """
+        import std.io { println };
+        import app.macros { retry };
+
+        struct Flaky :: [Error] {
+            fn message(): string {
+                return "flaky";
+            }
+        }
+
+        fn fetch(): int throws Flaky {
+            return 1;
+        }
+
+        """;
+
+    /// <summary>A mark the caller wrote under the quote's own <c>try</c> is the mark the caller
+    /// needs: without the macro the call would be unmarked, so it is not "marked already".</summary>
+    [Fact]
+    public void A_mark_under_the_quotes_own_try_is_not_marked_already()
+    {
+        var lines = Lines(Flaky + """
+            fn main(): void throws Flaky {
+                var result = 0;
+                retry!(3) {
+                    result = try fetch();
+                }
+                println(f"{result}");
+            }
+            """, 0);
+        Assert.DoesNotContain(lines, l => l.Contains("LYR-SEM0139"));
+    }
+
+    /// <summary>A mark the caller doubled inside its own block in a macro's body is said, and the
+    /// edit takes the whole keyword: a span read back from a macro is a point, and the edit took
+    /// the 't' alone ('result = ry fetch();').</summary>
+    [Fact]
+    public void A_doubled_mark_in_a_macros_body_is_taken_out_whole()
+    {
+        var lines = Lines(Flaky + """
+            fn main(): void throws Flaky {
+                var result = 0;
+                retry!(3) {
+                    try {
+                        result = try fetch();
+                    } catch (e) {
+                        println(e.message());
+                    }
+                }
+                println(f"{result}");
+            }
+            """, 0);
+        Assert.Single(lines, l => l.Contains("LYR-SEM0139"));
+        Assert.Contains(lines, l => l.Contains("result = fetch();"));
+        Assert.DoesNotContain(lines, l => l.Contains("ry fetch()") && !l.Contains("try fetch()"));
+    }
+
     /// <summary>A site an expansion holds: the chain of expansions, innermost first.</summary>
     [Fact]
     public void A_site_inside_an_expansion_chains_the_notes()

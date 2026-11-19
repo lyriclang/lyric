@@ -817,6 +817,20 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
     /// <summary>The span of the node being read, where its value names one.</summary>
     private Span? _current;
 
+    /// <summary>The keyword a node the caller wrote begins with, as its own span. A span of
+    /// std.syntax is a point — file, line, column —, so a node read back covers one character;
+    /// a diagnostic about the keyword and the edit that takes it out need the word, and the edit
+    /// left the rest of it behind ('ry fetch()'). Taken from the text where it is the keyword;
+    /// elsewhere the point, or the site.</summary>
+    private Span KeywordAt(Span? own, string keyword)
+    {
+        if (own is not { } at) return NoSpan;
+        var text = _sources.GetText(at.File);
+        return at.Start + keyword.Length <= text.Length && string.CompareOrdinal(text, at.Start, keyword, 0, keyword.Length) == 0
+            ? new Span(at.File, at.Start, at.Start + keyword.Length)
+            : at;
+    }
+
     private Span NoSpan => _current ?? At;
 
     private (string Name, Span Span) IdentOf(Value v, IrType t) =>
@@ -921,12 +935,15 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
             case "Comptime": return new ComptimeExpr(BoxedExpr(f[0], ft[0]), NoSpan);
             case "Throw": return new ThrowExpr(BoxedExpr(f[0], ft[0]), NoSpan);
             case "Try":
+            {
+                var kind = (TryKind)IndexIn(TryNames, Case(f[1], ft[1]).Name);
                 return new TryExpr(BoxedExpr(f[0], ft[0]), NoSpan)
                 {
-                    KeywordSpan = NoSpan,
-                    Kind = (TryKind)IndexIn(TryNames, Case(f[1], ft[1]).Name),
+                    KeywordSpan = KeywordAt(SpanIn(v, t), kind == TryKind.Propagate ? "try" : kind == TryKind.Optional ? "try?" : "try!"),
+                    Kind = kind,
                     Catches = CatchesOf(f[2], ft[2]),
                 };
+            }
             case "Macro":
                 return new MacroCallExpr(StrOf(f[0]), Many(f[1], ft[1], ExprOf), Maybe(f[2], ft[2], BlockOf), NoSpan) { NameSpan = NoSpan, BangSpan = NoSpan };
             default: throw ComptimeFailure.NotYet($"std.syntax: the expression '{name}' has no form in the compiler yet");
