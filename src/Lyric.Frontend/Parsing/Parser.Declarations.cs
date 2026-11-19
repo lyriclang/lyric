@@ -29,7 +29,7 @@ public sealed partial class Parser
             // past every position that could have reported it — and a second diagnostic from the
             // recovery that followed would only describe the wreckage.
             _de.Report("LYR-PAR0045", Severity.Error, deep.At,
-                $"nesting is deeper than this parser carries ({MaxNesting} levels) — the language "
+                $"nesting is deeper than this parser carries ({MaxNesting} levels, or fewer where its stack is smaller) — the language "
                 + "sets no limit, this implementation does, and the alternative was taking the "
                 + "process down");
             // the file is read as holding nothing: what follows from that — a 'main' missing, a name
