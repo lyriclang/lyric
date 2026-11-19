@@ -495,6 +495,10 @@ promise. This entry fills with the milestones.
   `{"Rect":{"w":2,"h":5}}` in JSON, and `Ring { r: int }` is `{"Ring":{"r":1}}`. It was a sequence,
   or the bare value for one field, as a positional payload still is (`{"Circle":3}`,
   `{"Pair":[4,6]}`). Data written before reads no longer for such a variant.
+- **A type test can name a type parameter of the code around it.** `c: Column<T>`,
+  `e is Column<T>` and `_ in [Column<T>, Cell<T>]` in a generic function or in a method of
+  `class Store<T>` test each instance's own type: `Column<int>` in `pick<int>`. The checker accepted
+  them and the build stopped with `LYR-ICE0002: this type argument`.
 
 ---
 

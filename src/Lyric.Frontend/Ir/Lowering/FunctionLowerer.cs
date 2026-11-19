@@ -2636,7 +2636,7 @@ internal sealed class FunctionLowerer
         }
         if (TypeOfExpr(test.Operand) is not IrInterfaceType)
             throw NotSupported("'is' on a value that is no interface value", test.Span);
-        var target = _typeTable.Lower(test.Type);
+        var target = LowerWrittenInBody(test.Type);
         var dest = _slots.NewTemp(BoolType);
         _b.Emit(new TypeTest(dest, value, TargetIdOf(target, test.Span), test.Span));
         return dest;
@@ -3849,7 +3849,7 @@ internal sealed class FunctionLowerer
                 var ifaceType = valueType is IrOptionalType oi ? oi.Inner : valueType;
                 if (ifaceType is not IrInterfaceType)
                     throw NotSupported("a type pattern on a value that is no interface value", tp.Span);
-                var target = _typeTable.Lower(tp.Type);
+                var target = LowerWrittenInBody(tp.Type);
                 var targetId = TargetIdOf(target, tp.Span);
                 if (!assumeMatch)
                 {
@@ -3878,7 +3878,7 @@ internal sealed class FunctionLowerer
                 var ifaceType = valueType is IrOptionalType oi ? oi.Inner : valueType;
                 if (ifaceType is not IrInterfaceType)
                     throw NotSupported("a type pattern on a value that is no interface value", ts.Span);
-                var targets = ts.Types.Select(t => _typeTable.Lower(t)).ToArray();
+                var targets = ts.Types.Select(LowerWrittenInBody).ToArray();
                 if (!assumeMatch)
                 {
                     var matched = _b.NewBlock();
@@ -8663,6 +8663,15 @@ internal sealed class FunctionLowerer
         using var scope = _typeTable.PushSubstitution(NamedSubstitution());
         return _typeTable.Lower(node);
     }
+
+    /// <summary>
+    /// A type written in the body, the instance's substitution applied where it has one: the type of
+    /// a type test, <c>c: Column&lt;T&gt;</c> or <c>e is Column&lt;T&gt;</c> in a generic function or a
+    /// method of a generic class. Lowered without it, the table met the parameter's name and found
+    /// no type — the checker had accepted the test, and the lowering reported it as untranslatable.
+    /// </summary>
+    private IrType LowerWrittenInBody(TypeNode node) =>
+        _substitution.Count > 0 ? LowerSubstituted(node) : _typeTable.Lower(node);
 
     /// <summary>
     /// The type arguments of a call site as a name map for the type table.
