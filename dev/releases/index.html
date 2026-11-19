@@ -637,6 +637,11 @@ native build had removed what it reaches; the tests run on .NET and never saw it
 formatter puts a chain too long for the line one to a line, with the <code>{</code> on its own.
 <code>lyric fix --from-4</code> joins Lyric 4's lists (rule S13).</p>
 </li>
+<li><p><strong>A codable enum's variant with named fields writes them by name</strong>: <code>Rect { w: int, h: int }</code> is
+<code>{&quot;Rect&quot;:{&quot;w&quot;:2,&quot;h&quot;:5}}</code> in JSON, and <code>Ring { r: int }</code> is <code>{&quot;Ring&quot;:{&quot;r&quot;:1}}</code>. It was a sequence,
+or the bare value for one field, as a positional payload still is (<code>{&quot;Circle&quot;:3}</code>,
+<code>{&quot;Pair&quot;:[4,6]}</code>). Data written before reads no longer for such a variant.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>

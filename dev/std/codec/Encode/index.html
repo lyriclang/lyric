@@ -49,9 +49,9 @@
 <pre class="signature"><code class="language-lyric"><span class="kw">fn</span> encode&lt;<span class="ty">E</span> :: [<span class="ty">Encoder</span>]&gt;(&amp;e: <span class="ty">E</span>): <span class="ty">void</span> <span class="kw">throws</span> <span class="ty">EncodeError</span></code></pre>
 <p>Writes this value into <code>e</code>. Synthesized for a conformance without the member: a struct's
 fields in declaration order under their wire names, a <code>@Codec { skip }</code> field left out; an
-enum's variant — a unit one as its name, one payload field as the value, several as a
-sequence — or, under the enum's <code>@Codec { tag }</code>, as a struct of the tag and the payload's
-fields.</p>
+enum's variant — a unit one as its name, a payload with names as a struct of its fields, a
+positional one as its value where it has one field and as a sequence where it has several
+— or, under the enum's <code>@Codec { tag }</code>, as a struct of the tag and the payload's fields.</p>
 <h4 id="errors">Errors</h4>
 <p>Throws <code>EncodeError</code> where the encoder cannot hold a form or its writer fails.</p>
 </section>

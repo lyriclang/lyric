@@ -1568,16 +1568,19 @@ the two anonymous containers from one — a struct or a variant it cannot read w
 or a class conforming without the members gets <code>encode</code> and <code>decode</code> over its fields in
 declaration order — every field, whatever its word —, each under its wire name; a field the
 data lacks reads as <code>decodeAbsent</code> gives it (<code>null</code> for an optional, <code>Missing</code> else); an
-unknown field passes. An enum gets its variant: a unit one as the name, one payload field as
-the value, several as a sequence in their order; reading, an unknown name is
-<code>UnknownVariant</code>. The struct's name on the wire is <code>typeName</code>'s. An own <code>encode</code> or <code>decode</code>
+unknown field passes. An enum gets its variant: a unit one as the name; a payload with names
+as a struct of its fields under their names, one field as much as several — the variant's
+name is the struct's —; a positional payload, <code>Circle(int)</code>, as its value where it has one
+field and as a sequence in their order where it has several (design 10 E3, review
+2026-11-10). Reading, an unknown name is <code>UnknownVariant</code>, and a payload in the other form
+than the variant's is refused as any value of another form is. The struct's name on the wire is <code>typeName</code>'s. An own <code>encode</code> or <code>decode</code>
 replaces the synthesized one (<a href="../../spec/05-interfaces/">05 §14</a>).</li>
 <li><strong><code>@Codec</code> steers it</strong> (E4): on a field, <code>name</code> writes it under that name and <code>skip</code> leaves it
 out — it reads as absent, so it is an optional or it is <code>Missing</code> —; on a struct or a class,
 <code>rename = .SnakeCase</code> or <code>.CamelCase</code> rewrites every field's name and <code>denyUnknown</code> refuses a
 field the data has and the type has not (<code>UnknownField</code>); on an enum, <code>tag = &quot;kind&quot;</code> writes a
-variant as a struct of the tag and the payload's fields, named by position (<code>&quot;0&quot;</code>, <code>&quot;1&quot;</code>),
-and reads it by the tag. <code>default</code> is not read in 5.0: a field marked so reads as absent.</li>
+variant as a struct of the tag and the payload's fields — under their names, a positional
+payload's by position (<code>&quot;0&quot;</code>, <code>&quot;1&quot;</code>) —, and reads it by the tag. <code>default</code> is not read in 5.0: a field marked so reads as absent.</li>
 </ol>
 <h2 id="json">JSON</h2>
 <p><strong><code>std.json</code></strong> (design 10 B10 E7; M10 S3) is RFC 8259, strictly: an encoder and a decoder of
