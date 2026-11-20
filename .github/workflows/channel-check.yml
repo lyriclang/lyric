@@ -69,6 +69,27 @@ jobs:
               sudo cp "$RUNNER_TEMP/hosts.new" "$hosts"
               if [ "$RID" = "osx-arm64" ]; then sudo dscacheutil -flushcache; fi
             fi
+            [ "$RID" != "linux-x64" ] || settled "$@"
+          }
+
+          # systemd-resolved answers from its own copy of the hosts file and reads the file again
+          # only now and then: a name the file no longer holds still came back at 127.0.0.1 a moment
+          # later. Wait until each name says what the file says.
+          settled() {
+            for i in $(seq 1 30); do
+              stale=0
+              for name in github.com objects.githubusercontent.com release-assets.githubusercontent.com dl.lyriclang.de; do
+                at=$(getent ahostsv4 "$name" | awk 'NR == 1 { print $1 }' || true)
+                case " $* " in
+                  *" $name "*) [ "$at" = 127.0.0.1 ] || stale=1 ;;
+                  *) [ "$at" != 127.0.0.1 ] || stale=1 ;;
+                esac
+              done
+              [ "$stale" = 1 ] || return 0
+              sleep 1
+            done
+            echo "the resolver still answers from the old hosts file" >&2
+            return 1
           }
 
           from() {
