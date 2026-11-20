@@ -1385,6 +1385,83 @@ pub macro positive(n: Expr): Expr {
 }
 '''
 
+[LYR-MAC0002]
+title = "a warning a macro reports"
+severity = "warning"
+lint = "macro-warning"
+group = "correctness"
+level = "warn"
+area = "11-metaprogramming"
+summary = "A macro called `warn(at, message)` of `std.syntax` while it expanded: it took its arguments and says what about them deserves a look. The warning stands at the node the macro named, with a note at the site's `!`."
+explanation = '''
+A macro that can expand what it was given, but finds something in it worth a word — a form it will drop in a later version, an argument it reads in a way a reader might not expect — says so with `warn` and goes on. The expansion stands, and the program compiles; `--deny-warnings` makes the warning fail the build as any warning does.
+
+The message is the macro's, and its documentation says what it asks for.
+'''
+wrong = '''
+//- src/main.lyr
+import app.macros { twice };
+
+fn main(): void {
+    let _ = twice!(1 + 2);
+}
+//- src/macros.lyr
+import std.syntax { Expr, warn };
+
+pub macro twice(n: Expr): Expr {
+    match (n) {
+        .Binary(_, _, _, _) => { warn(n.span(), "twice! evaluates its argument twice"); },
+        _ => { },
+    }
+    return quote { #{n} + #{n} };
+}
+'''
+right = '''
+//- src/main.lyr
+import app.macros { twice };
+
+fn main(): void {
+    let three = 1 + 2;
+    let _ = twice!(three);
+}
+//- src/macros.lyr
+import std.syntax { Expr, warn };
+
+pub macro twice(n: Expr): Expr {
+    match (n) {
+        .Binary(_, _, _, _) => { warn(n.span(), "twice! evaluates its argument twice"); },
+        _ => { },
+    }
+    return quote { #{n} + #{n} };
+}
+'''
+
+[LYR-MAC0003]
+title = "a note a macro writes"
+severity = "hint"
+area = "11-metaprogramming"
+summary = "A macro called `note(at, message)` of `std.syntax` while it expanded: what it made of its arguments, at the node it names, with a note at the site's `!`."
+explanation = '''
+A macro may say what it read in its arguments where a reader would ask — which of two forms it took, what it generated for a site. A note is no warning: it fails nothing, and an editor shows it as a hint.
+
+Nothing is to be changed; the note is the macro's account of the expansion.
+'''
+program = '''
+//- src/main.lyr
+import app.macros { twice };
+
+fn main(): void {
+    let _ = twice!(3);
+}
+//- src/macros.lyr
+import std.syntax { Expr, note };
+
+pub macro twice(n: Expr): Expr {
+    note(n.span(), "twice! doubles by adding");
+    return quote { #{n} + #{n} };
+}
+'''
+
 [LYR-MIG0001]
 title = "a program Lyric 4.6 refuses is not migrated"
 severity = "error"

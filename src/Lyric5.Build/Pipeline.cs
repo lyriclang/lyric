@@ -33,7 +33,8 @@ public static class Pipeline
             TargetOs.MacOs => "macos",
             TargetOs.Windows => "windows",
             _ => "other",
-        }, target.Arch, (profile?.Base ?? Lyric5.Toolchain.Profile.Debug) == Lyric5.Toolchain.Profile.Debug);
+        }, target.Arch, (profile?.Base ?? Lyric5.Toolchain.Profile.Debug) == Lyric5.Toolchain.Profile.Debug,
+            profile?.Name ?? "debug");
 
     /// <summary>The version the toolchain claims — three numbers, no dev stamp —, which a
     /// <c>@Deprecated</c>'s <c>until</c> comes due against: it falls due on the branch
@@ -234,9 +235,13 @@ public static class Pipeline
         // And what decides the findings is part of it: a build that is up to date runs no
         // front end and says nothing, so '-D warnings' after a plain build would pass on the plain
         // build's C — the command line's lint levels, '--warn-deps' and the profile's denyWarnings.
+        // What 'target' and 'profile' hold changes the C as much: a 'comptime if (profile.debug)'
+        // chooses, and a release build after a debug one took the debug build's choice. And the
+        // optimizer runs over the IR from opt 2 on, before the C is written.
         var key = Key(SourcesKey(project), request.ToolchainVersion, CEmitter.Version, CompilerIdentity,
             request.Profile.OverflowChecks ? "checked" : "wrapping",
-            project.LintArgs.Fingerprint, request.Profile.DenyWarnings ? "deny-warnings" : "");
+            project.LintArgs.Fingerprint, request.Profile.DenyWarnings ? "deny-warnings" : "",
+            FactsOf(request.Target, request.Profile).ToString(), request.Profile.Opt >= 2 ? "optimized" : "");
         var manifest = Path.Combine(project.CacheDir, $"{project.BinaryName}-{key}.units");
         // What 'embed' read is an input the key cannot name before the front
         // end runs: the list beside the units says which, and a file that changed sends the

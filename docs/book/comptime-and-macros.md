@@ -45,8 +45,9 @@ a tuple. An object of a class is not — it has an identity that belongs to a ru
 
 ## Choosing by target
 
-`target` and `profile` are constants of the build: the operating system and architecture it is
-built for, and whether the profile is a debug one. `comptime if` chooses by them; every branch is
+`target` and `profile` are constants of the build: the operating system, the architecture, the
+pointer width and the byte order it is built for (`target.endian`), whether the profile is a debug
+one and the profile's name (`profile.name`). `comptime if` chooses by them; every branch is
 checked, only the chosen one is built:
 
 ```lyric
@@ -110,6 +111,10 @@ directly, with its own type — nothing is looked up at run time. This is how th
 writes `Debug`, `Equatable` and the JSON codec for any struct: a default method of an interface
 that walks `Self`'s fields.
 
+`sizeOf<T>()` and `alignOf<T>()` give the size and the alignment of a type in bytes as C lays it
+out — what a buffer for a C library is measured in. The C compiler answers them, so they are
+constants in the binary, but not something a `comptime` site can ask.
+
 ## Macros
 
 A macro is a function over syntax. It takes pieces of the program — expressions, blocks,
@@ -155,6 +160,11 @@ The quote is hygienic: `attempts` and `e` are the macro's own, fresh at every si
 macros replaced by what they gave, which is the way to see what a site turned into. A macro can
 also be an attribute — `@Builder struct Point { … }` adding a `PointBuilder` beside the struct —
 and an expression macro can take a little language of its own in a string.
+
+A macro speaks to its user through `std.syntax`: `error(at, message)` refuses the site, at the
+node `at` names; `warn(at, message)` says something worth a look and lets the expansion stand — a
+warning like the compiler's own, the lint `macro-warning`; `note(at, message)` adds a hint, such
+as which of two forms the macro took. Each points at the node and at the site's `!`.
 
 [`examples/macros`](../../examples/macros/src/main.lyr) has all three kinds at work, and the test
 suite builds it and compares what `lyric expand` prints.

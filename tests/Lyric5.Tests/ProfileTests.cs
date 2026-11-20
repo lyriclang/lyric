@@ -153,6 +153,32 @@ public class ProfileTests
         Assert.Contains("LYR-RT0002", ran.Stderr);
     }
 
+    /// <summary>What <c>profile</c> holds is the build's: a release build after a debug one of the
+    /// same program reads its own profile, not the C the debug build left in the cache — and
+    /// back again.</summary>
+    [Fact]
+    public void A_build_reads_its_own_profile_after_another()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", WhichProfile));
+        var host = Target.Host;
+        string Ran(string profile)
+        {
+            var (exit, _, error) = Run("build", "-C", dir, "--profile", profile);
+            Assert.True(exit == 0, error);
+            var ran = ProcessRunner.Run(Path.Combine(dir, "out", profile, host.Triple, "app" + host.ExecutableSuffix), [], TimeSpan.FromMinutes(1));
+            Assert.True(ran.ExitCode == 0, ran.Stderr);
+            return ran.Stdout.Replace("\r\n", "\n");
+        }
+        Assert.Equal("debug true\n", Ran("debug"));
+        Assert.Equal("release false\n", Ran("release"));
+        Assert.Equal("debug true\n", Ran("debug"));
+    }
+
+    private const string WhichProfile = "import std.io { println };\n\n"
+        + "fn main(): void {\n"
+        + "    println(f\"{profile.name} {profile.debug}\");\n"
+        + "}\n";
+
     [Fact]
     public void A_field_flag_changes_the_profile_for_one_build()
     {

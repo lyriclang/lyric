@@ -330,7 +330,8 @@ public sealed record PlaceAt(TempId Dest, TempId Address, IrType Type, Span Span
 
 /// <summary><c>std.ffi</c>'s size of <paramref name="Type"/> in memory, a <c>uint</c>: what C's
 /// <c>sizeof</c> says of it, and the step between two of them.</summary>
-public sealed record SizeOf(TempId Dest, IrType Type, Span Span) : IrOp(Span);
+/// <summary>The size of a type in bytes as C lays it out — its alignment where <see cref="Align"/>.</summary>
+public sealed record SizeOf(TempId Dest, IrType Type, Span Span, bool Align = false) : IrOp(Span);
 
 /// <summary>A Lyric function as a C function's pointer, a <c>uint</c>: the address of a trampoline
 /// that takes C's values in their <paramref name="Params"/> forms, calls <paramref name="Function"/>

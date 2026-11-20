@@ -504,6 +504,13 @@ promise. This entry fills with the milestones.
   (`LYR-SEM0139`), though without the macro it is needed; a mark is counted against the program's
   own `try`s only. Where the caller does double a mark in such a body, the help takes the whole
   keyword out — it took the `t` alone (`result = ry fetch();`).
+- **`sizeOf<T>()` and `alignOf<T>()` in `std.meta`**, the size and the alignment as C lays a type
+  out; **`target.endian`** (`Endian`, in `std.os`) and **`profile.name`**; **`warn` and `note` in
+  `std.syntax`**, a macro's warning (`LYR-MAC0002`, the lint `macro-warning`) and hint
+  (`LYR-MAC0003`) beside its `error`. **A build reads its own profile after another**: the cached C
+  of a program was keyed without the target's and the profile's facts, so a release build after a
+  debug one of the same program took the debug build's `comptime` choices, `profile.debug`
+  included, and skipped the IR optimizer.
 
 ---
 

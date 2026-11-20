@@ -50,6 +50,9 @@ public sealed class Interpreter
 
     public IrModule Module => _module;
 
+    /// <summary>What a macro said with <c>warn</c> and <c>note</c> since it was last emptied.</summary>
+    public List<(string Code, Lyric.Core.Severity Severity, Lyric.Core.Span At, string Message)> Said => _natives.Said;
+
     /// <summary>Steps taken since the last <see cref="Refill"/>.</summary>
     public long Spent => _budgetLimit - _budget;
 
