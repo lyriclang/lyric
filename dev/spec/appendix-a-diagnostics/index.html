@@ -2828,7 +2828,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/14-cli/">14-cli</a></td>
 <td>the C compiler or the linker failed</td>
-<td>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails, or does not finish within five minutes and is stopped. The message carries the command and what the C compiler wrote, or the limit; the exit code is 2. A link whose failure the build can read is said as its findings instead (<code>LYR-LNK0001</code>–<code>LYR-LNK0003</code>); this error stands for what is left. A header no directory holds adds the directories that were searched.</td>
+<td>Reported by <code>build</code>, <code>run</code>, <code>test</code> and <code>bench</code> when compiling the generated C, a package's native C or a build script's C, archiving the runtime, or linking the binary fails, or does not finish within ten minutes and is stopped. The message carries the command and what the C compiler wrote, or the limit; the exit code is 2. A link whose failure the build can read is said as its findings instead (<code>LYR-LNK0001</code>–<code>LYR-LNK0003</code>); this error stands for what is left. A header no directory holds adds the directories that were searched.</td>
 </tr>
 <tr>
 <td>LYR-BLD0002</td>

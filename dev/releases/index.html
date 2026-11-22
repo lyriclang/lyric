@@ -660,6 +660,11 @@ of a program was keyed without the target's and the profile's facts, so a releas
 debug one of the same program took the debug build's <code>comptime</code> choices, <code>profile.debug</code>
 included, and skipped the IR optimizer.</p>
 </li>
+<li><p><strong><code>lyric lsp --version</code></strong> says the toolchain's version, the one the server's <code>initialize</code> answer
+gives, and starts no server: what an editor checks before it starts one. <strong>A run of the C
+compiler, the archiver or the linker may take ten minutes</strong> before it is stopped (<code>LYR-BLD0001</code>),
+not five: the standard library's tests took longer on a macOS runner in debug.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
