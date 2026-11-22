@@ -131,6 +131,16 @@ public sealed class Natives(Interpreter interpreter)
     private static StrObj S(Value v) => (StrObj)v.Ref!;
     private static Value Str(string text) => Value.Of(StrObj.Of(text));
 
+    /// <summary>What a macro said with <c>warn</c> and <c>note</c> while it expanded, oldest first:
+    /// the expander reports it at the site and empties the list.</summary>
+    public List<(string Code, Lyric.Core.Severity Severity, Lyric.Core.Span At, string Message)> Said { get; } = [];
+
+    private Value Say(string code, Lyric.Core.Severity severity, Value[] a)
+    {
+        Said.Add((code, severity, Syntax.SpanOf(S(a[0]).ToString(), (int)I(a[1]), (int)I(a[2])), S(a[3]).ToString()));
+        return default;
+    }
+
     /// <summary>The bytes at an address: the first <paramref name="length"/> of the object it
     /// points into. An address that is a number only — computed, or C's — names nothing here.</summary>
     private static byte[] Addressed(Value address, Value length)
@@ -160,6 +170,8 @@ public sealed class Natives(Interpreter interpreter)
         ["std.syntax.freshName"] = (a, _, _) => Str(Syntax.FreshName(S(a[0]).ToString())),
         // a struct parameter reaches a native flattened (ImportTable): the Span's file, line and column
         ["std.syntax.error"] = (a, _, _) => throw Syntax.MacroError(S(a[0]).ToString(), (int)I(a[1]), (int)I(a[2]), S(a[3]).ToString()),
+        ["std.syntax.warn"] = (a, _, _) => Say("LYR-MAC0002", Lyric.Core.Severity.Warning, a),
+        ["std.syntax.note"] = (a, _, _) => Say("LYR-MAC0003", Lyric.Core.Severity.Hint, a),
         // --- strings (string.c)
         ["std.string.concat"] = (a, _, _) => Str([.. S(a[0]).Bytes, .. S(a[1]).Bytes]),
         ["std.string.fromInt"] = (a, _, _) => Str(I(a[0]).ToString(System.Globalization.CultureInfo.InvariantCulture)),
@@ -339,6 +351,8 @@ public sealed class Natives(Interpreter interpreter)
         ["std.core.buildArch"] = (_, _, _) => Value.Int(Facts.Arch),
         ["std.core.buildPointerWidth"] = (_, _, _) => Value.Int(Facts.PointerWidth),
         ["std.core.buildDebug"] = (_, _, _) => Value.Bool(Facts.Debug),
+        ["std.core.buildBigEndian"] = (_, _, _) => Value.Bool(Facts.BigEndian),
+        ["std.core.buildProfile"] = (_, _, _) => Str(Facts.Profile),
 
         // --- the Unicode Character Database (unicode.c)
         ["std.core.unicodeCategory"] = (a, _, _) => Value.Int(UnicodeCategory((uint)a[0].Bits)),

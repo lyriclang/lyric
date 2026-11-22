@@ -210,7 +210,9 @@ public static class MacroExpander
                     if ((site.Attribute is null ? Arguments(site, macro, function, hoisted, bridge, diagnostics)
                             : AttributeArguments(site, macro, function, hoisted, bridge, diagnostics)) is not { } args) { failed = true; continue; }
                     interpreter.Refill();
+                    interpreter.Said.Clear();
                     var result = interpreter.Run(new FunctionId(index), args);
+                    ReportSaid(interpreter, site, diagnostics);
                     var placed = site.Attribute is null
                         ? Splice(site, macro, result, function.ReturnType, hoisted, bridge, replacements, splices, diagnostics, sources)
                         : SpliceDeclaration(site, macro, result, function.ReturnType, hoisted, bridge, replacements, declSplices, diagnostics, sources);
@@ -218,6 +220,8 @@ public static class MacroExpander
                 }
                 catch (ComptimeFailure failure)
                 {
+                    // what it said before it failed stands too
+                    ReportSaid(interpreter, site, diagnostics);
                     if (failure.Code == "LYR-MAC0001")
                         diagnostics.Report(failure.Code, Severity.Error, failure.At == default ? site.Span : failure.At, failure.Message,
                             [new DiagnosticNote(site.BangSpan, $"in the expansion of '{site.Written}'")]);
@@ -262,6 +266,16 @@ public static class MacroExpander
     /// <summary>The site's arguments as the macro's parameters take them: each written
     /// argument to the next parameter by its kind, the trailing block to a last <c>Block</c> or
     /// <c>Stmt[]</c> parameter; or <c>null</c>, reported.</summary>
+    /// <summary>What the macro said with <c>warn</c> and <c>note</c>, each at the node it named
+    /// with a note at the site's <c>!</c>, as its <c>error</c> is.</summary>
+    private static void ReportSaid(Interpreter interpreter, Site site, DiagnosticEngine diagnostics)
+    {
+        foreach (var (code, severity, at, message) in interpreter.Said)
+            diagnostics.Report(code, severity, at == default ? site.Span : at, message,
+                [new DiagnosticNote(site.BangSpan, $"in the expansion of '{site.Written}'")]);
+        interpreter.Said.Clear();
+    }
+
     private static Value[]? Arguments(Site site, FunctionSymbol macro, IrFunction function, IrModule module, SyntaxBridge bridge, DiagnosticEngine diagnostics)
     {
         var call = site.Call!;

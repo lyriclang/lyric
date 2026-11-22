@@ -6222,19 +6222,29 @@ extend Arch :: [Display] {
     }
 }
 
+/// The order a machine keeps the bytes of a number in: its least significant byte first, or its
+/// most significant.
+pub enum Endian :: Equatable & Debug {
+    Little,
+    Big,
+}
+
 /// Describes what a program is built for: its system, its machine, the width of a pointer in
-/// bits.
+/// bits, its byte order.
 pub struct Target :: Equatable & Debug {
     pub os: Platform,
     pub arch: Arch,
     pub pointerWidth: int,
+    pub endian: Endian,
 }
 
 /// Describes what a program is built as.
 ///
-/// `debug` is true where the profile is the built-in `debug` or one that inherits from it.
+/// `debug` is true where the profile is the built-in `debug` or one that inherits from it; `name`
+/// is the profile's own, as `--profile` or the manifest names it.
 pub struct Profile :: Equatable & Debug {
     pub debug: bool,
+    pub name: string,
 }
 
 /// The target of the build: `comptime if (target.os == .Windows)` chooses while compiling.
@@ -6244,10 +6254,33 @@ pub let target: Target = comptime Target {
     os = platformOf(buildOs()),
     arch = archOf(buildArch()),
     pointerWidth = buildPointerWidth(),
+    endian = if (buildBigEndian()) Endian.Big else Endian.Little,
 };
 
-/// The profile of the build: `comptime if (profile.debug)`.
-pub let profile: Profile = comptime Profile { debug = buildDebug() };
+/// The profile of the build: `comptime if (profile.debug)`, `profile.name`.
+pub let profile: Profile = comptime Profile { debug = buildDebug(), name = buildProfile() };
+
+/// Returns the size of a value of `T` in bytes, as C lays it out on the target: a struct with its
+/// padding, a class or an array as the reference it is.
+pub fn sizeOf<T>(): int {
+    return byteSizeOf<T>() as int;
+}
+
+/// Returns the alignment of `T` in bytes on the target, as C lays it out: an address where a
+/// value of `T` may start is a multiple of it.
+pub fn alignOf<T>(): int {
+    return byteAlignOf<T>() as int;
+}
+
+@Allow("unused")
+fn byteSizeOf<T>(): uint {
+    unreachable("std.core's byteSizeOf is the compiler's");
+}
+
+@Allow("unused")
+fn byteAlignOf<T>(): uint {
+    unreachable("std.core's byteAlignOf is the compiler's");
+}
 
 /// Builds the declaration only where `cond` holds: `@When(cond)`.
 ///
@@ -6281,6 +6314,8 @@ fn buildOs(): int;
 fn buildArch(): int;
 fn buildPointerWidth(): int;
 fn buildDebug(): bool;
+fn buildBigEndian(): bool;
+fn buildProfile(): string;
 
 /// Marks a field that a synthesized `clone()` copies as it stands instead of cloning it.
 ///

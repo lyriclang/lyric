@@ -219,7 +219,7 @@ public static class IrPrinter
         ErrorTrace t => $"{t.Dest}: {TypeStr(t.Type)} = errtrace s{t.Stash}",
         BlackBox b => $"{b.Dest}: {TypeStr(b.Type)} = blackbox {b.Value}",
         PlaceAt p => $"{p.Dest}: {TypeStr(new IrPlaceType(p.Type))} = placeat {p.Address}",
-        SizeOf s => $"{s.Dest}: u64 = sizeof {TypeStr(s.Type)}",
+        SizeOf s => $"{s.Dest}: u64 = {(s.Align ? "alignof" : "sizeof")} {TypeStr(s.Type)}",
         CCallback c => $"{c.Dest}: u64 = ccallback fn#{c.Function.Value}",
         RootClosure r => $"{r.Dest}: u64 = rootclosure {r.Closure}",
         RootObject r => $"{r.Dest}: u64 = rootobject {r.Value}",
