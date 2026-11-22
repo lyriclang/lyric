@@ -1038,6 +1038,9 @@ internal sealed class TypeTable
         // it is a void function that happens not to come back.
         NeverType => new IrScalarType(IrScalar.Void),
 
+        // A set of thrown types where a value stands is its root's value.
+        ThrownSet set => Lower(set.Root, span),
+
         // A function type carries its signature structurally and therefore needs no entry in this table,
         // unlike every named type. Lowered recursively, because parameters and the return may themselves
         // be classes, enums or functions again.

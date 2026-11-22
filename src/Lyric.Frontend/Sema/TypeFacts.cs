@@ -345,6 +345,8 @@ public static class TypeFacts
             case CoroutineOf co:
                 return "Coroutine<" + Render(co.Yield, name) + ResultText(co, name) + ">"
                        + (co.Throws is [NamedRef { Symbol.Name: "Error" }] ? " throws" : ThrownText(co.Throws, name));
+            // A set in any order is one set, so its text is in one order.
+            case ThrownSet set: return "[" + string.Join(", ", set.Members.Select(m => Render(m, name)).Order(StringComparer.Ordinal)) + "]";
             case NullType: return "null";
             case NeverType: return "never";
             case ErrorType: return "<error>";
