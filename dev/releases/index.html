@@ -652,6 +652,14 @@ them and the build stopped with <code>LYR-ICE0002: this type argument</code>.</p
 own <code>try</code>s only. Where the caller does double a mark in such a body, the help takes the whole
 keyword out — it took the <code>t</code> alone (<code>result = ry fetch();</code>).</p>
 </li>
+<li><p><strong><code>sizeOf&lt;T&gt;()</code> and <code>alignOf&lt;T&gt;()</code> in <code>std.meta</code></strong>, the size and the alignment as C lays a type
+out; <strong><code>target.endian</code></strong> (<code>Endian</code>, in <code>std.os</code>) and <strong><code>profile.name</code></strong>; <strong><code>warn</code> and <code>note</code> in
+<code>std.syntax</code></strong>, a macro's warning (<code>LYR-MAC0002</code>, the lint <code>macro-warning</code>) and hint
+(<code>LYR-MAC0003</code>) beside its <code>error</code>. <strong>A build reads its own profile after another</strong>: the cached C
+of a program was keyed without the target's and the profile's facts, so a release build after a
+debug one of the same program took the debug build's <code>comptime</code> choices, <code>profile.debug</code>
+included, and skipped the IR optimizer.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>

@@ -201,9 +201,12 @@ own tests (<code>tests/Lyric5.Tests</code>, <code>TargetTests</code>).</p>
 <ol>
 <li><strong><code>target</code></strong> and <strong><code>profile</code></strong> — <code>std.core</code>, in the prelude — are constants of the build (B4):
 <code>target.os</code> (<code>Platform</code>: <code>Linux</code>, <code>MacOS</code>, <code>Windows</code>, <code>Other</code>), <code>target.arch</code> (<code>Arch</code>: <code>X86_64</code>,
-<code>Aarch64</code>, <code>Other</code>) and <code>target.pointerWidth</code> (in bits) are the target's — a cross-build's, not
-the host's —, and <code>profile.debug</code> holds where the profile is the built-in <code>debug</code> or inherits
-from it (<a href="../../spec/15-project/">15 §4</a>). A program that reads neither carries neither.</li>
+<code>Aarch64</code>, <code>Other</code>), <code>target.pointerWidth</code> (in bits) and <code>target.endian</code> (<code>Endian</code>: <code>Little</code>,
+<code>Big</code>; <code>std.os</code> names the type) are the target's — a cross-build's, not the host's —;
+<code>profile.debug</code> holds where the profile is the built-in <code>debug</code> or inherits from it, and
+<code>profile.name</code> is the profile's own name, as <code>--profile</code> or the manifest gives it
+(<a href="../../spec/15-project/">15 §4</a>). A program that reads neither carries neither. <em>(Informative: every
+target the toolchain ships is little-endian.)</em></li>
 <li><strong><code>comptime if (target.os == .Windows)</code></strong> chooses by them while compiling (§2 rule 7): every
 branch is checked, the chosen one is built.</li>
 <li><strong><code>@When(cond)</code></strong> — in the prelude — on what stands at a module's top level, or on the module
@@ -243,7 +246,10 @@ and its <code>kind</code>, a <code>TypeKind</code>: <code>Primitive</code> (the 
 <code>Function</code>, <code>Parameter</code> (a type parameter), <code>Other</code> (W9).
 Each answer is a constant of the type at the instance it is asked at — in a generic function or a
 default, of each instance (R3). Nothing is reflected at run time (R6): a program reads a type
-through such constants alone.</li>
+through such constants alone. <strong><code>sizeOf&lt;T&gt;()</code></strong> and <strong><code>alignOf&lt;T&gt;()</code></strong> are the size and the
+alignment of <code>T</code> in bytes as C lays it out on the target — a struct with its padding, a class
+or an array as the reference it is (design 10 B13 M1, review 2026-11-10). They are functions
+the C compiler answers, constant in the binary; a <code>comptime</code> site cannot ask them.</li>
 <li><strong>What a question sees</strong> (R7) is what the code that asks may name: the module of the function
 it stands in, the interface's for a default. Another package's field is listed where it is
 <code>pub</code>, one of the package where it is not <code>private</code>, one of the module always; members alike.</li>
@@ -373,7 +379,10 @@ site again and again — is <code>LYR-CT0007</code>. A program without a site pa
 <li><strong>The macro runs under the interpreter's rules</strong> (<a href="#2-comptime">§2</a>; 09 Q9): pure, with the
 budget, a panic <code>LYR-CT0001</code> at the site with the chain of calls. <code>error(at, msg)</code> of
 <code>std.syntax</code> is the macro's own error, <code>LYR-MAC0001</code>: the main span at the node the macro
-names (<code>e.span()</code>, an argument's as written), a note at the site's <code>!</code>.</li>
+names (<code>e.span()</code>, an argument's as written), a note at the site's <code>!</code>. <strong><code>warn(at, msg)</code></strong>
+and <strong><code>note(at, msg)</code></strong> say something at the same places and let the expansion go on: a warning,
+the lint <code>macro-warning</code> (<code>LYR-MAC0002</code>, <a href="../../spec/16-diagnostics/">16 §5</a>), and a hint
+(<code>LYR-MAC0003</code>). What a macro said before it failed is said too.</li>
 <li><strong><code>quote { … }</code> is a tree as a value.</strong> Its content is syntax, checked nowhere: statements —
 a last expression without <code>;</code> is the tail, and a quote of a lone tail is an <code>Expr</code> — or
 declarations when the block opens with one. The quote's type is its content's kind, <code>Expr</code>,

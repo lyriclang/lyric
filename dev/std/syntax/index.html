@@ -64,6 +64,8 @@
 <li><a href="../../std/syntax/#fn.parseStmts">parseStmts()</a></li>
 <li><a href="../../std/syntax/#fn.parseDecls">parseDecls()</a></li>
 <li><a href="../../std/syntax/#fn.error">error()</a></li>
+<li><a href="../../std/syntax/#fn.warn">warn()</a></li>
+<li><a href="../../std/syntax/#fn.note">note()</a></li>
 </ul>
 </nav>
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:std" data-pagefind-meta="area:std">
@@ -146,6 +148,16 @@ an error at the call (<code>LYR-CT0001</code>, with the parser's message).</p>
 <p>Reports a macro's own error and ends the expansion: the message at <code>at</code>, a node of the site -
 <code>error(e.span(), &quot;...&quot;)</code> - and a note at the site's <code>!</code>.</p>
 </section>
+<section class="member" id="fn.warn">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> warn(at: <span class="ty">Span</span>, msg: <span class="ty">string</span>): <span class="ty">void</span></code></pre>
+<p>Reports a warning about the site and goes on: the message at <code>at</code>, a node of the site, and a
+note at the site's <code>!</code>. The expansion stands; the warning is the user's to act on.</p>
+</section>
+<section class="member" id="fn.note">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> note(at: <span class="ty">Span</span>, msg: <span class="ty">string</span>): <span class="ty">void</span></code></pre>
+<p>Reports a note about the site and goes on, as <a href="../../std/syntax/#fn.warn">warn</a> does: what the macro made of its
+arguments, where a reader would ask.</p>
+</section>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
@@ -156,6 +168,8 @@ an error at the call (<code>LYR-CT0001</code>, with the parser's message).</p>
 <li class="level-3"><a href="#fn.parseStmts">parseStmts</a></li>
 <li class="level-3"><a href="#fn.parseDecls">parseDecls</a></li>
 <li class="level-3"><a href="#fn.error">error</a></li>
+<li class="level-3"><a href="#fn.warn">warn</a></li>
+<li class="level-3"><a href="#fn.note">note</a></li>
 </ul>
 </aside>
 </div>

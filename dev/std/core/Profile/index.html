@@ -122,6 +122,7 @@
 <li><a href="../../../std/core/Join/">Join</a></li>
 <li><a href="../../../std/core/Platform/">Platform</a></li>
 <li><a href="../../../std/core/Arch/">Arch</a></li>
+<li><a href="../../../std/core/Endian/">Endian</a></li>
 <li><a href="../../../std/core/Target/">Target</a></li>
 <li><a class="current" href="../../../std/core/Profile/">Profile</a></li>
 <li><a href="../../../std/core/When/">When</a></li>
@@ -143,6 +144,8 @@
 <li><a href="../../../std/core/#fn.arrayOf">arrayOf()</a></li>
 <li><a href="../../../std/core/#fn.blackBox">blackBox()</a></li>
 <li><a href="../../../std/core/#fn.sequence">sequence()</a></li>
+<li><a href="../../../std/core/#fn.sizeOf">sizeOf()</a></li>
+<li><a href="../../../std/core/#fn.alignOf">alignOf()</a></li>
 <li><a href="../../../std/core/#fn.fields">fields()</a></li>
 <li><a href="../../../std/core/#fn.members">members()</a></li>
 <li><a href="../../../std/core/#fn.attribute">attribute()</a></li>
@@ -165,10 +168,14 @@
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">Profile</span> :: <span class="ty">Equatable</span> &amp; <span class="ty">Debug</span></code></pre>
 <p class="conforms">Conforms to <code>Equatable</code>, <code>Debug</code>.</p>
 <p>Describes what a program is built as.</p>
-<p><code>debug</code> is true where the profile is the built-in <code>debug</code> or one that inherits from it.</p>
+<p><code>debug</code> is true where the profile is the built-in <code>debug</code> or one that inherits from it; <code>name</code>
+is the profile's own, as <code>--profile</code> or the manifest names it.</p>
 <h2 id="fields">Fields</h2>
 <section class="member" id="field.debug">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> debug: <span class="ty">bool</span></code></pre>
+</section>
+<section class="member" id="field.name">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> name: <span class="ty">string</span></code></pre>
 </section>
 </main>
 <aside class="on-this-page" aria-label="On this page">
@@ -176,6 +183,7 @@
 <ul>
 <li class="level-2"><a href="#fields">Fields</a></li>
 <li class="level-3"><a href="#field.debug">debug</a></li>
+<li class="level-3"><a href="#field.name">name</a></li>
 </ul>
 </aside>
 </div>

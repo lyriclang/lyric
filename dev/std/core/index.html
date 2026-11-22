@@ -122,6 +122,7 @@
 <li><a href="../../std/core/Join/">Join</a></li>
 <li><a href="../../std/core/Platform/">Platform</a></li>
 <li><a href="../../std/core/Arch/">Arch</a></li>
+<li><a href="../../std/core/Endian/">Endian</a></li>
 <li><a href="../../std/core/Target/">Target</a></li>
 <li><a href="../../std/core/Profile/">Profile</a></li>
 <li><a href="../../std/core/When/">When</a></li>
@@ -143,6 +144,8 @@
 <li><a href="../../std/core/#fn.arrayOf">arrayOf()</a></li>
 <li><a href="../../std/core/#fn.blackBox">blackBox()</a></li>
 <li><a href="../../std/core/#fn.sequence">sequence()</a></li>
+<li><a href="../../std/core/#fn.sizeOf">sizeOf()</a></li>
+<li><a href="../../std/core/#fn.alignOf">alignOf()</a></li>
 <li><a href="../../std/core/#fn.fields">fields()</a></li>
 <li><a href="../../std/core/#fn.members">members()</a></li>
 <li><a href="../../std/core/#fn.attribute">attribute()</a></li>
@@ -283,7 +286,8 @@ nobody
 <div class="listed"><a href="../../std/core/Join/">Join</a> <span class="kind">struct</span> <span class="summary">— The join of two thrown types: what a walk over two sources throws.</span></div>
 <div class="listed"><a href="../../std/core/Platform/">Platform</a> <span class="kind">enum</span> <span class="summary">— The system a program runs on, as the target triples name it.</span></div>
 <div class="listed"><a href="../../std/core/Arch/">Arch</a> <span class="kind">enum</span> <span class="summary">— The machine a program runs on, as the target triples name it.</span></div>
-<div class="listed"><a href="../../std/core/Target/">Target</a> <span class="kind">struct</span> <span class="summary">— Describes what a program is built for: its system, its machine, the width of a pointer in bits.</span></div>
+<div class="listed"><a href="../../std/core/Endian/">Endian</a> <span class="kind">enum</span> <span class="summary">— The order a machine keeps the bytes of a number in: its least significant byte first, or its most significant.</span></div>
+<div class="listed"><a href="../../std/core/Target/">Target</a> <span class="kind">struct</span> <span class="summary">— Describes what a program is built for: its system, its machine, the width of a pointer in bits, its byte order.</span></div>
 <div class="listed"><a href="../../std/core/Profile/">Profile</a> <span class="kind">struct</span> <span class="summary">— Describes what a program is built as.</span></div>
 <div class="listed"><a href="../../std/core/When/">When</a> <span class="kind">struct</span> <span class="summary">— Builds the declaration only where <code>cond</code> holds: <code>@When(cond)</code>.</span></div>
 <div class="listed"><a href="../../std/core/Shared/">Shared</a> <span class="kind">struct</span> <span class="summary">— Marks a field that a synthesized <code>clone()</code> copies as it stands instead of cloning it.</span></div>
@@ -357,6 +361,16 @@ advance; for a benchmark's body, whose result nothing reads. It costs a store.</
 <p>Creates a generator inline: <code>sequence { yield 1; yield 2; }</code>.</p>
 <p>The trailing block is a generator lambda, and this calls it; the coroutine it makes runs
 nothing until it is pulled.</p>
+</section>
+<section class="member" id="fn.sizeOf">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> sizeOf&lt;<span class="ty">T</span>&gt;(): <span class="ty">int</span></code></pre>
+<p>Returns the size of a value of <code>T</code> in bytes, as C lays it out on the target: a struct with its
+padding, a class or an array as the reference it is.</p>
+</section>
+<section class="member" id="fn.alignOf">
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> alignOf&lt;<span class="ty">T</span>&gt;(): <span class="ty">int</span></code></pre>
+<p>Returns the alignment of <code>T</code> in bytes on the target, as C lays it out: an address where a
+value of <code>T</code> may start is a multiple of it.</p>
 </section>
 <section class="member" id="fn.fields">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">fn</span> fields&lt;<span class="ty">T</span>&gt;(): <span class="ty">FieldInfo</span>[]</code></pre>
@@ -434,8 +448,8 @@ carries none.</p>
 <p>A constant; a program that does not read it carries nothing of it.</p>
 </section>
 <section class="member" id="const.profile">
-<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">let</span> profile: <span class="ty">Profile</span> = <span class="kw">comptime</span> <span class="ty">Profile</span> { debug = buildDebug() }</code></pre>
-<p>The profile of the build: <code>comptime if (profile.debug)</code>.</p>
+<pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">let</span> profile: <span class="ty">Profile</span></code></pre>
+<p>The profile of the build: <code>comptime if (profile.debug)</code>, <code>profile.name</code>.</p>
 </section>
 <h2 id="extensions">Extensions</h2>
 <section class="member" id="ext.int">
@@ -2527,6 +2541,8 @@ quadratic.</p>
 <li class="level-3"><a href="#fn.arrayOf">arrayOf</a></li>
 <li class="level-3"><a href="#fn.blackBox">blackBox</a></li>
 <li class="level-3"><a href="#fn.sequence">sequence</a></li>
+<li class="level-3"><a href="#fn.sizeOf">sizeOf</a></li>
+<li class="level-3"><a href="#fn.alignOf">alignOf</a></li>
 <li class="level-3"><a href="#fn.fields">fields</a></li>
 <li class="level-3"><a href="#fn.members">members</a></li>
 <li class="level-3"><a href="#fn.attribute">attribute</a></li>

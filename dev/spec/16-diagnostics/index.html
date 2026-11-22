@@ -188,7 +188,8 @@ decides each — warns: <code>useless-allow</code> (<code>LYR-SEM0180</code>). T
 <li><strong>Warnings as errors</strong> is a switch: a profile's <code>denyWarnings</code> (<a href="../../spec/15-project/">15 §4</a> rule 4) and
 <code>--deny-warnings</code> are <code>-D warnings</code> for the package built, in front of the command line's own levels —
 each warning is an error, and its note names the profile. A build script's warnings are the lint
-<code>build-script-warning</code> and denied the same way.</li>
+<code>build-script-warning</code>, a macro's the lint <code>macro-warning</code> (<a href="../../spec/11-metaprogramming/">11 §5</a>), and
+both are denied the same way.</li>
 <li><strong>Every lint is held by two cases</strong> of the suite: a red one, whose program the lint reads (<code>warning:</code>
 its code), and a green one, the same program put right, which compiles in silence (<code>clean:</code> its name).
 Two lints are held otherwise: <code>reserved-device-name</code> by its green case alone, as its red program is a

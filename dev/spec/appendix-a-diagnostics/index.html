@@ -2342,6 +2342,20 @@ code is no longer reported, and its number is not given again.</p>
 <td>an error a macro reports</td>
 <td>A macro called <code>error(at, message)</code> of <code>std.syntax</code> while it expanded: the macro refuses its arguments. The diagnostic stands at the node the macro named, with a note at the site's <code>!</code>.</td>
 </tr>
+<tr>
+<td>LYR-MAC0002</td>
+<td>W</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a warning a macro reports</td>
+<td>A macro called <code>warn(at, message)</code> of <code>std.syntax</code> while it expanded: it took its arguments and says what about them deserves a look. The warning stands at the node the macro named, with a note at the site's <code>!</code>.</td>
+</tr>
+<tr>
+<td>LYR-MAC0003</td>
+<td>H</td>
+<td><a href="../../spec/11-metaprogramming/">11-metaprogramming</a></td>
+<td>a note a macro writes</td>
+<td>A macro called <code>note(at, message)</code> of <code>std.syntax</code> while it expanded: what it made of its arguments, at the node it names, with a note at the site's <code>!</code>.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="a6-mig--the-migration">A.6 MIG — The migration</h2>
@@ -3465,6 +3479,13 @@ code is no longer reported, and its number is not given again.</p>
 <td>style</td>
 <td>allow</td>
 <td>'while (true)' where 'loop' is meant</td>
+</tr>
+<tr>
+<td><code>macro-warning</code></td>
+<td>LYR-MAC0002</td>
+<td>correctness</td>
+<td>warn</td>
+<td>a warning a macro reports</td>
 </tr>
 <tr>
 <td><code>missing-docs</code></td>
