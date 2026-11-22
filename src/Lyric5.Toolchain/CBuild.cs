@@ -485,8 +485,10 @@ public sealed partial class CBuild
     }
 
     /// <summary>How long one run of the C compiler, the archiver or the linker may take before it
-    /// is stopped.</summary>
-    public TimeSpan Limit { get; init; } = TimeSpan.FromMinutes(5);
+    /// is stopped: long enough for the largest unit on a slow machine — the standard library's
+    /// tests took more than five minutes on a macOS runner in debug —, short enough that a hung
+    /// compiler ends.</summary>
+    public TimeSpan Limit { get; init; } = TimeSpan.FromMinutes(10);
 
     /// <summary>Runs <paramref name="tool"/> within <see cref="Limit"/>: one that does not finish is
     /// the environment's failure (a machine under load, a unit too large), said with what it did and
