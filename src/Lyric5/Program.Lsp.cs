@@ -12,6 +12,12 @@ public static partial class Program
         if (Verbs.Read(Verbs.Find("lsp")!, args, Unknown, out var unread) is not { } parsed) return unread;
         if (parsed.Words.Count > 0) return Unknown($"'lsp' takes no file, got '{parsed.Words[0]}'");
         if (parsed.Rest is not null) return Unknown("unknown option '--' for 'lsp'");
+        // what an editor checks before it starts the server: the version its 'serverInfo' gives
+        if (parsed.Flags.Contains("--version"))
+        {
+            Console.Out.WriteLine($"lyric lsp {DisplayVersion()}");
+            return 0;
+        }
 
         using var server = new LspServer(Console.OpenStandardInput(), Console.OpenStandardOutput(),
             new LspServerOptions { Version = DisplayVersion() });

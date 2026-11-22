@@ -511,6 +511,10 @@ promise. This entry fills with the milestones.
   of a program was keyed without the target's and the profile's facts, so a release build after a
   debug one of the same program took the debug build's `comptime` choices, `profile.debug`
   included, and skipped the IR optimizer.
+- **`lyric lsp --version`** says the toolchain's version, the one the server's `initialize` answer
+  gives, and starts no server: what an editor checks before it starts one. **A run of the C
+  compiler, the archiver or the linker may take ten minutes** before it is stopped (`LYR-BLD0001`),
+  not five: the standard library's tests took longer on a macOS runner in debug.
 
 ---
 

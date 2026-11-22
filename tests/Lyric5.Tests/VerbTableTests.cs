@@ -46,6 +46,17 @@ public class VerbTableTests
         Assert.Contains("| `test` | — | `--profile <name>`", table);
     }
 
+    /// <summary><c>lsp --version</c>: what an editor checks before it starts the server — the
+    /// toolchain's version, which the server's <c>initialize</c> answer gives as well.</summary>
+    [Fact]
+    public void Lsp_says_the_toolchains_version()
+    {
+        var (exit, output, _) = RunRaw("lsp", "--version");
+        Assert.Equal(0, exit);
+        var version = RunRaw("--version").Out.Split('\n')[0]["lyric ".Length..].Trim();
+        Assert.Equal($"lyric lsp {version}\n", output.ReplaceLineEndings("\n"));
+    }
+
     [Fact]
     public void A_flag_of_a_field_takes_no_value_and_a_value_option_needs_one()
     {
