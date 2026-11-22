@@ -933,8 +933,8 @@ fn invalidAt(offset: int): IoError {
     };
 }
 
-/// A `TextReader`'s lines. An iterator's `Error` is one type, so the two a reader may throw are
-/// joined, which an instance reads as `Error`: a loop over them is told `Error`.
+/// A `TextReader`'s lines. The two types a reader may throw are joined, which an instance reads
+/// as the set of both: a loop over them is told `IoError` and `Cancelled`.
 pub struct TextLinesIter<R :: [Reader]> :: [Iterator] {
     type Item = string;
     type Error = Join<IoError, Cancelled>;

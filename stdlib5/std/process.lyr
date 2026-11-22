@@ -182,17 +182,7 @@ pub struct Command {
         var out = child.stdout!;
         let bytes = try out.readToEnd();
         try out.close();
-        // the task's two error types join to `Error` in its handle: sorted out again here
-        var errorBytes: uint8[] = [];
-        try {
-            errorBytes = taken.await();
-        } catch (e: IoError) {
-            throw e;
-        } catch (e: Cancelled) {
-            throw e;
-        } catch (_) {
-            unreachable("the reading task throws an IoError or Cancelled, nothing else");
-        }
+        let errorBytes = try taken.await();
         return Output { status = try child.wait(), stdout = bytes, stderr = errorBytes };
     }
 
