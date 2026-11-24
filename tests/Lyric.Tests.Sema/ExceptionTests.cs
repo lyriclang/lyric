@@ -356,11 +356,13 @@ public class ExceptionTests
     }
 
     [Fact]
-    public void Several_thrown_types_bind_the_root()
+    public void Several_thrown_types_bind_their_set()
     {
-        // K7's join: two types make 'Error', which a set of the two does not cover.
-        AssertCode(Diags(Each + "fn t(): int throws [NotFound, Parse] { return try each(mayThrowBoth); }"), "LYR-SEM0034");
+        // Two types bind the set of them: a clause naming the two covers the call, the root
+        // does, and one of them alone does not.
+        AssertClean(Diags(Each + "fn t(): int throws [NotFound, Parse] { return try each(mayThrowBoth); }"));
         AssertClean(Diags(Each + "fn t(): int throws { return try each(mayThrowBoth); }"));
+        AssertCode(Diags(Each + "fn t(): int throws NotFound { return try each(mayThrowBoth); }"), "LYR-SEM0034");
     }
 
     [Fact]

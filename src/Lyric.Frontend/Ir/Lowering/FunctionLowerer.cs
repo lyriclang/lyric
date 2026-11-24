@@ -1174,7 +1174,7 @@ internal sealed class FunctionLowerer
     /// <summary>A recorded set in this instance's terms: substituted, <c>never</c> dropped
     /// — a call through a <c>fn() throws E</c> throws nothing where <c>E = never</c>, and the sema,
     /// which checks a generic body once, recorded the <c>E</c>.</summary>
-    private LyrType[] ThrownHere(LyrType[] set) => TypeChecker.ThrownAfter(set.Select(SubstituteType));
+    private LyrType[] ThrownHere(LyrType[] set) => TypeChecker.ThrownAfter(set.Select(SubstituteKeepingSets));
 
     /// <summary>The edge after a call that may fail: the error to the landing, the value
     /// on in a fresh block.</summary>
@@ -8604,6 +8604,14 @@ internal sealed class FunctionLowerer
     private LyrType SubstituteType(LyrType type)
     {
         StackGuard.Check("substituting a type");
+        return ThrownSet.AsValue(SubstituteTypeOnce(type));
+    }
+
+    /// <summary>As the checker substitutes: a set bound to a parameter stays one as a type
+    /// argument and as a thrown type, and is its root in a value's place.</summary>
+    private LyrType SubstituteKeepingSets(LyrType type)
+    {
+        StackGuard.Check("substituting a type");
         return SubstituteTypeOnce(type);
     }
 
@@ -8625,8 +8633,9 @@ internal sealed class FunctionLowerer
             Throws = ThrownHere(c.Throws),
         },
         GenericInstance g => TypeChecker.ReduceJoin(new GenericInstance(g.Definition,
-            g.Arguments.Select(SubstituteType).ToArray()) { Fixations = g.Fixations }),
+            g.Arguments.Select(SubstituteKeepingSets).ToArray()) { Fixations = g.Fixations }),
         AssocOf a => TypeChecker.ResolveAssociated(SubstituteType(a.Base), a.Member),
+        ThrownSet set => ThrownSet.Of(set.Members.Select(SubstituteKeepingSets), set.Root),
         _ => type,
     };
 

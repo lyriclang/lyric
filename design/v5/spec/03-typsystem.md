@@ -479,6 +479,16 @@ Die Attributliste `@[A, B]` ist keine Typliste und bleibt, wie sie ist.
 Umstellung von std/Book/Beispielen/Konformanz, Formatter. TS2 — Mengen als Typargumente:
 Bindung von `E`, Task-Menge, `Iterator.Error`; `LYR-SEM0238` retiriert mit seinem Pin.
 
+**Was TS2 an der Grenze zu den Werttypen festlegt (2026-11-22).** Ein Typparameter, der eine
+Menge bindet, steht auch an Wertstellen (`Result<T, E>` hält `Err(E)`). Bis Mengen Werttypen sind
+(TM10, Tür), gilt: **eine Menge an einer Wertstelle ist ihre Wurzel `Error`**, und sie erfüllt
+einen Constraint, wie die Wurzel ihn erfüllt — nicht, wie jedes Glied (TM3 kommt mit den
+Werttypen). Sonst hielte der Checker `Result<int, [A, B]>` für `Debug`, weil A und B es sind, und
+die Darstellung (die Box der Wurzel) könnte es nicht halten. Als Typargument und in `throws` bleibt
+die Menge eine Menge und macht die Instanz. `Join<A, B>` reduziert verschiedene Teile auf die
+Menge. Ein **geschriebenes** Typargument `<[A, B]>` bleibt Tür (mit den Werttypen): die Menge
+kommt durch Inferenz und durch `throws` in einen Typ.
+
 ---
 
 **Bereich 3 ist damit vollständig entschieden** (T1–T19, 2026-09-28).

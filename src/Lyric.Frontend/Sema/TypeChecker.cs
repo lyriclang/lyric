@@ -3955,12 +3955,14 @@ public sealed class TypeChecker
     private readonly HashSet<ThrowsClause> _checkedSets = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>A set after a substitution: <c>never</c> names nothing — <c>throws E</c> at
-    /// <c>E = never</c> is no clause — and two entries bound to one type are one.</summary>
+    /// <c>E = never</c> is no clause —, an entry bound to a set names its members, and two entries
+    /// bound to one type are one.</summary>
     internal static LyrType[] ThrownAfter(IEnumerable<LyrType> substituted)
     {
         var set = new List<LyrType>();
-        foreach (var t in substituted)
-            if (t is not NeverType && !set.Any(s => LyrType.Equal(s, t))) set.Add(t);
+        foreach (var entry in substituted)
+            foreach (var t in entry is ThrownSet several ? several.Members : [entry])
+                if (t is not NeverType && !set.Any(s => LyrType.Equal(s, t))) set.Add(t);
         return set.ToArray();
     }
 
@@ -7967,6 +7969,7 @@ public sealed class TypeChecker
         SliceOf s => MentionsTypeParam(s.Element),
         InlineArrayOf ia => MentionsTypeParam(ia.Element),
         CoroutineOf c => MentionsTypeParam(c.Yield) || MentionsTypeParam(c.Result),
+        ThrownSet set => set.Members.Any(MentionsTypeParam),
         TupleOf t => t.Elements.Any(MentionsTypeParam),
         GenericInstance g => g.Arguments.Any(MentionsTypeParam),
         FnType f => f.Parameters.Any(MentionsTypeParam) || MentionsTypeParam(f.Return) || f.Throws.Any(MentionsTypeParam),
@@ -8896,11 +8899,15 @@ public sealed class TypeChecker
     }
 
     // T to its argument across a type: Stack<T>.items of type T[] becomes int[] for Stack<int>.
-    private static LyrType Substitute(LyrType type, Dictionary<GenericParamSymbol, LyrType> map)
+    // A set bound to a parameter stays one where a type argument or a thrown type stands, and
+    // in a value's place is its root: sets are thrown, not held.
+    private static LyrType Substitute(LyrType type, Dictionary<GenericParamSymbol, LyrType> map) => Substitute(type, map, keepSet: false);
+
+    private static LyrType Substitute(LyrType type, Dictionary<GenericParamSymbol, LyrType> map, bool keepSet)
     {
-        if (map.Count == 0) return type;
+        if (map.Count == 0) return keepSet ? type : ThrownSet.AsValue(type);
         StackGuard.Check("substituting a type");
-        return type switch
+        var result = type switch
         {
             TypeParamType tp => map.TryGetValue(tp.Param, out var m) ? m : tp,
             Optional o => new Optional(Substitute(o.Inner, map)),
@@ -8909,19 +8916,25 @@ public sealed class TypeChecker
             InlineArrayOf ia => new InlineArrayOf(Substitute(ia.Element, map), ia.Length),
             TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()) { Labels = t.Labels },
             FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map))
-                { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map))), Places = f.Places, IsC = f.IsC },
+                { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map, keepSet: true))), Places = f.Places, IsC = f.IsC },
             // A join reduces once both its parts are known.
-            GenericInstance gi => ReduceJoin(new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map)).ToArray())
+            GenericInstance gi => ReduceJoin(new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map, keepSet: true)).ToArray())
             {
-                Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map))).ToArray(),
+                Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map, keepSet: true))).ToArray(),
                 // 'Task<T> throws E' at 'E = never' throws nothing.
-                Throws = gi.Throws is { } thrown && Substitute(thrown, map) is not NeverType and var bound ? bound : null,
+                Throws = gi.Throws is { } thrown && Substitute(thrown, map, keepSet: true) is not NeverType and var bound ? bound : null,
             }),
             RangeOf r => new RangeOf(Substitute(r.Element, map)),
-            CoroutineOf co => co with { Yield = Substitute(co.Yield, map), Result = Substitute(co.Result, map) },
+            CoroutineOf co => co with
+            {
+                Yield = Substitute(co.Yield, map), Result = Substitute(co.Result, map),
+                Throws = ThrownAfter(co.Throws.Select(t => Substitute(t, map, keepSet: true))),
+            },
             AssocOf a => ResolveAssociated(Substitute(a.Base, map), a.Member, InstanceFromMap(a.Member, map)),
+            ThrownSet set => ThrownSet.Of(set.Members.Select(m => Substitute(m, map, keepSet: true)), set.Root),
             _ => type // primitive, NamedRef, error, null
         };
+        return keepSet ? result : ThrownSet.AsValue(result);
     }
 
     /// <summary>
@@ -9502,15 +9515,10 @@ public sealed class TypeChecker
                 for (var i = 0; i < pf.Parameters.Length; i++) UnifyInfer(pf.Parameters[i], af.Parameters[i], map, argSpan);
                 UnifyInfer(pf.Return, af.Return, map, argSpan);
                 // A set written as one type parameter, 'throws E', takes the argument's:
-                // nothing thrown binds 'never', one type binds it, several their join — 'Error', as
-                // composed sets join. The first binding wins, as for every parameter.
+                // nothing thrown binds 'never', one type binds it, several the set of them. The
+                // first binding wins, as for every parameter.
                 if (pf.Throws is [TypeParamType thrownBy] && !map.ContainsKey(thrownBy.Param) && !af.Throws.Any(t => t.IsError))
-                    map[thrownBy.Param] = af.Throws switch
-                    {
-                        [] => LyrType.Never,
-                        [var one] => one,
-                        _ => ErrorRoot ?? LyrType.Error,
-                    };
+                    map[thrownBy.Param] = ThrownSet.Of(af.Throws, ErrorRoot ?? LyrType.Error);
                 break;
             case CoroutineOf pc when arg is CoroutineOf ac:
                 UnifyInfer(pc.Yield, ac.Yield, map, argSpan);
@@ -9605,6 +9613,7 @@ public sealed class TypeChecker
         GenericInstance g => g.Arguments.Any(a => HasOpenParam(a, map)),
         RangeOf r => HasOpenParam(r.Element, map),
         CoroutineOf c => HasOpenParam(c.Yield, map) || HasOpenParam(c.Result, map),
+        ThrownSet set => set.Members.Any(m => HasOpenParam(m, map)),
         _ => false,
     };
 
@@ -9629,6 +9638,7 @@ public sealed class TypeChecker
             case GenericInstance g: foreach (var a in g.Arguments) BindOpenParamsToError(a, map); break;
             case RangeOf r: BindOpenParamsToError(r.Element, map); break;
             case CoroutineOf c: BindOpenParamsToError(c.Yield, map); BindOpenParamsToError(c.Result, map); break;
+            case ThrownSet set: foreach (var m in set.Members) BindOpenParamsToError(m, map); break;
         }
     }
 
@@ -9653,6 +9663,7 @@ public sealed class TypeChecker
         GenericInstance g => g.Arguments.Any(ContainsError),
         RangeOf r => ContainsError(r.Element),
         CoroutineOf c => ContainsError(c.Yield) || ContainsError(c.Result),
+        ThrownSet set => set.Members.Any(ContainsError),
         _ => false,
     };
 
@@ -9792,6 +9803,10 @@ public sealed class TypeChecker
         // nothing binds, satisfies 'E :: [Error]'.
         NeverType => true,
 
+        // A set conforms as its value does, and that is its root: '[IoError, ParseError]' is
+        // an 'Error', and not a 'Debug' because both members are.
+        ThrownSet set => Satisfies(set.Root, iface, wanted),
+
         // An associated type through a constraint conforms to what its bound reaches —
         // through a blanket block too, as a type parameter does — and to nothing else:
         // its answer is anybody's until the type is known.
@@ -9824,16 +9839,14 @@ public sealed class TypeChecker
     /// <summary>
     /// The join of two thrown types, std.core's <c>Join&lt;A, B&gt;</c>,
     /// once both are known: one type where they are one, the other where one is <c>never</c>, the
-    /// root <c>Error</c> where they differ. Open, it stays as it is.
+    /// set of both where they differ. Open, it stays as it is.
     /// </summary>
     internal static LyrType ReduceJoin(GenericInstance gi)
     {
         if (gi.Arguments.Length != 2 || !JoinRoots.TryGetValue(gi.Definition, out var root)) return gi;
         var (a, b) = (gi.Arguments[0], gi.Arguments[1]);
         if (Open(a) || Open(b)) return gi;
-        if (a is NeverType) return b;
-        if (b is NeverType || LyrType.Equal(a, b)) return a;
-        return new NamedRef(root);
+        return ThrownSet.Of([a, b], new NamedRef(root));
 
         static bool Open(LyrType t) => t is TypeParamType or AssocOf
             || t is GenericInstance g && g.Arguments.Any(Open) || t is Optional { Inner: var inner } && Open(inner);
@@ -9854,15 +9867,14 @@ public sealed class TypeChecker
     }
 
     /// <summary>A coroutine's answers as an iterator: its <c>Item</c> what it yields, its
-    /// <c>Error</c> what it throws, <c>never</c> where nothing. The answer is one type, so of
-    /// several thrown the bound of <c>Error</c> answers, the root, as an inferred <c>E</c> joins
-    /// them; the coroutine's own pulls keep the set.</summary>
+    /// <c>Error</c> what it throws, <c>never</c> where nothing, the set where several — as an
+    /// inferred <c>E</c> binds them.</summary>
     internal static LyrType? CoroutineAnswer(CoroutineOf co, AssociatedTypeSymbol member) =>
         member.Owner is { Name: "Iterator", Kind: TypeSymbolKind.Interface }
             ? member.Name switch
             {
                 "Item" => co.Yield,
-                "Error" => co.Throws switch { [] => LyrType.Never, [var one] => one, _ => member.Bounds.FirstOrDefault() ?? LyrType.Error },
+                "Error" => ThrownSet.Of(co.Throws, member.Bounds.FirstOrDefault() ?? LyrType.Error),
                 _ => null,
             }
             : null;
@@ -14333,6 +14345,7 @@ public sealed class TypeChecker
         GenericInstance gi => gi.Arguments.Any(ContainsTypeParam),
         RangeOf r => ContainsTypeParam(r.Element),
         CoroutineOf c => ContainsTypeParam(c.Yield) || ContainsTypeParam(c.Result),
+        ThrownSet set => set.Members.Any(ContainsTypeParam),
         _ => false
     };
 
@@ -14701,8 +14714,11 @@ public sealed class TypeChecker
             return LyrType.Equal(given.Yield, wanted.Yield) && LyrType.Equal(given.Result, wanted.Result);
 
         // A task that cannot throw fits where one that may is expected (10 §2), for the same reason.
-        if (to is GenericInstance { Throws: not null } wantedTask && from is GenericInstance { Throws: null } givenTask)
-            return LyrType.Equal(givenTask, wantedTask with { Throws = null });
+        // So does one whose error the target's set covers, as for a coroutine.
+        if (to is GenericInstance { Throws: { } wantedError } wantedTask && from is GenericInstance { Throws: var givenError } givenTask
+            && ReferenceEquals(wantedTask.Definition, givenTask.Definition))
+            return LyrType.Equal(givenTask with { Throws = null }, wantedTask with { Throws = null })
+                   && (givenError is null || ThrownAfter([givenError]).All(t => ThrownAfter([wantedError]).Any(w => ThrownCoveredBy(t, w, _currentModule))));
 
         // A function value that throws less fits where one may throw more: the same
         // parameters and return — no variance — and its set covered by the target's. Free
@@ -14918,6 +14934,7 @@ public sealed class TypeChecker
         GenericInstance g => g.Arguments.Any(a => MentionsParam(a, param)),
         RangeOf r => MentionsParam(r.Element, param),
         CoroutineOf c => MentionsParam(c.Yield, param) || MentionsParam(c.Result, param),
+        ThrownSet set => set.Members.Any(m => MentionsParam(m, param)),
         _ => false,
     };
 
@@ -15196,15 +15213,14 @@ public sealed class TypeChecker
                 if (carried.IsError) return carried;
 
                 // A task carries the error its body may end with (10 §2), as a coroutine
-                // carries what its pulls throw.
-                // A task's is one type: its 'E' is inferred, and several bind the root.
+                // carries what its pulls throw: one type, or the set of several its 'E' binds.
                 if (carried is GenericInstance { Definition: var held } handle && _task is not null && ReferenceEquals(held, _task))
-                    return tt.Thrown.Length > 1
-                        ? _reportedThrows.Add(tt) ? Report(tt.Span, "LYR-SEM0238",
-                            $"a task's type names one thrown type, and '{TypeFacts.Display(carried)}' names {tt.Thrown.Length} — "
-                            + "several end its body as 'Error', so write the bare 'throws'")
-                            : LyrType.Error
-                        : handle with { Throws = ThrownTypeOf(tt.Thrown is [var one] ? one : null, scope) };
+                {
+                    if (tt.Thrown.Length <= 1) return handle with { Throws = ThrownTypeOf(tt.Thrown is [var one] ? one : null, scope) };
+                    if (!_writtenSets.TryGetValue(tt, out var several))
+                        _writtenSets[tt] = several = new ThrowsClause(tt.Thrown, tt.Span);
+                    return handle with { Throws = ThrownSet.Of(ResolveThrownSet(several, scope), ErrorRoot ?? LyrType.Error) };
+                }
 
                 // Only a coroutine and a task. Everything else runs at its CALL, and a function's
                 // own 'throws' already says so there; a type-level one would be a second spelling

@@ -491,6 +491,13 @@ promise. This entry fills with the milestones.
   `:: [I, J]` and `:: I, J` are `LYR-PAR0066`; one interface in brackets, `:: [I]`, stays. The
   formatter puts a chain too long for the line one to a line, with the `{` on its own.
   `lyric fix --from-4` joins Lyric 4's lists (rule S13).
+- **Several thrown types bind a type parameter to their set** (design 03 TM10, spec 03 §9.1
+  rule 9, 06 §8 rule 6): a generic call whose argument throws `[A, B]` throws `A` and `B`, not
+  `Error`, so a clause for each covers it. `spawn` over such a body gives a
+  `Task<int> throws [A, B]`, and that type can be written — `LYR-SEM0238` is retired; a coroutine
+  of `throws [A, B]` is an `Iterator` whose `Error` is the set, and so are `map`, `filter` and the
+  other adapters over two sources that throw differently. Where such a parameter is a value's
+  type — the `Err` of a `Result<int, [A, B]>` — the value is an `Error`.
 - **A codable enum's variant with named fields writes them by name**: `Rect { w: int, h: int }` is
   `{"Rect":{"w":2,"h":5}}` in JSON, and `Ring { r: int }` is `{"Ring":{"r":1}}`. It was a sequence,
   or the bare value for one field, as a positional payload still is (`{"Circle":3}`,

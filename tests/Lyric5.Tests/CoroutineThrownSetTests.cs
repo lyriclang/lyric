@@ -12,7 +12,7 @@ public class CoroutineThrownSetTests
 {
     private const string Declarations = """
         import std.io { IoError, println };
-        import std.task { Cancelled, Task };
+        import std.task { Cancelled, Task, spawn };
 
         struct A :: [Error] { fn message(): string { return "a"; } }
         struct B :: [Error] { fn message(): string { return "b"; } }
@@ -21,6 +21,7 @@ public class CoroutineThrownSetTests
         struct Holder { c: Coroutine<int> throws [A, B] }
         fn take(c: Coroutine<int> throws [A, B]): int { return try (c.next() ?? 0) catch (e: A) { 1 } catch (e: B) { 2 }; }
         fn drain(c: Coroutine<int> throws): void throws { var n = try c.next(); while (n != null) { println(n); n = try c.next(); } }
+        fn work(n: int): int throws [A, B] { if (n == 1) { throw A { }; } if (n == 2) { throw B { }; } return n; }
 
         """;
 
@@ -75,13 +76,14 @@ public class CoroutineThrownSetTests
         Assert.Contains("LYR-SEM0001", Refused("let c: Coroutine<int> throws A = two();"));
 
     /// <summary>An adapter's generic body pulls the coroutine its instance holds, and what the pull
-    /// throws comes out of the adapter: the one type, or, of a set, the root that an iterator's
-    /// <c>Error</c> answers.</summary>
+    /// throws comes out of the adapter: the one type, or the set that an iterator's <c>Error</c>
+    /// answers, each of it.</summary>
     [Theory]
     [InlineData("try { for (x in one().take(5)) { println(x); } println(\"after\"); } catch (e: B) { println(\"B\"); }", "1\nB\n")]
     [InlineData("try { for (x in one().map((n) => n * 10)) { println(x); } println(\"after\"); } catch (e: B) { println(\"B\"); }", "10\nB\n")]
     [InlineData("var xs = one().skip(0); try { println(xs.next() ?? 0); println(xs.next() ?? 0); println(\"after\"); } catch (e: B) { println(\"B\"); }", "1\nB\n")]
     [InlineData("try { for (x in two().take(5)) { println(x); } println(\"after\"); } catch (e: Error) { println(e.message()); }", "1\nb\n")]
+    [InlineData("try { for (x in two().map((n) => n * 10)) { println(x); } println(\"after\"); } " + Each, "10\nB\n")]
     public void An_adapter_over_a_coroutine_throws_what_its_pull_throws(string body, string expected) =>
         Assert.Equal(expected, Output(body));
 
@@ -97,8 +99,32 @@ public class CoroutineThrownSetTests
     [Theory]
     [InlineData("let c: ?(Coroutine<int> throws [A, A]) = null;", "LYR-SEM0137")]
     [InlineData("let c: ?(Coroutine<int> throws [A, int]) = null;", "LYR-SEM0030")]
-    [InlineData("let t: ?(Task<int> throws [A, B]) = null;", "LYR-SEM0238")]
     [InlineData("let c: Coroutine<int> throws [A] = two();", "LYR-SEM0001")]
     public void A_written_set_is_held_to_the_rules(string body, string code) =>
         Assert.Contains(code, Refused(body));
+
+    /// <summary>A body that throws several makes a task that throws their set (spec 10 §2
+    /// rule 8): awaited, each type comes out, and a written task type holds the set.</summary>
+    [Theory]
+    [InlineData("let t = spawn(() => try work(2)); try { println(t.await()); } " + Each, "B\n")]
+    [InlineData("let t: Task<int> throws [B, A] = spawn(() => try work(1)); try { println(t.await()); } " + Each, "A\n")]
+    [InlineData("let t: Task<int> throws = spawn(() => try work(3)); try { println(t.await()); } catch (e: Error) { println(\"E\"); }", "3\n")]
+    public void A_task_throws_its_bodys_set(string body, string expected) =>
+        Assert.Equal(expected, Output(body));
+
+    [Theory]
+    [InlineData("let t: Task<int> throws A = spawn(() => try work(3));", "LYR-SEM0001")]
+    [InlineData("let t: ?(Task<int> throws [A, A]) = null;", "LYR-SEM0137")]
+    [InlineData("let t: ?(Task<int> throws [A, int]) = null;", "LYR-SEM0030")]
+    public void A_task_types_set_is_held_to_the_rules(string body, string code) =>
+        Assert.Contains(code, Refused(body));
+
+    /// <summary>A set bound where a value stands is its root (spec 03 §9.1 rule 9): the
+    /// <c>Err</c> of a <c>Result&lt;int, [A, B]&gt;</c> is an <c>Error</c> — and the instance is
+    /// no <c>Debug</c> because its members are, which the lowering could not keep.</summary>
+    [Fact]
+    public void A_set_in_a_values_place_is_its_root() =>
+        Assert.Equal("a\nA\n", Output(
+            "let r = Result.of(() => try work(1)); match (r) { .Ok(v) => println(v), .Err(e) => println(e.message()), } "
+            + "try { println(r.get()); } " + Each));
 }

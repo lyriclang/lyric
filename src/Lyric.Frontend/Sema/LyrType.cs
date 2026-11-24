@@ -62,6 +62,7 @@ public abstract record LyrType
         // the second would pass for the first and the demand would be lost again at the binding.
         (CoroutineOf x, CoroutineOf y) => Equal(x.Yield, y.Yield) && Equal(x.Result, y.Result)
                                           && SameSet(x.Throws, y.Throws),
+        (ThrownSet x, ThrownSet y) => SameSet(x.Members, y.Members),
         (ErrorType, ErrorType) => true,
         (NullType, NullType) => true,
         (NeverType, NeverType) => true,
@@ -110,6 +111,45 @@ public sealed record GenericInstance(TypeSymbol Definition, LyrType[] Arguments)
     /// may end with, a thing of the type as on a coroutine; <c>null</c> where it throws
     /// nothing. std.task's <c>Task</c> alone carries one. Part of the type's identity.</summary>
     public LyrType? Throws { get; init; }
+}
+
+/// <summary>
+/// A set of thrown types, <c>[A, B]</c>, where a type stands for one: what a type parameter binds
+/// from a set of several (<c>throws E</c> at a call), what a task carries, what a join of two
+/// differing types is. Never of fewer than two members, each once, none itself a set — made through
+/// <see cref="Of"/>, which gives <c>never</c> for none and the type itself for one.
+///
+/// <para>Thrown only, for now: where it lands in a value's place — a variable, a payload — it
+/// stands as <see cref="Root"/>, the <c>Error</c> its members share. The members are not part of
+/// the order: <c>[A, B]</c> and <c>[B, A]</c> are one set.</para>
+/// </summary>
+public sealed record ThrownSet : LyrType
+{
+    private ThrownSet(LyrType[] members, LyrType root) => (Members, Root) = (members, root);
+
+    public LyrType[] Members { get; }
+
+    /// <summary>What a value of the set is until sets are values: the root <c>Error</c>.</summary>
+    public LyrType Root { get; }
+
+    /// <summary>The set of <paramref name="types"/>: sets among them flattened, <c>never</c>
+    /// dropped, a type named twice once; <c>never</c> for none, the type for one.</summary>
+    public static LyrType Of(IEnumerable<LyrType> types, LyrType root)
+    {
+        var members = new List<LyrType>();
+        foreach (var t in types)
+            foreach (var member in t is ThrownSet inner ? inner.Members : [t])
+                if (member is not NeverType && !members.Any(m => Equal(m, member))) members.Add(member);
+        return members.Count switch
+        {
+            0 => Never,
+            1 => members[0],
+            _ => new ThrownSet(members.ToArray(), root),
+        };
+    }
+
+    /// <summary>The type as a value's: a set's root, anything else itself.</summary>
+    public static LyrType AsValue(LyrType t) => t is ThrownSet set ? set.Root : t;
 }
 
 /// <summary><c>T.Item</c>: the associated type <see cref="Member"/> of whatever

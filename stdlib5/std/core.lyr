@@ -5410,7 +5410,7 @@ fn siftDown<T :: [TotalOrder]>(xs: Slice<T>, root: int, end: int): void {
 /// The join of two thrown types: what a walk over two sources throws.
 ///
 /// The compiler reduces it once both are known: to the one type where they are the same, to
-/// the other where one is `never`, to the root [Error] where they differ; left open, it covers
+/// the other where one is `never`, to the set of both where they differ; left open, it covers
 /// each of its parts. No value of it is made.
 pub struct Join<A :: [Error], B :: [Error]> :: [Error] {
     pub fn message(): string {

@@ -126,6 +126,12 @@ fn main(): void {
 the task failed: the text is not a value of the type
 ```
 
+A body that can throw several types makes a handle that throws all of them: its type is
+`Task<Row> throws [IoError, ParseError]`, written that way where it is named, and a `catch` for
+each covers `await()`. The same holds wherever a generic function takes what its argument throws,
+`throws E`: several types bind `E` to their set, so the call throws each of them, not just
+`Error`.
+
 ## Sleeping and timeouts
 
 `sleep` waits for a `Duration`, and lets the other tasks run meanwhile. `withTimeout` runs a body
