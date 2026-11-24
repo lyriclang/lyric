@@ -419,6 +419,18 @@ die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, N
 | B12 | **`lyric doc` dokumentiert das Paket, nicht seine Abhängigkeiten** (E7). Tür nach 5.0 | E7 |
 | B13 | **`LyrConfig.log`, `lyr_gc_collect()` und `lyr_gc_stats()` stehen nicht im öffentlichen Header** (H1, H5; der Plan nannte die Statistik schon eine Tür). Tür nach 5.0 | H1, H5 |
 
+## Review 2026-11-24 — Lints, die zu gut optimierbarem Code führen
+
+Aus der Messung der C-Emission an `lyric-script` (01, Review 2026-11-24). Ein Teil der Bauzeit liegt
+beim Quelltext selbst: `runTask` hat ~2.290 Zeilen und `specExpr` ~3.770. Der Maintainer will, dass die
+Werkzeuge gezielt zu Code lenken, den der Compiler gut optimiert, mit einfachen Fixes. Entschieden nach
+Empfehlung (2026-11-24); die Gruppe `perf` besteht seit W7 L3, ihre drei Lints sind gebaut (SEM0220–0222).
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| L6 | **`large-function`** in `perf`, Stufe `warn`: eine Funktion über einer Schwelle, gezählt in IR-Anweisungen nach der Senkung, nicht in Quellzeilen. Die Meldung nennt die größten Arme und Blöcke. Ein Fix „Arm in eine Funktion auslagern“ dort, wo es ohne Leser geht: ein Arm, der Lokale nur liest und weder `return` noch `break`/`continue` nach außen hat (`Safe`); einer, der Lokale ändert, mit `NeedsReview`; sonst keiner. Kommt mit C14 (01), weil Lint und automatische Teilung dieselbe Schwelle und dieselbe Analyse lesen. **Tür nach 5.0** | L3, G7 |
+| L7 | **Ein Katalog weiterer `perf`-Lints** wird in einer eigenen Runde entschieden, je mit rotem und grünem Fall (L4) und, wo möglich, einem Fix. Kandidaten für die Runde: eine Enum-Variante, die alle anderen groß macht; eine `if`-Kette über denselben Enum (→ `match`, auch als Refaktorierung); Allokation eines Literals in einer Schleife; `push` in einer Schleife mit bekannter Grenze ohne Kapazität; ein `clone` in einer Schleife; eine Closure, die in einer heißen Schleife Lokale fängt. **Uhr: die erste Runde nach 5.0.0** | L3 |
+
 ---
 
 **Bereich 11 ist damit vollständig entschieden** (W1–W9, 2026-09-29). Es bleibt 12 (Migration).

@@ -2616,3 +2616,20 @@ jetzt nur auf dem des Mirrors (#704). Der Dry-Run von `release.yml` auf `main` h
 stable-Schlüssel (der dev-Schlüssel lehnt sie ab), installiert auf drei Systemen, auf dem Mirror unter `staging/`; der
 öffentliche stable-Kanal blieb leer, der Entwurf ist gelöscht, kein Tag. Unbewiesen bleiben der Tag-Pfad, die Reserve und
 das Vorgehen bei Verlust oder Leck eines Schlüssels.
+
+## Nachtrag 2026-11-24 — die C-Emission: Uhren aus der Messung an `lyric-script`
+
+Die Entscheidungen stehen in 01, Review 2026-11-24 (C2′, C11–C17), und in 11, Review 2026-11-24 (L6, L7).
+Gemessen: ein kalter Debug-Bau von `lyric-script` 31,5 s (C 21,0 s), die Programm-Einheit allein 9,1 s
+bei `-O0` und 90,8 s bei `-O2`, auf einem Kern. Jede Änderung übersetzt sie ganz neu.
+
+| Slice | Inhalt | Uhr | Abschluss |
+|---|---|---|---|
+| **CE1** synthetisierter Code kompakt | C11: `equals`/`hash`/`compare`/`debug` eines Enums vergleichen erst den Tag und gehen nur für Varianten mit Nutzlast in einen `switch` | sofort, als Fehlerbehebung | `NativeFn` (157 Varianten): Zeilen und Frame vorher/nachher im PR; ein Test, dass ein Enum ohne Nutzlast in O(1) Zeilen vergleicht |
+| **CE2** eine Einheit je Modul | C2′: ein Header je Programm (Typen, Deskriptoren, Prototypen, Modul-Bindungen), eine Einheit je Modul, gecacht nach ihrem Text und dem Hash des Headers; die Instanzen wie bisher | nach #738, vor M18 | `lyric-script`: kalter Debug- und Release-Bau, eine Änderung in einem Modul — Zeiten vorher/nachher; die Goldens tragen die Einheiten; Messpunkt 3 hält |
+| **CE3** kalte Pfade | C12: Panik, `throw`, verlassende Fehlerprüfungen als `noinline`/`cold` | nach CE2, vor M18 | Messpunkt 3 hält oder wird besser; die Zeit von `-O2` an `lyric-script` |
+| **CE4** lesbares C | C13: `#line` nur bei Zeilenwechsel, `switch` für einen `match` über den Tag, Kopien propagiert, `if`/`while` aus dem Block | nach CE3, vor M18 | Zeilen der Einheiten, `-O0`-Frames der Parser-Spine (`objdump`), die Debugger-Tests |
+
+**Türen nach 5.0**: C14 (der Compiler teilt große Funktionen) mit L6 (`large-function`, Lint und Fix) und C16
+(ein Hinweis auf Hitze), C15 (Polymorphisierung). **L7**, der Katalog weiterer `perf`-Lints: die erste Runde nach
+5.0.0. **C17**: der Weg über C bleibt.

@@ -259,6 +259,43 @@ die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, N
 | B14 | **Weak-Referenzen bleiben eine Primitive der Laufzeit** (L1, gebaut in M11): `lyr_weak_*` mit Rückruf beim Leeren steht in 13 §1 der Spec; eine Fläche in Lyric (`Weak<T>`) ist eine Tür nach 5.0 | L1 |
 | C3 | **Kein Panik-Haken im Vertrag des Hosts in 5.0**: die Laufzeit hat einen (`lyr_set_panic_hook` in `lyr/panic.h`, mit eigenem Test), aber `lyric.h` sagt ihn nicht zu, und `lyr/…` bleibt intern (11 E9). Spec 13 §1.4 Punkt 5 beschrieb ihn als Teil des Vertrags — der Satz fällt (M17 S12a). Ein Host, der vom Ende erfahren will, liest die Fehlerausgabe (`stderr_write`) und den Exit-Code 101. Ihn in `lyric.h` aufzunehmen ist eine Tür nach 5.0 | L1, 11 H1, E9 |
 
+## Review 2026-11-24 — die C-Emission, gemessen an `lyric-script`
+
+C2 hielt die Abweichung „eine `.c` je Programm“ fest, gemessen an `hello` (0,16 s C), und sollte neu entschieden
+werden, wenn die Bauzeit es verlangt. `lyric-script` (S8, 92 Dateien) verlangt es. Gemessen am 2026-11-24 unter
+WSL2 mit 8 Kernen, `out/` leer:
+
+| | |
+|---|---|
+| Bau, Debug | 31,5 s, davon C 21,0 s, Frontend und Emission ~9,5 s |
+| Programm-Einheit | 911.979 Zeilen, 24 MB; 427.054 davon `#line` |
+| sie allein, `-O0 -g` / `-O2` | 9,1 s / **90,8 s**, je auf einem Kern |
+| Instanz-Einheiten | 554, zusammen ~294.000 Zeilen, parallel |
+| größte Funktionen (C-Zeilen / Quelle) | `runTask` 32.262 / ~2.290, `FnGen.to` 15.218 / ~1.130, `specExpr` 11.996 / ~3.770 |
+| synthetisiertes `equals` von `NativeFn` | 157 Varianten → 9.901 Zeilen, **Frame 47.776 Bytes** |
+
+Jede Änderung an irgendeinem Modul übersetzt die ganze Programm-Einheit neu. Bei `-O2` bestimmen die größten
+Funktionen die Zeit, denn clangs Optimierer wächst mit der Funktionsgröße schneller als linear. Die
+SSA-Temporären kosten dagegen kaum: `mem2reg` räumt sie ab `-O1` weg. Bei `-O0` kosten sie Stack und
+etwas Übersetzungszeit. Andere Sprachen über C (Nim, Lean 4, Koka, Cython, Vala, Haxe) übersetzen eine Einheit je
+Quellmodul, parallel und je Modul gecacht, und optimieren vor C. V geht mit einer Datei und tcc für den Debug-Bau
+(zig bringt kein tcc). Gambit und Chicken zeigen den Preis riesiger Funktionen. GHC verließ C wegen Tail-Calls,
+präziser Stack-Maps und festgenagelter Register; keins davon trifft Lyric (`musttail` gibt es in clang, der
+Stack wird konservativ gescannt).
+
+Entscheidungen des Maintainers („alles nach Empfehlung“, 2026-11-24). Die Uhren stehen in 13, Nachtrag 2026-11-24.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| C2′ | **Eine Einheit je Lyric-Modul**, wie C2 ursprünglich entschied, statt einer je Programm. Typen, Deskriptoren und Prototypen in einem Header je Programm; jede Modul-Einheit gecacht nach ihrem Text und dem des Headers; Instanzen bleiben eigene Einheiten (C3). Inlining über Modulgrenzen bleibt dem IR-Inliner; kein LTO im Release (B11). Ein Unity-Build bleibt die Tür aus C2. **Vor 5.0** | C2, C3 |
+| C11 | **Was der Compiler synthetisiert, ist kompakt**: `equals`, `hash`, `compare`, `debug` eines Enums vergleichen erst den Tag und gehen nur für Varianten mit Nutzlast in einen `switch`, ohne den Wert je Variante zu kopieren. Ein Fehler, kein Design: **sofort** | 09, 05 |
+| C12 | **Kalte Pfade werden ausgelagert**: der Weg einer Panik, eines `throw` und einer Fehlerprüfung, die das Programm verlässt, steht in eigenen `noinline`-Funktionen mit `__attribute__((cold))`. Der heiße Code wird kleiner, der Optimierer schneller. **Vor 5.0** | C5 |
+| C13 | **`#line` nur bei einem Zeilenwechsel**. Ein `match` über den Tag wird ein C-`switch`, Kopien wie `t0 = this` propagiert das IR weg, `if`/`while` stehen, wo der Block es hergibt (C5). Lesbarkeit, kleinere `-O0`-Frames, etwas Übersetzungszeit; am Maschinencode ab `-O1` ändert es nichts. **Vor 5.0, nach C2′** | C5, C6 |
+| C14 | **Große Funktionen teilt der Compiler selbst**: ein `match`-Arm oder Block über einer Größenschwelle, der kalt ist oder wenig nach außen springt, wird eine interne Funktion (gelesene Lokale als Argumente, geänderte über einen Frame). Ein heißer Dispatch (eine Interpreter-Schleife) bleibt eine Funktion. Ohne Wissen über die Hitze lagert der Compiler nur Kaltes aus; ein Hinweis dafür ist mit C16 zu entscheiden. **Tür nach 5.0** | C5, L12 |
+| C15 | **Polymorphisierung**: Instanzen, die sich nur in Objekt-Typargumenten unterscheiden, teilen einen Rumpf (gleiche Darstellung als Zeiger). **Tür nach 5.0** | C3 |
+| C16 | **Ein Hinweis auf Hitze** (`@Cold`/`@Hot` oder eine Messung aus einem Profil) ist nicht entschieden. Er kommt mit C14 zur Entscheidung. **Tür nach 5.0** | 09 A1 |
+| C17 | **Der Weg über C bleibt.** Ein eigenes Backend über LLVM-IR oder Maschinencode (GHC, Rust, Swift, Zig) ist keine Tür: es kostet das Cross-Compiling, die libc und die C-ABI, die `zig cc` mitbringt, und keiner der Gründe GHCs trifft Lyric | L8 |
+
 ---
 
 **Bereich 1 ist damit vollständig entschieden** (L1–L12, 2026-09-28).
