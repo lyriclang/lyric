@@ -91,6 +91,7 @@
 <h2 id="explanation">Explanation</h2>
 <p>After <code>::</code> stands what the type is: one interface, <code>struct User :: Named</code>, or several joined with <code>&amp;</code>, <code>struct User :: Named &amp; Shown</code> — it is a <code>Named</code> and a <code>Shown</code>. A list in brackets is a set of types, and a set means one of them, as <code>throws [A, B]</code> and <code>catch (e in [A, B])</code> do; a conformance or a constraint needs all of them, so it is not written as a list. One interface may still stand in brackets, <code>:: [Named]</code>: a set of one is that interface.</p>
 <p>Join the interfaces with <code>&amp;</code>. In a type parameter's constraint a <code>,</code> after one interface begins the next parameter: <code>&lt;T :: Named, U&gt;</code> has the parameters <code>T</code> and <code>U</code>; <code>&lt;T :: Named &amp; Shown&gt;</code> constrains <code>T</code> twice.</p>
+<p><code>lyric fix</code> writes the chain for you, in every file of the package: the brackets go and each <code>,</code> between two interfaces becomes <code> &amp;</code>. The editor offers the same change.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="kw">interface</span> <span class="ty">Named</span> {
     <span class="kw">fn</span> name(): <span class="ty">string</span>;

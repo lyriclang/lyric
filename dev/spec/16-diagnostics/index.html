@@ -82,7 +82,10 @@ chosen are not.</li>
 <ol>
 <li>A declaration the parser cannot read whole reports its lexical and syntax errors (<code>LYR-LEX…</code>,
 <code>LYR-PAR…</code>) and nothing that follows from them: no finding whose place lies inside it. The other
-declarations of the file report as they would.</li>
+declarations of the file report as they would. A syntax error with a safe fix (§6 rule 1) leaves
+its declaration whole, for the parser reads the text as the fix writes it (rule 2): the
+declaration reports its other findings, and what it gets synthesized (<a href="../../spec/05-interfaces/">05 §14</a>)
+it gets.</li>
 <li><strong>A mistake is said once.</strong> What follows from it is not said again: an instance whose type
 arguments an annotation got wrong, refused there and not again where an initializer takes them;
 the names an or-pattern's alternative does not bind, in one finding; the parser's recovery, which
@@ -91,7 +94,9 @@ skips the rest of an unclosed interpolation and reads <code>T { x: 1 }</code> as
 of <code>,</code>, said once at the <code>;</code> and read as the <code>,</code> it stands for — <code>T { a = 1; }</code> after the name of
 a type is the initializer, not a call with a trailing block (<code>LYR-PAR0064</code>, with <code>,</code> as its fix) —,
 and a <code>continue</code>, <code>break</code> or <code>return</code> where a value stands, a match arm or a branch of an <code>if</code>,
-read as the block it belongs in (<code>LYR-PAR0065</code>, with <code>{ continue; }</code> as its fix); a literal's
+read as the block it belongs in (<code>LYR-PAR0065</code>, with <code>{ continue; }</code> as its fix), and several
+interfaces after <code>::</code> written as a list, <code>[I, J]</code> or <code>I, J</code>, read as their chain
+(<code>LYR-PAR0066</code>, with <code>I &amp; J</code> as its fix); a literal's
 suffix the lexer refused, which the parser does
 not refuse again; a conformance written twice (<code>LYR-SEM0133</code>), whose second block the calls do not
 see; a compile-time-only call, said where the program makes it and not again inside the standard

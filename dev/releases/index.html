@@ -681,6 +681,25 @@ analysis, <code>analysed app: N modules in … ms</code>, followed by each phase
 the block's interfaces, before its target is matched. In the check of <code>lyric-script</code> the phase
 went from 1.5 s to 1.1 s.</p>
 </li>
+<li><p><strong>The names of an import's path answer hover and go to definition.</strong> In
+<code>import stanza.platform.window { Platform }</code>, each name stands for the module its path names up to
+it: <code>window</code> shows <code>module stanza.platform.window</code> with the <code>//!</code> block that opens its file and
+jumps there. The alias of <code>import std.io as console</code> does the same. A package without a module of
+its own, such as <code>std</code>, shows <code>package std</code> and has nowhere to jump. A module's hover now carries
+its documentation wherever it is named, <code>io</code> in <code>io.println</code> included. <strong>A doc block's sections
+stand three levels down in a hover</strong>: <code># Errors</code> shows as <code>#### Errors</code>, no larger than the
+signature above it. The text and <code>lyric doc</code> keep them as written, and a <code>#</code> in a code block
+stays.</p>
+</li>
+<li><p><strong><code>lyric fix</code> joins a list of interfaces with <code>&amp;</code></strong> (<code>LYR-PAR0066</code>): <code>:: [Equatable, Debug]</code>
+becomes <code>:: Equatable &amp; Debug</code>, in a constraint as well. Comments and line breaks stay as written,
+and so do <code>[I]</code> and a delegate's <code>by</code>. The editor offers the same change. Code written for Lyric 5
+before the rule needs one run. <strong>Such a type keeps its conformances until then.</strong> A declaration
+with a parse error that the parser reads as its safe fix writes it (<code>LYR-PAR0037</code>, <code>0064</code>,
+<code>0065</code>, <code>0066</code>) counted as unread: nothing was synthesized for it, and its other mistakes were
+kept back. A <code>struct V :: [Equatable, Debug]</code> had no <code>debug</code>, and every type that printed a <code>V</code>
+said so.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
