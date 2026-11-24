@@ -174,6 +174,18 @@ public class MinisignTests
         Assert.Equal("5.0.0", ChannelIndex.Read(Bytes("stable.json"), Text("stable.json.minisig"), Key(), ChannelIndex.Stable).Newest!.Version);
     }
 
+    /// <summary>The offer for a pin of a development build: the newest build of the channel that
+    /// meets it, none where the channel's newest is older.</summary>
+    [Fact]
+    public void A_pin_of_a_development_build_is_offered_the_newest_that_meets_it()
+    {
+        var index = ChannelIndex.Read(Bytes("dev.json"), Text("dev.json.minisig"), Key(), ChannelIndex.Dev);
+        Assert.Equal("5.0.0-dev.20261028+0b3eb5e", ToolchainSwitch.Newest(index, new SemVer(5, 0, 0, "dev.20261027"), "x86_64-linux-gnu")!.Version);
+        Assert.Null(ToolchainSwitch.Newest(index, new SemVer(5, 0, 0, "dev.20261029"), "x86_64-linux-gnu"));
+        // a stable pin is never met by a development build
+        Assert.Null(ToolchainSwitch.Least(index, new SemVer(5, 0, 0, null), "x86_64-linux-gnu"));
+    }
+
     [Fact]
     public void A_channel_index_is_refused_changed_signed_by_another_key_or_standing_for_another_channel()
     {

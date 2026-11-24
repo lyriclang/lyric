@@ -345,15 +345,17 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     }
 
     /// <summary><c>toolchain = "5.1"</c> or <c>">=5.1"</c>: the least toolchain that builds the
-    /// package. A pin the toolchain did not check would be a promise it did not keep.</summary>
+    /// package — or <c>"5.0.0-dev.20261119"</c>, the least development build, by its day. A pin the
+    /// toolchain did not check would be a promise it did not keep.</summary>
     private static ToolchainPin? ReadToolchain(TomlTable package, string file)
     {
         if (!package.TryGet("toolchain", out var given)) return null;
         if (given is not string required || ToolchainPattern().Match(required) is not { Success: true } match)
             throw new ManifestException("LYR-PKG0002", file, package.Line, 1,
-                $"toolchain {Describe(given)} is no toolchain requirement: \"5.1\" or \">=5.1\", the least toolchain that builds the package");
+                $"toolchain {Describe(given)} is no toolchain requirement: \"5.1\" or \">=5.1\", the least toolchain that builds the package, or \"5.0.0-dev.20261119\", the least development build");
         var patch = match.Groups[3].Success ? long.Parse(match.Groups[3].Value) : 0;
-        return new ToolchainPin(new SemVer(long.Parse(match.Groups[1].Value), long.Parse(match.Groups[2].Value), patch, null), package.Line);
+        var dev = match.Groups[4].Success ? match.Groups[4].Value : null;
+        return new ToolchainPin(new SemVer(long.Parse(match.Groups[1].Value), long.Parse(match.Groups[2].Value), patch, dev), package.Line);
     }
 
     /// <summary><c>[[bin]]</c>: each program a name and an entry — a module of the package, a
@@ -530,7 +532,7 @@ public sealed partial record Manifest(string File, string Name, string Version, 
     [GeneratedRegex("^[a-z][a-z0-9_-]*$")]
     private static partial Regex BinaryPattern();
 
-    [GeneratedRegex(@"^(?:>=\s*)?(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})(?:\.(0|[1-9][0-9]{0,8}))?$")]
+    [GeneratedRegex(@"^(?:>=\s*)?(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})(?:\.(0|[1-9][0-9]{0,8})(?:-(dev\.[0-9]{8}))?)?$")]
     private static partial Regex ToolchainPattern();
 }
 

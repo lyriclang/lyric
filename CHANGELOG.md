@@ -552,6 +552,11 @@ promise. This entry fills with the milestones.
   silent. It named every lint: a package that checked without a warning failed with tens of
   thousands of errors under the switch. A lint raised to `warn` by `[lints]` or an attribute is
   denied with the others.
+- **A package can ask for a development build**: `toolchain = "5.0.0-dev.20261119"` in `[package]`
+  is met by the development build of that day or a later one, and by every release of 5.0.0 or
+  after. An older development build refuses the package (`LYR-PKG0009`) or hands the command to an
+  installed toolchain that meets the pin. At a terminal, the newest development build is offered.
+  A pin of a version, `"5.0"`, still takes any development build of it.
 
 ---
 

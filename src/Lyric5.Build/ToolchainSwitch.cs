@@ -58,22 +58,26 @@ public static class ToolchainSwitch
             : new SwitchDecision.Missing(pin.Minimum, package.Name, manifest, pin.Line);
     }
 
-    /// <summary>Whether <paramref name="version"/> is <paramref name="minimum"/> or later; a
-    /// development build of a version counts as that version.</summary>
-    public static bool Satisfies(string version, SemVer minimum) => minimum.CompareTo(ToolchainCheck.Numbers(version)) <= 0;
+    /// <summary>Whether <paramref name="version"/> is <paramref name="minimum"/> or later
+    /// (<see cref="ToolchainCheck.Satisfies"/>).</summary>
+    public static bool Satisfies(string version, SemVer minimum) => ToolchainCheck.Satisfies(version, minimum);
 
     /// <summary>
     /// The offer at a terminal: the least stable version the package's pin admits, for this machine,
-    /// installed where the answer is yes. The installed version, or <c>null</c> where there is none
+    /// installed where the answer is yes — for a pin of a development build the newest development
+    /// build, which carries the most fixes. The installed version, or <c>null</c> where there is none
     /// to offer or the answer is no — then the verb refuses the package.
     /// </summary>
     public static string? Offer(ToolchainFetch fetch, ToolchainHome home, SwitchDecision.Missing missing, string running, TextWriter prompt, Func<string?> answer)
     {
-        if (Least(fetch.Index(ChannelIndex.Stable), missing.Minimum, Lyric5.Toolchain.Target.Host.Triple) is not { } release) return null;
+        var channel = missing.Minimum.Pre is null ? ChannelIndex.Stable : ChannelIndex.Dev;
+        var triple = Lyric5.Toolchain.Target.Host.Triple;
+        var offered = channel == ChannelIndex.Stable ? Least(fetch.Index(channel), missing.Minimum, triple) : Newest(fetch.Index(channel), missing.Minimum, triple);
+        if (offered is not { } release) return null;
         prompt.Write($"package '{missing.Package}' needs lyric {missing.Minimum} or later, and this is lyric {running}; install lyric {release.Version}? [y/N] ");
         prompt.Flush();
         if (answer()?.Trim().ToLowerInvariant() is not ("y" or "yes")) return null;
-        fetch.Install(home, release, ChannelIndex.Stable);
+        fetch.Install(home, release, channel);
         prompt.WriteLine($"installed lyric {release.Version} in {home.DirectoryOf(release.Version)}");
         return release.Version;
     }
@@ -84,4 +88,11 @@ public static class ToolchainSwitch
         index.Releases
             .Where(r => r.Number.Pre is null && minimum.CompareTo(r.Number) <= 0 && r.Archives.ContainsKey(triple))
             .MinBy(r => r.Number);
+
+    /// <summary>The newest version of <paramref name="index"/> — a channel of development builds —
+    /// that is <paramref name="minimum"/> or later and has an archive for <paramref name="triple"/>.</summary>
+    public static ChannelRelease? Newest(ChannelIndex index, SemVer minimum, string triple) =>
+        index.Releases
+            .Where(r => minimum.CompareTo(r.Number) <= 0 && r.Archives.ContainsKey(triple))
+            .MaxBy(r => r.Number);
 }
