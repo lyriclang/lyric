@@ -2645,3 +2645,10 @@ Die Entscheidungen stehen in 11, Review 2026-11-24 „Komfort im Editor“ (IDE1
 | **ED3** Quellaktionen | IDE2: Imports aufräumen, alles Ungenutzte der Datei entfernen | nach ED2, vor M18 | ein Test je Aktion; ein zweiter Lauf ändert nichts |
 
 **Nach 5.0**: IDE3 und IDE5 (Uhr: die erste Runde nach 5.0.0), IDE4 mit L6 und C14 (Tür), IDE6 mit IDE3.
+
+## Nachtrag 2026-11-24 — Befunde aus `stanza_wip`: Uhren
+
+| Slice | Inhalt | Uhr | Abschluss |
+|---|---|---|---|
+| **BF1** `warnings` wirkt auf das, was warnt | 11 L8; Spec 16 §5 Regeln 1, 5, 8 spec-first, mit Fällen | sofort, nach dem PR der Importpfade | `--deny-warnings` an `stanza_wip` meldet nur, was ohne den Schalter warnt; `-A warnings` schweigt; ein `@Allow` geht vor |
+| **BF2** Dev-Build als Minimum | 11 P13; Spec 15 (der Pin), 14 (`toolchain install` bietet `dev` an) | nach BF1, vor M18 | ein älterer Dev-Build ist `PKG0009`, ein neuerer und eine Release genügen; der Wechsel auf einen installierten Dev-Build |

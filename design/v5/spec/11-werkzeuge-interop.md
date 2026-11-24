@@ -448,6 +448,17 @@ in 13, Nachtrag 2026-11-24.
 | IDE6 | **Erzeugen**: ein Doku-Gerüst (`///` mit `# Errors` aus `throws`, `# Panics` aus den Paniken des Rumpfs) mit IDE3. **„Konstruktor erzeugen“ ist verworfen**: Lyric hat keine Konstruktoren, ein Struct-Literal ersetzt sie, und ein erzeugtes `static fn new` legte ein Muster nahe, das die Sprache nicht braucht | E2 |
 | IDE7 | **Abschnitte der Doku im Hover**: `# Errors`, `# Panics`, `# Examples` sind Abschnitte (wie bei rustdoc) und bleiben so geschrieben; `lyric doc` setzt sie als Abschnitte. Der Hover rückt jede Überschrift eines Doc-Blocks um drei Ebenen ein (`#` → `####`, höchstens `######`), damit sie im Hover nicht größer steht als die Signatur. Code-Blöcke bleiben unberührt | E2, W8 |
 
+## Review 2026-11-24 — zwei Befunde aus einem Paket des Maintainers
+
+Gefunden in `stanza_wip` (eine Engine in Lyric) beim Wechsel auf einen neuen Dev-Build. Entschieden am
+2026-11-24: P13 auf Frage des Maintainers, L8 als Fehler, der W7 L2 und Spec 16 §5 Regel 8 widerspricht.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| P13 | **Der Toolchain-Pin nimmt einen Dev-Build als Minimum**: `toolchain = "5.0.0-dev.20261119"` verlangt mindestens den Dev-Build dieses Tages. Jeder Dev-Build derselben Version vom selben Tag an genügt, ebenso jede Release ab dieser Version. Ein älterer Dev-Build ist `LYR-PKG0009`, wie eine ältere Version. Der Commit-Hash hinter `+` zählt nicht, denn er ist nicht geordnet. Vorher zählte ein Dev-Build als die Version, deren Dev-Build er ist: `"5.0"` nahm jeden alten Dev-Build, ohne die Fixes, die ein Paket braucht. **Vor M18**, als Slice nach L8 | P12 |
+| L8 | **`warnings` wirkt auf das, was warnt**: Die Stufe eines Lints entsteht zuerst ohne `warnings`, aus Attribut, Kommandozeile, Manifest und der eigenen Stufe. Ist sie dann `warn`, entscheidet der engste `warnings`-Selektor. `-D warnings` (`--deny-warnings`, `denyWarnings`) macht so jede Warnung zum Fehler, und was `allow` ist, bleibt still. `-A warnings` schaltet alle Warnungen ab, `-W warnings` ändert nichts. Vorher stand `warnings` für jeden Lint, auch die auf `allow`: `--deny-warnings` meldete an `stanza_wip` 53.534 Fehler, ohne den Schalter keinen. Wie Rusts `-D warnings`. **Sofort**, mit Spec 16 §5 | L1, L2 |
+
+
 ---
 
 **Bereich 11 ist damit vollständig entschieden** (W1–W9, 2026-09-29). Es bleibt 12 (Migration).
