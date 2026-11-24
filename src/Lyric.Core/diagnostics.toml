@@ -3523,6 +3523,8 @@ explanation = '''
 After `::` stands what the type is: one interface, `struct User :: Named`, or several joined with `&`, `struct User :: Named & Shown` — it is a `Named` and a `Shown`. A list in brackets is a set of types, and a set means one of them, as `throws [A, B]` and `catch (e in [A, B])` do; a conformance or a constraint needs all of them, so it is not written as a list. One interface may still stand in brackets, `:: [Named]`: a set of one is that interface.
 
 Join the interfaces with `&`. In a type parameter's constraint a `,` after one interface begins the next parameter: `<T :: Named, U>` has the parameters `T` and `U`; `<T :: Named & Shown>` constrains `T` twice.
+
+`lyric fix` writes the chain for you, in every file of the package: the brackets go and each `,` between two interfaces becomes ` &`. The editor offers the same change.
 '''
 wrong = '''
 interface Named {

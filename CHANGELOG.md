@@ -529,6 +529,23 @@ promise. This entry fills with the milestones.
   **The check of every program is faster**: whether a block gives an interface is asked first of
   the block's interfaces, before its target is matched. In the check of `lyric-script` the phase
   went from 1.5 s to 1.1 s.
+- **The names of an import's path answer hover and go to definition.** In
+  `import stanza.platform.window { Platform }`, each name stands for the module its path names up to
+  it: `window` shows `module stanza.platform.window` with the `//!` block that opens its file and
+  jumps there. The alias of `import std.io as console` does the same. A package without a module of
+  its own, such as `std`, shows `package std` and has nowhere to jump. A module's hover now carries
+  its documentation wherever it is named, `io` in `io.println` included. **A doc block's sections
+  stand three levels down in a hover**: `# Errors` shows as `#### Errors`, no larger than the
+  signature above it. The text and `lyric doc` keep them as written, and a `#` in a code block
+  stays.
+- **`lyric fix` joins a list of interfaces with `&`** (`LYR-PAR0066`): `:: [Equatable, Debug]`
+  becomes `:: Equatable & Debug`, in a constraint as well. Comments and line breaks stay as written,
+  and so do `[I]` and a delegate's `by`. The editor offers the same change. Code written for Lyric 5
+  before the rule needs one run. **Such a type keeps its conformances until then.** A declaration
+  with a parse error that the parser reads as its safe fix writes it (`LYR-PAR0037`, `0064`,
+  `0065`, `0066`) counted as unread: nothing was synthesized for it, and its other mistakes were
+  kept back. A `struct V :: [Equatable, Debug]` had no `debug`, and every type that printed a `V`
+  said so.
 
 ---
 

@@ -42,6 +42,12 @@ public static class DefinitionProvider
         if (NodeFinder.ImportedAt(model, path, file, offset, out _) is { } imported)
             return Declaration(imported) is { } declared && !model.Compilation.IsSynthesized(declared.File) ? declared : null;
 
+        // A name of an import's path jumps to the module the path names up to it, where there is
+        // one; a package or a directory without a module of its own has no file to open.
+        if (NodeFinder.ImportPathAt(model, path, file, offset, out _) is { } prefix)
+            return NodeFinder.ModuleNamed(model, prefix) is { } module && Declaration(module) is { } target
+                && !model.Compilation.IsSynthesized(target.File) ? target : null;
+
         // From the inside out, like hover: the innermost node is the most specific, and the nodes
         // above it are the fallback when it binds to nothing.
         for (var i = path.Count - 1; i >= 0; i--)

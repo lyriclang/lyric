@@ -80,6 +80,13 @@ public sealed partial class Parser
     /// the resolver and the checker would say about them is said about the recovery's leftovers,
     /// and the engine keeps it back. The parser's errors are found by their place, not counted as
     /// they come — the lexer reported its own before the first declaration was read.
+    ///
+    /// <para>An error that carries a safe fix leaves no wreckage: the parser reads the text as that
+    /// fix writes it — a ';' between fields as ',', ':' in an initializer as '=', a jump where a value
+    /// stands as its block, a list of interfaces as their chain. Its declaration is whole, and
+    /// counting it broken kept back every other finding in it and synthesized none of its
+    /// conformances: a type written ':: [Equatable, Debug]' had no 'debug', and the error said so
+    /// wherever it was used. A safe fix of the parser is given only where that holds.</para>
     /// </summary>
     private void MarkUnparsed(List<Decl> decls)
     {
@@ -87,7 +94,8 @@ public sealed partial class Parser
         var file = decls[0].Span.File;
         var broken = _de.Diagnostics
             .Where(d => d.Severity == Severity.Error && d.Span.File == file
-                        && (d.Code.StartsWith("LYR-PAR", StringComparison.Ordinal) || d.Code.StartsWith("LYR-LEX", StringComparison.Ordinal)))
+                        && (d.Code.StartsWith("LYR-PAR", StringComparison.Ordinal) || d.Code.StartsWith("LYR-LEX", StringComparison.Ordinal))
+                        && !(d.Notes ?? []).Any(n => n.Fix is { Applicability: Applicability.Safe }))
             .Select(d => d.Span.Start)
             .Order()
             .ToList();
@@ -1213,6 +1221,11 @@ public sealed partial class Parser
         var by = default(Span);
         var listed = default(Span);
         var inBrackets = 0;
+        // What turns a list into the chain it is read as — a bracket of several goes, a comma
+        // between two becomes '&' — for the fix of LYR-PAR0066. A bracket left open has none.
+        var start = _buffer.Current.Span.Start;
+        var edits = new List<(Span At, string Text)>();
+        var fixable = true;
         void Entry()
         {
             types.Add(ParseType());
@@ -1229,18 +1242,25 @@ public sealed partial class Parser
         }
         do
         {
-            if (_buffer.Match(TokenKind.LBracket))
+            if (_buffer.Check(TokenKind.LBracket))
             {
+                var group = new List<(Span At, string Text)> { (_buffer.Advance().Span, "") };
+                var several = false;
                 inBrackets++;
                 Entry();
                 while (_buffer.Check(TokenKind.Comma))
                 {
                     var comma = _buffer.Advance().Span;
-                    if (_buffer.Check(TokenKind.RBracket)) break; // ':: [I,]': still one
+                    if (_buffer.Check(TokenKind.RBracket)) { group.Add((comma, "")); break; } // ':: [I,]': still one
                     if (listed == default) listed = comma;
+                    several = true;
+                    group.Add((comma, " &"));
                     Entry();
                 }
+                if (!_buffer.Check(TokenKind.RBracket)) fixable = false;
                 _boundsEnd = _buffer.Expect(TokenKind.RBracket, "LYR-PAR0004", "expected ']' after the interface").Span;
+                group.Add((_boundsEnd, ""));
+                if (several) edits.AddRange(group);
             }
             else Entry();
             if (!commaEnds)
@@ -1248,16 +1268,36 @@ public sealed partial class Parser
                 {
                     var comma = _buffer.Advance().Span;
                     if (listed == default) listed = comma;
+                    edits.Add((comma, " &"));
                     Entry();
                 }
         } while (_buffer.Match(TokenKind.Amp));
         if (listed != default)
-            _de.Report("LYR-PAR0066", Severity.Error, listed,
-                $"several interfaces {where} are joined with '&': ':: I & J' — '[I, J]' is a set, one of them, not both");
+            _de.Report(new Diagnostic("LYR-PAR0066", Severity.Error, listed,
+                $"several interfaces {where} are joined with '&': ':: I & J' — '[I, J]' is a set, one of them, not both",
+                fixable ? [DiagnosticNote.Suggest("join them with '&'", Joined(start, edits))] : []));
         delegates = fields?.ToArray();
         bySpan = by;
         bracketed = types.Count == 1 && inBrackets == 1;
         return types.ToArray();
+    }
+
+    /// <summary>The bounds from <paramref name="start"/> to the last token read, as the chain they
+    /// are read as: the text between the edits stays as written, comments and line breaks
+    /// included.</summary>
+    private Replacement Joined(int start, List<(Span At, string Text)> edits)
+    {
+        var end = _buffer.Peek(-1).Span;
+        var text = _sm.GetText(end.File);
+        var joined = new System.Text.StringBuilder();
+        var at = start;
+        foreach (var (span, with) in edits.OrderBy(e => e.At.Start))
+        {
+            joined.Append(text, at, span.Start - at).Append(with);
+            at = span.End;
+        }
+        joined.Append(text, at, end.End - at);
+        return new Replacement(new Span(end.File, start, end.End), joined.ToString(), Applicability.Safe);
     }
 
     /// <summary><c>by</c> after a bound that delegates nothing: a type parameter's constraint, an

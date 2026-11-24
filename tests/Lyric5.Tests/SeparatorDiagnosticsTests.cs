@@ -36,6 +36,45 @@ public class SeparatorDiagnosticsTests
         Assert.Equal(0, after);
     }
 
+    /// <summary>A list of interfaces is read as their chain, so the type is whole: its 'Debug' is
+    /// synthesized and a use elsewhere finds 'debug'. It was not, and every type that printed it
+    /// said "'V' has no member 'debug'".</summary>
+    [Fact]
+    public void A_list_of_interfaces_is_one_finding_each_and_the_type_keeps_its_conformances()
+    {
+        var (errors, fixedText, after) = Run("""
+            import std.io { println };
+
+            struct V :: [Equatable, Debug] { x: int }
+            enum Kind :: [Equatable, Debug] { A, B }
+            struct W :: Equatable & Debug { k: Kind, v: V }
+
+            fn show<T :: Debug>(t: T): string { return t.debug(); }
+
+            fn main(): void {
+                println(show(W { k = .A, v = V { x = 1 } }));
+                println(f"{V { x = 2 } == V { x = 2 }}");
+            }
+            """);
+        Assert.Equal([(3, 23, "LYR-PAR0066"), (4, 24, "LYR-PAR0066")], errors);
+        Assert.Contains("struct V :: Equatable & Debug { x: int }\n", fixedText);
+        Assert.Contains("enum Kind :: Equatable & Debug { A, B }\n", fixedText);
+        Assert.Equal(0, after);
+    }
+
+    /// <summary>What else is wrong in a declaration with such a finding is said too: the declaration
+    /// is whole, and its mistakes are not the recovery's.</summary>
+    [Fact]
+    public void A_declaration_with_a_safely_fixed_finding_says_its_other_mistakes()
+    {
+        var root = Package(("lyric.toml", AppManifest), ("src/main.lyr", "class C {\n    var n: int;\n    fn f(): int { return \"s\"; }\n}\n\nfn main(): void {\n}\n"));
+        var (_, _, said) = RunRaw("check", "-C", root, "--color", "never");
+        var errors = Finding.Matches(said)
+            .Select(m => (int.Parse(m.Groups["line"].Value), int.Parse(m.Groups["col"].Value), m.Groups["code"].Value))
+            .ToList();
+        Assert.Equal([(2, 15, "LYR-PAR0064"), (3, 19, "LYR-SEM0001")], errors);
+    }
+
     [Fact]
     public void An_initializer_with_semicolons_is_the_initializer_said_at_each_semicolon()
     {

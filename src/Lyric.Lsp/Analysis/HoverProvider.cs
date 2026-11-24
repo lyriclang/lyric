@@ -33,6 +33,18 @@ public static class HoverProvider
         if (NodeFinder.ImportedAt(model, path, file, offset, out var name) is { } imported)
             return Describe(model, imported, type: null) is { } text ? new HoverResult(text, name) : null;
 
+        // A name of an import's path stands for the module the path names up to it. Where there
+        // is none, the first name is still a package when modules lie beneath it ('std'); a
+        // directory between two names is nothing to describe.
+        if (NodeFinder.ImportPathAt(model, path, file, offset, out var segment) is { } prefix)
+        {
+            if (NodeFinder.ModuleNamed(model, prefix) is { } module)
+                return Describe(model, module, type: null) is { } text ? new HoverResult(text, segment) : null;
+            return !prefix.Contains('.') && model.Compilation.Modules.Any(m => m.FullName.StartsWith(prefix + ".", StringComparison.Ordinal))
+                ? new HoverResult(Code($"package {prefix}"), segment)
+                : null;
+        }
+
         // From the inside out: the innermost node is the most specific answer, but not every node
         // carries one — a literal knows its type, the argument list around it does not.
         for (var i = path.Count - 1; i >= 0; i--)
@@ -72,10 +84,12 @@ public static class HoverProvider
     /// <para>Empty when there is none, so a program without documentation gets exactly the answer it
     /// got before this existed.</para>
     ///
-    /// <para>The text goes through unchanged. It is already markdown as far as this server is
-    /// concerned — <c>///</c> and one space are stripped by the lexer and nothing else is
-    /// interpreted, because a tag vocabulary would be a documentation language, and there is none in
-    /// the grammar.</para>
+    /// <para>The text goes through as written, but for its headings. It is already markdown as far
+    /// as this server is concerned — <c>///</c> and one space are stripped by the lexer and nothing
+    /// else is interpreted, because a tag vocabulary would be a documentation language, and there is
+    /// none in the grammar. A section, <c># Errors</c>, is a first-level heading in the text and in
+    /// <c>lyric doc</c>; in a hover it would stand larger than the signature above it, so it goes
+    /// down three levels here (<see cref="Sections"/>).</para>
     /// </summary>
     private static string Documentation(SemanticModel model, Symbol symbol)
     {
@@ -84,9 +98,47 @@ public static class HoverProvider
         if (symbol is ImportBindingSymbol import) return Documentation(model, import.Target);
 
         if (symbol.Declaration is not { } declaration) return "";
+
+        // A module's documentation is the '//!' block that opens its file, which no declaration
+        // carries: read where 'lyric doc' reads it.
+        if (symbol is ModuleSymbol)
+            return declaration.Span.File.IsValid && !model.Compilation.IsSynthesized(declaration.Span.File)
+                && DocLinks.ModuleText(model.Compilation.Sources.GetText(declaration.Span.File)) is { } moduleText
+                ? $"\n\n---\n\n{Sections(moduleText)}"
+                : "";
+
         if (model.Documentation.Of(declaration) is not { } text) return "";
 
-        return $"\n\n---\n\n{text}";
+        return $"\n\n---\n\n{Sections(text)}";
+    }
+
+    /// <summary>
+    /// A doc block's headings three levels down, at most to the sixth: <c># Errors</c> is
+    /// <c>#### Errors</c>. A line in a fenced code block is code, not a heading, and stays.
+    /// </summary>
+    internal static string Sections(string text)
+    {
+        var lines = text.Split('\n');
+        string? fence = null;
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith("```", StringComparison.Ordinal) || trimmed.StartsWith("~~~", StringComparison.Ordinal))
+            {
+                var mark = trimmed[..3];
+                if (fence is null) fence = mark;
+                else if (mark == fence) fence = null;
+                continue;
+            }
+            if (fence is not null || line.Length - trimmed.Length > 3) continue;
+
+            var level = 0;
+            while (level < trimmed.Length && trimmed[level] == '#') level++;
+            if (level is 0 or > 6 || (level < trimmed.Length && trimmed[level] != ' ' && trimmed[level] != '\t')) continue;
+            lines[i] = new string('#', Math.Min(level + 3, 6)) + trimmed[level..];
+        }
+        return string.Join('\n', lines);
     }
 
     /// <summary>

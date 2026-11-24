@@ -105,6 +105,57 @@ public static class NodeFinder
     }
 
     /// <summary>
+    /// The module a name of an import's path stands for, where the offset stands on one: in
+    /// <c>import a.b.c { x }</c> the name <c>b</c> stands for <c>a.b</c>, and the alias of
+    /// <c>import a.b as m</c> for <c>a.b</c> itself. The module's full name, and the span of the
+    /// name; <c>null</c> elsewhere. Whether such a module exists is the caller's question: a name
+    /// may stand for a package or a directory that holds modules and is none.
+    ///
+    /// <para>The path's names are strings without spans, so they are found in the text, in order,
+    /// after the keyword: what lies between them is dots and blanks.</para>
+    /// </summary>
+    /// <param name="path">What <see cref="PathAt"/> found, the module first.</param>
+    public static string? ImportPathAt(
+        SemanticModel model, IReadOnlyList<Node> path, FileId file, int offset, out Span name)
+    {
+        name = default;
+        if (path is [.., ImportDecl owner, ImportAlias alias])
+        {
+            var aliasName = new Span(alias.Span.File, alias.Span.End - alias.Alias.Length, alias.Span.End);
+            if (!On(aliasName, file, offset)) return null;
+            name = aliasName;
+            return string.Join('.', owner.Path);
+        }
+        if (path is not [.., ImportDecl import]) return null;
+
+        var text = model.Compilation.Sources.GetText(import.Span.File);
+        var end = import.Clause?.Span.Start ?? import.Span.End;
+        var at = text.IndexOf("import", import.Span.Start, StringComparison.Ordinal);
+        if (at < 0) return null;
+        at += "import".Length;
+        for (var k = 0; k < import.Path.Length; k++)
+        {
+            var found = text.IndexOf(import.Path[k], at, StringComparison.Ordinal);
+            if (found < 0 || found + import.Path[k].Length > end) return null;
+            var segment = new Span(import.Span.File, found, found + import.Path[k].Length);
+            if (On(segment, file, offset))
+            {
+                name = segment;
+                return string.Join('.', import.Path[..(k + 1)]);
+            }
+            at = segment.End;
+        }
+        return null;
+    }
+
+    /// <summary>The module of the compilation with this full name, or <c>null</c>.</summary>
+    public static ModuleSymbol? ModuleNamed(SemanticModel model, string fullName) =>
+        model.Compilation.Modules.FirstOrDefault(m => m.FullName == fullName);
+
+    private static bool On(Span span, FileId file, int offset) =>
+        span.File == file && offset >= span.Start && offset <= span.End;
+
+    /// <summary>
     /// The chain from the module down to the innermost node covering <paramref name="offset"/>,
     /// outermost first. Empty when the offset lies outside the module.
     /// </summary>
