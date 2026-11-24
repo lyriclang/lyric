@@ -33,6 +33,7 @@ public sealed partial class Parser
 
     private Pattern ParsePatternPrimary()
     {
+        NeedStack();
         var cur = _buffer.Current;
         switch (cur.TokenKind)
         {

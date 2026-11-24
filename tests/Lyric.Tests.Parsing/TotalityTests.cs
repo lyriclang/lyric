@@ -62,7 +62,7 @@ public class TotalityTests
     public void Deep_nesting_does_not_overflow_the_stack()
     {
         // Recursive descent has a stack proportional to the nesting. 200 levels stand for a
-        // pathological but plausible file; a true bomb (tens of thousands) is out of contract.
+        // pathological but plausible file; what a true bomb does is pinned in NestingLimitTests.
         ParseAll("fn main(): int { return " + new string('(', 200) + "1"
                  + new string(')', 200) + "; }");
         ParseAll("fn main(): int { let x: " + string.Concat(Enumerable.Repeat("?", 1))

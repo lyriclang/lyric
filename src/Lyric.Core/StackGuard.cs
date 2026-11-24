@@ -20,6 +20,10 @@ namespace Lyric.Core;
 /// </remarks>
 public static class StackGuard
 {
+    /// <summary>Whether this thread has stack left to go deeper, for a recursion that ends in a
+    /// diagnostic of its own rather than in <see cref="CompilerDepthException"/>.</summary>
+    public static bool HasRoom() => RuntimeHelpers.TryEnsureSufficientExecutionStack();
+
     /// <summary>Throws when the stack is nearly spent; <paramref name="doing"/> names the
     /// recursion for the report ("lowering a type").</summary>
     public static void Check(string doing)
