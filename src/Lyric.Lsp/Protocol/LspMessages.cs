@@ -840,8 +840,8 @@ public sealed record WorkDoneProgressCreateParams
     public required string Token { get; init; }
 }
 
-/// <summary>A report on a progress token: <see cref="WorkDoneProgressBegin"/> or
-/// <see cref="WorkDoneProgressEnd"/> as <see cref="Value"/>.</summary>
+/// <summary>A report on a progress token: <see cref="WorkDoneProgressBegin"/>,
+/// <see cref="WorkDoneProgressReport"/> or <see cref="WorkDoneProgressEnd"/> as <see cref="Value"/>.</summary>
 public sealed record ProgressParams
 {
     public required string Token { get; init; }
@@ -855,6 +855,18 @@ public sealed record WorkDoneProgressBegin
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Message { get; init; }
+}
+
+public sealed record WorkDoneProgressReport
+{
+    public string Kind => "report";
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Message { get; init; }
+
+    /// <summary>0 to 100; a client draws a bar where it is given.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Percentage { get; init; }
 }
 
 public sealed record WorkDoneProgressEnd

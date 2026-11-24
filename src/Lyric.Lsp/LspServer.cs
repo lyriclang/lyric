@@ -13,14 +13,16 @@ public sealed record LspServerOptions
     /// <summary>
     /// How long a document must be quiet before it is compiled.
     ///
-    /// <para>Its purpose is to skip versions, not to delay the answer. The number is small because
-    /// a whole compile in this process costs 7 to 16 ms for a file of a hundred lines, standard
-    /// library included — the two hundred milliseconds a batch invocation of the compiler takes
-    /// are process start and JIT warm-up, neither of which a long-lived server pays. At that price
-    /// the debounce is the DOMINANT latency, so it is set to coalesce a burst of keystrokes and
-    /// nothing more.</para>
+    /// <para>Its purpose is to skip versions, not to delay the answer, and it is set to coalesce a
+    /// burst of keystrokes and nothing more: the compile that follows checks the standard library
+    /// with the package, a few hundred milliseconds in a server that has warmed up, and every
+    /// millisecond waited here is added to that.</para>
     /// </summary>
     public TimeSpan Debounce { get; init; } = TimeSpan.FromMilliseconds(50);
+
+    /// <summary>How long an analysis after a file's first runs before the client is shown its
+    /// progress: one that ends sooner is not worth a bar that comes and goes.</summary>
+    public TimeSpan ProgressDelay { get; init; } = TimeSpan.FromMilliseconds(750);
 
     /// <summary>The version the server says it is in <c>initialize</c>: the toolchain's.</summary>
     public string Version { get; init; } = ToolchainVersion.Value;
@@ -116,7 +118,8 @@ public sealed class LspServer : IDisposable
             _options.Debounce,
             _options.StdlibRoot,
             _options.Version,
-            BeginProgress);
+            BeginProgress,
+            _options.ProgressDelay);
     }
 
     /// <summary>
@@ -552,14 +555,14 @@ public sealed class LspServer : IDisposable
 
     /// <summary>
     /// Shows that an analysis runs (E20), where the client draws progress: a token the client is
-    /// asked to create, then <c>begin</c>, and <c>end</c> when the returned handle is disposed.
-    /// <c>null</c> for a client that draws none.
+    /// asked to create, then <c>begin</c>, a <c>report</c> for each phase, and <c>end</c> when the
+    /// returned handle is disposed. <c>null</c> for a client that draws none.
     ///
     /// <para>Never awaited by the analysis. A token is the client's once it answered the create
     /// request, and the answer arrives on the read loop — which may itself be waiting on this very
     /// analysis (a pull). The messages go out in order on a task of their own.</para>
     /// </summary>
-    private IDisposable? BeginProgress(string what)
+    private IAnalysisProgress? BeginProgress(string what)
     {
         if (!_workDoneProgress || _state != State.Running) return null;
 
@@ -586,21 +589,7 @@ public sealed class LspServer : IDisposable
             return true;
         });
 
-        return new ProgressHandle(() => _ = EndProgressAsync(begun, token));
-    }
-
-    private async Task EndProgressAsync(Task<bool> begun, string token)
-    {
-        try
-        {
-            if (await begun.ConfigureAwait(false))
-                await SendProgressAsync(token, LspJson.ToElement(new WorkDoneProgressEnd(),
-                    LspJson.Default.WorkDoneProgressEnd)).ConfigureAwait(false);
-        }
-        catch
-        {
-            // The connection is gone, and with it the bar.
-        }
+        return new ProgressHandle(begun, value => SendProgressAsync(token, value));
     }
 
     private Task SendProgressAsync(string token, JsonElement value) =>
@@ -620,14 +609,42 @@ public sealed class LspServer : IDisposable
         }
     }
 
-    /// <summary>Ends a progress report once, when the analysis it stands for ends.</summary>
-    private sealed class ProgressHandle(Action end) : IDisposable
+    /// <summary>
+    /// One progress display: its reports and its end, in order, after its begin — each waits for
+    /// the one before it on a chain of its own, never on the caller's thread. Ended once; a report
+    /// after the end is dropped.
+    /// </summary>
+    private sealed class ProgressHandle(Task<bool> begun, Func<JsonElement, Task> send) : IAnalysisProgress
     {
-        private int _ended;
+        private readonly object _gate = new();
+        private Task _tail = begun;
+        private bool _ended;
 
-        public void Dispose()
+        public void Report(string message, int percentage) =>
+            Then(LspJson.ToElement(new WorkDoneProgressReport { Message = message, Percentage = percentage },
+                LspJson.Default.WorkDoneProgressReport), end: false);
+
+        public void Dispose() =>
+            Then(LspJson.ToElement(new WorkDoneProgressEnd(), LspJson.Default.WorkDoneProgressEnd), end: true);
+
+        private void Then(JsonElement value, bool end)
         {
-            if (Interlocked.Exchange(ref _ended, 1) == 0) end();
+            lock (_gate)
+            {
+                if (_ended) return;
+                _ended = end;
+                _tail = _tail.ContinueWith(async _ =>
+                {
+                    try
+                    {
+                        if (await begun.ConfigureAwait(false)) await send(value).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // The connection is gone, and with it the bar.
+                    }
+                }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default).Unwrap();
+            }
         }
     }
 

@@ -33,6 +33,7 @@ namespace Lyric.Lsp.Protocol;
 [JsonSerializable(typeof(WorkDoneProgressCreateParams))]
 [JsonSerializable(typeof(ProgressParams))]
 [JsonSerializable(typeof(WorkDoneProgressBegin))]
+[JsonSerializable(typeof(WorkDoneProgressReport))]
 [JsonSerializable(typeof(WorkDoneProgressEnd))]
 [JsonSerializable(typeof(DidOpenTextDocumentParams))]
 [JsonSerializable(typeof(DidChangeTextDocumentParams))]

@@ -1773,9 +1773,12 @@ public sealed class TypeChecker
                                 new DiagnosticNote(NodeSpan(node), "the blanket block's conformance"));
                             excluded = true;
                         }
+                // The shared interface first: it is a lookup, and two blocks of the library rarely
+                // share one, where whether they meet is a substitution of the one into the other —
+                // asked of every pair first, it was a tenth of every analysis.
                 if (clash is null && !excluded)
                     foreach (var (prior, priorTarget, priorChain) in blockSites)
-                        if (Meets(block, target, prior, priorTarget) && SharedWith(priorChain) is { } shared)
+                        if (SharedWith(priorChain) is { } shared && Meets(block, target, prior, priorTarget))
                         { clash = $"another block gives '{shared.Name}' to '{TypeFacts.Display(priorTarget)}'"; break; }
                 if (clash is not null)
                     _de.Report("LYR-SEM0133", Severity.Error, NodeSpan(node),
@@ -9931,7 +9934,7 @@ public sealed class TypeChecker
             // parameters — reaches where its target matches the instance and its constraints hold
             // for what the match bound; the lowering builds a row for exactly the instances
             // proved here.
-            if (BlockSubstitution(block, self, wanted) is not { } blockMap) continue;
+            if (!CouldGive(block, iface) || BlockSubstitution(block, self, wanted) is not { } blockMap) continue;
             foreach (var node in block.Decl.Interfaces)
                 if (NodeReaches(node, block.MethodScope, iface, wanted, blockMap, self))
                 {
@@ -9941,6 +9944,31 @@ public sealed class TypeChecker
         }
         return BlockConforms(self, iface, wanted, shapes: false);
     }
+
+    /// <summary>
+    /// Whether one of a block's interfaces has <paramref name="iface"/> in its chain — what
+    /// <see cref="NodeReaches"/> asks first of every node. Asked before the block's substitution,
+    /// which matches its target and checks its constraints: a block of the library rarely gives the
+    /// interface asked for, and matching each of them first made the question of a conformance
+    /// the costliest part of every analysis.
+    /// </summary>
+    private bool CouldGive(ExtensionBlock block, TypeSymbol iface)
+    {
+        foreach (var node in block.Decl.Interfaces)
+            if (Conformance.InterfaceOf(node, _binding) is { } direct && ChainOf(direct).Contains(iface))
+                return true;
+        return false;
+    }
+
+    /// <summary>An interface and its transitive parents, worked out once per check.</summary>
+    private HashSet<TypeSymbol> ChainOf(TypeSymbol iface)
+    {
+        if (!_chains.TryGetValue(iface, out var chain))
+            _chains[iface] = chain = new HashSet<TypeSymbol>(Conformance.WithParents(iface, _binding), ReferenceEqualityComparer.Instance);
+        return chain;
+    }
+
+    private readonly Dictionary<TypeSymbol, HashSet<TypeSymbol>> _chains = new(ReferenceEqualityComparer.Instance);
 
     private static bool IsShape(LyrType type) => type is ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType;
 
@@ -9967,6 +9995,7 @@ public sealed class TypeChecker
             if (!(block.IsBlanketTarget || (shapes && IsShapeBlock(block))))
                 continue;
             if (!_comp.Reaches(_currentModule, block)) continue;
+            if (!CouldGive(block, iface)) continue;
             var probe = (block, TypeFacts.Display(type));
             if (!_blockProbes.Add(probe)) continue;
             try
