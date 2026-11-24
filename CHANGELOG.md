@@ -546,6 +546,12 @@ promise. This entry fills with the milestones.
   `0065`, `0066`) counted as unread: nothing was synthesized for it, and its other mistakes were
   kept back. A `struct V :: [Equatable, Debug]` had no `debug`, and every type that printed a `V`
   said so.
+- **`--deny-warnings` denies the warnings, not every lint.** `warnings` names the lints that warn
+  where it is read, so `-D warnings`, `--deny-warnings` and a profile's `denyWarnings` turn each
+  warning into an error. A lint at `allow`, such as `missing-docs` or `int-literal-adapts`, stays
+  silent. It named every lint: a package that checked without a warning failed with tens of
+  thousands of errors under the switch. A lint raised to `warn` by `[lints]` or an attribute is
+  denied with the others.
 
 ---
 

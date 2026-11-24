@@ -115,8 +115,10 @@ The narrowest attribute around a finding decides. Without one, the command line 
 manifest, and the manifest over the lint's own level; within one place a lint decides over its group,
 and its group over `warnings`.
 
-`--deny-warnings`, and a profile's `denyWarnings = true`, turn every warning into an error — the
-setting for a continuous build that must stay clean. A denied finding says who denied it.
+`warnings` stands for what warns: `-D warnings` makes each warning an error, and a lint that is
+allowed, such as `missing-docs`, stays silent. `--deny-warnings`, and a profile's
+`denyWarnings = true`, are `-D warnings`: the setting for a continuous build that must stay clean,
+and a build that checks without a warning passes it. A denied finding says who denied it.
 
 The warnings of your dependencies, and of the standard library, are not said: they are theirs to
 fix. `--warn-deps` says them, at their own levels, and never as errors.
