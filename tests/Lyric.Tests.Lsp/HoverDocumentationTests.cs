@@ -145,6 +145,46 @@ public sealed class HoverDocumentationTests
         Assert.Contains("Returns the number of processors online", text);
     }
 
+    [Fact]
+    public void A_name_of_an_import_path_shows_the_module_and_its_documentation()
+    {
+        // The '//!' block that opens std/io.lyr: no declaration carries it.
+        var found = HoverAt("import std.i$o { println };\nfn main(): int {\n    println(\"hi\");\n    return 0;\n}\n");
+        Assert.NotNull(found);
+        Assert.StartsWith("```lyric\nmodule std.io\n```\n\n---\n\nInput and output", found.Markdown);
+        Assert.Equal((11, 13), (found.Span.Start, found.Span.End));
+    }
+
+    [Fact]
+    public void A_whole_module_import_and_its_uses_show_the_module_documentation_too()
+    {
+        Assert.Contains("Input and output", Text("import std.io as con$sole;\nfn main(): int {\n    console.println(\"hi\");\n    return 0;\n}\n"));
+        Assert.Contains("Input and output", Text("import std.io;\nfn main(): int {\n    i$o.println(\"hi\");\n    return 0;\n}\n"));
+    }
+
+    [Fact]
+    public void A_sections_heading_stands_three_levels_down_and_code_stays()
+    {
+        // '# Errors' as written would stand larger than the signature above it.
+        var text = Text("/// Twice.\n///\n/// # Errors\n/// Never.\n///\n/// ## Notes\n/// #### Deep\n/// ```\n/// # not a heading\n/// ```\n"
+            + "fn twice(n: int): int { return n * 2; }\nfn main(): int {\n    return tw$ice(2);\n}\n");
+        var doc = text[(text.IndexOf("---", StringComparison.Ordinal) + 3)..];
+        Assert.Contains("\n#### Errors\n", doc);
+        Assert.Contains("\n##### Notes\n", doc);
+        Assert.Contains("\n###### Deep\n", doc);
+        Assert.Contains("\n# not a heading\n", doc);
+        Assert.DoesNotContain("\n# Errors", doc);
+    }
+
+    [Fact]
+    public void A_package_without_a_module_of_its_own_is_named_as_one()
+    {
+        var found = HoverAt("import st$d.io { println };\nfn main(): int {\n    println(\"hi\");\n    return 0;\n}\n");
+        Assert.NotNull(found);
+        Assert.Equal("```lyric\npackage std\n```", found.Markdown);
+        Assert.Equal((7, 10), (found.Span.Start, found.Span.End));
+    }
+
     // ------------------------------------------------------------------ counter-checks
 
     [Fact]

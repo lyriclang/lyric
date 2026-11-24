@@ -104,6 +104,33 @@ public class JoinedBoundsTests
         Assert.Equal(["I", "J"], Names(Bounds(module.Declarations[0])));
     }
 
+    /// <summary>The refusal carries the chain it is read as, safe for <c>lyric fix</c>: a bracket of
+    /// several goes, a comma between two becomes <c>&amp;</c>, everything else stays as written.</summary>
+    [Theory]
+    [InlineData("struct S :: [I, J] { }", "struct S :: I & J { }")]
+    [InlineData("struct S :: I, J { }", "struct S :: I & J { }")]
+    [InlineData("interface S :: [I, J,] { }", "interface S :: I & J { }")]
+    [InlineData("fn f<T :: [I, J], U :: [K]>(): void { }", "fn f<T :: I & J, U :: [K]>(): void { }")]
+    [InlineData("class D :: [Walker by legs, /* c */ Named] { }", "class D :: Walker by legs & /* c */ Named { }")]
+    [InlineData("struct S :: [I] & [J,\n    K] { }", "struct S :: [I] & J &\n    K { }")]
+    public void A_list_of_several_is_fixed_to_the_chain(string source, string fixedSource)
+    {
+        var (_, de) = ParseModule(source);
+        var refused = Assert.Single(de.Diagnostics);
+        var fix = Assert.Single(refused.Notes ?? [], n => n.Fix is not null).Fix!.Value;
+        Assert.Equal(Applicability.Safe, fix.Applicability);
+        Assert.Equal(fixedSource, source[..fix.Span.Start] + fix.Text + source[fix.Span.End..]);
+        Assert.False(ParseModule(fixedSource).diag.HasErrors);
+    }
+
+    [Fact]
+    public void A_list_left_open_has_no_fix()
+    {
+        var (_, de) = ParseModule("struct S :: [I, J { }");
+        var refused = Assert.Single(de.Diagnostics, d => d.Code == "LYR-PAR0066");
+        Assert.DoesNotContain(refused.Notes ?? [], n => n.Fix is not null);
+    }
+
     [Theory]
     [InlineData("struct S :: [I,] { }")]
     [InlineData("struct S :: [I by f] { }")]

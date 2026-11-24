@@ -219,6 +219,32 @@ public sealed class DefinitionTests
         Assert.Equal("println", result.Sources.GetText(target.File).Substring(target.NameSpan.Start, target.NameSpan.Length));
     }
 
+    [Theory]
+    [InlineData("import std.i$o { println };")]
+    [InlineData("import std.io$ { println };")]
+    [InlineData("import std.i$o;")]
+    [InlineData("import std.io as con$sole;")]
+    public void A_name_of_an_import_path_jumps_to_the_module_it_names(string import)
+    {
+        // The path's names are no nodes either; the last one, or an alias, is the module's file.
+        var target = TargetAt(import + "\n\nfn main(): int {\n    return 0;\n}\n", out var result);
+        Assert.NotNull(target);
+        Assert.EndsWith("std/io.lyr", result.Sources.GetPath(target.File).Replace('\\', '/'));
+        Assert.Equal(0, target.NameSpan.Start);
+        Assert.Equal(0, target.NameSpan.Length);
+    }
+
+    [Theory]
+    [InlineData("import s$td.io { println };")]
+    [InlineData("import std.io { println }$;")]
+    [InlineData("im$port std.io { println };")]
+    public void A_package_without_a_module_of_its_own_and_the_rest_of_the_import_jump_nowhere(string import)
+    {
+        // 'std' holds modules and is none: there is no file to open. The keyword and what follows
+        // the clause are no names.
+        Assert.Null(TargetAt(import + "\n\nfn main(): int {\n    return 0;\n}\n", out _));
+    }
+
     [Fact]
     public void The_target_carries_the_declaration_AND_the_name()
     {
