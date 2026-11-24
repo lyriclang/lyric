@@ -122,10 +122,13 @@ jobs:
         shell: bash
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libgl-dev
 
+      # VSTEST_CONNECTION_TIMEOUT as in dev.yml: the solution starts a testhost per project, and on
+      # a slow Windows runner one of them missed vstest's 90 s to connect (main, 2026-11-24)
       - name: Test
         shell: bash
         env:
           LYRIC5_CROSS_TARGETS: '0'
+          VSTEST_CONNECTION_TIMEOUT: "300"
         run: |
           filter='${{ steps.affected.outputs.filter }}'
           if [ -n "$filter" ]; then set -- --filter "$filter"; else set --; fi
