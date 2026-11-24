@@ -2633,3 +2633,15 @@ bei `-O0` und 90,8 s bei `-O2`, auf einem Kern. Jede Änderung übersetzt sie ga
 **Türen nach 5.0**: C14 (der Compiler teilt große Funktionen) mit L6 (`large-function`, Lint und Fix) und C16
 (ein Hinweis auf Hitze), C15 (Polymorphisierung). **L7**, der Katalog weiterer `perf`-Lints: die erste Runde nach
 5.0.0. **C17**: der Weg über C bleibt.
+
+## Nachtrag 2026-11-24 — Komfort im Editor: Uhren
+
+Die Entscheidungen stehen in 11, Review 2026-11-24 „Komfort im Editor“ (IDE1–IDE7).
+
+| Slice | Inhalt | Uhr | Abschluss |
+|---|---|---|---|
+| **ED1** Doku im Hover | IDE7: Überschriften eines Doc-Blocks im Hover drei Ebenen tiefer, Code-Blöcke unberührt | sofort, mit dem PR der Importpfade | ein Test je Ebene und einer mit `#` in einem Code-Block |
+| **ED2** Fixes an Fehlern | IDE1: fehlende `match`-Arme, fehlende Member eines Interfaces | nach CE1, vor M18 | je ein Test über `lyric fix` und über die Code Action; der korrigierte Text kompiliert bis auf die `panic`-Rümpfe |
+| **ED3** Quellaktionen | IDE2: Imports aufräumen, alles Ungenutzte der Datei entfernen | nach ED2, vor M18 | ein Test je Aktion; ein zweiter Lauf ändert nichts |
+
+**Nach 5.0**: IDE3 und IDE5 (Uhr: die erste Runde nach 5.0.0), IDE4 mit L6 und C14 (Tür), IDE6 mit IDE3.
