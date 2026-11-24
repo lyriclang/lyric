@@ -803,6 +803,19 @@ nothing: a binding that holds a <code>void</code> and a parameter written with i
 — is warned about (<code>LYR-SEM0200</code>): no call can infer it. A <strong>type's</strong> is not (T18): a type
 may carry a parameter only its name uses, a <strong>phantom</strong> — <code>struct Id&lt;T&gt; { raw: int }</code> makes
 <code>Id&lt;User&gt;</code> and <code>Id&lt;Order&gt;</code> two types.</li>
+<li>A type parameter may stand for a <strong>set of thrown types</strong> — what <code>throws E</code> binds where an
+argument throws several (<a href="../../spec/06-errors/#8-function-values-that-throw">06 §8</a> rule 6), what a task
+throws (<a href="../../spec/10-concurrency/">10 §2</a> rule 8), what a join of two differing types is
+(<a href="../../spec/12-stdlib/">12 §Iteration</a>). The set is an argument as a type is and makes the instance,
+<code>Task&lt;int&gt; throws [A, B]</code>, <code>Result&lt;int, [A, B]&gt;</code> — in no order: <code>[A, B]</code> and <code>[B, A]</code> make one.
+Where the parameter stands in a set, its members stand there, and a type named twice is named
+once: <code>throws [E, TimedOut]</code> at <code>E = [A, B]</code> throws <code>A</code>, <code>B</code> and <code>TimedOut</code>, at <code>E = TimedOut</code>
+only <code>TimedOut</code> (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/03-typsystem.md">03 TM9</a>).
+A set is thrown, not held: where the parameter is a value's type — a variable, a field, a
+payload, an element — the set stands as the root <code>Error</code>, and it satisfies a constraint as the
+root does. The <code>Err</code> of a <code>Result&lt;int, [A, B]&gt;</code> is an <code>Error</code>, and the instance is no <code>Debug</code>
+because <code>A</code> and <code>B</code> are. A set is written where a thrown type is
+(<a href="../../spec/02-grammar/#3-types">02 §3</a>, <code>TypeSet</code>), not as a type argument of its own.</li>
 </ol>
 <h3 id="92-inference-at-a-call">9.2 Inference at a call</h3>
 <ol>

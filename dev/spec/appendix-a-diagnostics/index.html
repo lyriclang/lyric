@@ -2317,8 +2317,8 @@ code is no longer reported, and its number is not given again.</p>
 <td>LYR-SEM0238</td>
 <td>E</td>
 <td><a href="../../spec/10-concurrency/">10-concurrency</a></td>
-<td>a task's type that names several thrown types</td>
-<td>A task's type is written <code>Task&lt;T&gt; throws [A, B]</code>; a task names one thrown type, or the bare <code>throws</code> for the root.</td>
+<td>a task's type that names several thrown types <em>(retired)</em></td>
+<td>A task's type was written <code>Task&lt;T&gt; throws [A, B]</code>, a set of several thrown types. Retired: sets as type arguments: a body that throws several makes a task that throws their set, and a task's type writes the set as a clause does, 'Task<int> throws [A, B]'</td>
 </tr>
 </tbody>
 </table>

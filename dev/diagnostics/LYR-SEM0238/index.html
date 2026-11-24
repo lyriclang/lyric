@@ -248,41 +248,15 @@
 <main class="text" data-pagefind-body="" data-pagefind-filter="area:Diagnostics" data-pagefind-meta="area:Diagnostics">
 <h1>LYR-SEM0238</h1>
 <p class="code-title">a task's type that names several thrown types</p>
-<p class="meta">error · <a href="../../spec/10-concurrency/">spec 10-concurrency</a></p>
-<p>A task's type is written <code>Task&lt;T&gt; throws [A, B]</code>; a task names one thrown type, or the bare <code>throws</code> for the root.</p>
-<h2 id="explanation">Explanation</h2>
-<p>What a task throws is what its body ends with, and the body's set reaches the task's type through the <code>E</code> of <code>spawn</code>: one type binds it, several bind the root <code>Error</code>. A task's type therefore holds one type, and a written set of several would promise more than any task can carry.</p>
-<p>Write the one type the body throws, or the bare <code>throws</code> where it throws several. A coroutine's type is different: its set is its function's clause, and <code>Coroutine&lt;int&gt; throws [A, B]</code> is written as it is declared.</p>
-<h2 id="wrong">Wrong</h2>
-<pre><code class="language-lyric"><span class="kw">import</span> std.task { <span class="ty">Task</span> };
-
-<span class="kw">struct</span> <span class="ty">A</span> :: [<span class="ty">Error</span>] { <span class="kw">fn</span> message(): <span class="ty">string</span> { <span class="kw">return</span> <span class="str">"a"</span>; } }
-<span class="kw">struct</span> <span class="ty">B</span> :: [<span class="ty">Error</span>] { <span class="kw">fn</span> message(): <span class="ty">string</span> { <span class="kw">return</span> <span class="str">"b"</span>; } }
-
-<span class="kw">fn</span> idle(t: ?(<span class="ty">Task</span>&lt;<span class="ty">int</span>&gt; <span class="kw">throws</span> [<span class="ty">A</span>, <span class="ty">B</span>])): <span class="ty">bool</span> {
-    <span class="kw">return</span> t == <span class="kw">null</span>;
-}
-
-<span class="kw">fn</span> main(): <span class="ty">void</span> {
-    <span class="kw">let</span> _ = idle(<span class="kw">null</span>);
-}</code></pre>
-<h2 id="right">Right</h2>
-<pre><code class="language-lyric"><span class="kw">import</span> std.task { <span class="ty">Task</span> };
-
-<span class="kw">fn</span> idle(t: ?(<span class="ty">Task</span>&lt;<span class="ty">int</span>&gt; <span class="kw">throws</span>)): <span class="ty">bool</span> {
-    <span class="kw">return</span> t == <span class="kw">null</span>;
-}
-
-<span class="kw">fn</span> main(): <span class="ty">void</span> {
-    <span class="kw">let</span> _ = idle(<span class="kw">null</span>);
-}</code></pre>
+<p class="meta">error, retired · <a href="../../spec/10-concurrency/">spec 10-concurrency</a></p>
+<div class="retired"><p><strong>Retired.</strong></p>
+<p>sets as type arguments: a body that throws several makes a task that throws their set, and a task's type writes the set as a clause does, 'Task<int> throws [A, B]'</p>
+</div>
+<p>A task's type was written <code>Task&lt;T&gt; throws [A, B]</code>, a set of several thrown types.</p>
 </main>
 <aside class="on-this-page" aria-label="On this page">
 <p class="aside-title">On this page</p>
 <ul>
-<li class="level-2"><a href="#explanation">Explanation</a></li>
-<li class="level-2"><a href="#wrong">Wrong</a></li>
-<li class="level-2"><a href="#right">Right</a></li>
 </ul>
 </aside>
 </div>

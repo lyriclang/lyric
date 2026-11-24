@@ -288,9 +288,10 @@ escape — the types its sites throw past every <code>try</code> inside it. The 
 covers nothing of it: the lambda runs later.</li>
 <li>A <strong>type parameter</strong> may stand as the set, <code>throws E</code> with <code>E :: [Error]</code>
 (<a href="#1-what-is-thrown">§1</a> rule 2, <code>LYR-SEM0030</code>), and is <strong>inferred</strong> at a call from the
-argument's set (05 E2 K4): a set of none binds <code>never</code>, one type binds it, several bind <code>Error</code>
-(the K7 join) — <code>fn map&lt;T, U, E :: [Error]&gt;(xs: T[], f: fn(T) -&gt; U throws E): U[] throws E</code>
-throws what <code>f</code> throws. Where several arguments could bind it, one binding stands, as for any
+argument's set (05 E2 K4): a set of none binds <code>never</code>, one type binds it, several bind the set
+of them, <code>[A, B]</code> (<a href="../../spec/03-types/#91-type-parameters-and-instances">03 §9.1</a> rule 9) —
+<code>fn map&lt;T, U, E :: [Error]&gt;(xs: T[], f: fn(T) -&gt; U throws E): U[] throws E</code> throws what <code>f</code>
+throws, each of its types. Where several arguments could bind it, one binding stands, as for any
 type parameter (<a href="../../spec/03-types/#92-inference-at-a-call">03 §9.2</a>), and an argument that throws
 beyond it is refused there. An <code>E</code> bound to <code>never</code> names nothing: a call
 whose set comes out empty throws nothing, needs no <code>try</code>, and a <code>try</code> over it is warned about

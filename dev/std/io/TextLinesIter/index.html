@@ -53,8 +53,8 @@
 <h1>struct TextLinesIter</h1>
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">struct</span> <span class="ty">TextLinesIter</span>&lt;<span class="ty">R</span> :: [<span class="ty">Reader</span>]&gt; :: [<span class="ty">Iterator</span>]</code></pre>
 <p class="conforms">Conforms to <code>Iterator</code>.</p>
-<p>A <code>TextReader</code>'s lines. An iterator's <code>Error</code> is one type, so the two a reader may throw are
-joined, which an instance reads as <code>Error</code>: a loop over them is told <code>Error</code>.</p>
+<p>A <code>TextReader</code>'s lines. The two types a reader may throw are joined, which an instance reads
+as the set of both: a loop over them is told <code>IoError</code> and <code>Cancelled</code>.</p>
 <h2 id="methods">Methods</h2>
 <section class="member" id="method.next">
 <pre class="signature"><code class="language-lyric"><span class="kw">pub</span> <span class="kw">mut</span> <span class="kw">fn</span> next(): ?<span class="ty">string</span> <span class="kw">throws</span> <span class="ty">Join</span>&lt;<span class="ty">IoError</span>, <span class="ty">Cancelled</span>&gt;</code></pre>

@@ -637,6 +637,14 @@ native build had removed what it reaches; the tests run on .NET and never saw it
 formatter puts a chain too long for the line one to a line, with the <code>{</code> on its own.
 <code>lyric fix --from-4</code> joins Lyric 4's lists (rule S13).</p>
 </li>
+<li><p><strong>Several thrown types bind a type parameter to their set</strong> (design 03 TM10, spec 03 §9.1
+rule 9, 06 §8 rule 6): a generic call whose argument throws <code>[A, B]</code> throws <code>A</code> and <code>B</code>, not
+<code>Error</code>, so a clause for each covers it. <code>spawn</code> over such a body gives a
+<code>Task&lt;int&gt; throws [A, B]</code>, and that type can be written — <code>LYR-SEM0238</code> is retired; a coroutine
+of <code>throws [A, B]</code> is an <code>Iterator</code> whose <code>Error</code> is the set, and so are <code>map</code>, <code>filter</code> and the
+other adapters over two sources that throw differently. Where such a parameter is a value's
+type — the <code>Err</code> of a <code>Result&lt;int, [A, B]&gt;</code> — the value is an <code>Error</code>.</p>
+</li>
 <li><p><strong>A codable enum's variant with named fields writes them by name</strong>: <code>Rect { w: int, h: int }</code> is
 <code>{&quot;Rect&quot;:{&quot;w&quot;:2,&quot;h&quot;:5}}</code> in JSON, and <code>Ring { r: int }</code> is <code>{&quot;Ring&quot;:{&quot;r&quot;:1}}</code>. It was a sequence,
 or the bare value for one field, as a positional payload still is (<code>{&quot;Circle&quot;:3}</code>,

@@ -97,8 +97,9 @@ rules (<a href="../../spec/02-grammar/#3-types">02 §3</a>, <code>LYR-SEM0030</c
 the root; a coroutine fits where one is expected whose set covers its own —
 one that throws nothing among them —, never the other way (<code>LYR-SEM0001</code>), as a function value
 does (<a href="../../spec/06-errors/#8-function-values-that-throw">06 §8</a> rule 3). As an <code>Iterator</code> its
-<code>Error</code> is one type: the one it throws, <code>never</code> where none, the root <code>Error</code> where several,
-as an inferred <code>E</code> joins them (<a href="../../spec/06-errors/#8-function-values-that-throw">06 §8</a> rule 6).</li>
+<code>Error</code> is the one type it throws, <code>never</code> where none, the set where several, as an inferred
+<code>E</code> binds them (<a href="../../spec/06-errors/#8-function-values-that-throw">06 §8</a> rule 6): an adapter over it
+and a generic walk of it throw each type of the set.</li>
 <li>A coroutine runs on a stack of its own, on the thread that first pulled it
 (<a href="../../spec/13-abi/#16-coroutines">13 §1.6</a>). Pulling a coroutine that runs — from its own body, or
 from a coroutine it pulled — or one that runs on another thread panics with <code>LYR-RT0014</code>. A
@@ -184,12 +185,13 @@ any error that leaves it is (<a href="../../spec/06-errors/#5-the-error-path">06
 <li><strong><code>spawn(body)</code></strong> makes <code>body</code> a task of the running thread, ready behind the tasks ready
 before it, and gives its <strong>handle</strong>, a <code>Task&lt;T&gt; throws E</code> (06 T1): <code>T</code> is what the body
 returns — <code>void</code> too (<a href="../../spec/03-types/">03 §9.1</a> rule 7) — and <code>E</code> what it throws. The handle's
-type carries the error as a coroutine's carries what its pulls throw (05 E10); <code>Task&lt;T&gt;</code>
-throws nothing, and fits where a <code>Task&lt;T&gt; throws E</code> is expected, but not the reverse
-(<code>LYR-SEM0001</code>). A task's <code>E</code> is one type, inferred as every <code>E</code> is
-(<a href="../../spec/06-errors/#8-function-values-that-throw">06 §8</a> rule 6): a body that throws several makes
-a <code>Task&lt;T&gt; throws Error</code>, and a written task type of several, <code>Task&lt;T&gt; throws [A, B]</code>, is
-refused (<code>LYR-SEM0238</code>). <code>throws</code> after any other type than a coroutine or a task is refused
+type carries the error as a coroutine's carries what its pulls throw (05 E10). A task's <code>E</code>
+is inferred as every <code>E</code> is (<a href="../../spec/06-errors/#8-function-values-that-throw">06 §8</a> rule 6): a
+body that throws several makes a <code>Task&lt;T&gt; throws [A, B]</code>, which <code>await()</code> throws type by type,
+and a written task type writes the set as a clause does (<code>LYR-SEM0030</code>, <code>LYR-SEM0137</code>).
+<code>Task&lt;T&gt;</code> throws nothing; a task fits where one is expected whose set covers its own —
+<code>Task&lt;T&gt;</code> where a <code>Task&lt;T&gt; throws E</code> is, <code>throws A</code> where <code>throws [A, B]</code> is —, never the
+reverse (<code>LYR-SEM0001</code>). <code>throws</code> after any other type than a coroutine or a task is refused
 (<code>LYR-SEM0084</code>). After a <strong>return type</strong> that is a task or a coroutine — with a <code>?</code> before
 it or without — a <code>throws</code> could be the type's or the function's, and without parentheses
 it is refused (<code>LYR-SEM0165</code>): a function that returns a throwing task writes

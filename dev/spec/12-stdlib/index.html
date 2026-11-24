@@ -317,8 +317,9 @@ itself and passes <code>close()</code> on (the
 review's M8a-4), so a loop that leaves <code>gen().map(f)</code> early closes the generator; <code>zip</code> and
 <code>chain</code> close both of theirs, the first error winning.
 Their <code>Error</code> is the <strong>join</strong> of their sources' (design 05 E2 K7), <code>Join&lt;A, B&gt;</code> of <code>std.core</code>:
-one type where both are one, the other where one is <code>never</code>, the root <code>Error</code> where they
-differ — reduced once both are known; open, it covers each of its parts.</li>
+one type where both are one, the other where one is <code>never</code>, the set of both where they
+differ, <code>[A, B]</code> (<a href="../../spec/03-types/#91-type-parameters-and-instances">03 §9.1</a> rule 9) — reduced
+once both are known; open, it covers each of its parts.</li>
 <li>A <strong>function an adapter or a terminator takes may throw</strong> (design 05 K4; 13 M8c P2): <code>map</code>,
 <code>filter</code>, <code>takeWhile</code>, <code>skipWhile</code> and <code>inspect</code> take a <code>fn(…) -&gt; … throws E</code> and give an
 iterator whose <code>Error</code> is <code>Join&lt;I.Error, E&gt;</code>; <code>fold</code>, <code>reduce</code>, <code>any</code>, <code>all</code>, <code>none</code>, <code>find</code>,
@@ -493,8 +494,9 @@ follows it reads like the standard one.</p>
 (<a href="../../spec/09-patterns/">09</a>). <code>throws</code> stays the mechanism: two bridges lead to it and back, and no
 operator is a result's own (05 E1). <strong><code>Result.of(f)</code></strong> calls <code>f</code>, a <code>fn() -&gt; T throws E</code>, and
 is <code>Ok</code> with what it returns or <code>Err</code> with what it throws — <code>Result.of { try half(n) }</code>, <code>E</code>
-inferred from what the lambda throws (05 K4), the root <code>Error</code> where that is two types.
-<strong><code>r.get()</code></strong> is an <code>Ok</code>'s value and throws an <code>Err</code>'s error: <code>try r.get()</code>. <code>E</code> is an <code>Error</code>,
+inferred from what the lambda throws (05 K4), the set where that is two types — the <code>Err</code>
+then holds an <code>Error</code> (<a href="../../spec/03-types/#91-type-parameters-and-instances">03 §9.1</a> rule 9).
+<strong><code>r.get()</code></strong> is an <code>Ok</code>'s value and throws an <code>Err</code>'s error, each type of a set: <code>try r.get()</code>. <code>E</code> is an <code>Error</code>,
 since <code>get()</code> throws it. The library returns no <code>Result</code> (10 B3); the caller makes one. It is
 <code>@MustUse</code> (<a href="../../spec/11-metaprogramming/">11 §1</a> rule 11): a statement that drops one warns.</li>
 <li><strong><code>From&lt;T&gt; { static fn from(v: T): Self; }</code></strong> is a conversion into a type, which the type
@@ -635,8 +637,8 @@ view (03 §5.3), so they are classes over a buffer on the heap.</li>
 <code>readLine(): ?string</code> is the next line without its end — a <code>\n</code> or a <code>\r\n</code>; a <code>\r</code> alone is
 text — or <code>null</code> at the end. A last line without an end is a line; the end of the last line
 starts none. <code>lines()</code> iterates the same; <code>chars()</code> iterates the codepoints; <code>readToEnd(): string</code> is the rest. All throw <code>[IoError, Cancelled]</code>, and the two iterators' <code>Error</code> is
-<code>Join&lt;IoError, Cancelled&gt;</code>, the root <code>Error</code> once reduced (§Iteration): a loop over them is
-told <code>Error</code>. A codepoint split between two reads of <code>r</code>
+<code>Join&lt;IoError, Cancelled&gt;</code>, <code>[IoError, Cancelled]</code> once reduced (§Iteration): a loop over
+them is told each. A codepoint split between two reads of <code>r</code>
 waits for its rest. Bytes that are no UTF-8 throw <code>InvalidData</code>, a <code>Utf8Error</code> as the cause
 whose offset counts from the reader's start; a line that throws is consumed. A byte order mark
 is text, <code>U+FEFF</code>, unless <code>skipBom: true</code> drops it from the front.</li>

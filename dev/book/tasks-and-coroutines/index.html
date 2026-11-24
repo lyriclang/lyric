@@ -135,6 +135,11 @@ can throw a <code>ParseError</code>, so <code>await()</code> can too:</p>
     }
 }</code></pre>
 <pre class="output"><code>the task failed: the text is not a value of the type</code></pre>
+<p>A body that can throw several types makes a handle that throws all of them: its type is
+<code>Task&lt;Row&gt; throws [IoError, ParseError]</code>, written that way where it is named, and a <code>catch</code> for
+each covers <code>await()</code>. The same holds wherever a generic function takes what its argument throws,
+<code>throws E</code>: several types bind <code>E</code> to their set, so the call throws each of them, not just
+<code>Error</code>.</p>
 <h2 id="sleeping-and-timeouts">Sleeping and timeouts</h2>
 <p><code>sleep</code> waits for a <code>Duration</code>, and lets the other tasks run meanwhile. <code>withTimeout</code> runs a body
 and gives up on it after a time, with a <code>TimedOut</code> error:</p>
