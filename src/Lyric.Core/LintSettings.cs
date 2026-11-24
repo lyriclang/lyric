@@ -20,14 +20,24 @@ public sealed class LintSettings(IReadOnlyList<LintSettings.Rule> commandLine, I
     public IReadOnlyList<Rule> Manifest { get; } = manifest;
 
     /// <summary>The level of <paramref name="lint"/> here, and who set it — <c>null</c> for its own.</summary>
-    public (LintLevel Level, string? Origin) LevelOf(CatalogEntry lint)
+    public (LintLevel Level, string? Origin) LevelOf(CatalogEntry lint) =>
+        LevelOf(lint, warns: LevelOf(lint, warns: false).Level == LintLevel.Warn);
+
+    /// <summary>
+    /// The level of <paramref name="lint"/> where <c>warnings</c> names it or not: it names the lints
+    /// that warn without it (spec 16 §5 rule 1), so <c>-D warnings</c> makes each warning an error
+    /// and leaves what is allowed silent. <paramref name="warns"/> says whether this lint is one —
+    /// decided by the caller, who knows the attributes around a finding as well.
+    /// </summary>
+    public (LintLevel Level, string? Origin) LevelOf(CatalogEntry lint, bool warns)
     {
         foreach (var source in (IReadOnlyList<Rule>[])[CommandLine, Manifest])
         {
             Rule? best = null;
             var specificity = -1;
             foreach (var rule in source)
-                if (DiagnosticCatalog.Select(rule.Selector) is { } named && named.Lints.Contains(lint) && named.Specificity >= specificity)
+                if (DiagnosticCatalog.Select(rule.Selector) is { } named && named.Lints.Contains(lint) && named.Specificity >= specificity
+                    && (warns || named.Specificity > 0))
                 {
                     best = rule;
                     specificity = named.Specificity;

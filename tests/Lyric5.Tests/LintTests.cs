@@ -50,6 +50,43 @@ public class LintTests
         Assert.Contains($"note: 'unused-variable' is denied by '-D {selector}' on the command line", error);
     }
 
+    private const string Undocumented = """
+        pub struct Holder {
+            pub n: int,
+        }
+
+        fn main(): void {
+            let unused = Holder { n = 1 };
+        }
+        """;
+
+    /// <summary>'warnings' names what warns: '-D warnings' makes the warning an error and leaves
+    /// 'missing-docs', a lint at 'allow', silent. It named every lint, and a package that checked
+    /// clean failed with thousands of errors under '--deny-warnings'.</summary>
+    [Theory]
+    [InlineData("-D", "warnings")]
+    [InlineData("--deny-warnings", null)]
+    public void Warnings_as_errors_leave_what_is_allowed_silent(string option, string? selector)
+    {
+        var root = App(program: Undocumented);
+        Assert.DoesNotContain("LYR-SEM0223", Build(root).Err);
+        var (exit, error) = selector is null ? Build(root, option) : Build(root, option, selector);
+        Assert.Equal(1, exit);
+        Assert.Contains("error[LYR-SEM0071]: 'unused' is never used", error);
+        Assert.DoesNotContain("LYR-SEM0223", error);
+    }
+
+    /// <summary>A lint the manifest raises to 'warn' warns, and so '--deny-warnings' denies it.</summary>
+    [Fact]
+    public void A_lint_raised_to_warn_is_denied_with_the_warnings()
+    {
+        var root = App("warn = [\"missing-docs\"]", Undocumented);
+        Assert.Contains("warning[LYR-SEM0223]", Build(root).Err);
+        var (exit, error) = Build(root, "--deny-warnings");
+        Assert.Equal(1, exit);
+        Assert.Contains("error[LYR-SEM0223]", error);
+    }
+
     [Fact]
     public void The_manifest_sets_a_level_and_the_command_line_overrides_it()
     {

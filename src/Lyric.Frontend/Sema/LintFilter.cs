@@ -74,13 +74,15 @@ public static class LintFilter
         static bool Around(Span extent, Span at) =>
             extent.File == at.File && at.Start >= extent.Start && at.End <= extent.End;
 
-        // the narrowest site around the finding that names its lint; of two alike, the more specific, then the later
-        Site? Deciding(Diagnostic d, CatalogEntry lint, Site? not = null)
+        // the narrowest site around the finding that names its lint; of two alike, the more specific, then the later.
+        // 'warnings' names the lint only where it warns without it (16 §5 rule 1)
+        Site? Deciding(Diagnostic d, CatalogEntry lint, Site? not, bool warns)
         {
             Site? best = null;
             foreach (var site in sites)
             {
                 if (ReferenceEquals(site, not) || !Around(site.Extent, d.Span) || !site.Lints.Contains(lint)) continue;
+                if (site.Specificity == 0 && !warns) continue;
                 if (best is null || site.Extent.Length < best.Extent.Length
                     || (site.Extent.Length == best.Extent.Length && site.Specificity >= best.Specificity))
                     best = site;
@@ -102,7 +104,11 @@ public static class LintFilter
             if (isForeign && !warnDeps) return null;
             LintLevel level;
             DiagnosticNote why;
-            if (Deciding(d, lint, about) is { } site)
+            var settings = packages?.GetValueOrDefault(package) ?? LintSettings.Default;
+            // whether the lint warns here without 'warnings': only then does 'warnings' name it
+            var warns = (Deciding(d, lint, about, warns: false) is { } plain ? plain.Level : settings.LevelOf(lint, warns: false).Level)
+                        == LintLevel.Warn;
+            if (Deciding(d, lint, about, warns) is { } site)
             {
                 level = site.Level;
                 used.Add(site);
@@ -110,7 +116,7 @@ public static class LintFilter
             }
             else
             {
-                var (set, origin) = (packages?.GetValueOrDefault(package) ?? LintSettings.Default).LevelOf(lint);
+                var (set, origin) = settings.LevelOf(lint, warns);
                 level = set;
                 why = new DiagnosticNote(origin is null ? $"'{lint.Lint}' is denied by its own level" : $"'{lint.Lint}' is denied by {origin}");
             }
