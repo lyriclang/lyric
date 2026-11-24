@@ -114,8 +114,10 @@ allow = ["shadowed-local"]</code></pre>
 <p>The narrowest attribute around a finding decides. Without one, the command line decides over the
 manifest, and the manifest over the lint's own level; within one place a lint decides over its group,
 and its group over <code>warnings</code>.</p>
-<p><code>--deny-warnings</code>, and a profile's <code>denyWarnings = true</code>, turn every warning into an error — the
-setting for a continuous build that must stay clean. A denied finding says who denied it.</p>
+<p><code>warnings</code> stands for what warns: <code>-D warnings</code> makes each warning an error, and a lint that is
+allowed, such as <code>missing-docs</code>, stays silent. <code>--deny-warnings</code>, and a profile's
+<code>denyWarnings = true</code>, are <code>-D warnings</code>: the setting for a continuous build that must stay clean,
+and a build that checks without a warning passes it. A denied finding says who denied it.</p>
 <p>The warnings of your dependencies, and of the standard library, are not said: they are theirs to
 fix. <code>--warn-deps</code> says them, at their own levels, and never as errors.</p>
 <h2 id="letting-the-compiler-fix-it">Letting the compiler fix it</h2>

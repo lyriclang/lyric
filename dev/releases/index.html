@@ -700,6 +700,13 @@ with a parse error that the parser reads as its safe fix writes it (<code>LYR-PA
 kept back. A <code>struct V :: [Equatable, Debug]</code> had no <code>debug</code>, and every type that printed a <code>V</code>
 said so.</p>
 </li>
+<li><p><strong><code>--deny-warnings</code> denies the warnings, not every lint.</strong> <code>warnings</code> names the lints that warn
+where it is read, so <code>-D warnings</code>, <code>--deny-warnings</code> and a profile's <code>denyWarnings</code> turn each
+warning into an error. A lint at <code>allow</code>, such as <code>missing-docs</code> or <code>int-literal-adapts</code>, stays
+silent. It named every lint: a package that checked without a warning failed with tens of
+thousands of errors under the switch. A lint raised to <code>warn</code> by <code>[lints]</code> or an attribute is
+denied with the others.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>

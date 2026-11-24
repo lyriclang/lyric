@@ -171,7 +171,9 @@ it was (<code>while</code>) and its <code>trace</code>.</li>
 <li><strong>Every warning is a lint</strong>: a name — lowercase words joined by <code>-</code>, as <code>unused-variable</code> —, a group, and a
 level of its own; <a href="../../spec/appendix-a-diagnostics/">Appendix A</a> lists them, <code>lyric explain NAME</code> prints one. The
 groups are <code>unused</code>, <code>correctness</code>, <code>resources</code>, <code>concurrency</code>, <code>deprecation</code>, <code>style</code>, <code>perf</code> and <code>docs</code>;
-<code>warnings</code> names every lint. A warning that is no lint does not exist.</li>
+<code>warnings</code> names every lint that warns where it is read: one whose level, decided by rule 5 without any
+<code>warnings</code>, is <code>warn</code>. A lint at <code>allow</code> is not named by it, and one at <code>deny</code> is denied already. A
+warning that is no lint does not exist.</li>
 <li>A lint's <strong>level</strong> is <code>allow</code> — it is not said —, <code>warn</code> — it is said as a warning —, or <code>deny</code> — it is said as
 an error, with a note that names who denied it, and the build fails (exit 1, <a href="../../spec/14-cli/">14 §1.1</a>).</li>
 <li>A <strong>selector</strong> names a lint, by its name or its code, a group, or <code>warnings</code>. One that names nothing is
@@ -192,7 +194,7 @@ errors always are.</li>
 decides each — warns: <code>useless-allow</code> (<code>LYR-SEM0180</code>). The <code>@Allow</code> itself never decides that warning.</li>
 <li><strong>Warnings as errors</strong> is a switch: a profile's <code>denyWarnings</code> (<a href="../../spec/15-project/">15 §4</a> rule 4) and
 <code>--deny-warnings</code> are <code>-D warnings</code> for the package built, in front of the command line's own levels —
-each warning is an error, and its note names the profile. A build script's warnings are the lint
+each warning is an error, and its note names the profile; a lint at <code>allow</code> stays silent (rule 1). A build script's warnings are the lint
 <code>build-script-warning</code>, a macro's the lint <code>macro-warning</code> (<a href="../../spec/11-metaprogramming/">11 §5</a>), and
 both are denied the same way.</li>
 <li><strong>Every lint is held by two cases</strong> of the suite: a red one, whose program the lint reads (<code>warning:</code>
