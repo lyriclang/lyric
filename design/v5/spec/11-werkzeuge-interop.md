@@ -58,7 +58,7 @@ entschieden").
 | E2/E28 (Fixes) | `@Deprecated.replacement` speist `lyric fix`; Bereich 12 für Migrationsregeln | 09 A11 |
 | Q7 (`lyric expand`), B3 (`lyric api`) | beschlossen als Verben | 08 Q7, 07 B3 |
 | Signale im eingebetteten Runtime | keine Handler (`installSignalHandlers = false`) | 10 Q9 |
-| Bare-Metal | Laufzeitprofil-Tür, nicht 5.0 | 10 Q9 |
+| Bare-Metal | Laufzeitprofil-Tür, nicht 5.0; skizziert im Abschnitt „Bare-Metal (Tür)“ am Ende | 10 Q9 |
 
 ## Fragen
 
@@ -422,3 +422,38 @@ die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, N
 ---
 
 **Bereich 11 ist damit vollständig entschieden** (W1–W9, 2026-09-29). Es bleibt 12 (Migration).
+
+## Bare-Metal (Tür) — skizziert 2026-11-18
+
+Mikrocontroller und Code ohne Betriebssystem (lyric#733). **Uhr: nach 5.0**, ausgelöst durch ein echtes
+Board-Projekt des Maintainers. Entschieden mit dem Maintainer:
+
+- **Keine eigene Sprache und keine Basissprache des Compilers.** Ein Profil derselben Sprache wie in
+  Rust (`core`/`alloc`/`std`, `no_std`), Zig (`freestanding`), Embedded Swift und TinyGo. Lyric-Script
+  ist eine eigene Sprache, weil es ein anderes Ausführungsmodell hat (VM, Sandbox, Budget); Bare-Metal
+  hätte dasselbe Modell mit weniger Laufzeit. Ein Compiler allokiert ständig und gehört nicht in eine
+  Untermenge ohne Heap; den Bootstrap trägt das erzeugte C (lyric#724).
+- **Die std wird in Schichten geteilt, nicht die Sprache:** `core` braucht nichts (Zahlen, Structs,
+  Enums, Inline-Arrays, `Ptr`, Pattern Matching, Interfaces), `alloc` braucht einen Heap (`string`,
+  `List`, `Map`, Klassen, Closures), `std` braucht ein Betriebssystem (Dateien, Netz, Prozesse,
+  Threads, Zeit). Ein Profil lehnt beim Übersetzen ab, was seine Schicht nicht hat, mit einer
+  Diagnose, die die Schicht nennt.
+
+Skizze, zu entscheiden, wenn die Uhr läuft:
+
+| Punkt | Skizze |
+|---|---|
+| Profile | `bare` ohne Heap: nur Werte, statische Daten, Inline-Arrays, String-Literale als statische Daten, nicht fangende Funktionen. `bare+heap`: ein kleiner Heap über einem festen Bereich, als GC (MicroPython, TinyGo) oder als Pool. Boehm braucht Betriebssystemspeicher und scannt Stacks, er bleibt dem Profil mit Betriebssystem. |
+| Fehler | `throw` macht heute einen Interface-Wert und damit eine Allokation. In `bare` braucht ein Fehler eine Form ohne Heap; offen. |
+| Zeiger, Register | `Ptr<T>`, `unsafe`, `@Layout(C)` gibt es seit M14. Dazu kämen `readVolatile`/`writeVolatile` (der Emitter schreibt `volatile`), Bitfelder (heute Tür in X2) und ein Generator aus den SVD-Dateien der Hersteller wie `svd2rust`, neben `lyric bindgen`. |
+| Interrupts | `@Interrupt("TIM2")` an einer Funktion trägt sie in die Vektortabelle ein. Der Checker verlangt, was eine ISR darf: keine Allokation, kein Warten, kein Wurf; geteilter Zustand über `AtomicValue` oder einen kritischen Abschnitt. Der Interrupt ist ein **Waker** von `std.task` (wie Rusts Embassy): ein Task wartet auf „Timer abgelaufen“, die ISR weckt ihn. Ein stackful Task braucht einen eigenen Stack, also feste Stackgrößen und eine Höchstzahl an Tasks; zu messen. |
+| Laufzeit | `liblyr` ohne libc-Teile für Dateien und Threads. Die Prelude-Kette (`core`, `collections`, `hash`, `math`, `iter`, `string`) importiert kein Betriebssystem-Modul (geprüft 2026-11-18); was sie vom System braucht (`lyr_hash_key`, Panik-Ausgabe, Zahlformate), geht durch C-Funktionen der Laufzeit, die eine freistehende Laufzeit selbst stellt. Panik: ein Haken des Programms (LED, Reset) statt Backtrace. |
+| Werkzeuge | `zig cc` übersetzt schon für `thumbv7em-none-eabi` und `riscv32` freistehend. Dazu kommen ein Linker-Skript und eine Speicherkarte je Board im Manifest. Geflasht wird mit einem fremden Werkzeug (`probe-rs`). |
+| `int` | Bleibt 64 Bit (Portabilität). Auf 32-Bit-Kernen schreibt man `int32`/`uint8`; ein Lint im Profil `bare` ist denkbar. |
+
+**Vor 5.0 nichts zu tun:** Ein späteres `bare` braucht eine eigene Prelude je Profil und lehnt Module
+ab, statt sie umzubenennen. Das ist additiv; kein Modulpfad von 5.0 muss dafür brechen.
+
+Reihenfolge, wenn die Uhr läuft: Profil `bare` bis zu einem Blinky auf einem echten Board (RP2040
+oder STM32) mit `Ptr`, `volatile`, statischem Speicher und Linker-Skript; dann Interrupts als Waker,
+Bitfelder und der SVD-Generator; zuletzt `bare+heap` mit Messung.
