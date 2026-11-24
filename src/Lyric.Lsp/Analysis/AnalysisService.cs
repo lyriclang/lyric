@@ -156,8 +156,11 @@ public sealed class AnalysisService : IDisposable
         new(DocumentUri.PathComparer);
 
     /// <summary>Shows that an analysis runs, where the client draws progress: called with what is
-    /// analysed, and the handle it returns is disposed when the analysis ends.</summary>
-    private readonly Func<string, IDisposable?>? _progress;
+    /// analysed, reported to with its phases, and disposed when the analysis ends.</summary>
+    private readonly Func<string, IAnalysisProgress?>? _progress;
+
+    /// <summary>How long a later analysis runs before it is shown; see <see cref="AnalysisPhases"/>.</summary>
+    private readonly TimeSpan _progressDelay;
 
     private bool _disposed;
 
@@ -168,10 +171,12 @@ public sealed class AnalysisService : IDisposable
         TimeSpan debounce,
         string? stdlibRoot = null,
         string? toolVersion = null,
-        Func<string, IDisposable?>? progress = null)
+        Func<string, IAnalysisProgress?>? progress = null,
+        TimeSpan? progressDelay = null)
     {
         _toolVersion = toolVersion;
         _progress = progress;
+        _progressDelay = progressDelay ?? TimeSpan.FromMilliseconds(750);
         _documents = documents;
         _publish = publish;
         _log = log;
@@ -303,6 +308,13 @@ public sealed class AnalysisService : IDisposable
         {
             Release(path, source);
         }
+    }
+
+    /// <summary>One analysis's time, phase by phase, as a line of the log.</summary>
+    internal static string Timings(string unit, int modules, IReadOnlyList<(string Phase, TimeSpan Time)>? phases, TimeSpan total)
+    {
+        var parts = phases is null ? "" : " (" + string.Join(", ", phases.Select(p => $"{p.Phase} {p.Time.TotalMilliseconds:F0} ms")) + ")";
+        return $"analysed {unit}: {modules} {(modules == 1 ? "module" : "modules")} in {total.TotalMilliseconds:F0} ms{parts}";
     }
 
     private void Release(string key, CancellationTokenSource source)
@@ -484,18 +496,22 @@ public sealed class AnalysisService : IDisposable
     {
         // The first analysis of an open file is the wait an editor shows (E20): before it, nothing
         // answers. Reported from its start, the package's manifest and graph included, which take
-        // seconds the first time. A later one takes milliseconds and is not worth a flicker.
-        using var progress = LastGood(document.Path) is null ? _progress?.Invoke(Path.GetFileName(document.Path)) : null;
+        // seconds the first time. A later one is reported once it has run for a while: in a small
+        // package it is over before that, in a large one it takes seconds at every keystroke.
+        var what = Path.GetFileName(document.Path);
+        using var progress = LastGood(document.Path) is null
+            ? AnalysisPhases.Now(_progress, what)
+            : AnalysisPhases.After(_progress, what, _progressDelay);
 
         var unit = await UnitForAsync(document.Path).ConfigureAwait(false);
 
         if (unit is not null && unit.ModuleOf(document.Path) is not null)
         {
-            await AnalyzeProjectAsync(unit, document, cancellationToken).ConfigureAwait(false);
+            await AnalyzeProjectAsync(unit, document, cancellationToken, progress).ConfigureAwait(false);
             return;
         }
 
-        await AnalyzeSingleAsync(document, cancellationToken).ConfigureAwait(false);
+        await AnalyzeSingleAsync(document, cancellationToken, progress).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -503,7 +519,7 @@ public sealed class AnalysisService : IDisposable
     /// saved or not, plus every open buffer there that was never saved at all.
     /// </summary>
     private async Task AnalyzeProjectAsync(
-        PackageUnit unit, OpenDocument? trigger, CancellationToken cancellationToken)
+        PackageUnit unit, OpenDocument? trigger, CancellationToken cancellationToken, ICompilerProgress? phases = null)
     {
         var unitKey = Path.GetFullPath(unit.Root);
 
@@ -536,14 +552,20 @@ public sealed class AnalysisService : IDisposable
             }
         }
 
-        var options = Options(unit.Options, token);
+        var options = Options(unit.Options, token) with { Progress = phases };
 
         // Off the caller's thread: the compile is synchronous and CPU-bound, and the caller is
         // either the read loop or a test.
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
         var result = await Task.Run(() => SourceCompiler.CheckProject(scripts, options), token)
             .ConfigureAwait(false);
 
         token.ThrowIfCancellationRequested();
+
+        // What 'lyric check -v' says of a build, said of each analysis in the client's log: where
+        // an editor that waits spends its time.
+        await SafeLogAsync(Timings(Path.GetFileName(unit.Root), roots.Count, result.Times,
+            System.Diagnostics.Stopwatch.GetElapsedTime(started)), MessageType.Log).ConfigureAwait(false);
 
         // Recorded even when the result is discarded below: what this unit reads does not depend
         // on whether its diagnostics are still wanted.
@@ -623,9 +645,11 @@ public sealed class AnalysisService : IDisposable
 
     /// <summary>A document outside every project: compiled from itself, exactly as before the
     /// server knew what a project was.</summary>
-    private async Task AnalyzeSingleAsync(OpenDocument document, CancellationToken cancellationToken)
+    private async Task AnalyzeSingleAsync(OpenDocument document, CancellationToken cancellationToken,
+        ICompilerProgress? phases = null)
     {
         var (options, module) = await OptionsForAsync(document, cancellationToken).ConfigureAwait(false);
+        options = options with { Progress = phases };
 
         var result = await Task.Run(
             () => SourceCompiler.Check(

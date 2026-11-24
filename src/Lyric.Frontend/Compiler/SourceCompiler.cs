@@ -508,7 +508,9 @@ public static class SourceCompiler
         };
 
         var times = new PhaseClock();
+        var report = options.Progress;
         Module? entry = null;
+        report?.BeginPhase(Phase.Parse, $"{roots.Count} modules");
         foreach (var root in roots)
         {
             if (root.Open(sources, diagnostics) is not { } id) continue;
@@ -528,14 +530,19 @@ public static class SourceCompiler
 
         // No root could even be opened. The diagnostics say why, and there is no module to hang a
         // model on.
+        report?.EndPhase();
         if (entry is null) return new CompileResult(sources, diagnostics, null);
         times.Mark(PhaseClock.Parse);
 
         CompilerPosition.Begin(sources);
+        report?.BeginPhase(Phase.Resolve);
         var binding = compilation.Resolve();
+        report?.EndPhase();
         times.Mark(PhaseClock.Resolve);
         options.Cancellation.ThrowIfCancellationRequested();
+        report?.BeginPhase(Phase.Check, $"{compilation.Modules.Count} modules");
         var types = Semantics.Analyze(compilation, binding, diagnostics, singleProgram: false);
+        report?.EndPhase();
         times.Mark(PhaseClock.Check);
         options.Cancellation.ThrowIfCancellationRequested();
 
@@ -548,7 +555,9 @@ public static class SourceCompiler
         // attribute's value is read from here ('lyric test' its '@Test').
         var embed = EmbedReaderFor(sources, options);
         types.SourcePlace = SourcePlaceFor(sources, options);
+        if (types.ComptimeSites.Count > 0) report?.BeginPhase(Phase.Check, SitesDetail);
         var evaluated = EvaluateSites(compilation, binding, types, diagnostics, options, embed, out var comptime);
+        if (types.ComptimeSites.Count > 0) report?.EndPhase();
         times.Mark(PhaseClock.Evaluate);
         if (!evaluated) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
         WarnDeprecated(compilation, binding, types, diagnostics, options, comptime);

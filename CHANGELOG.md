@@ -522,6 +522,13 @@ promise. This entry fills with the milestones.
   gives, and starts no server: what an editor checks before it starts one. **A run of the C
   compiler, the archiver or the linker may take ten minutes** before it is stopped (`LYR-BLD0001`),
   not five: the standard library's tests took longer on a macOS runner in debug.
+- **The language server says what an analysis does and how long it took.** The progress bar names
+  the phase: parse, resolve, check, and the `comptime` sites with their count. An analysis after a
+  file's first shows a bar too, once it has run for 0.75 s. The client's log gets a line for each
+  analysis, `analysed app: N modules in … ms`, followed by each phase's time.
+  **The check of every program is faster**: whether a block gives an interface is asked first of
+  the block's interfaces, before its target is matched. In the check of `lyric-script` the phase
+  went from 1.5 s to 1.1 s.
 
 ---
 

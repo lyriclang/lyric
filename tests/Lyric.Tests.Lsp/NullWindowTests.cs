@@ -85,6 +85,7 @@ public sealed class NullWindowTests
         // The token is asked for first, and used only once the client has made it.
         string? token = null;
         var kinds = new List<string>();
+        var said = new List<string>();
         while (kinds.LastOrDefault() != "end")
         {
             var message = await harness.ReceiveAsync();
@@ -98,19 +99,28 @@ public sealed class NullWindowTests
             {
                 Assert.NotNull(token);
                 Assert.Equal(token, message.GetProperty("params").GetProperty("token").GetString());
-                kinds.Add(message.GetProperty("params").GetProperty("value").GetProperty("kind").GetString()!);
+                var value = message.GetProperty("params").GetProperty("value");
+                kinds.Add(value.GetProperty("kind").GetString()!);
+                if (value.TryGetProperty("message", out var text)) said.Add(text.GetString()!);
             }
         }
 
-        Assert.Equal(["begin", "end"], kinds);
+        // Begun, told each phase, ended: the phases in between, in the order the front end runs them.
+        Assert.Equal("begin", kinds[0]);
+        Assert.Equal("end", kinds[^1]);
+        Assert.All(kinds[1..^1], kind => Assert.Equal("report", kind));
+        Assert.Contains(said, text => text.StartsWith("parsing", StringComparison.Ordinal));
+        Assert.Contains(said, text => text.StartsWith("checking", StringComparison.Ordinal));
+        Assert.True(said.FindIndex(text => text.StartsWith("parsing", StringComparison.Ordinal))
+                    < said.FindIndex(text => text.StartsWith("checking", StringComparison.Ordinal)));
     }
 
     [Fact]
-    public async Task A_later_analysis_is_not_reported()
+    public async Task A_later_analysis_shorter_than_the_delay_is_not_reported()
     {
-        // It takes milliseconds; a bar for each keystroke would be a flicker.
+        // A bar for each keystroke would be a flicker: the delay is out of reach here.
         var uri = DocumentUri.FromFilePath(BufferPath());
-        await using var harness = new ServerHarness();
+        await using var harness = new ServerHarness(new LspServerOptions { ProgressDelay = TimeSpan.FromMinutes(10) });
         await harness.InitializeAsync(WorkDoneProgress);
 
         await harness.NotifyAsync(LspMethods.DidOpen, DidOpen(uri, Program));
@@ -135,6 +145,47 @@ public sealed class NullWindowTests
 
         while (await harness.ReceiveAsync() is var message && Method(message) != LspMethods.PublishDiagnostics)
             Assert.NotEqual(LspMethods.WorkDoneProgressCreate, Method(message));
+    }
+
+    [Fact]
+    public async Task A_later_analysis_longer_than_the_delay_is_reported()
+    {
+        // In a large package every keystroke's analysis takes seconds; past the delay it is shown.
+        var uri = DocumentUri.FromFilePath(BufferPath());
+        await using var harness = new ServerHarness(new LspServerOptions { ProgressDelay = TimeSpan.Zero });
+        await harness.InitializeAsync(WorkDoneProgress);
+
+        await harness.NotifyAsync(LspMethods.DidOpen, DidOpen(uri, Program));
+        while (true)
+        {
+            var message = await harness.ReceiveAsync();
+            if (Method(message) == LspMethods.WorkDoneProgressCreate)
+                await harness.SendAsync($$"""{"jsonrpc":"2.0","id":{{message.GetProperty("id").GetInt32()}},"result":null}""");
+            else if (Method(message) == LspMethods.Progress
+                     && message.GetProperty("params").GetProperty("value").GetProperty("kind").GetString() == "end")
+                break;
+        }
+
+        await harness.NotifyAsync(LspMethods.DidChange, JsonSerializer.Serialize(new
+        {
+            textDocument = new { uri, version = 2 },
+            contentChanges = new[] { new { text = Program.Replace("1", "2") } },
+        }));
+
+        var asked = false;
+        while (true)
+        {
+            var message = await harness.ReceiveAsync();
+            if (Method(message) == LspMethods.WorkDoneProgressCreate)
+            {
+                asked = true;
+                await harness.SendAsync($$"""{"jsonrpc":"2.0","id":{{message.GetProperty("id").GetInt32()}},"result":null}""");
+            }
+            else if (Method(message) == LspMethods.Progress
+                     && message.GetProperty("params").GetProperty("value").GetProperty("kind").GetString() == "end")
+                break;
+        }
+        Assert.True(asked);
     }
 
     [Fact]
