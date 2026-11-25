@@ -728,6 +728,11 @@ package of eight programs were 2,247 findings. The command now says each finding
 its warning once on the last line, and <code>--max-errors</code> counts the command's errors, not each
 program's.</p>
 </li>
+<li><p><strong><code>lyric fmt</code> keeps a comment in a lambda handed to a method.</strong> In <code>obj.each((x) =&gt; { // … })</code>
+and in <code>obj.each { x =&gt; // … }</code> the comment was dropped, and the trailing block then fitted on
+one line; with a free function it stayed. A single method call was printed as a chain of calls
+first, which took the comments, then again without them.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
