@@ -573,6 +573,10 @@ promise. This entry fills with the milestones.
   and in `obj.each { x => // … }` the comment was dropped, and the trailing block then fitted on
   one line; with a free function it stayed. A single method call was printed as a chain of calls
   first, which took the comments, then again without them.
+- **`lyric toolchain update` updates to a newer development build of the same day.** Two `dev`
+  builds published on the same day share the same SemVer number and differ only in their commit
+  hash after `+`, so the version comparison saw them as equal and reported the older build as the
+  newest of the channel.
 
 ---
 

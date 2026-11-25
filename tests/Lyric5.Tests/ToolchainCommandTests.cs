@@ -109,6 +109,49 @@ public class ToolchainCommandTests
     }
 
     [Fact]
+    public void Update_replaces_an_earlier_dev_build_of_the_same_day_and_keeps_a_later_one()
+    {
+        using var server = new MirrorServer();
+        var home = Home(server);
+        void Put(string version)
+        {
+            Directory.CreateDirectory(home.DirectoryOf(version));
+            File.WriteAllText(Path.Combine(home.DirectoryOf(version), ToolchainManifest.FileName), "{}\n");
+            home.SetDefault(version);
+        }
+
+        // two dev builds of the same day compare equal in SemVer; the channel's newest still wins
+        const string sameDay = "9.0.0-dev.20261102+1111111";
+        Put(sameDay);
+
+        var (updated, said, error) = RunToolchain("update");
+        Assert.True(updated == 0, error);
+        Assert.Contains($"installed lyric {New} in {home.DirectoryOf(New)}", said);
+        Assert.Contains($"lyric {New} is the default", said);
+        Assert.Contains($"lyric {sameDay} stays until 'lyric5 toolchain remove {sameDay}'", said);
+        Assert.Equal(New, home.Default());
+        Assert.Equal($"lyric {New} is the newest of the channel 'dev'\n", RunToolchain("update").Out);
+
+        // when the newest of the day is already installed, update switches the default without downloading again
+        home.SetDefault(sameDay);
+        var archivesBefore = server.Asked.Count(p => p.StartsWith("/dev/", StringComparison.Ordinal));
+        var (switched, switchedOut, switchedErr) = RunToolchain("update");
+        Assert.True(switched == 0, switchedErr);
+        Assert.DoesNotContain($"installed lyric {New}", switchedOut);
+        Assert.Contains($"lyric {New} is the default", switchedOut);
+        Assert.Equal(New, home.Default());
+        Assert.Equal(archivesBefore, server.Asked.Count(p => p.StartsWith("/dev/", StringComparison.Ordinal)));
+
+        // a default ahead of the channel's newest day is not downgraded
+        const string ahead = "9.0.0-dev.20261103+fffffff";
+        Put(ahead);
+        var (kept, keptOut, keptErr) = RunToolchain("update");
+        Assert.True(kept == 0, keptErr);
+        Assert.Equal($"lyric {ahead} is the newest of the channel 'dev'\n", keptOut);
+        Assert.Equal(ahead, home.Default());
+    }
+
+    [Fact]
     public void The_running_toolchain_and_a_stray_bin_are_not_touched()
     {
         using var server = new MirrorServer();
