@@ -1302,6 +1302,14 @@ public sealed class AstFormatter
         if (links.Count == 0) return null;
         links.Reverse();
 
+        // Whether it is a chain is decided before anything is printed: printing a link takes the
+        // comments inside it off the list, and a call laid out as any call after all — 'b.each(…)',
+        // one call — would be printed again without them.
+        var first = 0;
+        while (first < links.Count && links[first] is MemberExpr) first++;
+        if (first == 0 && at is IdentifierExpr or ThisExpr && links[0] is CallExpr) first++;
+        if (links.Skip(first).Count(l => l is CallExpr) < 2) return null;
+
         Doc LinkDoc(Expr link) => link switch
         {
             CallExpr { Callee: MemberExpr m } c => CallTail(c,
@@ -1323,7 +1331,6 @@ public sealed class AstFormatter
             open.Add(LinkDoc(links[next]));
             if (links[next] is CallExpr) { segments.Add(open); open = []; }
         }
-        if (segments.Count < 2) return null;
         if (open.Count > 0) segments[^1].AddRange(open);
 
         return Doc.GroupOf(Doc.Of([.. head]),

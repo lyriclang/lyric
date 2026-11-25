@@ -191,6 +191,24 @@ public class CommentTests
         Assert.Contains("/* A wider\n   explanation. */", formatted);
     }
 
+    /// <summary>A lambda handed to a method — in its parentheses or as its trailing block — keeps
+    /// the comments in its body, as one handed to a free function does, and so does one in a chain
+    /// of calls. A single method call was printed as a chain first, which took the comments, and
+    /// then again as a call without them; the trailing block then fit on one line.</summary>
+    [Theory]
+    [InlineData("b.each((x) => {\n        // inside\n        let _ = x;\n    });")]
+    [InlineData("b.each { x =>\n        // inside\n        let _ = x;\n    };")]
+    [InlineData("each((x) => {\n        // inside\n        let _ = x;\n    });")]
+    [InlineData("b.each((x) => {\n        // inside\n        let _ = x;\n    }).each((y) => {\n        // inside too\n        let _ = y;\n    });")]
+    public void A_comment_in_a_lambda_handed_to_a_method_stays(string statement)
+    {
+        var formatted = Format("struct Box {\n    fn each(f: fn(int) -> void): Box {\n        f(1);\n        return this;\n    }\n}\n\n"
+            + "fn each(f: fn(int) -> void): void {\n    f(1);\n}\n\nfn main(): void {\n    let b = Box { };\n    " + statement + "\n}\n");
+        Assert.Contains("// inside\n", formatted);
+        if (statement.Contains("inside too")) Assert.Contains("// inside too\n", formatted);
+        Assert.Matches(@"\n\s+// inside\n\s+let _ = x;", formatted);
+    }
+
     [Fact]
     public void Match_arms_carry_their_comments()
     {
