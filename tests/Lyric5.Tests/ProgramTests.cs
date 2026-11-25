@@ -161,11 +161,31 @@ public class ProgramTests
         Assert.Contains("error[LYR-PKG0009]: package 'geo' needs lyric 99.0.0 or later", why);
     }
 
+    /// <summary>A pin of a development build: this toolchain, built here, is no development build
+    /// and meets one of its own version; one of a later version refuses, and says where the
+    /// development builds are.</summary>
+    [Fact]
+    public void A_package_names_the_least_development_build()
+    {
+        var met = Package(("lyric.toml", AppManifest.Replace("version = \"0.1.0\"\n", "version = \"0.1.0\"\ntoolchain = \"5.0.0-dev.20261119\"\n")), ("src/main.lyr", Says("app")));
+        Assert.Equal(0, Run("build", "-C", met).Exit);
+
+        var later = Package(("lyric.toml", AppManifest.Replace("version = \"0.1.0\"\n", "version = \"0.1.0\"\ntoolchain = \"99.0.0-dev.20261119\"\n")), ("src/main.lyr", Says("app")));
+        var (exit, _, error) = Run("build", "-C", later);
+        Assert.Equal(2, exit);
+        Assert.Contains("error[LYR-PKG0009]: package 'app' needs lyric 99.0.0-dev.20261119 or later", error);
+        Assert.Contains("lyric5 toolchain install dev installs the newest development build", error);
+    }
+
     [Theory]
     [InlineData("\"~5.1\"")]
     [InlineData("\"5\"")]
     [InlineData("\"<6.0\"")]
     [InlineData("51")]
+    [InlineData("\"5.0-dev.20261119\"")]
+    [InlineData("\"5.0.0-dev\"")]
+    [InlineData("\"5.0.0-rc.1\"")]
+    [InlineData("\"5.0.0-dev.2026111\"")]
     public void A_toolchain_pin_is_a_least_version(string pin)
     {
         var dir = Package(("lyric.toml", AppManifest.Replace("version = \"0.1.0\"\n", $"version = \"0.1.0\"\ntoolchain = {pin}\n")));

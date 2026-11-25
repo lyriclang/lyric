@@ -67,6 +67,31 @@ public class ToolchainSwitchTests
         Assert.IsType<SwitchDecision.Here>(Decide(home, broken));
     }
 
+    /// <summary>A pin of a development build takes that day's build or a later one, and every
+    /// release of its version or after; an older development build is handed on or missing. The
+    /// commit behind '+' does not count.</summary>
+    [Fact]
+    public void A_pin_of_a_development_build_takes_that_day_or_later_and_every_release()
+    {
+        const string older = "5.0.0-dev.20261118+6916b2a", met = "5.0.0-dev.20261119+d73b8f7";
+        var home = Home(null, older, met);
+        var pin = Pinned("5.0.0-dev.20261119");
+        Assert.IsType<SwitchDecision.Here>(Decide(home, pin, met));
+        Assert.IsType<SwitchDecision.Here>(Decide(home, pin, "5.0.0-dev.20261120+0000000"));
+        Assert.IsType<SwitchDecision.Here>(Decide(home, pin, "5.0.0"));
+        Assert.IsType<SwitchDecision.Here>(Decide(home, pin, "5.1.0-dev.20260101+0000000"));
+
+        var handed = Assert.IsType<SwitchDecision.Installed>(Decide(home, pin, older));
+        Assert.Equal(met, handed.Version);
+        Assert.Equal("package 'app' needs lyric 5.0.0-dev.20261119 or later", handed.Why);
+
+        var missing = Assert.IsType<SwitchDecision.Missing>(Decide(Home(null, older), pin, older));
+        Assert.Equal(new SemVer(5, 0, 0, "dev.20261119"), missing.Minimum);
+
+        // a pin of the version takes any development build of it, as before
+        Assert.IsType<SwitchDecision.Here>(Decide(home, Pinned("5.0"), older));
+    }
+
     [Fact]
     public void The_variable_names_a_toolchain_and_a_handed_command_is_not_handed_again()
     {

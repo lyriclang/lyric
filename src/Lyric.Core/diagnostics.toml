@@ -3901,9 +3901,11 @@ error[LYR-PKG0008]: the content of 'geo' at commit e4ff41cbf4c5 of https://examp
 title = "a package asks for a newer toolchain"
 severity = "error"
 area = "15-project"
-summary = "Reported when a package of the graph has `toolchain = \"X.Y\"` (or `\">=X.Y\"`) in `[package]` and the running toolchain is older. The exit code is 2."
+summary = "Reported when a package of the graph has `toolchain = \"X.Y\"` (or `\">=X.Y\"`, or a development build `\"X.Y.Z-dev.YYYYMMDD\"`) in `[package]` and the running toolchain is older. The exit code is 2."
 explanation = '''
-`toolchain` in `[package]` is the least toolchain that builds the package: one that uses a feature of 5.1 says so, and an older toolchain refuses it up front rather than failing somewhere in the middle of the compile. A development build of a version counts as that version.
+`toolchain` in `[package]` is the least toolchain that builds the package: one that uses a feature of 5.1 says so, and an older toolchain refuses it up front rather than failing somewhere in the middle of the compile. For a pin of a version, a development build of that version counts as the version.
+
+A package that needs a fix only a development build has names that build by its day: `toolchain = "5.0.0-dev.20261119"` takes the development build of that day or a later one, and every release of 5.0.0 or after. `lyric toolchain install dev` installs the newest development build.
 
 Install the toolchain the message names, or use a version of the package that asks for less.
 '''

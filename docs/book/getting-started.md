@@ -62,6 +62,11 @@ A command in that package then runs with an installed toolchain that is 5.1 or l
 where it is — whichever one you started; at a terminal, one is offered for installing where none
 is. `LYRIC_TOOLCHAIN=local` runs the one you started, and `LYRIC_TOOLCHAIN=5.1.0` a version.
 
+A development build of 5.1 counts as 5.1 for that pin. Where a package needs a fix that only a
+newer development build has, it names that build by its day, `toolchain = "5.0.0-dev.20261119"`:
+the development build of that day or a later one meets it, and so does every release of 5.0.0 or
+after. At a terminal the newest development build is offered.
+
 `lyric toolchain` asks the mirror first and GitHub after it. What one of them serves wrongly is said
 in a warning and the other asked: only a signature and a hash make anything acceptable, wherever it
 came from. `LYRIC_MIRROR` names a mirror of your own in place of both, with its key in
