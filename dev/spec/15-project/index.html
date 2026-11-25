@@ -86,7 +86,11 @@ A package's <strong>root module</strong> is its <code>src/lib.lyr</code> (<a hre
 <li><strong><code>toolchain = &quot;5.1&quot;</code></strong> — or <code>&quot;&gt;=5.1&quot;</code> — in <code>[package]</code> is the least toolchain that builds the
 package (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 P12</a>): a toolchain below what any package of the program asks
 for refuses the program (<code>LYR-PKG0009</code>, exit 2, <a href="../../spec/14-cli/">14 §1.3</a>), a development build of
-a version counting as that version. Another form is refused (<code>LYR-PKG0002</code>). The root package's
+a version counting as that version. <strong><code>toolchain = &quot;5.0.0-dev.20261119&quot;</code></strong>, a version of three
+numbers with <code>-dev.</code> and a day of eight digits, is the least development build: the development
+build of that version from that day or a later one meets it, and so does every release of that
+version or after it; the part after <code>+</code> is not compared. Another form is refused
+(<code>LYR-PKG0002</code>). The root package's
 pin also chooses the toolchain: a command in the package is handed to an installed toolchain
 that meets it, where the one started does not (<a href="../../spec/14-cli/">14 §13</a> rule 11).</li>
 <li><strong><code>comptimeBudget = 100_000_000</code></strong> in <code>[package]</code> is the steps one <code>comptime</code> site may take
@@ -98,7 +102,7 @@ is refused (<code>LYR-PKG0002</code>).</li>
 <p>The packages a package imports from (<a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/11-werkzeuge-interop.md">11 W2</a>, <a href="https://github.com/lyriclang/lyric/blob/main/design/v5/spec/07-module.md">07 V7</a>).</p>
 <p><strong>Conformance.</strong> <code>conformance/cases/15-project/</code>, package cases that hold their dependencies in
 their own directories, and the git repositories they read as their versions
-(<a href="https://github.com/lyriclang/lyric-spec/blob/8106dc27c0440b03aaaa5192ed1332f7875fe27e/conformance/README.md">the suite's README</a>); the toolchain's own tests
+(<a href="https://github.com/lyriclang/lyric-spec/blob/fbf02b4757ed0657e482e9d04ba37e39b5cad69a/conformance/README.md">the suite's README</a>); the toolchain's own tests
 (<code>tests/Lyric5.Tests</code>: <code>DependencyTests</code>, <code>GitDependencyTests</code>, <code>PackageContentTests</code>).</p>
 <ol>
 <li><code>[dependencies]</code> names them, each where it is read from: a directory,

@@ -38,9 +38,10 @@
 <h1>LYR-PKG0009</h1>
 <p class="code-title">a package asks for a newer toolchain</p>
 <p class="meta">error · <a href="../../spec/15-project/">spec 15-project</a></p>
-<p>Reported when a package of the graph has <code>toolchain = &quot;X.Y&quot;</code> (or <code>&quot;&gt;=X.Y&quot;</code>) in <code>[package]</code> and the running toolchain is older. The exit code is 2.</p>
+<p>Reported when a package of the graph has <code>toolchain = &quot;X.Y&quot;</code> (or <code>&quot;&gt;=X.Y&quot;</code>, or a development build <code>&quot;X.Y.Z-dev.YYYYMMDD&quot;</code>) in <code>[package]</code> and the running toolchain is older. The exit code is 2.</p>
 <h2 id="explanation">Explanation</h2>
-<p><code>toolchain</code> in <code>[package]</code> is the least toolchain that builds the package: one that uses a feature of 5.1 says so, and an older toolchain refuses it up front rather than failing somewhere in the middle of the compile. A development build of a version counts as that version.</p>
+<p><code>toolchain</code> in <code>[package]</code> is the least toolchain that builds the package: one that uses a feature of 5.1 says so, and an older toolchain refuses it up front rather than failing somewhere in the middle of the compile. For a pin of a version, a development build of that version counts as the version.</p>
+<p>A package that needs a fix only a development build has names that build by its day: <code>toolchain = &quot;5.0.0-dev.20261119&quot;</code> takes the development build of that day or a later one, and every release of 5.0.0 or after. <code>lyric toolchain install dev</code> installs the newest development build.</p>
 <p>Install the toolchain the message names, or use a version of the package that asks for less.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="com">//- lyric.toml</span>

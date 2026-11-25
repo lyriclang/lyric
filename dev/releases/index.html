@@ -707,6 +707,12 @@ silent. It named every lint: a package that checked without a warning failed wit
 thousands of errors under the switch. A lint raised to <code>warn</code> by <code>[lints]</code> or an attribute is
 denied with the others.</p>
 </li>
+<li><p><strong>A package can ask for a development build</strong>: <code>toolchain = &quot;5.0.0-dev.20261119&quot;</code> in <code>[package]</code>
+is met by the development build of that day or a later one, and by every release of 5.0.0 or
+after. An older development build refuses the package (<code>LYR-PKG0009</code>) or hands the command to an
+installed toolchain that meets the pin. At a terminal, the newest development build is offered.
+A pin of a version, <code>&quot;5.0&quot;</code>, still takes any development build of it.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>

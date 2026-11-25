@@ -2785,7 +2785,7 @@ code is no longer reported, and its number is not given again.</p>
 <td>E</td>
 <td><a href="../../spec/15-project/">15-project</a></td>
 <td>a package asks for a newer toolchain</td>
-<td>Reported when a package of the graph has <code>toolchain = &quot;X.Y&quot;</code> (or <code>&quot;&gt;=X.Y&quot;</code>) in <code>[package]</code> and the running toolchain is older. The exit code is 2.</td>
+<td>Reported when a package of the graph has <code>toolchain = &quot;X.Y&quot;</code> (or <code>&quot;&gt;=X.Y&quot;</code>, or a development build <code>&quot;X.Y.Z-dev.YYYYMMDD&quot;</code>) in <code>[package]</code> and the running toolchain is older. The exit code is 2.</td>
 </tr>
 <tr>
 <td>LYR-PKG0010</td>
