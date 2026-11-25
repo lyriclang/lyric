@@ -336,11 +336,9 @@ class SignalHub {
         this.guard.release();
         catchAll(added, true);
         if (start) {
-            let _ = Thread.spawn(
-                () => {
-                    signalHub.watch();
-                }
-            );
+            let _ = Thread.spawn(() => {
+                signalHub.watch();
+            });
         }
     }
 

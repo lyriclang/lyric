@@ -573,6 +573,11 @@ promise. This entry fills with the milestones.
   and in `obj.each { x => // … }` the comment was dropped, and the trailing block then fitted on
   one line; with a free function it stayed. A single method call was printed as a chain of calls
   first, which took the comments, then again without them.
+- **`lyric fmt` keeps a last lambda with a block in its call's parentheses**: `each((x) => {`, the
+  body indented under the call, `});`, as Prettier and rustfmt lay out a last closure. The lambda
+  was put on lines of its own, `each(` / `(x) => {` … `}` / `);`. Where what stands before the
+  block does not fit on the line, the arguments still go one to a line. Six files of the standard
+  library are reformatted; run `lyric fmt` once over a package to follow.
 
 ---
 

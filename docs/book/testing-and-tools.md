@@ -136,6 +136,11 @@ Each prints its nanoseconds and allocations per run. `--save base.txt` keeps the
 There are no settings, so every Lyric program looks the same and a diff shows only what changed.
 `lyric fmt --check` changes nothing and fails where a file is not in form — the line for a CI job.
 
+A call whose last argument is a lambda with a block keeps the lambda in its parentheses: the
+line reads `fold(10, (acc, x) => {`, the block's body is indented under the call, and `});`
+closes it. Where what stands before the block does not fit on the line, the arguments go one to a
+line.
+
 ## Check, fix, explain
 
 `lyric check` says everything `build` would say, without making a binary — fast enough to run on

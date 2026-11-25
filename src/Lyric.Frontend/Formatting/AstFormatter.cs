@@ -1354,12 +1354,24 @@ public sealed class AstFormatter
 
         if (arguments.Length == 0) return Doc.Of(head, Doc.From("()"));
 
+        // Each argument printed once, for every layout below: a print takes its comments.
+        var printed = arguments.Select((a, i) => ArgumentDoc(call, a, i)).ToArray();
+
         // No trailing comma: the call grammar does not allow one.
         var parenthesized = Doc.GroupOf(head, Doc.From("("),
-            Doc.IndentOf(Doc.LineOrNothing,
-                Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace),
-                    arguments.Select((a, i) => ArgumentDoc(call, a, i)).ToArray())),
+            Doc.IndentOf(Doc.LineOrNothing, Doc.Join(Doc.Of(Doc.From(","), Doc.LineOrSpace), printed)),
             Doc.LineOrNothing, Doc.From(")"));
+
+        // 'each((x) => {' … '});': a last lambda with a block hugs the parentheses, the block's
+        // body indented under the call, where what stands before the block fits on the line.
+        if (trailing is null && arguments[^1] is LambdaExpr { Form: not LambdaForm.Trailing, Body: Block }
+            && !Doc.WillBreak(head) && !printed[..^1].Any(Doc.WillBreak))
+        {
+            var lead = Doc.Of(head, Doc.From("("),
+                Doc.Join(Doc.From(", "), printed[..^1]), Doc.From(printed.Length > 1 ? ", " : ""));
+            return new Doc.Hug(lead, printed[^1], Doc.From(")"), parenthesized);
+        }
+
         return trailing is null ? parenthesized : Doc.Of(parenthesized, trailing);
     }
 
