@@ -569,6 +569,10 @@ promise. This entry fills with the milestones.
   package of eight programs were 2,247 findings. The command now says each finding once, counts
   its warning once on the last line, and `--max-errors` counts the command's errors, not each
   program's.
+- **`lyric fmt` keeps a comment in a lambda handed to a method.** In `obj.each((x) => { // … })`
+  and in `obj.each { x => // … }` the comment was dropped, and the trailing block then fitted on
+  one line; with a free function it stayed. A single method call was printed as a chain of calls
+  first, which took the comments, then again without them.
 
 ---
 
