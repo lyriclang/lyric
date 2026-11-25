@@ -573,6 +573,19 @@ promise. This entry fills with the milestones.
   and in `obj.each { x => // … }` the comment was dropped, and the trailing block then fitted on
   one line; with a free function it stayed. A single method call was printed as a chain of calls
   first, which took the comments, then again without them.
+- **Global `--toolchain <version|local>` option.** Selects an installed toolchain — or `local` for
+  the running binary — for one command, taking precedence over `LYRIC_TOOLCHAIN` and
+  `[package] toolchain` in `lyric.toml`. When handing a command on to another toolchain,
+  `--toolchain` is removed from `argv` so older installed toolchains accept it. `lyric env` now
+  reports the real origin of `toolchain` (`command line`, `LYRIC_TOOLCHAIN`, `lyric.toml`, or
+  `default`).
+- **Build header in normal and verbose output.** `build`, `run`, `check`, `test` and `bench` print
+  a compact `Toolchain` line at the start naming the Lyric version, C compiler, target triple and
+  any explicit selection or switch reason, and `Finished` includes active non-default profile
+  flags (`lto`, `gc=boehm`, `fast-math`, `no overflow checks`). Under `-v`, the header expands into
+  `Toolchain`, `Compiler` (with path and origin), `Target` (`host` or `cross`) and `Profile` lines
+  — even when caches are warm — alongside `Package`, `Runtime` (`prebuilt` or `cached`) and
+  `Cached` lines. `-q` and `--json` stay silent.
 
 ---
 

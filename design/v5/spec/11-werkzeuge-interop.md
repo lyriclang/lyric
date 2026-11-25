@@ -458,6 +458,15 @@ Gefunden in `stanza_wip` (eine Engine in Lyric) beim Wechsel auf einen neuen Dev
 | P13 | **Der Toolchain-Pin nimmt einen Dev-Build als Minimum**: `toolchain = "5.0.0-dev.20261119"` verlangt mindestens den Dev-Build dieses Tages. Jeder Dev-Build derselben Version vom selben Tag an genügt, ebenso jede Release ab dieser Version. Ein älterer Dev-Build ist `LYR-PKG0009`, wie eine ältere Version. Der Commit-Hash hinter `+` zählt nicht, denn er ist nicht geordnet. Vorher zählte ein Dev-Build als die Version, deren Dev-Build er ist: `"5.0"` nahm jeden alten Dev-Build, ohne die Fixes, die ein Paket braucht. **Vor M18**, als Slice nach L8 | P12 |
 | L8 | **`warnings` wirkt auf das, was warnt**: Die Stufe eines Lints entsteht zuerst ohne `warnings`, aus Attribut, Kommandozeile, Manifest und der eigenen Stufe. Ist sie dann `warn`, entscheidet der engste `warnings`-Selektor. `-D warnings` (`--deny-warnings`, `denyWarnings`) macht so jede Warnung zum Fehler, und was `allow` ist, bleibt still. `-A warnings` schaltet alle Warnungen ab, `-W warnings` ändert nichts. Vorher stand `warnings` für jeden Lint, auch die auf `allow`: `--deny-warnings` meldete an `stanza_wip` 53.534 Fehler, ohne den Schalter keinen. Wie Rusts `-D warnings`. **Sofort**, mit Spec 16 §5 | L1, L2 |
 
+## Review 2026-11-25 — `--toolchain` und Build-Kopf
+
+Entschieden mit dem Maintainer (2026-11-25, lyric#763, lyric#764).
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| T9 | **`--toolchain <version\|local>` als globale Option** (vor `--`): steht auf der obersten Sprosse der Präzedenzleiter über `LYRIC_TOOLCHAIN` und `[package] toolchain`. Beim Delegieren (`HandOn`) wird `--toolchain` aus `argv` entfernt, damit ältere Toolchains die Option nicht ablehnen (`LYRIC_TOOLCHAIN_FROM` verhindert ein zweites Delegieren). `lyric env` nennt die tatsächliche Herkunft von `toolchain` (`command line`, `LYRIC_TOOLCHAIN`, `lyric.toml`, `default`). Verworfen: `+version`-Syntax (bricht C3) | C3, C4, T2, T7 |
+| C11 | **Build-Kopf in Statuszeilen** (`build`, `run`, `check`, `test`, `bench`; stumm bei `-q`/`--json`): Im Normalmodus eine kompakte `Toolchain`-Zeile am Anfang (Lyric-Version, C-Compiler wo genutzt, Zieltripel und Auswahl-/Wechselgrund wo gesetzt) sowie aktive nicht-triviale Profil-Flags in `Finished`. Im `-v`-Modus aufgeteilt in `Toolchain`, `Compiler` (mit Pfad und Herkunft), `Target` (`host`/`cross`) und `Profile` — immer ausgegeben, auch bei warmem Cache —, dazu `Package` auch bei Frontend-Cache-Hit, `Runtime` (`prebuilt`/`cached`) und `Cached` für übersprungene Frontend-/Link-Schritte | C6, C7 |
+
 
 ---
 

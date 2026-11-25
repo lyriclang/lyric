@@ -16,25 +16,40 @@ public abstract record SwitchDecision
 }
 
 /// <summary>
-/// Which toolchain runs a command: <c>LYRIC_TOOLCHAIN</c> — <c>local</c> for this one, or a
-/// version — over the <c>toolchain</c> the package here asks for, a least version. This toolchain
-/// runs it where it is what is asked for; else the default, where it is; else the newest installed
-/// that is. A command handed on carries <c>LYRIC_TOOLCHAIN_FROM</c>, and is never handed on again.
-/// Only the package the command runs in is read: a dependency's pin is checked by the build
-/// (<see cref="ToolchainCheck"/>).
+/// Which toolchain runs a command: <c>--toolchain</c> over <c>LYRIC_TOOLCHAIN</c> — <c>local</c>
+/// for this one, or a version — over the <c>toolchain</c> the package here asks for, a least
+/// version. This toolchain runs it where it is what is asked for; else the default, where it is;
+/// else the newest installed that is. A command handed on carries <c>LYRIC_TOOLCHAIN_FROM</c>, and
+/// is never handed on again. Only the package the command runs in is read: a dependency's pin is
+/// checked by the build (<see cref="ToolchainCheck"/>).
 /// </summary>
 public static class ToolchainSwitch
 {
     public const string Variable = "LYRIC_TOOLCHAIN";
     public const string FromVariable = "LYRIC_TOOLCHAIN_FROM";
+    public const string OriginVariable = "LYRIC_TOOLCHAIN_ORIGIN";
+    public const string WhyVariable = "LYRIC_TOOLCHAIN_WHY";
 
     /// <param name="running">This toolchain's version.</param>
     /// <param name="variable">The environment, by name.</param>
     /// <param name="manifest">The <c>lyric.toml</c> of the package the command runs in, if any.</param>
-    /// <exception cref="ToolchainException"><c>LYR-CLI0025</c>: <c>LYRIC_TOOLCHAIN</c> names a version not installed.</exception>
-    public static SwitchDecision Decide(string running, Func<string, string?> variable, ToolchainHome home, string? manifest)
+    /// <param name="requested">The value of <c>--toolchain</c> on the command line, if any.</param>
+    /// <exception cref="ToolchainException"><c>LYR-CLI0025</c>: <c>--toolchain</c> or
+    /// <c>LYRIC_TOOLCHAIN</c> names a version not installed.</exception>
+    public static SwitchDecision Decide(string running, Func<string, string?> variable, ToolchainHome home,
+        string? manifest, string? requested = null)
     {
         if (!string.IsNullOrEmpty(variable(FromVariable))) return new SwitchDecision.Here();
+        if (!string.IsNullOrWhiteSpace(requested))
+        {
+            if (requested == "local" || requested == running || requested == ToolchainHome.WithoutBuild(running))
+                return new SwitchDecision.Here();
+            return home.Resolve(requested) is { } version
+                ? new SwitchDecision.Installed(version, $"--toolchain {requested}")
+                : throw new ToolchainException("LYR-CLI0025",
+                    $"--toolchain names lyric {requested}, which is not installed in {home.Toolchains}",
+                    $"lyric5 toolchain install {requested} — or --toolchain local runs this toolchain");
+        }
         var asked = variable(Variable);
         if (!string.IsNullOrWhiteSpace(asked))
         {
@@ -57,6 +72,20 @@ public static class ToolchainSwitch
             ? new SwitchDecision.Installed(newest, why)
             : new SwitchDecision.Missing(pin.Minimum, package.Name, manifest, pin.Line);
     }
+
+    /// <summary>Where the active toolchain choice came from, as <c>lyric env</c> names origins.</summary>
+    public static string Origin(string? requested, Func<string, string?> variable) =>
+        !string.IsNullOrWhiteSpace(requested) ? "command line"
+        : variable(OriginVariable) is { Length: > 0 } handed ? handed
+        : !string.IsNullOrWhiteSpace(variable(Variable)) ? Variable
+        : "default";
+
+    /// <summary>Why this toolchain was chosen explicitly or switched to; <c>null</c> for the default.</summary>
+    public static string? Reason(string? requested, Func<string, string?> variable) =>
+        !string.IsNullOrWhiteSpace(requested) ? $"--toolchain {requested}"
+        : variable(WhyVariable) is { Length: > 0 } why ? why
+        : variable(Variable) is { Length: > 0 } env ? $"{Variable}={env}"
+        : null;
 
     /// <summary>Whether <paramref name="version"/> is <paramref name="minimum"/> or later
     /// (<see cref="ToolchainCheck.Satisfies"/>).</summary>

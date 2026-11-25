@@ -60,7 +60,9 @@ toolchain = "5.1"
 
 A command in that package then runs with an installed toolchain that is 5.1 or later — the default
 where it is — whichever one you started; at a terminal, one is offered for installing where none
-is. `LYRIC_TOOLCHAIN=local` runs the one you started, and `LYRIC_TOOLCHAIN=5.1.0` a version.
+is. `--toolchain local` (or `LYRIC_TOOLCHAIN=local`) runs the one you started, and
+`--toolchain 5.1.0` (or `LYRIC_TOOLCHAIN=5.1.0`) a version; `--toolchain` takes precedence over
+`LYRIC_TOOLCHAIN` and `lyric.toml`.
 
 A development build of 5.1 counts as 5.1 for that pin. Where a package needs a fix that only a
 newer development build has, it names that build by its day, `toolchain = "5.0.0-dev.20261119"`:
@@ -138,6 +140,7 @@ In the package's directory, `lyric run` builds the program and runs it:
 ```text
 $ cd hello
 $ lyric run
+   Toolchain lyric 5.0.0-dev.20261023+6d7bd38, zig 0.16.0 (x86_64-linux-gnu)
    Compiling hello v0.1.0 (src/main.lyr)
      Parsing 13 modules 0.21s
    Analyzing 13 modules 0.70s
@@ -152,13 +155,15 @@ $ lyric run
 Hello, world!
 ```
 
-The lines before the greeting are the build's, on the standard error: each step that does work
-says what it works on and, when it is done, how long it took; `Finished` says how long it all took,
-`Produced` what came of it. Run it again and nothing has changed — no step is said, and a `Summary`
-says the C units came from the cache. In a log, where a line cannot be finished later, each step
-says its line as it starts and a `Timings` line gives the times at the end. The first build of a
-profile also compiles the runtime, once for every program on the machine. `-v` says more: each
-package, each C unit with its time, each command; `-q` says none of these lines, only the findings.
+The lines before the greeting are the build's, on the standard error: a `Toolchain` header with the
+Lyric version, C compiler and target, then each step that does work and, when it is done, how long
+it took; `Finished` says how long it all took, `Produced` what came of it. Run it again and nothing
+has changed — no step is said, and a `Summary` says the C units came from the cache. In a log, where
+a line cannot be finished later, each step says its line as it starts and a `Timings` line gives the
+times at the end. The first build of a profile also compiles the runtime, once for every program on
+the machine. `-v` expands the header into `Toolchain`, `Compiler`, `Target` and `Profile` lines,
+names each package, the runtime's origin, cached steps, each C unit with its time, and each command;
+`-q` says none of these lines, only the findings.
 
 `lyric build` builds without running; the binary lands under `out/`, by profile and target —
 `out/debug/x86_64-linux-gnu/hello` on Linux. The default profile is `debug`: quick to build, with

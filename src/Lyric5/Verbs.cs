@@ -35,7 +35,7 @@ internal static class Verbs
     private static readonly Opt Profile = new("--profile", "<name>", "the build profile: debug, release, asan, tsan, or one of the manifest's (default: LYRIC_PROFILE, else debug)");
     private static readonly Opt Target = new("--target", "<triple>", "a Tier 1 target (default: this machine)");
     private static readonly Opt Bin = new("--bin", "<name>", "the package's program");
-    private static readonly Opt Verbose = new("-v", null, "say each package, each C unit with its time, and each command of the C compiler, the archiver and the linker as it starts", Alias: "--verbose");
+    private static readonly Opt Verbose = new("-v", null, "say the toolchain, compiler, target, profile, packages, cache hits, each C unit with its time, and each command of the C compiler, the archiver and the linker as it starts", Alias: "--verbose");
     private static readonly Opt Quiet = new("-q", null, "say no status lines: what is compiled, linked and run", Alias: "--quiet");
 
     /// <summary>The profile's fields, for one build (spec 15 §4).</summary>
@@ -117,9 +117,10 @@ internal static class Verbs
             [new("--markdown", null, "the verbs and their options as a Markdown table, the one the spec prints")]),
     ];
 
-    /// <summary>The options every verb takes, read before the verb's own (spec 16 §1, §4, §5).</summary>
+    /// <summary>The options every verb takes, read before the verb's own (spec 14 §5, 16 §1, §4, §5).</summary>
     public static readonly Opt[] Global =
     [
+        new("--toolchain", "<version|local>", "the installed toolchain to run with, or local for this one (over LYRIC_TOOLCHAIN and lyric.toml)"),
         new("--color", "<auto|always|never>", "colour the diagnostics (default auto: a terminal, unless NO_COLOR is set or TERM is dumb)"),
         new("--absolute-paths", null, "paths as they are, not relative to the package"),
         new("--max-errors", "<n>", "draw the first n errors and count the rest (default 50, 0 for all)"),

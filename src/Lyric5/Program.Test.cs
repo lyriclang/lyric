@@ -14,8 +14,8 @@ public static partial class Program
     /// test held, 1 when one failed or the program was refused. <c>--no-run</c> builds the program
     /// and prints its path instead: what a debugger launches.
     /// </summary>
-    private static int Test(string[] args, LintArgs lints) =>
-        Package(args, "test", "tests", null, lints, (project, profile, target, compiler, values, flags) =>
+    private static int Test(string[] args, LintArgs lints, string? toolchain) =>
+        Package(args, "test", "tests", null, lints, toolchain, (project, profile, target, compiler, values, flags) =>
             TestRun.Run(project, profile, target, compiler, DisplayVersion(), values.GetValueOrDefault("-f"), Console.Out, Console.Error,
                 run: !flags.Contains("--no-run")));
 
@@ -26,8 +26,8 @@ public static partial class Program
     /// <c>--save</c> names a file the run writes its times to, <c>--compare</c> one it reads to say
     /// how they changed. The program's exit is the command's.
     /// </summary>
-    private static int Bench(string[] args, LintArgs lints) =>
-        Package(args, "bench", "benchmarks", "release", lints, (project, profile, target, compiler, values, _) =>
+    private static int Bench(string[] args, LintArgs lints, string? toolchain) =>
+        Package(args, "bench", "benchmarks", "release", lints, toolchain, (project, profile, target, compiler, values, _) =>
             BenchRun.Run(project, profile, target, compiler, DisplayVersion(), values.GetValueOrDefault("-f"),
                 values.TryGetValue("--save", out var save) ? Path.GetFullPath(save) : "",
                 values.TryGetValue("--compare", out var compare) ? Path.GetFullPath(compare) : "",
@@ -39,7 +39,7 @@ public static partial class Program
     /// unless <c>--target</c> names another, as <c>build</c> and <c>run</c> take it —, and the
     /// compiler found; then <paramref name="run"/>.</summary>
     private static int Package(string[] args, string verb, string what, string? profileDefault,
-        LintArgs lints, Func<Project, BuildProfile, Target, CCompiler, Dictionary<string, string>, HashSet<string>, int> run)
+        LintArgs lints, string? toolchain, Func<Project, BuildProfile, Target, CCompiler, Dictionary<string, string>, HashSet<string>, int> run)
     {
         if (Verbs.Read(Verbs.Find(verb)!, args, Unknown, out var unread) is not { } parsed) return unread;
         if (parsed.Words.Count > 0) return Unknown($"'{verb}' runs a package's {what} and takes no file, got '{parsed.Words[0]}'");
@@ -79,6 +79,7 @@ public static partial class Program
             return Unknown($"unknown target '{values["--target"]}': {string.Join(", ", Target.Tier1.Select(t => t.Triple))}");
         }
         if (CompilerFor(profile) is not { } compiler) return 2;
+        SayBuildHeader(profile, target, compiler, toolchain);
         return run(project, profile, target, compiler, values, flags);
     }
 }
