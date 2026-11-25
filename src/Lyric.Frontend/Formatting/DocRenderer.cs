@@ -81,6 +81,24 @@ public static class DocRenderer
                 case Doc.IfBroken(var content):
                     if (!flat) work.Push((indent, flat, content));
                     break;
+
+                case Doc.Hug(var lead, var last, var close, var otherwise):
+                {
+                    var room = width - (pendingIndent > 0 ? pendingIndent : column);
+                    var whole = Doc.Of(lead, last, close);
+                    if (flat || Fits(whole, room, work))
+                        work.Push((indent, true, whole));
+                    else if (Fits([(true, lead), (false, last)], room, new Stack<(int, bool, Doc)>()))
+                    {
+                        // the lead on this line, the lambda's block broken under it, then the close
+                        work.Push((indent, false, close));
+                        work.Push((indent, false, last));
+                        work.Push((indent, true, lead));
+                    }
+                    else
+                        work.Push((indent, false, otherwise));
+                    break;
+                }
             }
         }
 
@@ -96,10 +114,16 @@ public static class DocRenderer
     /// cross the width must break — the classic off-by-a-paren of naive implementations.</para>
     /// </summary>
     private static bool Fits(Doc doc, int available,
+        Stack<(int Indent, bool Flat, Doc Doc)> continuation) =>
+        Fits([(true, doc)], available, continuation);
+
+    /// <summary>As above, for parts measured each in its own mode, the first first: a hug's lead
+    /// flat and its lambda broken, whose first line ends at its block's first break.</summary>
+    private static bool Fits(IReadOnlyList<(bool Flat, Doc Doc)> measured, int available,
         Stack<(int Indent, bool Flat, Doc Doc)> continuation)
     {
         var work = new Stack<(bool Flat, Doc Doc)>();
-        work.Push((true, doc));
+        for (var i = measured.Count - 1; i >= 0; i--) work.Push(measured[i]);
 
         // The continuation is enumerated lazily on demand — usually the group itself decides
         // long before the surrounding parts matter.
@@ -156,6 +180,14 @@ public static class DocRenderer
                 case Doc.IfBroken(var content):
                     // Measured FLAT the content does not exist; in broken surroundings it does.
                     if (!flat) work.Push((flat, content));
+                    break;
+
+                case Doc.Hug(var lead, var last, var close, _):
+                    // flat, all of it on the line; in broken surroundings the line ends inside
+                    // the lambda's block
+                    work.Push((flat, close));
+                    work.Push((flat, last));
+                    work.Push((flat, lead));
                     break;
             }
         }

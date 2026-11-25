@@ -43,6 +43,16 @@ public abstract record Doc
     /// allows it in some positions and taste forbids it in the flat ones.</summary>
     public sealed record IfBroken(Doc Content) : Doc;
 
+    /// <summary>
+    /// A call whose last argument is a lambda with a block, hugged: <c>each((x) => {</c> on the
+    /// line, the block's body indented under it, <c>});</c> closing — as Prettier and rustfmt lay
+    /// out a last closure. Rendered flat where all of it fits; else <paramref name="Lead"/> flat and
+    /// <paramref name="Last"/> broken where the lead and the last's first line fit; else
+    /// <paramref name="Otherwise"/>, the arguments one to a line. The forms share their parts:
+    /// what is printed once is not printed again, and no comment is taken twice.
+    /// </summary>
+    public sealed record Hug(Doc Lead, Doc Last, Doc Close, Doc Otherwise) : Doc;
+
     // The builders. Static on the type so a formatter reads as prose: Doc.Group(...).
 
     public static readonly Doc Nil = new Text("");
@@ -70,6 +80,7 @@ public abstract record Doc
         Concat(var parts) => parts.Any(WillBreak),
         Group(var content) => WillBreak(content),
         Indent(var content) => WillBreak(content),
+        Hug(var lead, var last, var close, _) => WillBreak(lead) || WillBreak(last) || WillBreak(close),
         _ => false,
     };
 

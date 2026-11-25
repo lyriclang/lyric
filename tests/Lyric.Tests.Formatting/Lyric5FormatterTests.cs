@@ -258,6 +258,81 @@ public class Lyric5FormatterTests
             """);
     }
 
+    /// <summary>A last lambda with a block hugs the parentheses — after other arguments, as a
+    /// method's, as a value — and its comments stay; the form comes back unchanged.</summary>
+    [Fact]
+    public void A_last_lambda_with_a_block_hugs_the_parentheses()
+    {
+        Keeps("""
+            fn each(f: fn(int) -> void): void {
+                f(1);
+            }
+
+            fn fold(start: int, f: fn(int, int) -> int): int {
+                return f(start, 2);
+            }
+
+            fn main(): void {
+                each((x) => {
+                    // the comment stays
+                    let _ = x;
+                });
+                let total = fold(10, (acc, x) => {
+                    let s = acc + x;
+                    return s * 2;
+                });
+                let _ = total;
+            }
+
+            """);
+    }
+
+    /// <summary>Written the old way, one argument to a line, the lambda comes back hugged.</summary>
+    [Fact]
+    public void A_lambda_put_on_its_own_lines_comes_back_hugged()
+    {
+        var formatted = Format("""
+            fn fold(start: int, f: fn(int, int) -> int): int {
+                return f(start, 2);
+            }
+
+            fn main(): void {
+                let total = fold(
+                    10,
+                    (acc, x) => {
+                        return acc + x;
+                    }
+                );
+                let _ = total;
+            }
+            """);
+        Assert.Contains("    let total = fold(10, (acc, x) => {\n        return acc + x;\n    });\n", formatted);
+    }
+
+    /// <summary>Where what stands before the block does not fit on the line, the arguments go one
+    /// to a line as before; a lambda whose body is an expression is never hugged.</summary>
+    [Fact]
+    public void A_lambda_is_not_hugged_where_its_lead_does_not_fit_or_it_has_no_block()
+    {
+        Keeps("""
+            fn fold(start: int, f: fn(int, int) -> int): int {
+                return f(start, 2);
+            }
+
+            fn main(): void {
+                let total = fold(
+                    10000000000000 + 20000000000000 + 30000000000000 + 40000000000000 + 50000000000000,
+                    (acc, x) => {
+                        return acc + x;
+                    }
+                );
+                let doubled = fold(1, (acc, x) => acc + x * 2);
+                let _ = total + doubled;
+            }
+
+            """);
+    }
+
     [Fact]
     public void An_if_with_block_branches_is_an_operand_without_parentheses()
     {

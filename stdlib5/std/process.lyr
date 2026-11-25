@@ -172,13 +172,11 @@ pub struct Command {
             stderr = Stdio.Piped,
         }).spawn();
         var errors = child.stderr!;
-        let taken = task.spawn(
-            () => {
-                let bytes = try errors.readToEnd();
-                try errors.close();
-                return bytes;
-            }
-        );
+        let taken = task.spawn(() => {
+            let bytes = try errors.readToEnd();
+            try errors.close();
+            return bytes;
+        });
         var out = child.stdout!;
         let bytes = try out.readToEnd();
         try out.close();
@@ -466,11 +464,9 @@ class Reaper {
         this.started = true;
         this.guard.release();
         if (start) {
-            let _ = Thread.spawn(
-                () => {
-                    reaper.watch();
-                }
-            );
+            let _ = Thread.spawn(() => {
+                reaper.watch();
+            });
         } else {
             processNudge();
         }

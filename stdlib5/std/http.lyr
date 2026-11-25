@@ -1580,11 +1580,9 @@ pub class Server {
             } catch (_: IoError) { }
             this.nextConn = this.nextConn + 1;
             let id = this.nextConn;
-            let _ = spawn(
-                () => {
-                    this.connection(id, Conn.new(stream), handler);
-                }
-            );
+            let _ = spawn(() => {
+                this.connection(id, Conn.new(stream), handler);
+            });
         }
     }
 

@@ -294,13 +294,11 @@ pub fn withTimeout<T, E :: [Error]>(
 ): T throws [E, TimedOut, Cancelled] {
     var late = false;
     let work = spawn(body);
-    let timer = spawn(
-        () => {
-            try sleep(d);
-            late = true;
-            work.cancel();
-        }
-    );
+    let timer = spawn(() => {
+        try sleep(d);
+        late = true;
+        work.cancel();
+    });
     defer timer.cancel();
     defer work.settle();
     try {
@@ -889,12 +887,10 @@ pub class Timer {
     /// program does not wait for.
     pub static fn after(d: Duration): Channel<void> {
         let ch = Channel<void>.new();
-        spawnDetached(
-            () => {
-                try sleep(d);
-                ch.close();
-            }
-        );
+        spawnDetached(() => {
+            try sleep(d);
+            ch.close();
+        });
         return ch;
     }
 }

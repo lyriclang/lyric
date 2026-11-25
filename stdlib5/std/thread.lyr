@@ -53,19 +53,17 @@ pub class Thread {
         let s = Scheduler { };
         enlist(s);
         let task = launchOn(s, body, null);
-        startThread(
-            () => {
-                setCurrentScheduler(s);
-                s.started();
-                while (!task.isDone()) {
-                    s.step();
-                }
-                s.wind();
-                s.stopped();
-                living.leave(s);
-                setCurrentScheduler(null);
+        startThread(() => {
+            setCurrentScheduler(s);
+            s.started();
+            while (!task.isDone()) {
+                s.step();
             }
-        );
+            s.wind();
+            s.stopped();
+            living.leave(s);
+            setCurrentScheduler(null);
+        });
         return task;
     }
 }
@@ -118,13 +116,9 @@ pub class Pool :: [Closeable] {
         atomicFetchAndAdd(&w.active, 1);
         this.guard.release();
         // counted, the worker stays for it; the hand-over itself needs no guard
-        return launchOn(
-            w.scheduler,
-            body,
-            () => {
-                atomicFetchAndAdd(&w.active, -1);
-            }
-        );
+        return launchOn(w.scheduler, body, () => {
+            atomicFetchAndAdd(&w.active, -1);
+        });
     }
 
     /// Waits until every task given to the pool has ended, then ends its threads.
@@ -186,20 +180,18 @@ class Worker {
         let s = this.scheduler;
         let w = this;
         enlist(s);
-        startThread(
-            () => {
-                setCurrentScheduler(s);
-                s.started();
-                while (!(atomicLoad(&w.closing) && atomicLoad(&w.active) == 0)) {
-                    s.step();
-                }
-                s.wind();
-                w.finished.close();
-                s.stopped();
-                living.leave(s);
-                setCurrentScheduler(null);
+        startThread(() => {
+            setCurrentScheduler(s);
+            s.started();
+            while (!(atomicLoad(&w.closing) && atomicLoad(&w.active) == 0)) {
+                s.step();
             }
-        );
+            s.wind();
+            w.finished.close();
+            s.stopped();
+            living.leave(s);
+            setCurrentScheduler(null);
+        });
     }
 
     /// Marks the worker as closing and wakes its thread, which ends once its tasks have.
