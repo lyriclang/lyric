@@ -2616,3 +2616,39 @@ jetzt nur auf dem des Mirrors (#704). Der Dry-Run von `release.yml` auf `main` h
 stable-Schlüssel (der dev-Schlüssel lehnt sie ab), installiert auf drei Systemen, auf dem Mirror unter `staging/`; der
 öffentliche stable-Kanal blieb leer, der Entwurf ist gelöscht, kein Tag. Unbewiesen bleiben der Tag-Pfad, die Reserve und
 das Vorgehen bei Verlust oder Leck eines Schlüssels.
+
+## Nachtrag 2026-11-24 — die C-Emission: Uhren aus der Messung an `lyric-script`
+
+Die Entscheidungen stehen in 01, Review 2026-11-24 (C2′, C11–C17), und in 11, Review 2026-11-24 (L6, L7).
+Gemessen: ein kalter Debug-Bau von `lyric-script` 31,5 s (C 21,0 s), die Programm-Einheit allein 9,1 s
+bei `-O0` und 90,8 s bei `-O2`, auf einem Kern. Jede Änderung übersetzt sie ganz neu.
+
+| Slice | Inhalt | Uhr | Abschluss |
+|---|---|---|---|
+| **CE1** synthetisierter Code kompakt | C11: `equals`/`hash`/`compare`/`debug` eines Enums vergleichen erst den Tag und gehen nur für Varianten mit Nutzlast in einen `switch` | sofort, als Fehlerbehebung | `NativeFn` (157 Varianten): Zeilen und Frame vorher/nachher im PR; ein Test, dass ein Enum ohne Nutzlast in O(1) Zeilen vergleicht |
+| **CE2** eine Einheit je Modul | C2′: ein Header je Programm (Typen, Deskriptoren, Prototypen, Modul-Bindungen), eine Einheit je Modul, gecacht nach ihrem Text und dem Hash des Headers; die Instanzen wie bisher | nach #738, vor M18 | `lyric-script`: kalter Debug- und Release-Bau, eine Änderung in einem Modul — Zeiten vorher/nachher; die Goldens tragen die Einheiten; Messpunkt 3 hält |
+| **CE3** kalte Pfade | C12: Panik, `throw`, verlassende Fehlerprüfungen als `noinline`/`cold` | nach CE2, vor M18 | Messpunkt 3 hält oder wird besser; die Zeit von `-O2` an `lyric-script` |
+| **CE4** lesbares C | C13: `#line` nur bei Zeilenwechsel, `switch` für einen `match` über den Tag, Kopien propagiert, `if`/`while` aus dem Block | nach CE3, vor M18 | Zeilen der Einheiten, `-O0`-Frames der Parser-Spine (`objdump`), die Debugger-Tests |
+
+**Türen nach 5.0**: C14 (der Compiler teilt große Funktionen) mit L6 (`large-function`, Lint und Fix) und C16
+(ein Hinweis auf Hitze), C15 (Polymorphisierung). **L7**, der Katalog weiterer `perf`-Lints: die erste Runde nach
+5.0.0. **C17**: der Weg über C bleibt.
+
+## Nachtrag 2026-11-24 — Komfort im Editor: Uhren
+
+Die Entscheidungen stehen in 11, Review 2026-11-24 „Komfort im Editor“ (IDE1–IDE7).
+
+| Slice | Inhalt | Uhr | Abschluss |
+|---|---|---|---|
+| **ED1** Doku im Hover | IDE7: Überschriften eines Doc-Blocks im Hover drei Ebenen tiefer, Code-Blöcke unberührt | sofort, mit dem PR der Importpfade | ein Test je Ebene und einer mit `#` in einem Code-Block |
+| **ED2** Fixes an Fehlern | IDE1: fehlende `match`-Arme, fehlende Member eines Interfaces | nach CE1, vor M18 | je ein Test über `lyric fix` und über die Code Action; der korrigierte Text kompiliert bis auf die `panic`-Rümpfe |
+| **ED3** Quellaktionen | IDE2: Imports aufräumen, alles Ungenutzte der Datei entfernen | nach ED2, vor M18 | ein Test je Aktion; ein zweiter Lauf ändert nichts |
+
+**Nach 5.0**: IDE3 und IDE5 (Uhr: die erste Runde nach 5.0.0), IDE4 mit L6 und C14 (Tür), IDE6 mit IDE3.
+
+## Nachtrag 2026-11-24 — Befunde aus `stanza_wip`: Uhren
+
+| Slice | Inhalt | Uhr | Abschluss |
+|---|---|---|---|
+| **BF1** `warnings` wirkt auf das, was warnt | 11 L8; Spec 16 §5 Regeln 1, 5, 8 spec-first, mit Fällen | sofort, nach dem PR der Importpfade | `--deny-warnings` an `stanza_wip` meldet nur, was ohne den Schalter warnt; `-A warnings` schweigt; ein `@Allow` geht vor |
+| **BF2** Dev-Build als Minimum | 11 P13; Spec 15 (der Pin), 14 (`toolchain install` bietet `dev` an) | nach BF1, vor M18 | ein älterer Dev-Build ist `PKG0009`, ein neuerer und eine Release genügen; der Wechsel auf einen installierten Dev-Build |

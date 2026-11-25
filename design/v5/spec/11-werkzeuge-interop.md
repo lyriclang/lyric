@@ -419,6 +419,46 @@ die Bereiche in M17 S5 und S6 fand. Die Kennung ist die der Liste im Plan (13, N
 | B12 | **`lyric doc` dokumentiert das Paket, nicht seine Abhängigkeiten** (E7). Tür nach 5.0 | E7 |
 | B13 | **`LyrConfig.log`, `lyr_gc_collect()` und `lyr_gc_stats()` stehen nicht im öffentlichen Header** (H1, H5; der Plan nannte die Statistik schon eine Tür). Tür nach 5.0 | H1, H5 |
 
+## Review 2026-11-24 — Lints, die zu gut optimierbarem Code führen
+
+Aus der Messung der C-Emission an `lyric-script` (01, Review 2026-11-24). Ein Teil der Bauzeit liegt
+beim Quelltext selbst: `runTask` hat ~2.290 Zeilen und `specExpr` ~3.770. Der Maintainer will, dass die
+Werkzeuge gezielt zu Code lenken, den der Compiler gut optimiert, mit einfachen Fixes. Entschieden nach
+Empfehlung (2026-11-24); die Gruppe `perf` besteht seit W7 L3, ihre drei Lints sind gebaut (SEM0220–0222).
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| L6 | **`large-function`** in `perf`, Stufe `warn`: eine Funktion über einer Schwelle, gezählt in IR-Anweisungen nach der Senkung, nicht in Quellzeilen. Die Meldung nennt die größten Arme und Blöcke. Ein Fix „Arm in eine Funktion auslagern“ dort, wo es ohne Leser geht: ein Arm, der Lokale nur liest und weder `return` noch `break`/`continue` nach außen hat (`Safe`); einer, der Lokale ändert, mit `NeedsReview`; sonst keiner. Kommt mit C14 (01), weil Lint und automatische Teilung dieselbe Schwelle und dieselbe Analyse lesen. **Tür nach 5.0** | L3, G7 |
+| L7 | **Ein Katalog weiterer `perf`-Lints** wird in einer eigenen Runde entschieden, je mit rotem und grünem Fall (L4) und, wo möglich, einem Fix. Kandidaten für die Runde: eine Enum-Variante, die alle anderen groß macht; eine `if`-Kette über denselben Enum (→ `match`, auch als Refaktorierung); Allokation eines Literals in einer Schleife; `push` in einer Schleife mit bekannter Grenze ohne Kapazität; ein `clone` in einer Schleife; eine Closure, die in einer heißen Schleife Lokale fängt. **Uhr: die erste Runde nach 5.0.0** | L3 |
+
+## Review 2026-11-24 — Komfort im Editor: Fixes, Refaktorierungen, Doku im Hover
+
+Heute sind die Code Actions des Servers die Fixes, die eine Diagnose trägt (G7; 17 Stellen im Frontend), und
+`@Allow`; dazu Rename (E2). Refaktorierungen waren weder entschieden noch verworfen. Der Maintainer fragte nach
+dem Komfort, den C# in Rider oder Visual Studio gibt. Entschieden nach Empfehlung (2026-11-24); die Uhren stehen
+in 13, Nachtrag 2026-11-24.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| IDE1 | **Fixes an Fehlern, die es gibt, vor 5.0**: ein `match` ohne alle Fälle (`SEM0050`) bekommt die fehlenden Arme, je mit dem Rumpf `panic("not written yet")` (`NeedsReview`; ein `todo` gibt es nicht); ein Typ, dem ein Member eines Interfaces fehlt, bekommt dessen Stubs mit der Signatur des Interfaces (`NeedsReview`). Über `lyric fix` und den Editor zugleich (G7) | G7, E2 |
+| IDE2 | **Quellaktionen „Imports aufräumen“ und „alles Ungenutzte der Datei entfernen“** über die Fixes der `unused`-Lints, vor 5.0. Aufräumen heißt: Ungenutztes weg, die Reihenfolge, die der Formatter schreibt | E2, L5 |
+| IDE3 | **Umwandlungen** auf Wunsch, ohne Diagnose: eine `if`-Kette über denselben Wert → `match`; `if`/`else` umkehren; eine Zuweisung in beiden Zweigen → `if`-Ausdruck; Zählschleife → `for (x in …)`; `loop` mit `break` am Anfang → `while`; Verkettung → f-String. **Uhr: die erste Runde nach 5.0.0** | E2 |
+| IDE4 | **Strukturelle Refaktorierungen**: Variable, Konstante, Funktion extrahieren; Variable inlinen; Parameter einführen; Signatur ändern zuletzt. Sie lesen dieselbe Analyse wie der Fix von L6 und die Teilung von C14 (01) und kommen mit ihnen. **Tür nach 5.0** | E2, L6 |
+| IDE5 | **Navigation**: Implementierungen, Aufrufhierarchie, Typhierarchie. **Uhr: die erste Runde nach 5.0.0** | E2 |
+| IDE6 | **Erzeugen**: ein Doku-Gerüst (`///` mit `# Errors` aus `throws`, `# Panics` aus den Paniken des Rumpfs) mit IDE3. **„Konstruktor erzeugen“ ist verworfen**: Lyric hat keine Konstruktoren, ein Struct-Literal ersetzt sie, und ein erzeugtes `static fn new` legte ein Muster nahe, das die Sprache nicht braucht | E2 |
+| IDE7 | **Abschnitte der Doku im Hover**: `# Errors`, `# Panics`, `# Examples` sind Abschnitte (wie bei rustdoc) und bleiben so geschrieben; `lyric doc` setzt sie als Abschnitte. Der Hover rückt jede Überschrift eines Doc-Blocks um drei Ebenen ein (`#` → `####`, höchstens `######`), damit sie im Hover nicht größer steht als die Signatur. Code-Blöcke bleiben unberührt | E2, W8 |
+
+## Review 2026-11-24 — zwei Befunde aus einem Paket des Maintainers
+
+Gefunden in `stanza_wip` (eine Engine in Lyric) beim Wechsel auf einen neuen Dev-Build. Entschieden am
+2026-11-24: P13 auf Frage des Maintainers, L8 als Fehler, der W7 L2 und Spec 16 §5 Regel 8 widerspricht.
+
+| # | Entscheidung | Betrifft |
+|---|---|---|
+| P13 | **Der Toolchain-Pin nimmt einen Dev-Build als Minimum**: `toolchain = "5.0.0-dev.20261119"` verlangt mindestens den Dev-Build dieses Tages. Jeder Dev-Build derselben Version vom selben Tag an genügt, ebenso jede Release ab dieser Version. Ein älterer Dev-Build ist `LYR-PKG0009`, wie eine ältere Version. Der Commit-Hash hinter `+` zählt nicht, denn er ist nicht geordnet. Vorher zählte ein Dev-Build als die Version, deren Dev-Build er ist: `"5.0"` nahm jeden alten Dev-Build, ohne die Fixes, die ein Paket braucht. **Vor M18**, als Slice nach L8 | P12 |
+| L8 | **`warnings` wirkt auf das, was warnt**: Die Stufe eines Lints entsteht zuerst ohne `warnings`, aus Attribut, Kommandozeile, Manifest und der eigenen Stufe. Ist sie dann `warn`, entscheidet der engste `warnings`-Selektor. `-D warnings` (`--deny-warnings`, `denyWarnings`) macht so jede Warnung zum Fehler, und was `allow` ist, bleibt still. `-A warnings` schaltet alle Warnungen ab, `-W warnings` ändert nichts. Vorher stand `warnings` für jeden Lint, auch die auf `allow`: `--deny-warnings` meldete an `stanza_wip` 53.534 Fehler, ohne den Schalter keinen. Wie Rusts `-D warnings`. **Sofort**, mit Spec 16 §5 | L1, L2 |
+
+
 ---
 
 **Bereich 11 ist damit vollständig entschieden** (W1–W9, 2026-09-29). Es bleibt 12 (Migration).
