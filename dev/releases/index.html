@@ -722,6 +722,12 @@ way around it.</p>
 content alone. Where the path is not part of that content, <code>LYR-CT0004</code> says so and names
 <code>[package] include</code>. It said only that it found no file, while the repository had it.</p>
 </li>
+<li><p><strong>A finding in a module several programs share is said once.</strong> <code>check</code> and <code>build</code> compile each
+<code>[[bin]]</code> of a package, and a finding in a module they share was said by each: 361 places in a
+package of eight programs were 2,247 findings. The command now says each finding once, counts
+its warning once on the last line, and <code>--max-errors</code> counts the command's errors, not each
+program's.</p>
+</li>
 </ul>
 <hr />
 <h2 id="v4.6.0-never-released">v4.6.0 — never released</h2>
