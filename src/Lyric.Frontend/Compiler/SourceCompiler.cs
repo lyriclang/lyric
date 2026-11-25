@@ -243,7 +243,7 @@ public static class SourceCompiler
     /// <summary>'embed' reads relative to the module that calls, within its package's
     /// directory: the one a package's source root lies in.</summary>
     private static EmbedReader EmbedReaderFor(SourceManager sources, CompilerOptions options) =>
-        new(sources.GetPath,
+        new(sources.GetPath, whyMissing: options.EmbedMissing, packageDirectories:
             options.PackageRoots?.Values.Select(root => Path.GetDirectoryName(Path.GetFullPath(root))!).ToList() ?? []);
 
     /// <summary>Where a span begins as the binary names it: a standard-library source
@@ -675,6 +675,11 @@ public sealed record SemanticModel(
 /// </summary>
 public sealed record CompilerOptions
 {
+    /// <summary>For a file <c>embed</c> did not find, absolute: why, where the build knows a reason
+    /// the compiler cannot — a package from git holds its package content alone. <c>null</c> for
+    /// none.</summary>
+    public Func<string, string?>? EmbedMissing { get; init; }
+
     /// <summary>Where the standard library lives. <c>null</c> means
     /// <c>StdlibLoader.DefaultRoot()</c>: <c>LYRIC_STDLIB</c> or the directory next to the
     /// binary.</summary>

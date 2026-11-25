@@ -168,6 +168,29 @@ public class GitDependencyTests
         Assert.Contains("error[LYR-RES0003]: cannot find module 'geo.draft'", error);
     }
 
+    /// <summary>A file that 'embed' reads in a package from git and that its content does not
+    /// hold: the message says so and names 'include'; with the file in 'include' it is read.</summary>
+    [Fact]
+    public void An_embed_of_a_file_outside_a_git_packages_content_says_why()
+    {
+        const string table = "import std.core { embed };\n\npub fn table(): string {\n    return string.fromUtf8Lossy(comptime embed(\"../assets/table.txt\"));\n}\n";
+        const string main = "import std.io { println };\nimport geo.data { table };\n\nfn main(): void {\n    println(table());\n}\n";
+        using var repo = new TestRepo();
+        repo.Commit(("lyric.toml", Manifest("geo", version: "1.0.0")), ("src/data.lyr", table), ("assets/table.txt", "rows"));
+        repo.Tag("v1.0.0");
+        var dir = App($"geo = {{ git = \"{repo.Url}\", tag = \"v1.0.0\" }}", main);
+        var (exit, _, error) = Run("build", "-C", dir);
+        Assert.Equal(1, exit);
+        Assert.True(error.Contains("'embed' found no file '../assets/table.txt'"), error);
+        Assert.Contains("the package 'geo' comes from git, which holds its package content alone, and 'assets/table.txt' is not part of it", error);
+
+        repo.Commit(("lyric.toml", Manifest("geo", version: "1.1.0").Replace("version = \"1.1.0\"\n", "version = \"1.1.0\"\ninclude = [\"src/\", \"assets/\"]\n")),
+            ("src/data.lyr", table), ("assets/table.txt", "rows"));
+        repo.Tag("v1.1.0");
+        var held = App($"geo = {{ git = \"{repo.Url}\", tag = \"v1.1.0\" }}", main);
+        Assert.Equal("rows\n", BuildAndRun(held, "app", "build", "-C", held));
+    }
+
     /// <summary>One package of each name: a tag and a branch of one repository are two
     /// sources.</summary>
     [Fact]
