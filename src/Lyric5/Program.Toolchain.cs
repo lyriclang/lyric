@@ -154,7 +154,9 @@ public static partial class Program
         var channel = ToolchainHome.ChannelOf(current);
         var fetch = Fetcher();
         var newest = fetch.Index(channel).Newest;
-        if (newest is null || SemVer.Parse(current) is { } number && newest.Number.CompareTo(number) <= 0)
+        // two dev builds of the same day have equal SemVer numbers and differ only after '+'
+        if (newest is null || newest.Version == current
+            || SemVer.Parse(current) is { } number && newest.Number.CompareTo(number) < 0)
         {
             Console.Out.WriteLine($"lyric {current} is the newest of the channel '{channel}'");
             return 0;
