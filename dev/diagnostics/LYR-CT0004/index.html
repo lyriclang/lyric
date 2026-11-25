@@ -37,6 +37,7 @@
 <h2 id="explanation">Explanation</h2>
 <p><code>embed(path)</code> reads a file while the program compiles and makes its content a value of the program. It runs only inside a <code>comptime</code> site, and it reads only files within the package, found relative to the file that calls it.</p>
 <p>Write <code>comptime embed(&quot;…&quot;)</code>, and check that the path names a file inside the package.</p>
+<p>A package read from git holds its package content alone: by default <code>lyric.toml</code>, <code>src/</code>, <code>native/</code>, <code>build.lyr</code>, <code>README*</code> and <code>LICENSE*</code>. A file the repository has elsewhere, <code>assets/</code> for one, is not there, and the message says so. That package's <code>[package] include</code> names what it holds.</p>
 <h2 id="wrong">Wrong</h2>
 <pre><code class="language-lyric"><span class="com">//- src/main.lyr</span>
 <span class="kw">import</span> std.core { embed };
