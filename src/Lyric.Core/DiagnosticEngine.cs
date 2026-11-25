@@ -282,6 +282,20 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
     private readonly HashSet<Diagnostic> _rendered = [];
     private int _shownErrors;
 
+    /// <summary>A finding as another compilation of the same file knows it: its file by path, not
+    /// by the id this engine's sources gave it.</summary>
+    private string KeyOf(Diagnostic diagnostic) =>
+        string.Join('\u0001', diagnostic.Code,
+            diagnostic.Span.File.IsValid ? _sourceManager.GetPath(diagnostic.Span.File) : "",
+            diagnostic.Span.Start, diagnostic.Span.End, diagnostic.Message);
+
+    /// <summary>The warnings <see cref="RenderText(TextWriter, RenderStyle)"/> would say that
+    /// neither this engine nor another compilation of the command has said: what a build's last
+    /// line counts.</summary>
+    public int UnsaidWarnings(RenderStyle style) =>
+        Diagnostics.Count(d => d.Severity == Severity.Warning && !_rendered.Contains(d)
+                               && !(style.Said?.Said(KeyOf(d)) ?? false));
+
     /// <summary>Renders, in <see cref="RenderStyle.Current"/>, what has not been rendered yet.</summary>
     public void RenderText(TextWriter output) => RenderText(output, RenderStyle.Current);
 
@@ -298,7 +312,8 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
         {
             // the JSON form says every finding, each once; the limit is the drawing's
             foreach (var diagnostic in SortedSnapshot())
-                if (_rendered.Add(diagnostic)) events.Diagnostic(_sourceManager, diagnostic, style);
+                if (_rendered.Add(diagnostic) && (style.Said?.First(KeyOf(diagnostic)) ?? true))
+                    events.Diagnostic(_sourceManager, diagnostic, style);
             return;
         }
         var renderer = new TextRenderer(_sourceManager, style);
@@ -306,13 +321,19 @@ public sealed class DiagnosticEngine(SourceManager sourceManager)
         foreach (var diagnostic in SortedSnapshot())
         {
             if (!_rendered.Add(diagnostic)) continue;
-            if (style.MaxErrors > 0 && _shownErrors >= style.MaxErrors)
+            // another compilation of the command said it already: a module two programs share
+            if (style.Said is { } said && !said.First(KeyOf(diagnostic))) continue;
+            if (style.MaxErrors > 0 && (style.Said?.ShownErrors ?? _shownErrors) >= style.MaxErrors)
             {
                 if (diagnostic.Severity == Severity.Error) hiddenErrors++; else hiddenOthers++;
                 continue;
             }
             renderer.Render(output, diagnostic);
-            if (diagnostic.Severity == Severity.Error) _shownErrors++;
+            if (diagnostic.Severity == Severity.Error)
+            {
+                _shownErrors++;
+                style.Said?.Shown();
+            }
         }
         if (hiddenErrors + hiddenOthers == 0) return;
         var what = hiddenErrors == 1 ? "1 more error" : $"{hiddenErrors} more errors";

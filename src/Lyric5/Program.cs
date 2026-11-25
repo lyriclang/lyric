@@ -219,6 +219,7 @@ public static partial class Program
             MaxErrors = maxErrors,
             BaseDirectory = manifest is not null ? Path.GetDirectoryName(manifest) : Directory.GetCurrentDirectory(),
             Events = json ? new Lyric.Core.Rendering.EventWriter(Console.Out) : null,
+            Said = new Lyric.Core.Rendering.SaidFindings(),
         };
         lintArgs = new LintArgs(lints, warnDeps);
         return null;

@@ -65,7 +65,7 @@ public static class Pipeline
     {
         var result = SourceCompiler.Lower(SourceOf(project), OptionsFor(project, profile, target) with { Progress = phases });
         phases?.Dispose();
-        BuildStatus.Warned(phases is null ? 0 : result.Diagnostics.Diagnostics.Count(d => d.Severity == Severity.Warning));
+        BuildStatus.Warned(phases is null ? 0 : result.Diagnostics.UnsaidWarnings(Lyric.Core.Rendering.RenderStyle.Current));
         if (!result.Render(error) || result.Ir is null) return null;
         if (SubsetGate.Check(result.Ir, result.Diagnostics)) return result;
         result.Diagnostics.RenderText(error);
