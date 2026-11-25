@@ -20,7 +20,7 @@ public static partial class Program
     /// variable over the manifest over the default. It takes the options that change one —
     /// <c>--profile</c>, the fields, <c>--target</c> — so that what it says is what that build reads.
     /// </summary>
-    private static int Env(string[] args, LintArgs lints)
+    private static int Env(string[] args, LintArgs lints, string? toolchain)
     {
         if (Verbs.Read(Verbs.Find("env")!, args, Unknown, out var unread) is not { } parsed) return unread;
         if (parsed.Words.Count > 0 || parsed.Rest is not null)
@@ -45,7 +45,7 @@ public static partial class Program
 
         var settings = new List<Setting>
         {
-            new("toolchain", DisplayVersion(), "default"),
+            new("toolchain", DisplayVersion(), ToolchainSwitch.Origin(toolchain, Environment.GetEnvironmentVariable)),
             new("edition", "5", "default"),
             new("std", Pipeline.StdlibRoot, "default"),
             new("manifest", manifest?.File ?? "(none: a file is a package of its own)", manifest is null ? "default" : "lyric.toml"),

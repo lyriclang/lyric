@@ -14,5 +14,7 @@ internal static class TestEnvironment
         Environment.SetEnvironmentVariable("LYRIC_HOME", Path.Combine(Path.GetTempPath(), $"lyric5-tests-home-{Environment.ProcessId}"));
         Environment.SetEnvironmentVariable("LYRIC_TOOLCHAIN", null);
         Environment.SetEnvironmentVariable("LYRIC_TOOLCHAIN_FROM", null);
+        Environment.SetEnvironmentVariable("LYRIC_TOOLCHAIN_ORIGIN", null);
+        Environment.SetEnvironmentVariable("LYRIC_TOOLCHAIN_WHY", null);
     }
 }

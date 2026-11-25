@@ -117,6 +117,15 @@ public class VerbTableTests
         var (_, text, _) = RunRaw("env", "-C", root);
         Assert.Contains("profile.opt", text);
         Assert.Contains("(default)", text);
+
+        // --toolchain reports 'command line' as the origin of toolchain in lyric env
+        var (flagExit, flagJson, _) = RunRaw("env", "-C", root, "--toolchain", "local", "--json");
+        Assert.True(flagExit == 0, flagJson);
+        var flagSettings = JsonDocument.Parse(flagJson).RootElement.GetProperty("settings").EnumerateArray()
+            .ToDictionary(s => s.GetProperty("name").GetString()!, s => s.GetProperty("origin").GetString());
+        Assert.Equal("command line", flagSettings["toolchain"]);
+
+        Assert.Contains("--toolchain <version|local>", RunRaw("help").Out);
     }
 
     [Fact]

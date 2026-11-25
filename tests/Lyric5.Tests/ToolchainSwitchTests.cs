@@ -107,6 +107,27 @@ public class ToolchainSwitchTests
         var refused = Assert.Throws<ToolchainException>(() => Decide(home, null, Running, ("LYRIC_TOOLCHAIN", "5.1")));
         Assert.Equal("LYR-CLI0025", refused.Code);
         Assert.Contains("LYRIC_TOOLCHAIN names lyric 5.1, which is not installed", refused.Message);
+
+        // --toolchain takes precedence over LYRIC_TOOLCHAIN and the package pin
+        SwitchDecision Flagged(string? requested, params (string Name, string Value)[] env) =>
+            ToolchainSwitch.Decide(Running, name => env.FirstOrDefault(e => e.Name == name).Value, home, pinned, requested);
+        Assert.IsType<SwitchDecision.Here>(Flagged("local", ("LYRIC_TOOLCHAIN", "5.1.0")));
+        Assert.IsType<SwitchDecision.Here>(Flagged(Running, ("LYRIC_TOOLCHAIN", "5.1.0")));
+        var byFlag = Assert.IsType<SwitchDecision.Installed>(Flagged("5.2.0", ("LYRIC_TOOLCHAIN", "5.1.0")));
+        Assert.Equal("5.2.0", byFlag.Version);
+        Assert.Equal("--toolchain 5.2.0", byFlag.Why);
+        Assert.IsType<SwitchDecision.Here>(Flagged("5.2.0", ("LYRIC_TOOLCHAIN_FROM", "5.0.0")));
+        var missingFlag = Assert.Throws<ToolchainException>(() => Flagged("5.9.0"));
+        Assert.Equal("LYR-CLI0025", missingFlag.Code);
+        Assert.Contains("--toolchain names lyric 5.9.0, which is not installed", missingFlag.Message);
+
+        // Origin and Reason reflect the precedence ladder
+        Assert.Equal("command line", ToolchainSwitch.Origin("local", _ => "5.1.0"));
+        Assert.Equal("--toolchain local", ToolchainSwitch.Reason("local", _ => "5.1.0"));
+        Assert.Equal("lyric.toml", ToolchainSwitch.Origin(null, k => k == ToolchainSwitch.OriginVariable ? "lyric.toml" : null));
+        Assert.Equal("LYRIC_TOOLCHAIN", ToolchainSwitch.Origin(null, k => k == ToolchainSwitch.Variable ? "5.1.0" : null));
+        Assert.Equal("default", ToolchainSwitch.Origin(null, _ => null));
+        Assert.Null(ToolchainSwitch.Reason(null, _ => null));
     }
 
     [Fact]
@@ -172,5 +193,28 @@ public class ToolchainSwitchTests
             Assert.True(here == 2, refused);
             Assert.Contains("error[LYR-PKG0009]: package 'app' needs lyric 7.0.0 or later", refused);
         }
+
+        // --toolchain hands on to the named toolchain and strips --toolchain from argv so older binaries accept it
+        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
+        var baseEnv = new Dictionary<string, string> { ["LYRIC_HOME"] = home.Root, ["LYRIC_TOOLCHAIN"] = "", ["LYRIC_TOOLCHAIN_FROM"] = "" };
+        string[][] flagInvocations = [["--toolchain", "7.1.0", "build", "-C", package], ["build", "--toolchain=7.1.0", "-C", package]];
+        foreach (var flagArgs in flagInvocations)
+        {
+            var ran = ProcessRunner.Run(host, [Path.Combine(AppContext.BaseDirectory, "lyric5.dll"), .. flagArgs],
+                TimeSpan.FromMinutes(2), environment: baseEnv);
+            Assert.True(ran.ExitCode == 3, $"{ran.ExitCode}: {ran.Stdout}{ran.Stderr}");
+            Assert.StartsWith($"build -C {package}\nfrom ", ran.Stdout.Replace("\r\n", "\n"));
+            Assert.DoesNotContain("--toolchain", ran.Stdout);
+        }
+
+        // --toolchain local stays on this toolchain and hits the pin; missing value is exit 2
+        var stayed = ProcessRunner.Run(host, [Path.Combine(AppContext.BaseDirectory, "lyric5.dll"), "--toolchain", "local", "build", "-C", package],
+            TimeSpan.FromMinutes(2), environment: baseEnv);
+        Assert.Equal(2, stayed.ExitCode);
+        Assert.Contains("error[LYR-PKG0009]: package 'app' needs lyric 7.0.0 or later", stayed.Stderr);
+
+        var (missingVal, _, missingErr) = RunRaw("--toolchain");
+        Assert.Equal(2, missingVal);
+        Assert.Contains("'--toolchain' takes a version or 'local'", missingErr);
     }
 }

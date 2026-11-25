@@ -27,10 +27,10 @@ public static partial class Program
         var given = args;
         try
         {
-            if (TakeRenderOptions(ref args, out var lints) is { } refused) return refused;
+            if (TakeRenderOptions(ref args, out var lints, out var toolchain, out var forwarded) is { } refused) return refused;
             if (args.Length == 0) return Usage(Console.Out, 0);
-            if (Switch(args, given) is { } handedOn) return handedOn;
-            var exit = Dispatch(args, lints);
+            if (Switch(args, forwarded, toolchain) is { } handedOn) return handedOn;
+            var exit = Dispatch(args, lints, toolchain);
             // the JSON form closes with the count (16 §4); 'run' said it before its program ran
             Lyric.Core.Rendering.RenderStyle.Current.Events?.Summary();
             return exit;
@@ -41,7 +41,7 @@ public static partial class Program
         }
     }
 
-    private static int Dispatch(string[] args, LintArgs lints)
+    private static int Dispatch(string[] args, LintArgs lints, string? toolchain)
     {
         if (args[0] is "--version" or "-V") return Version();
         if (args[0] is "--help" or "-h") return Usage(Console.Out, 0);
@@ -68,7 +68,7 @@ public static partial class Program
             BuildStatus.Live = !verbose && !Console.IsErrorRedirected;
             BuildStatus.Verbose = verbose;
         }
-        try { return Dispatched(verb, rest, lints); }
+        try { return Dispatched(verb, rest, lints, toolchain); }
         finally
         {
             CBuild.Echo = null;
@@ -76,23 +76,23 @@ public static partial class Program
         }
     }
 
-    private static int Dispatched(VerbSpec verb, string[] rest, LintArgs lints)
+    private static int Dispatched(VerbSpec verb, string[] rest, LintArgs lints, string? toolchain)
     {
         return verb.Name switch
         {
-            "build" => Build(rest, lints, BuildVerb.Build),
-            "run" => Build(rest, lints, BuildVerb.Run),
-            "check" => Build(rest, lints, BuildVerb.Check),
-            "expand" => Build(rest, lints, BuildVerb.Expand),
-            "test" => Test(rest, lints),
-            "bench" => Bench(rest, lints),
+            "build" => Build(rest, lints, BuildVerb.Build, toolchain),
+            "run" => Build(rest, lints, BuildVerb.Run, toolchain),
+            "check" => Build(rest, lints, BuildVerb.Check, toolchain),
+            "expand" => Build(rest, lints, BuildVerb.Expand, toolchain),
+            "test" => Test(rest, lints, toolchain),
+            "bench" => Bench(rest, lints, toolchain),
             "fix" => Fix(rest, lints),
             "fmt" => Fmt(rest),
             "doc" => Doc(rest),
             "api" => Api(rest),
             "lsp" => Lsp(rest),
             "dap" => Dap(rest),
-            "env" => Env(rest, lints),
+            "env" => Env(rest, lints, toolchain),
             "new" => New(rest, here: false),
             "init" => New(rest, here: true),
             "completions" => Completions(rest),
@@ -152,17 +152,22 @@ public static partial class Program
     }
 
     /// <summary>
-    /// The options of every verb that say how its diagnostics read:
+    /// The options of every verb: <c>--toolchain &lt;version|local&gt;</c>,
     /// <c>--color auto|always|never</c>, <c>--absolute-paths</c>, <c>--max-errors N</c>
     /// (0 for all), anywhere before a <c>--</c>. They are taken out of <paramref name="args"/> and
     /// set as <see cref="Lyric.Core.Rendering.RenderStyle.Current"/> — every verb, the same style, and
-    /// set afresh by each command, so none leaks into the next. Paths are said relative to the
-    /// package's root: the one <c>-C</c> names, or the one around the working directory.
+    /// set afresh by each command, so none leaks into the next. <paramref name="forwarded"/> keeps the
+    /// original command line with only <c>--toolchain</c> removed so an older installed toolchain can
+    /// run a handed-on command. Paths are said relative to the package's root: the one <c>-C</c>
+    /// names, or the one around the working directory.
     /// </summary>
-    private static int? TakeRenderOptions(ref string[] args, out LintArgs lintArgs)
+    private static int? TakeRenderOptions(ref string[] args, out LintArgs lintArgs, out string? toolchain, out string[] forwarded)
     {
         lintArgs = LintArgs.None;
+        toolchain = null;
+        forwarded = args;
         var kept = new List<string>();
+        var passed = new List<string>();
         var color = "auto";
         var absolute = false;
         var json = false;
@@ -173,7 +178,22 @@ public static partial class Program
         for (var i = 0; i < args.Length; i++)
         {
             var arg = args[i];
-            if (arg == "--") { kept.AddRange(args[i..]); break; }
+            if (arg == "--")
+            {
+                kept.AddRange(args[i..]);
+                passed.AddRange(args[i..]);
+                break;
+            }
+            if (arg == "--toolchain" || arg.StartsWith("--toolchain=", StringComparison.Ordinal))
+            {
+                var value = arg == "--toolchain"
+                    ? (i + 1 < args.Length ? args[++i] : null)
+                    : arg["--toolchain=".Length..];
+                if (string.IsNullOrWhiteSpace(value)) return Unknown("'--toolchain' takes a version or 'local'");
+                toolchain = value;
+                continue;
+            }
+            passed.Add(arg);
             if (arg == "--absolute-paths") { absolute = true; continue; }
             // the JSON form (16 §4) for the verbs that report findings; metadata's --json is its own
             if (arg == "--json" && kept.Count > 0 && Verbs.Find(kept[0]) is { Json: true }) { json = true; continue; }
@@ -184,6 +204,7 @@ public static partial class Program
             {
                 if (i + 1 >= args.Length) return Unknown($"'{arg}' takes a lint, a group or 'warnings'");
                 var selector = args[++i];
+                passed.Add(selector);
                 if (Lyric.Core.DiagnosticCatalog.Select(selector) is null)
                     return Unknown(Lyric.Core.DiagnosticCatalog.Nearest(selector) is { } near
                         ? $"no lint, group or warning code '{selector}'; did you mean '{near}'?"
@@ -196,6 +217,7 @@ public static partial class Program
             {
                 if (i + 1 >= args.Length) return Unknown($"'{arg}' takes a value");
                 var value = args[++i];
+                passed.Add(value);
                 if (arg == "--color")
                 {
                     if (value is not ("auto" or "always" or "never")) return Unknown($"'--color' takes auto, always or never, not '{value}'");
@@ -209,6 +231,7 @@ public static partial class Program
             kept.Add(arg);
         }
         args = [.. kept];
+        forwarded = [.. passed];
 
         var start = Path.GetFullPath(from ?? Directory.GetCurrentDirectory());
         var manifest = Directory.Exists(start) ? Project.FindManifest(start) : null;

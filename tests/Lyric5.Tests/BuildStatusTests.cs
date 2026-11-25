@@ -28,8 +28,14 @@ public partial class BuildStatusTests
     private static string[] Lines(string error) =>
         [.. error.Replace("\r\n", "\n").Replace('\\', '/').Split('\n').Where(line => Status().IsMatch(line))];
 
-    [GeneratedRegex(@"^ *(Compiling|Checking|Linking|Archiving|Running|Binding|Fetching|Updating|Finished) ")]
+    [GeneratedRegex(@"^ *(Toolchain|Compiler|Target|Profile|Runtime|Cached|Compiling|Checking|Linking|Archiving|Running|Binding|Fetching|Updating|Finished) ")]
     private static partial Regex Status();
+
+    [GeneratedRegex(@"^   Toolchain lyric \S+, (zig|clang|gcc) .+ \([^)]+\)( — .+)?$")]
+    private static partial Regex BuildToolchainHeader();
+
+    [GeneratedRegex(@"^   Toolchain lyric \S+ \([^)]+\)( — .+)?$")]
+    private static partial Regex CheckToolchainHeader();
 
     [GeneratedRegex(@"^    Finished debug \[opt 0, debug info\] in \d+\.\d\ds$")]
     private static partial Regex Finished();
@@ -41,15 +47,19 @@ public partial class BuildStatusTests
         var (exit, _, error) = RunRaw("build", "-C", dir, "--color", "never");
         Assert.True(exit == 0, error);
         var lines = Lines(error).Where(l => !l.Contains("the runtime")).ToArray(); // the runtime's is the user cache's
-        Assert.Equal("   Compiling app v0.1.0 (src/main.lyr)", lines[0]);
-        Assert.Matches(@"^   Compiling \d+ of \d+ C units of app$", lines[1]);
-        Assert.StartsWith("     Linking app (out", lines[2]);
-        Assert.Matches(Finished(), lines[3]);
-        Assert.Equal(4, lines.Length);
+        Assert.Matches(BuildToolchainHeader(), lines[0]);
+        Assert.Equal("   Compiling app v0.1.0 (src/main.lyr)", lines[1]);
+        Assert.Matches(@"^   Compiling \d+ of \d+ C units of app$", lines[2]);
+        Assert.StartsWith("     Linking app (out", lines[3]);
+        Assert.Matches(Finished(), lines[4]);
+        Assert.Equal(5, lines.Length);
 
         var (again, _, said) = RunRaw("build", "-C", dir, "--color", "never");
         Assert.Equal(0, again);
-        Assert.Matches(Finished(), Assert.Single(Lines(said)));
+        var upToDate = Lines(said);
+        Assert.Matches(BuildToolchainHeader(), upToDate[0]);
+        Assert.Matches(Finished(), upToDate[1]);
+        Assert.Equal(2, upToDate.Length);
     }
 
     /// <summary>The whole of a log's lines: the front end's phases, what the build made with its
@@ -87,15 +97,44 @@ public partial class BuildStatusTests
         Assert.DoesNotContain("Produced", error);
     }
 
-    /// <summary><c>-v</c> names the packages and each C unit with its time.</summary>
+    /// <summary><c>-v</c> splits the build header into Toolchain, Compiler, Target and Profile
+    /// lines and names packages, runtime origin, cached steps and each C unit with its time.</summary>
     [Fact]
-    public void Verbose_says_the_packages_and_each_unit()
+    public void Verbose_says_the_header_packages_runtime_cache_and_each_unit()
     {
         var dir = Native();
         var (exit, _, error) = RunRaw("build", "-C", dir, "-v", "--color", "never");
         Assert.True(exit == 0, error);
+        Assert.Matches(@"(?m)^   Toolchain lyric \S+ \(default\)\r?$", error);
+        Assert.Matches(@"(?m)^    Compiler (zig|clang|gcc) .+ \(.+, (installed|PATH|LYRIC_CC)\)\r?$", error);
+        Assert.Matches(@"(?m)^      Target [^ ]+ \(host\)\r?$", error);
+        Assert.Matches(@"(?m)^     Profile debug \[opt 0, gc=immix, debug info, overflow checks\]\r?$", error);
         Assert.Matches(@"(?m)^     Package std v", error);
         Assert.Matches(@"(?m)^    Compiled twice\.c \(twice\.c\) \d+\.\d\ds\r?$", error);
+
+        // warm cache under -v still prints the full header, packages, runtime origin and cached steps
+        var (again, _, warm) = RunRaw("build", "-C", dir, "-v", "--color", "never");
+        Assert.True(again == 0, warm);
+        Assert.Matches(@"(?m)^   Toolchain lyric \S+ \(default\)\r?$", warm);
+        Assert.Matches(@"(?m)^    Compiler (zig|clang|gcc) ", warm);
+        Assert.Matches(@"(?m)^      Target [^ ]+ \(host\)\r?$", warm);
+        Assert.Matches(@"(?m)^     Profile debug \[opt 0, gc=immix, debug info, overflow checks\]\r?$", warm);
+        Assert.Matches(@"(?m)^     Package std v", warm);
+        Assert.Matches(@"(?m)^      Cached frontend for app \(\d+ C units?\)\r?$", warm);
+        Assert.Matches(@"(?m)^     Runtime (prebuilt|cached) \(.+\)\r?$", warm);
+        Assert.Matches(@"(?m)^      Cached app \(out/.+, up to date\)\r?$", warm.Replace('\\', '/'));
+    }
+
+    /// <summary>An explicit <c>--toolchain</c> is shown in the header, and non-default profile
+    /// flags appear in <c>Finished</c>.</summary>
+    [Fact]
+    public void Header_shows_toolchain_reason_and_finished_shows_active_profile_flags()
+    {
+        var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", Main));
+        var (exit, _, error) = RunRaw("check", "-C", dir, "--toolchain", "local", "--no-overflow-checks", "--fast-math", "--color", "never");
+        Assert.True(exit == 0, error);
+        Assert.Matches(@"(?m)^   Toolchain lyric \S+ \([^)]+\) — --toolchain local\r?$", error);
+        Assert.Matches(@"(?m)^    Finished debug \[opt 0, debug info, no overflow checks, fast-math\] in \d+\.\d\ds\r?$", error);
     }
 
     /// <summary>What is quiet stays quiet: none of the new lines under <c>-q</c>.</summary>
@@ -157,10 +196,11 @@ public partial class BuildStatusTests
         var (exit, _, error) = RunRaw("build", "-C", dir, "--color", "never");
         Assert.True(exit == 0, error);
         var lines = Lines(error);
-        Assert.Matches(@"^   Compiling 1 of \d+ C units of app$", lines[0]);
-        Assert.StartsWith("     Linking app (out", lines[1]);
-        Assert.Matches(Finished(), lines[2]);
-        Assert.Equal(3, lines.Length);
+        Assert.Matches(BuildToolchainHeader(), lines[0]);
+        Assert.Matches(@"^   Compiling 1 of \d+ C units of app$", lines[1]);
+        Assert.StartsWith("     Linking app (out", lines[2]);
+        Assert.Matches(Finished(), lines[3]);
+        Assert.Equal(4, lines.Length);
     }
 
     [Fact]
@@ -170,9 +210,10 @@ public partial class BuildStatusTests
         var (exit, _, error) = RunRaw("check", "-C", dir, "--color", "never");
         Assert.True(exit == 0, error);
         var lines = Lines(error);
-        Assert.Equal("    Checking app v0.1.0 (src/main.lyr)", lines[0]);
-        Assert.Matches(Finished(), lines[1]);
-        Assert.Equal(2, lines.Length);
+        Assert.Matches(CheckToolchainHeader(), lines[0]);
+        Assert.Equal("    Checking app v0.1.0 (src/main.lyr)", lines[1]);
+        Assert.Matches(Finished(), lines[2]);
+        Assert.Equal(3, lines.Length);
     }
 
     /// <summary><c>run</c> says the binary it runs, after the build's last line.</summary>
@@ -183,6 +224,7 @@ public partial class BuildStatusTests
         var (exit, _, error) = RunRaw("run", "-C", dir, "--color", "never");
         Assert.True(exit == 0, error);
         var lines = Lines(error);
+        Assert.Matches(BuildToolchainHeader(), lines[0]);
         Assert.Matches(Finished(), lines[^2]);
         Assert.StartsWith("     Running out", lines[^1]);
     }
@@ -194,7 +236,10 @@ public partial class BuildStatusTests
         var dir = Package(("lyric.toml", AppManifest), ("src/main.lyr", "fn main(): void {\n    let x: int = \"no\";\n}\n"));
         var (exit, _, error) = RunRaw("build", "-C", dir, "--color", "never");
         Assert.Equal(1, exit);
-        Assert.Equal(["   Compiling app v0.1.0 (src/main.lyr)"], Lines(error));
+        var lines = Lines(error);
+        Assert.Matches(BuildToolchainHeader(), lines[0]);
+        Assert.Equal("   Compiling app v0.1.0 (src/main.lyr)", lines[1]);
+        Assert.Equal(2, lines.Length);
         Assert.Contains("error[LYR-SEM", error);
     }
 

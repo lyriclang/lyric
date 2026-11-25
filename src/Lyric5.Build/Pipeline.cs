@@ -285,8 +285,10 @@ public static class Pipeline
         CompileResult? compiled = null;
         if (File.Exists(manifest))
         {
+            SayPackages(project, request.ToolchainVersion);
             DiagnosticStore.Replay(said, error);
             sources = File.ReadAllLines(manifest).Where(line => line.Length > 0).ToList();
+            BuildStatus.SayVerbose("Cached", $"frontend for {project.BinaryName} ({sources.Count} C unit{(sources.Count == 1 ? "" : "s")})");
         }
         else
         {
@@ -414,6 +416,7 @@ public static class Pipeline
                 build.LinkExecutable(inputs, executable, libraries, linkPaths);
                 File.WriteAllText(record, lines);
             }
+            else BuildStatus.SayVerbose("Cached", $"{project.BinaryName} ({Shown(executable)}, up to date)");
             if (File.Exists(names)) File.Copy(names, NamesOf(executable), overwrite: true);
             PutBeside(native.Beside, executable);
             return (0, executable);

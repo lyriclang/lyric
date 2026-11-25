@@ -35,12 +35,18 @@ public static class RuntimeArchive
     {
         var root = SourceRoot()
             ?? throw new CBuildException("this toolchain carries no runtime source (runtime/include/lyr not found above it)");
-        if (Prebuilt(root, compiler, target, profile) is { } prebuilt) return prebuilt;
+        if (Prebuilt(root, compiler, target, profile) is { } prebuilt)
+        {
+            BuildStatus.SayVerbose("Runtime", $"prebuilt ({Pipeline.Shown(prebuilt)})");
+            return prebuilt;
+        }
         var cache = CacheDir(toolchainVersion);
         // The flags, not the name alone: '--lto' on 'release' is another archive than 'release'.
         var key = $"{toolchainVersion}|{compiler.Identity}|{target.Triple}|{profile.Name}|{string.Join(' ', profile.Codegen)}|{SourceStamp(root)}";
+        var builtNow = false;
         string Build()
         {
+            builtNow = true;
             using var step = BuildStatus.Begin("Compiling", $"the runtime ({target.Triple}, {profile.Name})");
             var built = RuntimeLayout.BuildArchive(new CBuild(compiler, target, profile, cache), root, Path.Combine(cache, "lib"));
             // A new archive is rare — a new version, target or profile —: then the versions nobody
@@ -52,7 +58,9 @@ public static class RuntimeArchive
         var archive = UserCache.Memo("runtime-archive", key, Build);
         MarkUsed(cache);
         // The memo may outlive the archive (a cleaned cache): then build again.
-        return File.Exists(archive) ? archive : Build();
+        if (!File.Exists(archive)) return Build();
+        if (!builtNow) BuildStatus.SayVerbose("Runtime", $"cached ({archive})");
+        return archive;
     }
 
     /// <summary>The file beside a prebuilt archive that says how it was built.</summary>

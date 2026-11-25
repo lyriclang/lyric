@@ -23,20 +23,23 @@ public static partial class Program
     /// <paramref name="args"/>, the options every verb takes already taken out; an installed toolchain
     /// is given <paramref name="given"/>, the command line as it came.
     /// </summary>
-    private static int? Switch(string[] args, string[] given)
+    private static int? Switch(string[] args, string[] given, string? toolchain)
     {
         if (args.Length == 0 || Unswitched.Contains(args[0])) return null;
         var home = ToolchainHome.ForUser();
         try
         {
-            switch (ToolchainSwitch.Decide(DisplayVersion(), Environment.GetEnvironmentVariable, home, ManifestOf(args)))
+            switch (ToolchainSwitch.Decide(DisplayVersion(), Environment.GetEnvironmentVariable, home, ManifestOf(args), toolchain))
             {
                 case SwitchDecision.Installed installed:
-                    return HandOn(home.BinaryOf(installed.Version), given);
+                    var origin = !string.IsNullOrWhiteSpace(toolchain) ? "command line"
+                        : !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ToolchainSwitch.Variable)) ? ToolchainSwitch.Variable
+                        : "lyric.toml";
+                    return HandOn(home.BinaryOf(installed.Version), given, origin, installed.Why);
                 case SwitchDecision.Missing missing when args[0] is not ("version" or "--version" or "-V")
                                                         && !Console.IsInputRedirected && !Console.IsErrorRedirected:
                     return ToolchainSwitch.Offer(Fetcher(), home, missing, DisplayVersion(), Console.Error, Console.ReadLine) is { } version
-                        ? HandOn(home.BinaryOf(version), given)
+                        ? HandOn(home.BinaryOf(version), given, "lyric.toml", $"package '{missing.Package}' needs lyric {missing.Minimum} or later")
                         : null;
                 default:
                     return null;
@@ -66,7 +69,7 @@ public static partial class Program
     /// child that inherits the console, whose exit is this one's — a Ctrl+C reaches the child and
     /// leaves the parent waiting for it.
     /// </summary>
-    private static int HandOn(string binary, string[] args)
+    private static int HandOn(string binary, string[] args, string origin, string why)
     {
         Console.Out.Flush();
         Console.Error.Flush();
@@ -76,6 +79,8 @@ public static partial class Program
             var start = new ProcessStartInfo(binary) { UseShellExecute = false };
             foreach (var arg in args) start.ArgumentList.Add(arg);
             start.Environment[ToolchainSwitch.FromVariable] = from;
+            start.Environment[ToolchainSwitch.OriginVariable] = origin;
+            start.Environment[ToolchainSwitch.WhyVariable] = why;
             ConsoleCancelEventHandler wait = (_, e) => e.Cancel = true;
             Console.CancelKeyPress += wait;
             try
@@ -102,9 +107,11 @@ public static partial class Program
             argv[0] = Marshal.StringToCoTaskMemUTF8(binary);
             for (var i = 0; i < args.Length; i++) argv[i + 1] = Marshal.StringToCoTaskMemUTF8(args[i]);
             foreach (DictionaryEntry entry in Environment.GetEnvironmentVariables())
-                if ((string)entry.Key != ToolchainSwitch.FromVariable)
+                if ((string)entry.Key is not (ToolchainSwitch.FromVariable or ToolchainSwitch.OriginVariable or ToolchainSwitch.WhyVariable))
                     envp.Add(Marshal.StringToCoTaskMemUTF8($"{entry.Key}={entry.Value}"));
             envp.Add(Marshal.StringToCoTaskMemUTF8($"{ToolchainSwitch.FromVariable}={from}"));
+            envp.Add(Marshal.StringToCoTaskMemUTF8($"{ToolchainSwitch.OriginVariable}={origin}"));
+            envp.Add(Marshal.StringToCoTaskMemUTF8($"{ToolchainSwitch.WhyVariable}={why}"));
             envp.Add(IntPtr.Zero);
             Native.execve(binary, argv, [.. envp]);
             // execve returns only where it failed

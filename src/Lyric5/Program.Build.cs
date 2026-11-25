@@ -27,7 +27,7 @@ public static partial class Program
     /// it. <c>check</c> takes the programs through everything a build does before the C — the build
     /// scripts, the front end, the lints, <c>comptime</c> — and makes neither C nor a binary.
     /// </summary>
-    private static int Build(string[] args, LintArgs lints, BuildVerb how)
+    private static int Build(string[] args, LintArgs lints, BuildVerb how, string? toolchain)
     {
         var verb = how.ToString().ToLowerInvariant();
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -57,7 +57,7 @@ public static partial class Program
 
         if (flags.Contains("--shared") && !flags.Contains("--lib"))
             return Unknown("'--shared' says which library '--lib' builds; without '--lib' there is none");
-        if (flags.Contains("--lib")) return BuildLibrary(values, flags, baseDirectory, file, lints, offline, locked, clock);
+        if (flags.Contains("--lib")) return BuildLibrary(values, flags, baseDirectory, file, lints, offline, locked, clock, toolchain);
 
         // The programs this command is about: a package's every one, or the file's.
         List<Project> programs;
@@ -138,7 +138,11 @@ public static partial class Program
 
         if (ProfileOf(values, flags, library?.Manifest ?? programs[0].Manifest) is not { } profile) return 2;
 
-        if (library is not null) return Pipeline.CheckLibrary(library, Console.Error, profile, lints);
+        if (library is not null)
+        {
+            SayBuildHeader(profile, Target.Host, null, toolchain);
+            return Pipeline.CheckLibrary(library, Console.Error, profile, lints);
+        }
         programs = [.. programs.Select(p => p with { LintArgs = lints })];
 
         Target target;
@@ -157,6 +161,7 @@ public static partial class Program
         if (expand) return Pipeline.Expand(programs[0], Console.Out, Console.Error, profile, target);
         if (check)
         {
+            SayBuildHeader(profile, target, null, toolchain);
             // every program said, the first that fails deciding the exit
             var exit = 0;
             foreach (var program in programs)
@@ -166,6 +171,7 @@ public static partial class Program
         }
 
         if (CompilerFor(profile) is not { } compiler) return 2;
+        SayBuildHeader(profile, target, compiler, toolchain);
 
         string? executable = null;
         var produced = new List<string>();
@@ -191,11 +197,72 @@ public static partial class Program
         return ProcessRunner.RunInherited(executable!, programArgs, baseDirectory);
     }
 
+    /// <summary>The build header on standard error: a single compact <c>Toolchain</c> line in normal
+    /// mode, or split <c>Toolchain</c>, <c>Compiler</c>, <c>Target</c> and <c>Profile</c> lines
+    /// under <c>-v</c>. Silent when <c>-q</c> or <c>--json</c> leaves <see cref="BuildStatus.Writer"/>
+    /// unset.</summary>
+    private static void SayBuildHeader(BuildProfile profile, Target target, CCompiler? compiler, string? toolchain)
+    {
+        if (BuildStatus.Writer is null) return;
+        var version = DisplayVersion();
+        var origin = ToolchainSwitch.Origin(toolchain, Environment.GetEnvironmentVariable);
+        var reason = ToolchainSwitch.Reason(toolchain, Environment.GetEnvironmentVariable);
+        if (!BuildStatus.Verbose)
+        {
+            var cc = compiler is null ? "" : $", {compiler.Name} {compiler.Version}";
+            var why = reason is null ? "" : $" — {reason}";
+            BuildStatus.Say("Toolchain", $"lyric {version}{cc} ({target.Triple}){why}");
+            return;
+        }
+        BuildStatus.Say("Toolchain", $"lyric {version} ({reason ?? origin})");
+        if (compiler is not null)
+            BuildStatus.Say("Compiler", $"{compiler.Name} {compiler.Version} ({compiler.Path}, {CompilerOrigin(profile, compiler)})");
+        BuildStatus.Say("Target", $"{target.Triple} ({(target.IsHost ? "host" : "cross")})");
+        BuildStatus.Say("Profile", DescribeProfile(profile, verbose: true));
+    }
+
+    /// <summary>Where <paramref name="compiler"/> came from: <c>LYRIC_CC</c>, <c>installed</c> zig
+    /// under the home, or <c>PATH</c>.</summary>
+    private static string CompilerOrigin(BuildProfile profile, CCompiler compiler)
+    {
+        if (!profile.RequiresClang && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("LYRIC_CC")))
+            return "LYRIC_CC";
+        return CCompiler.InstalledZig(LyricHome.Root) is { } installed && installed.Path == compiler.Path
+            ? "installed"
+            : "PATH";
+    }
+
+    /// <summary>A profile's summary for <c>Finished</c> (compact, active non-default flags) or for
+    /// the verbose <c>Profile</c> header (all fields).</summary>
+    private static string DescribeProfile(BuildProfile profile, bool verbose)
+    {
+        var flags = new List<string> { $"opt {profile.Opt}" };
+        var gc = profile.Gc.ToString().ToLowerInvariant();
+        if (verbose)
+        {
+            flags.Add($"gc={gc}");
+            flags.Add(profile.DebugInfo ? "debug info" : "no debug info");
+            if (profile.Lto) flags.Add("lto");
+            flags.Add(profile.OverflowChecks ? "overflow checks" : "wrapping");
+            if (profile.FastMath) flags.Add("fast-math");
+            if (profile.DenyWarnings) flags.Add("deny warnings");
+        }
+        else
+        {
+            if (profile.DebugInfo) flags.Add("debug info");
+            if (profile.Lto) flags.Add("lto");
+            if (profile.Gc != Collector.Immix) flags.Add($"gc={gc}");
+            if (!profile.OverflowChecks) flags.Add("no overflow checks");
+            if (profile.FastMath) flags.Add("fast-math");
+        }
+        return $"{profile.Name} [{string.Join(", ", flags)}]";
+    }
+
     /// <summary>The last status lines of a build that succeeded: the profile, what it compiles with,
     /// and how long the command took; what it made, with its size; what else there is to say of it.</summary>
     private static void Finished(BuildProfile profile, System.Diagnostics.Stopwatch clock, IReadOnlyList<string> produced)
     {
-        BuildStatus.Say("Finished", $"{profile.Name} [opt {profile.Opt}{(profile.DebugInfo ? ", debug info" : "")}] in {BuildStatus.Seconds(clock.Elapsed)}");
+        BuildStatus.Say("Finished", $"{DescribeProfile(profile, verbose: false)} in {BuildStatus.Seconds(clock.Elapsed)}");
         foreach (var file in produced)
             BuildStatus.Say("Produced", $"{Pipeline.Shown(file)} ({BuildStatus.Size(new FileInfo(file).Length)})");
         BuildStatus.Summary();
@@ -207,7 +274,7 @@ public static partial class Program
     /// header <c>&lt;name&gt;.h</c>, under <c>out/&lt;profile&gt;/&lt;target&gt;/</c>.
     /// </summary>
     private static int BuildLibrary(Dictionary<string, string> values, HashSet<string> flags, string baseDirectory, string? file,
-        LintArgs lints, bool offline, bool locked, System.Diagnostics.Stopwatch clock)
+        LintArgs lints, bool offline, bool locked, System.Diagnostics.Stopwatch clock, string? toolchain)
     {
         if (file is not null) return Unknown("'--lib' builds the package's library, src/lib.lyr; a file is a program by itself");
         if (values.ContainsKey("--bin")) return Unknown("'--bin' names a program of the package; '--lib' builds its library");
@@ -243,6 +310,7 @@ public static partial class Program
             return Unknown($"unknown target '{values["--target"]}': {string.Join(", ", Target.Tier1.Select(t => t.Triple))}");
         }
         if (CompilerFor(profile) is not { } compiler) return 2;
+        SayBuildHeader(profile, target, compiler, toolchain);
         var (exit, built, linkArgs) = Pipeline.BuildLibrary(
             new BuildRequest(project with { LintArgs = lints }, profile, target, compiler, DisplayVersion()), Console.Error);
         if (exit != 0 || built is null) return exit;
