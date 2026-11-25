@@ -30,6 +30,42 @@ public class CascadeTests
     public void A_compile_time_only_call_is_said_where_the_program_makes_it() =>
         Assert.Equal(1, Count("import std.syntax { parseExpr };\n\nfn main(): void {\n    let _ = parseExpr(\"1 + 2\").toSource();\n}\n", "LYR-CG0002"));
 
+    /// <summary>The programs of a package share a module, and each is compiled: a finding in the
+    /// module is said once by the command, its warning counted once on the last line, and
+    /// '--max-errors' is the command's. They were said once per program.</summary>
+    [Fact]
+    public void A_finding_in_a_module_several_programs_share_is_said_once()
+    {
+        string Program(string name) => $"import std.io {{ println }};\nimport app.shared {{ one }};\n\nfn main(): void {{\n    println(f\"{name} {{one()}}\");\n}}\n";
+        string Three(string shared) => Package(
+            ("lyric.toml", AppManifest + "\n[[bin]]\nname = \"first\"\nentry = \"src/bin/first.lyr\"\n\n[[bin]]\nname = \"second\"\nentry = \"src/bin/second.lyr\"\n\n[[bin]]\nname = \"third\"\nentry = \"src/bin/third.lyr\"\n"),
+            ("src/shared.lyr", shared),
+            ("src/bin/first.lyr", Program("first")), ("src/bin/second.lyr", Program("second")), ("src/bin/third.lyr", Program("third")));
+        var wrong = Three("pub fn one(): int {\n    let wrong: int = \"text\";\n    return 1;\n}\n");
+        var unused = Three("pub fn one(): int {\n    let unused = 2;\n    return 1;\n}\n");
+
+        foreach (var verb in new[] { "check", "build" })
+        {
+            var (exit, _, error) = RunRaw(verb, "-C", wrong, "--color", "never");
+            Assert.Equal(1, exit);
+            Assert.Equal(1, Regex.Matches(error, @"^error\[LYR-SEM0001\]", RegexOptions.Multiline).Count);
+
+            var (fine, _, warned) = RunRaw(verb, "-C", unused, "--color", "never");
+            Assert.True(fine == 0, warned);
+            Assert.Equal(1, Regex.Matches(warned, @"^warning\[LYR-SEM0071\]", RegexOptions.Multiline).Count);
+            Assert.Contains("Summary 1 warning", warned);
+        }
+
+        // three errors, one in each program's own file, and a limit of two: the command draws two
+        var own = Package(
+            ("lyric.toml", AppManifest + "\n[[bin]]\nname = \"first\"\nentry = \"src/bin/first.lyr\"\n\n[[bin]]\nname = \"second\"\nentry = \"src/bin/second.lyr\"\n\n[[bin]]\nname = \"third\"\nentry = \"src/bin/third.lyr\"\n"),
+            ("src/bin/first.lyr", "fn main(): void {\n    let a: int = \"1\";\n}\n"),
+            ("src/bin/second.lyr", "fn main(): void {\n    let b: int = \"2\";\n}\n"),
+            ("src/bin/third.lyr", "fn main(): void {\n    let c: int = \"3\";\n}\n"));
+        var (_, _, limited) = RunRaw("check", "-C", own, "--color", "never", "--max-errors", "2");
+        Assert.Equal(2, Regex.Matches(limited, @"^error\[LYR-SEM0001\]", RegexOptions.Multiline).Count);
+    }
+
     private const string Marks = """
         enum Oops :: [Error] { Bad; fn message(): string { return "oops"; } }
         struct Box {

@@ -34,6 +34,11 @@ public sealed record RenderStyle
     /// and no text is drawn; <c>null</c> draws text.</summary>
     public EventWriter? Events { get; init; }
 
+    /// <summary>What the command has said across its compilations — each finding once, however
+    /// many programs compile the module it is in (16 §2 rule 2); <c>null</c> leaves each
+    /// compilation's engine to itself.</summary>
+    public SaidFindings? Said { get; init; }
+
     /// <summary>No colour, paths as read, the default limit.</summary>
     public static RenderStyle Plain { get; } = new();
 

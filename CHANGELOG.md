@@ -564,6 +564,11 @@ promise. This entry fills with the milestones.
 - **`embed` says why a file of a package from git is missing**: such a package holds its package
   content alone. Where the path is not part of that content, `LYR-CT0004` says so and names
   `[package] include`. It said only that it found no file, while the repository had it.
+- **A finding in a module several programs share is said once.** `check` and `build` compile each
+  `[[bin]]` of a package, and a finding in a module they share was said by each: 361 places in a
+  package of eight programs were 2,247 findings. The command now says each finding once, counts
+  its warning once on the last line, and `--max-errors` counts the command's errors, not each
+  program's.
 
 ---
 
