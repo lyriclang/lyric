@@ -103,6 +103,7 @@ public static class Pipeline
         return new CompilerOptions
         {
             StdlibRoot = StdlibRoot, PackageRoots = project.PackageRoots,
+            EmbedMissing = EmbedMissing(project.Graph),
             PackageDependencies = project.DeclaredDependencies,
             PackageTestRoots = project.TestRoot is { } tests ? new Dictionary<string, string> { [project.Name] = tests } : null,
             PackageGenRoots = GenRoots(project),
@@ -158,6 +159,28 @@ public static class Pipeline
             : CEmitter.Join(CEmitter.Emit(result.Ir!, result.Sources, StdlibRoot, profile?.OverflowChecks ?? true)));
         return 0;
     }
+
+    /// <summary>
+    /// Why <c>embed</c> found no file, where the graph says: the file lies in a package read from
+    /// git, and its path is not in that package's content (<see cref="PackageContent"/>), which is
+    /// all a package from git holds — the repository may well have it. <c>null</c> elsewhere: a file
+    /// of a package on disk is there or not.
+    /// </summary>
+    internal static Func<string, string?>? EmbedMissing(PackageGraph? graph) => graph is null || graph.Revisions.Count == 0 ? null : full =>
+    {
+        foreach (var (name, manifest) in graph.Packages)
+        {
+            if (!graph.Revisions.ContainsKey(name)) continue;
+            var root = Path.GetDirectoryName(Path.GetFullPath(manifest.File))!;
+            var relative = Path.GetRelativePath(root, full);
+            if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative)) continue;
+            relative = relative.Replace('\\', '/');
+            return PackageContent.Holds(manifest, relative) ? null
+                : $"the package '{name}' comes from git, which holds its package content alone, and '{relative}' is not part of it — "
+                  + "its [package] include names what it holds, by default lyric.toml, src/, native/, build.lyr, README* and LICENSE*";
+        }
+        return null;
+    };
 
     /// <summary>
     /// The packages' lint levels for a build under <paramref name="profile"/>: a profile that denies
@@ -753,6 +776,7 @@ public static class Pipeline
         var options = new CompilerOptions
         {
             StdlibRoot = StdlibRoot, PackageRoots = library.Graph.SourceRoots,
+            EmbedMissing = EmbedMissing(library.Graph),
             PackageDependencies = library.Graph.Declared,
             PackageBindingRoots = Bindings.Roots(Path.Combine(manifest.Root, "out", "cache"), library.Graph, null),
             LintLevels = LintLevelsOf(levels, manifest.Name, profile), RootPackage = manifest.Name,
@@ -807,6 +831,7 @@ public static class Pipeline
         return SourceCompiler.CheckProject(roots, new CompilerOptions
         {
             StdlibRoot = StdlibRoot, PackageRoots = graph.SourceRoots,
+            EmbedMissing = EmbedMissing(graph),
             PackageDependencies = graph.Declared,
             PackageBindingRoots = Bindings.Roots(Path.Combine(manifest.Root, "out", "cache"), graph, null),
             LintLevels = LintLevelsOf(levels, manifest.Name, null), RootPackage = manifest.Name,

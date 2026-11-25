@@ -697,6 +697,8 @@ explanation = '''
 `embed(path)` reads a file while the program compiles and makes its content a value of the program. It runs only inside a `comptime` site, and it reads only files within the package, found relative to the file that calls it.
 
 Write `comptime embed("…")`, and check that the path names a file inside the package.
+
+A package read from git holds its package content alone: by default `lyric.toml`, `src/`, `native/`, `build.lyr`, `README*` and `LICENSE*`. A file the repository has elsewhere, `assets/` for one, is not there, and the message says so. That package's `[package] include` names what it holds.
 '''
 wrong = '''
 //- src/main.lyr

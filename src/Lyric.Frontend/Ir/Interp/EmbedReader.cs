@@ -8,7 +8,10 @@ namespace Lyric.Ir.Interp;
 /// outside the program. Every file read is noted, absolute, for the build, which depends on it as
 /// on a source.
 /// </summary>
-public sealed class EmbedReader(Func<FileId, string> pathOf, IReadOnlyCollection<string> packageDirectories)
+/// <param name="whyMissing">For a file not found, absolute: why, where the build knows a reason — a
+/// package from git holds its package content alone —; <c>null</c> where it knows none.</param>
+public sealed class EmbedReader(Func<FileId, string> pathOf, IReadOnlyCollection<string> packageDirectories,
+    Func<string, string?>? whyMissing = null)
 {
     private readonly List<string> _read = [];
 
@@ -27,7 +30,8 @@ public sealed class EmbedReader(Func<FileId, string> pathOf, IReadOnlyCollection
         if (!Within(full, package))
             throw ComptimeFailure.Embed($"'embed' reads within the package, and '{path}' lies outside it ({package})");
         if (!File.Exists(full))
-            throw ComptimeFailure.Embed($"'embed' found no file '{path}' ({full})");
+            throw ComptimeFailure.Embed($"'embed' found no file '{path}' ({full})"
+                + (whyMissing?.Invoke(full) is { } why ? $": {why}" : ""));
         if (!_read.Contains(full)) _read.Add(full);
         return File.ReadAllBytes(full);
     }

@@ -557,6 +557,13 @@ promise. This entry fills with the milestones.
   after. An older development build refuses the package (`LYR-PKG0009`) or hands the command to an
   installed toolchain that meets the pin. At a terminal, the newest development build is offered.
   A pin of a version, `"5.0"`, still takes any development build of it.
+- **A lambda inside a lambda may name `this`.** It captures the `this` the outer lambda captured: a
+  class's reference, a struct's copy. The build stopped with an internal error (`LYR-ICE0001`,
+  "lambda captures 'this' outside a method"); a `let self = this;` before the outer lambda was the
+  way around it.
+- **`embed` says why a file of a package from git is missing**: such a package holds its package
+  content alone. Where the path is not part of that content, `LYR-CT0004` says so and names
+  `[package] include`. It said only that it found no file, while the repository had it.
 
 ---
 

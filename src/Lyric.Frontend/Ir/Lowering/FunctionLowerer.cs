@@ -515,10 +515,8 @@ internal sealed class FunctionLowerer
 
         if (capturesThis)
         {
-            var slot = ThisSlot ?? throw Bug("lambda captures 'this' outside a method");
-            var thisType = ThisType ?? throw Bug("captured 'this' has no type");
-            var value = _slots.NewTemp(thisType);
-            _b.Emit(new LoadLocal(value, slot, thisType, lambda.Span));
+            // in a method, its 'this'; in a lambda, the 'this' that lambda captured in turn
+            var (thisType, value) = ThisValue(lambda.Span);
 
             fieldNames[^1] = "this";
             fieldTypes[^1] = thisType;
@@ -3394,27 +3392,33 @@ internal sealed class FunctionLowerer
 
     /// <summary><c>this</c> is slot 0. That it exists was checked by the sema (<c>LYR-SEM0008</c> in a
     /// static method), so a missing slot is a bug here.</summary>
-    private TempId LowerThis(ThisExpr expr)
+    private TempId LowerThis(ThisExpr expr) => ThisValue(expr.Span).Value;
+
+    /// <summary>
+    /// <c>this</c> where the code stands, with its type: a method's slot 0, or inside a lambda the
+    /// value the lambda captured — read from the environment, at the field behind the named
+    /// captures. A class's <c>this</c> is the shared reference, a struct's the copy taken when the
+    /// closure was made. A lambda inside a lambda captures it from there: the outer lambda's
+    /// environment, not a method's slot it has none of.
+    /// </summary>
+    private (IrType Type, TempId Value) ThisValue(Span span)
     {
-        // Inside a lambda 'this' is a captured value: read from the environment, at
-        // the field behind the named captures. A class's 'this' is the shared reference, a
-        // struct's the copy taken when the closure was made.
         if (ThisSlot is null && _capturedThisField is { } field && _envSlot is { } envSlot && _envType is { } envType
             && _thisType is { } captured)
         {
             var env = _slots.NewTemp(new IrRefType(envType));
-            _b.Emit(new LoadLocal(env, envSlot, new IrRefType(envType), expr.Span));
+            _b.Emit(new LoadLocal(env, envSlot, new IrRefType(envType), span));
             var self = _slots.NewTemp(captured);
-            _b.Emit(new LoadField(self, env, envType, new FieldId(field), captured, expr.Span));
-            return self;
+            _b.Emit(new LoadField(self, env, envType, new FieldId(field), captured, span));
+            return (captured, self);
         }
 
         if (ThisSlot is not { } slot || ThisType is not { } type)
-            throw Bug($"'this' reached lowering outside an instance method at {expr.Span}");
+            throw Bug($"'this' reached lowering outside an instance method at {span}");
 
         var dest = _slots.NewTemp(type);
-        _b.Emit(new LoadLocal(dest, slot, type, expr.Span));
-        return dest;
+        _b.Emit(new LoadLocal(dest, slot, type, span));
+        return (type, dest);
     }
 
     /// <summary>
