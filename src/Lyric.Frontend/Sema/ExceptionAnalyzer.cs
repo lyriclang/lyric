@@ -121,6 +121,7 @@ internal sealed class ExceptionAnalyzer
     {
         foreach (var module in _comp.Modules)
         {
+            if (_comp.IsCached(module)) continue;
             _module = module;
             foreach (var decl in _comp.AstOf(module).Declarations)
                 AnalyzeDecl(decl);

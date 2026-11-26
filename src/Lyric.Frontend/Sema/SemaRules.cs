@@ -42,11 +42,14 @@ public sealed class SemaRules
     public void Run()
     {
         foreach (var module in _comp.Modules)
+        {
+            if (_comp.IsCached(module)) continue;
             foreach (var decl in _comp.AstOf(module).Declarations)
             {
                 CheckDecl(decl);
                 CheckNeverPositions(decl, null);
             }
+        }
         // The bodies parsed again — a round per field, a default per conformer:
         // 'e.[f]' is a member there, and a write through it answers to the field's word and the
         // function's 'mut' as any member write does.
@@ -78,6 +81,7 @@ public sealed class SemaRules
     {
         foreach (var module in _comp.Modules)
         {
+            if (_comp.IsCached(module)) continue;
             _surfaceModule = module;
             foreach (var decl in _comp.AstOf(module).Declarations)
                 switch (decl)

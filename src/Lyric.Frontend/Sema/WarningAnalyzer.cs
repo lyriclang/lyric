@@ -56,9 +56,12 @@ internal sealed partial class WarningAnalyzer
 
         // Both tables: the checker's references carry expression uses, the resolver's carry the
         // type names of annotations and conformance lists. An import used only in an annotation
-        // is used.
-        CollectUses(_types.AllReferences);
-        CollectUses(_binding.All);
+        // is used. When standard-library modules are unwatched, only this compilation's own tables
+        // need scanning.
+        var refs = _comp.WarnNative ? _types.AllReferences : _types.LocalReferences;
+        var bindings = _comp.WarnNative ? _binding.All : _binding.LocalAll;
+        CollectUses(refs);
+        CollectUses(bindings);
 
         // And the qualifier of a type path, which has no node and so appears in neither: the
         // 'look' of 'look.Eye' is a mention of the import, exactly as 'look.over(...)' is.
@@ -389,8 +392,8 @@ internal sealed partial class WarningAnalyzer
             var reported = new HashSet<Node>(ReferenceEqualityComparer.Instance);
             foreach (var table in new[]
                      {
-                         (IEnumerable<KeyValuePair<Node, Symbol>>)_types.AllReferences,
-                         _binding.All,
+                         _comp.WarnNative ? _types.AllReferences : _types.LocalReferences,
+                         _comp.WarnNative ? _binding.All : _binding.LocalAll,
                      })
                 foreach (var (node, symbol) in table)
                 {
@@ -480,7 +483,7 @@ internal sealed partial class WarningAnalyzer
     /// </summary>
     private void WarnUnusedLocals()
     {
-        foreach (var (node, symbol) in _types.AllReferences)
+        foreach (var (node, symbol) in _comp.WarnNative ? _types.AllReferences : _types.LocalReferences)
         {
             if (symbol is not LocalSymbol local) continue;
             if (!ReferenceEquals(symbol.Declaration, node)) continue;
@@ -645,7 +648,7 @@ internal sealed partial class WarningAnalyzer
         }
         foreach (var root in _types.ReparsedRoots) Collect(root);
 
-        foreach (var (node, symbol) in _types.AllReferences)
+        foreach (var (node, symbol) in _comp.WarnNative ? _types.AllReferences : _types.LocalReferences)
         {
             if (reparsed.Contains(node)) continue;
             if (symbol is not LocalSymbol { IsMutable: true } local) continue;
@@ -867,7 +870,7 @@ internal sealed partial class WarningAnalyzer
     /// </summary>
     private void WarnNamedVoid()
     {
-        foreach (var (node, symbol) in _types.AllReferences)
+        foreach (var (node, symbol) in _comp.WarnNative ? _types.AllReferences : _types.LocalReferences)
         {
             if (!ReferenceEquals(symbol.Declaration, node) || symbol.Name == "_") continue;
             if (_nativeFiles.Contains(node.Span.File)) continue;

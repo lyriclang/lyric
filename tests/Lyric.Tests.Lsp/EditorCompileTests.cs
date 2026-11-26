@@ -1,5 +1,9 @@
+using System.Text.Json;
 using Lyric.Compiler;
+using Lyric.Lsp;
 using Lyric.Lsp.Analysis;
+using Lyric.Lsp.Documents;
+using Lyric.Lsp.Protocol;
 using Lyric.Parsing;
 
 namespace Lyric.Tests.Lsp;
@@ -22,6 +26,7 @@ public sealed class EditorCompileTests : IDisposable
     }
 
     private static readonly StdlibSeed Seed = StdlibSeed.Shared(Lyric5.Build.Pipeline.StdlibRoot);
+    private static readonly CheckedStdlib? CheckedStd = CheckedStdlib.Shared(Lyric5.Build.Pipeline.StdlibRoot);
 
     /// <summary>Programs that say something: clean, an error, a warning, one the lints take back,
     /// one reaching far into std.</summary>
@@ -180,5 +185,233 @@ public sealed class EditorCompileTests : IDisposable
         var build = Said(Check(path, options));
         Assert.Contains(build, l => l.StartsWith("LYR-CT0002", StringComparison.Ordinal));
         Assert.Equal(build, Said(Check(path, options with { EditorBudget = AnalysisService.EditorBudget })));
+    }
+
+    [Fact]
+    public void Checked_stdlib_builds_cleanly_and_reuses_std_symbols_across_runs()
+    {
+        Assert.NotNull(CheckedStd);
+        var path = Program(Hello);
+        var options = PackageUnit.SingleFileOptions(path) with { Lower = false, CheckedStdlib = CheckedStd };
+
+        var first = Check(path, options);
+        var second = Check(path, options);
+        Assert.True(first.UsedCheckedStdlib);
+        Assert.True(second.UsedCheckedStdlib);
+        Assert.Empty(Said(first));
+        Assert.Empty(Said(second));
+        Assert.Same(
+            first.Model!.Compilation.FindModule(["std", "io"]),
+            second.Model!.Compilation.FindModule(["std", "io"]));
+        Assert.True(second.Model.Compilation.IsCached(second.Model.Compilation.FindModule(["std", "io"])!));
+    }
+
+    [Theory]
+    [MemberData(nameof(Programs))]
+    public void Checked_stdlib_changes_nothing_a_compilation_says(string text)
+    {
+        Assert.NotNull(CheckedStd);
+        var path = Program(text);
+        var options = PackageUnit.SingleFileOptions(path) with { Lower = false };
+        var fresh = Check(path, options);
+        var cached = Check(path, options with { CheckedStdlib = CheckedStd });
+        Assert.True(cached.UsedCheckedStdlib);
+        Assert.Equal(Said(fresh), Said(cached));
+    }
+
+    [Fact]
+    public void User_extensions_and_derived_conformances_work_and_stay_isolated_with_checked_stdlib()
+    {
+        Assert.NotNull(CheckedStd);
+        var withExt = Program("""
+            import std.io { println };
+            import std.codec { Codable };
+            import std.json;
+
+            struct Point :: Equatable & Debug & Codable {
+                x: int,
+                y: int,
+            }
+
+            extend string {
+                fn shouty(): string {
+                    return this + "!";
+                }
+            }
+
+            fn main(): int {
+                let a = Point { x = 1, y = 2 };
+                let b = Point { x = 1, y = 2 };
+                let encoded = try! json.encode(a);
+                println(encoded.shouty());
+                return if (a == b) 0 else 1;
+            }
+            """);
+        var withoutExt = Program("""
+            fn main(): int {
+                let s = "hi";
+                let _ = s.shouty();
+                return 0;
+            }
+            """);
+
+        var first = Check(withExt, PackageUnit.SingleFileOptions(withExt) with { Lower = false, CheckedStdlib = CheckedStd });
+        Assert.True(first.UsedCheckedStdlib);
+        Assert.Empty(Said(first));
+
+        // The extension method from the first compilation must not leak into the second.
+        var second = Check(withoutExt, PackageUnit.SingleFileOptions(withoutExt) with { Lower = false, CheckedStdlib = CheckedStd });
+        Assert.True(second.UsedCheckedStdlib);
+        Assert.Contains(Said(second), l => l.Contains("shouty"));
+    }
+
+    [Fact]
+    public void Changing_a_std_file_invalidates_the_checked_stdlib_cache()
+    {
+        var root = CopyOfStd();
+        var cached = CheckedStdlib.BuildSnapshot(root);
+        Assert.NotNull(cached);
+
+        var path = Program(UsesShout);
+        var options = PackageUnit.SingleFileOptions(path) with { StdlibRoot = root, Lower = false, CheckedStdlib = cached };
+        var before = Check(path, options);
+        Assert.True(before.UsedCheckedStdlib);
+        Assert.NotEmpty(Said(before));
+
+        // Modify std/io.lyr on disk: the old snapshot is now rejected and std is checked fresh.
+        var io = Path.Combine(root, "std", "io.lyr");
+        File.AppendAllText(io, Shout);
+        File.SetLastWriteTimeUtc(io, DateTime.UtcNow.AddMinutes(1));
+        Assert.False(cached.IsFreshOnDisk());
+
+        var afterEdit = Check(path, options);
+        Assert.False(afterEdit.UsedCheckedStdlib);
+        Assert.Empty(Said(afterEdit));
+
+        // Shared() refreshes the snapshot automatically on disk change.
+        var refreshed = CheckedStdlib.Shared(root);
+        Assert.NotNull(refreshed);
+        var afterRefresh = Check(path, options with { CheckedStdlib = refreshed });
+        Assert.True(afterRefresh.UsedCheckedStdlib);
+        Assert.Empty(Said(afterRefresh));
+    }
+
+    [Fact]
+    public void Different_build_facts_or_toolchain_version_invalidate_the_checked_stdlib_cache()
+    {
+        Assert.NotNull(CheckedStd);
+        var path = Program(Hello);
+        var baseOpts = PackageUnit.SingleFileOptions(path) with { Lower = false, CheckedStdlib = CheckedStd };
+
+        Assert.True(CheckedStd.IsValidFor(baseOpts));
+        Assert.False(CheckedStd.IsValidFor(baseOpts with { ToolchainVersion = "0.0.1-other" }));
+        Assert.False(CheckedStd.IsValidFor(baseOpts with { OverflowChecks = !CheckedStd.OverflowChecks }));
+        Assert.False(CheckedStd.IsValidFor(baseOpts with { Build = CheckedStd.Build with { Debug = !CheckedStd.Build.Debug } }));
+        Assert.False(CheckedStd.IsValidFor(baseOpts with { WarnDeps = true }));
+    }
+
+    [Fact]
+    public void Open_std_file_in_overlay_bypasses_the_checked_stdlib_cache()
+    {
+        Assert.NotNull(CheckedStd);
+        var io = Path.Combine(Lyric5.Build.Pipeline.StdlibRoot, "std", "io.lyr");
+        var path = Program(UsesShout);
+        var options = PackageUnit.SingleFileOptions(path) with
+        {
+            Lower = false,
+            CheckedStdlib = CheckedStd,
+            SourceOverlay = new Dictionary<string, string> { [Path.GetFullPath(io)] = File.ReadAllText(io) + Shout },
+        };
+        var result = Check(path, options);
+        Assert.False(result.UsedCheckedStdlib);
+        Assert.Empty(Said(result));
+    }
+
+    private string Package(string mainText)
+    {
+        var pkgDir = Path.Combine(_dir, "pkg-" + Guid.NewGuid().ToString("N")[..6]);
+        Directory.CreateDirectory(Path.Combine(pkgDir, "src"));
+        File.WriteAllText(Path.Combine(pkgDir, "lyric.toml"), "[package]\nname = \"app\"\nversion = \"0.1.0\"\n");
+        var mainPath = Path.Combine(pkgDir, "src", "main.lyr");
+        File.WriteAllText(mainPath, mainText);
+        return mainPath;
+    }
+
+    private static async Task<(JsonElement Published, List<string> Logs)> ReceiveAnalysisAsync(ServerHarness harness)
+    {
+        var logs = new List<string>();
+        while (true)
+        {
+            var message = await harness.ReceiveAsync();
+            if (!message.TryGetProperty("method", out var method)) continue;
+            var name = method.GetString();
+            if (name == LspMethods.LogMessage)
+                logs.Add(message.GetProperty("params").GetProperty("message").GetString() ?? "");
+            else if (name == LspMethods.PublishDiagnostics)
+                return (message, logs);
+        }
+    }
+
+    [Fact]
+    public async Task The_server_reuses_checked_std_on_the_second_analysis()
+    {
+        var mainPath = Package(Hello);
+        var uri = DocumentUri.FromFilePath(mainPath);
+        await using var harness = new ServerHarness();
+        await harness.InitializeAsync();
+
+        await harness.NotifyAsync(LspMethods.DidOpen, JsonSerializer.Serialize(new
+        {
+            textDocument = new { uri, languageId = "lyric", version = 1, text = Hello },
+        }));
+        var (firstPub, _) = await ReceiveAnalysisAsync(harness);
+        Assert.Empty(firstPub.GetProperty("params").GetProperty("diagnostics").EnumerateArray());
+
+        await harness.NotifyAsync(LspMethods.DidChange, JsonSerializer.Serialize(new
+        {
+            textDocument = new { uri, version = 2 },
+            contentChanges = new[] { new { text = Hello.Replace("\"hi\"", "\"hello\"") } },
+        }));
+        var (secondPub, logs) = await ReceiveAnalysisAsync(harness);
+        Assert.Empty(secondPub.GetProperty("params").GetProperty("diagnostics").EnumerateArray());
+        Assert.Contains(logs, line => line.Contains("analysed ", StringComparison.Ordinal)
+                                   && line.Contains("std cached", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task The_server_discards_the_checked_std_cache_when_a_std_file_changes()
+    {
+        var stdRoot = CopyOfStd();
+        var mainPath = Package(UsesShout);
+        var uri = DocumentUri.FromFilePath(mainPath);
+
+        await using var harness = new ServerHarness(new LspServerOptions
+        {
+            Debounce = TimeSpan.Zero,
+            StdlibRoot = stdRoot,
+        });
+        await harness.InitializeAsync();
+
+        await harness.NotifyAsync(LspMethods.DidOpen, JsonSerializer.Serialize(new
+        {
+            textDocument = new { uri, languageId = "lyric", version = 1, text = UsesShout },
+        }));
+        var (firstPub, _) = await ReceiveAnalysisAsync(harness);
+        Assert.NotEmpty(firstPub.GetProperty("params").GetProperty("diagnostics").EnumerateArray());
+
+        // Edit std/io.lyr on disk: the server must invalidate its cached std snapshot and see shout().
+        var io = Path.Combine(stdRoot, "std", "io.lyr");
+        File.AppendAllText(io, Shout);
+        File.SetLastWriteTimeUtc(io, DateTime.UtcNow.AddMinutes(1));
+
+        await harness.NotifyAsync(LspMethods.DidChange, JsonSerializer.Serialize(new
+        {
+            textDocument = new { uri, version = 2 },
+            contentChanges = new[] { new { text = UsesShout + "\n" } },
+        }));
+        var (secondPub, logs) = await ReceiveAnalysisAsync(harness);
+        Assert.Empty(secondPub.GetProperty("params").GetProperty("diagnostics").EnumerateArray());
+        Assert.Contains(logs, line => line.Contains("analysed ", StringComparison.Ordinal)
+                                   && line.Contains("std cached", StringComparison.Ordinal));
     }
 }

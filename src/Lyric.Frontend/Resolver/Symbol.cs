@@ -128,9 +128,9 @@ public sealed class FieldSymbol : Symbol
 
 /// <summary>
 /// An associated type. Declared on an interface, <c>type Item;</c>, it
-/// is a question every conformer answers: <see cref="Bindings"/> holds the answer per
-/// conforming type once the checker has read the conformance. Declared on a struct, class,
-/// enum or in a conformance block, <c>type Item = int;</c>, it is one conformer's answer.
+/// is a question every conformer answers (stored per compilation in <c>TypeResult</c>). Declared on
+/// a struct, class, enum or in a conformance block, <c>type Item = int;</c>, it is one conformer's
+/// answer.
 /// </summary>
 public sealed class AssociatedTypeSymbol : Symbol
 {
@@ -138,29 +138,6 @@ public sealed class AssociatedTypeSymbol : Symbol
 
     /// <summary>The interface that declares it; <c>null</c> for a conformer's answer.</summary>
     public TypeSymbol? Owner { get; set; }
-
-    // The answers, per conformer and per conformance INSTANCE: 'Mul<int>' and
-    // 'Mul<float>' of one type each answer 'Out' for themselves. The instance is the interface
-    // at the conformance's arguments with 'Self' as the conformer.
-    private readonly Dictionary<TypeSymbol, List<(Sema.LyrType Instance, Sema.LyrType Answer)>> _answers =
-        new(ReferenceEqualityComparer.Instance);
-
-    public void Bind(TypeSymbol conformer, Sema.LyrType instance, Sema.LyrType answer)
-    {
-        if (!_answers.TryGetValue(conformer, out var list)) _answers[conformer] = list = new();
-        list.Add((instance, answer));
-    }
-
-    /// <summary>The conformer's answer: for the instance asked, else — the question reached
-    /// here without one — the first conformance's. <c>null</c> where the type gave none.</summary>
-    public Sema.LyrType? Answer(TypeSymbol conformer, Sema.LyrType? instance, bool exact = false)
-    {
-        if (!_answers.TryGetValue(conformer, out var list) || list.Count == 0) return null;
-        if (instance is not null)
-            foreach (var (at, answer) in list)
-                if (Sema.LyrType.Equal(at, instance)) return answer;
-        return exact ? null : list[0].Answer;
-    }
 
     /// <summary>What every answer conforms to: the interfaces of
     /// <c>type Iter :: [Iterator];</c>, resolved in the declaring interface, whose <c>Self</c>
@@ -171,20 +148,6 @@ public sealed class AssociatedTypeSymbol : Symbol
     /// no <c>Self</c>: what a value of the interface answers when its type leaves the member
     /// unfixed — <c>Iterator&lt;Item = int&gt;</c> throws nothing. Set by the checker.</summary>
     public Sema.LyrType? Default { get; set; }
-
-    /// <summary>The answer a blanket or shape block gives a type that has none of its own (05 §13
-    /// rules 6, 8) — the block's answer at the parameters the type binds; set by the checker.</summary>
-    public Func<Sema.LyrType, Sema.LyrType?>? BlockAnswer { get; set; }
-
-    /// <summary>A built-in conformer's answer, the builtin named by its type name ('int'):
-    /// the primitive types have no symbol of their own in the types.</summary>
-    public Sema.LyrType? BuiltinAnswer(string name, Sema.LyrType? instance)
-    {
-        foreach (var conformer in _answers.Keys)
-            if (conformer.Kind == TypeSymbolKind.Builtin && conformer.Name == name)
-                return Answer(conformer, instance);
-        return null;
-    }
 }
 
 public sealed class EnumVariantSymbol : Symbol

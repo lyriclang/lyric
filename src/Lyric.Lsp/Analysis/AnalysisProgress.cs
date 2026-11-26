@@ -81,7 +81,7 @@ internal sealed class AnalysisPhases : ICompilerProgress, IDisposable
                 Say(detail.Length > 0 ? $"parsing {detail}" : "parsing", 10);
                 break;
             case Phase.Resolve:
-                Say("resolving names", 25);
+                Say(detail.Length > 0 ? $"resolving names ({detail})" : "resolving names", 25);
                 break;
             case Phase.Check when detail == SourceCompiler.SitesDetail:
                 Say("evaluating compile-time sites", 80);

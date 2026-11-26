@@ -60,8 +60,10 @@ public static class SourceCompiler
 
     private static CompileResult Run(ScriptSource source, Stage stage, CompilerOptions options)
     {
+        options.Cancellation.ThrowIfCancellationRequested();
         var report = options.Progress;
-        var sources = SourcesFor(options);
+        var checkedStd = stage != Stage.Expand ? CheckedStdOf(options) : null;
+        var sources = SourcesFor(options, checkedStd);
         var diagnostics = new DiagnosticEngine(sources);
 
         report?.BeginPhase(Phase.Read, source.DisplayName);
@@ -90,7 +92,7 @@ public static class SourceCompiler
         var parsedModules = new Dictionary<string, LoadedModule>(StringComparer.Ordinal);
         Compilation Build(IReadOnlyDictionary<string, Module>? trees)
         {
-            var built = new Compilation(sources, diagnostics)
+            var built = new Compilation(sources, diagnostics, checkedStd)
             {
                 Library = options.Library,
                 WarnNative = options.WarnDeps,
@@ -175,13 +177,18 @@ public static class SourceCompiler
         // — the module's only roots, so it holds what the sites reach —, the IR interpreter over
         // it, and the real lowering writes each site's value as a constant.
         types.SourcePlace = SourcePlaceFor(sources, options);
-        if (types.ComptimeSites.Count > 0) report?.BeginPhase(Phase.Check, SitesDetail);
-        var evaluated = EvaluateSites(compilation, binding, types, diagnostics, options, embed, out var comptime);
-        if (types.ComptimeSites.Count > 0) report?.EndPhase();
-        if (!evaluated) return new CompileResult(sources, diagnostics, null, model);
+        ComptimeTable? comptime = null;
+        var evaluate = options.Lower || checkedStd is null || types.HasLocalComptimeSites || checkedStd.HasWhenOrDeprecated;
+        if (evaluate)
+        {
+            if (types.ComptimeSites.Count > 0) report?.BeginPhase(Phase.Check, SitesDetail);
+            var evaluated = EvaluateSites(compilation, binding, types, diagnostics, options, embed, out comptime);
+            if (types.ComptimeSites.Count > 0) report?.EndPhase();
+            if (!evaluated) return new CompileResult(sources, diagnostics, null, model) { UsedCheckedStdlib = checkedStd is not null };
+        }
         WarnDeprecated(compilation, binding, types, diagnostics, options, comptime);
-        if (diagnostics.HasErrors) return new CompileResult(sources, diagnostics, null, model); // an 'until' come due
-        if (!options.Lower) return Unlowered(compilation, types, diagnostics, options, sources, model, embed, comptime);
+        if (diagnostics.HasErrors) return new CompileResult(sources, diagnostics, null, model) { UsedCheckedStdlib = checkedStd is not null }; // an 'until' come due
+        if (!options.Lower) return Unlowered(compilation, types, diagnostics, options, sources, model, embed, comptime) with { UsedCheckedStdlib = checkedStd is not null };
 
         // Lowering limits arrive as LYR-ICE0002 in the same engine and are rendered with file, line and
         // column like any other error.
@@ -447,10 +454,15 @@ public static class SourceCompiler
         return loader;
     }
 
-    /// <summary>A compilation's source manager: the seed's fork where the options hold a seed of
-    /// the library they read, a fresh one otherwise.</summary>
-    private static SourceManager SourcesFor(CompilerOptions options) =>
-        SeedOf(options) is { } seed ? seed.Fork() : new SourceManager();
+    /// <summary>A compilation's source manager: the checked stdlib's fork, else the seed's fork
+    /// where the options hold a seed of the library they read, a fresh one otherwise.</summary>
+    private static SourceManager SourcesFor(CompilerOptions options, CheckedStdlib? checkedStd = null) =>
+        checkedStd is not null ? checkedStd.ForkSources()
+        : SeedOf(options) is { } seed ? seed.Fork() : new SourceManager();
+
+    /// <summary>The options' checked standard library snapshot, when valid for this run.</summary>
+    private static CheckedStdlib? CheckedStdOf(CompilerOptions options) =>
+        options.CheckedStdlib is { } cached && cached.IsValidFor(options) ? cached : null;
 
     /// <summary>The options' seed, where it is one of the library the options read.</summary>
     private static StdlibSeed? SeedOf(CompilerOptions options) =>
@@ -493,13 +505,15 @@ public static class SourceCompiler
         IReadOnlyList<ScriptSource> roots, CompilerOptions? options = null)
     {
         options ??= new CompilerOptions();
-        var sources = SourcesFor(options);
+        options.Cancellation.ThrowIfCancellationRequested();
+        var checkedStd = CheckedStdOf(options);
+        var sources = SourcesFor(options, checkedStd);
         var diagnostics = new DiagnosticEngine(sources);
 
         var loader = BuildModuleLoader(sources, diagnostics, options,
             roots.Count > 0 ? roots[0].BaseDirectory : Directory.GetCurrentDirectory());
 
-        var compilation = new Compilation(sources, diagnostics)
+        var compilation = new Compilation(sources, diagnostics, checkedStd)
         {
             ModuleLoader = loader,
             WarnNative = options.WarnDeps,
@@ -517,11 +531,6 @@ public static class SourceCompiler
 
             var parsed = ParsedModule.Parse(sources, id, diagnostics);
 
-            // The header wins over the caller's derivation. A file whose header disagrees with its
-            // path registers under the name it claims; an import of the path-derived name then
-            // reloads the file and reports the mismatch (LYR-RES0006), the same way it would were
-            // the file not a root.
-            // Lyric 5's names its module by the path alone, a header or none
             var name = root.ModuleName;
 
             compilation.AddModule(parsed.Ast, name, documentation: parsed.Documentation);
@@ -531,16 +540,22 @@ public static class SourceCompiler
         // No root could even be opened. The diagnostics say why, and there is no module to hang a
         // model on.
         report?.EndPhase();
-        if (entry is null) return new CompileResult(sources, diagnostics, null);
+        if (entry is null) return new CompileResult(sources, diagnostics, null) { UsedCheckedStdlib = checkedStd is not null };
         times.Mark(PhaseClock.Parse);
 
         CompilerPosition.Begin(sources);
-        report?.BeginPhase(Phase.Resolve);
+        report?.BeginPhase(Phase.Resolve, checkedStd is not null ? "std cached" : "");
         var binding = compilation.Resolve();
         report?.EndPhase();
         times.Mark(PhaseClock.Resolve);
         options.Cancellation.ThrowIfCancellationRequested();
-        report?.BeginPhase(Phase.Check, $"{compilation.Modules.Count} modules");
+        var checkedCount = checkedStd is not null
+            ? compilation.Modules.Count(m => !compilation.IsCached(m))
+            : compilation.Modules.Count;
+        var checkDetail = checkedStd is not null
+            ? $"{checkedCount} {(checkedCount == 1 ? "module" : "modules")} (std cached)"
+            : $"{compilation.Modules.Count} modules";
+        report?.BeginPhase(Phase.Check, checkDetail);
         var types = Semantics.Analyze(compilation, binding, diagnostics, singleProgram: false);
         report?.EndPhase();
         times.Mark(PhaseClock.Check);
@@ -549,37 +564,46 @@ public static class SourceCompiler
         var model = new SemanticModel(compilation, entry, binding, types);
 
         if (diagnostics.HasErrors)
-            return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
+            return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases, UsedCheckedStdlib = checkedStd is not null };
 
         // Every build that lowers evaluates — a library by itself too; an
         // attribute's value is read from here ('lyric test' its '@Test').
         var embed = EmbedReaderFor(sources, options);
         types.SourcePlace = SourcePlaceFor(sources, options);
-        if (types.ComptimeSites.Count > 0) report?.BeginPhase(Phase.Check, SitesDetail);
-        var evaluated = EvaluateSites(compilation, binding, types, diagnostics, options, embed, out var comptime);
-        if (types.ComptimeSites.Count > 0) report?.EndPhase();
-        times.Mark(PhaseClock.Evaluate);
-        if (!evaluated) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
+        ComptimeTable? comptime = null;
+        var evaluate = options.Lower || checkedStd is null || types.HasLocalComptimeSites || checkedStd.HasWhenOrDeprecated;
+        if (evaluate)
+        {
+            if (types.ComptimeSites.Count > 0) report?.BeginPhase(Phase.Check, SitesDetail);
+            var evaluated = EvaluateSites(compilation, binding, types, diagnostics, options, embed, out comptime);
+            if (types.ComptimeSites.Count > 0) report?.EndPhase();
+            times.Mark(PhaseClock.Evaluate);
+            if (!evaluated) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases, UsedCheckedStdlib = checkedStd is not null };
+        }
+        else
+        {
+            times.Mark(PhaseClock.Evaluate);
+        }
         WarnDeprecated(compilation, binding, types, diagnostics, options, comptime);
-        if (diagnostics.HasErrors) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases }; // an 'until' come due
+        if (diagnostics.HasErrors) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases, UsedCheckedStdlib = checkedStd is not null }; // an 'until' come due
         options.Cancellation.ThrowIfCancellationRequested();
         if (!options.Lower)
         {
             var unlowered = Unlowered(compilation, types, diagnostics, options, sources, model, embed, comptime);
             times.Mark(PhaseClock.Lint);
-            return unlowered with { Times = times.Phases };
+            return unlowered with { Times = times.Phases, UsedCheckedStdlib = checkedStd is not null };
         }
 
         var ir = ModuleLowerer.Lower(compilation, binding, types, diagnostics,
             optimize: options.Optimize, libraryRoots: true, passes: options.Passes, comptime: comptime);
         times.Mark(PhaseClock.Lower);
-        if (ir is null) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
+        if (ir is null) return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases, UsedCheckedStdlib = checkedStd is not null };
         LintFilter.Apply(compilation, types, diagnostics, StringFieldsOf(types, comptime), options.LintLevels, options.RootPackage, options.WarnDeps,
                 Written(options, sources));
         times.Mark(PhaseClock.Lint);
 
         return new CompileResult(sources, diagnostics, ir, model)
-            { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive, Times = times.Phases };
+            { Embedded = embed.Read, ComptimeValues = comptime?.Values, Inactive = comptime?.Inactive, Times = times.Phases, UsedCheckedStdlib = checkedStd is not null };
     }
 
     /// <summary>
@@ -689,6 +713,11 @@ public sealed record CompilerOptions
     /// compilations follow each other and need not parse it again. Taken where it is the seed of
     /// <see cref="StdlibRoot"/>.</summary>
     public Parsing.StdlibSeed? StdlibSeed { get; init; }
+
+    /// <summary>The standard library parsed, resolved, and typechecked once
+    /// (<see cref="Compiler.CheckedStdlib"/>): an editor's compilations skip re-resolving and
+    /// re-checking <c>std</c> while the snapshot remains valid for this run.</summary>
+    public CheckedStdlib? CheckedStdlib { get; init; }
 
     /// <summary>An editor's cap on the budget of each <c>comptime</c> site, below the program's own
     /// (<see cref="ComptimeBudget"/>): a site of the program that runs out of it stays without a
@@ -892,6 +921,9 @@ public sealed record CompileResult(
     /// <summary>Where <see cref="SourceCompiler.CheckProject"/>'s time went, phase by phase in the
     /// order they ran, as far as it got; <c>null</c> from the other entries.</summary>
     public IReadOnlyList<(string Phase, TimeSpan Time)>? Times { get; init; }
+
+    /// <summary>Whether this compilation reused a pre-checked standard library snapshot.</summary>
+    public bool UsedCheckedStdlib { get; init; }
 
     /// <summary>Renders every diagnostic exactly once and reports whether the run was clean.
     /// </summary>

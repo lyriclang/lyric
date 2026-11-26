@@ -17,18 +17,19 @@ public sealed class Resolver
 {
     private readonly Compilation _comp;
     private readonly DiagnosticEngine _de;
-    private readonly BindingResult _binding = new();
+    private readonly BindingResult _binding;
 
     private readonly SourceManager _sm;
 
     /// <summary>The module whose declarations pass 3 binds: where a type path is named FROM.</summary>
     private ModuleSymbol? _module;
 
-    public Resolver(Compilation comp, SourceManager sm, DiagnosticEngine de)
+    public Resolver(Compilation comp, SourceManager sm, DiagnosticEngine de, BindingResult? baseBinding = null)
     {
         _comp = comp;
         _de = de;
         _sm = sm;
+        _binding = new BindingResult(baseBinding);
     }
 
     /// <summary>The "previous declaration" note for a duplicate, or none when the first claimant
@@ -40,13 +41,13 @@ public sealed class Resolver
 
     public BindingResult Run()
     {
-        foreach (var module in _comp.Modules) DeclareModule(module);
+        foreach (var module in _comp.Modules) if (!_comp.IsCached(module)) DeclareModule(module);
         SynthesizeInlineArrays();
-        foreach (var module in _comp.Modules) ResolveImports(module);
+        foreach (var module in _comp.Modules) if (!_comp.IsCached(module)) ResolveImports(module);
         CheckOneNamespace();
         DetectImportCycles();
-        foreach (var module in _comp.Modules) SynthesizeImplied(module);
-        foreach (var module in _comp.Modules) BindTypeNames(module);
+        foreach (var module in _comp.Modules) if (!_comp.IsCached(module)) SynthesizeImplied(module);
+        foreach (var module in _comp.Modules) if (!_comp.IsCached(module)) BindTypeNames(module);
         ResolveExtensionTargets();
         _comp.Extensions.BuildIndex();
         return _binding;
@@ -73,6 +74,12 @@ public sealed class Resolver
         var lengths = new SortedDictionary<int, Span>();
         foreach (var module in _comp.Modules)
         {
+            if (_comp.IsCached(module) && _comp.CheckedStd?.FindModule(module.FullName) is { } cached)
+            {
+                foreach (var n in cached.InlineArrayLengths)
+                    lengths.TryAdd(n, default);
+                continue;
+            }
             var pending = new Stack<Node>();
             pending.Push(_comp.AstOf(module));
             while (pending.Count > 0)
@@ -84,6 +91,7 @@ public sealed class Resolver
         }
         foreach (var (n, at) in lengths)
         {
+            if (_comp.TryAddCachedInlineArray(n)) continue;
             var text = $$"""
                 extend<T :: [Equatable]> T[{{n}}] :: [Equatable] {
                     fn equals(o: T[{{n}}]): bool {
@@ -545,7 +553,7 @@ public sealed class Resolver
     /// (LYR-RES0005).</summary>
     private void ResolveImports(ModuleSymbol module)
     {
-        if (!_importsResolved.Add(module)) return;
+        if (_comp.IsCached(module) || !_importsResolved.Add(module)) return;
         foreach (var decl in _comp.AstOf(module).Declarations)
             if (decl is ImportDecl imp)
                 ResolveImport(module, imp);
@@ -720,6 +728,8 @@ public sealed class Resolver
     private void CheckOneNamespace()
     {
         foreach (var module in _comp.Modules)
+        {
+            if (_comp.IsCached(module)) continue;
             foreach (var symbol in module.Members.Symbols)
             {
                 string[] path = [.. module.Path, symbol.Name];
@@ -730,13 +740,16 @@ public sealed class Resolver
                     $"'{symbol.Name}' in module '{module.FullName}' is also the module '{string.Join('.', path)}' — "
                     + "one name has one meaning in a module");
             }
+        }
     }
 
     private void DetectImportCycles()
     {
         var idx = new Dictionary<ModuleSymbol, int>(ReferenceEqualityComparer.Instance);
         for (var i = 0; i < _comp.Modules.Count; i++) idx[_comp.Modules[i]] = i;
-        var state = new int[_comp.Modules.Count]; // 0 = neu, 1 = im Stack, 2 = fertig
+        var state = new int[_comp.Modules.Count]; // 0 = new, 1 = on stack, 2 = done
+        for (var i = 0; i < _comp.Modules.Count; i++)
+            if (_comp.IsCached(_comp.Modules[i])) state[i] = 2;
 
         void Dfs(ModuleSymbol m)
         {
@@ -812,6 +825,7 @@ public sealed class Resolver
     {
         foreach (var block in _comp.Extensions.Blocks)
         {
+            if (_comp.IsCachedExtension(block)) continue;
             _module = block.Module;
             var scope = block.MethodScope;
             BindGenerics(block.Decl.Generics, scope);

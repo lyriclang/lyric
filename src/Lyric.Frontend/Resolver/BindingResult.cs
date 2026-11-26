@@ -10,11 +10,15 @@ namespace Lyric.Resolver;
 /// </summary>
 public sealed class BindingResult
 {
+    private readonly BindingResult? _base;
     private readonly Dictionary<Node, Symbol> _bindings = new(ReferenceEqualityComparer.Instance);
+
+    public BindingResult(BindingResult? baseBinding = null) => _base = baseBinding;
 
     public void Bind(Node node, Symbol symbol) => _bindings[node] = symbol;
 
-    public Symbol? Resolve(Node node) => _bindings.TryGetValue(node, out var s) ? s : null;
+    public Symbol? Resolve(Node node) =>
+        _bindings.TryGetValue(node, out var s) ? s : _base?.Resolve(node);
 
     /// <summary>
     /// Every bound node with its symbol.
@@ -24,9 +28,13 @@ public sealed class BindingResult
     /// second truth about one relation. A consumer that needs the reverse direction builds it from
     /// here.</para>
     /// </summary>
-    public IEnumerable<KeyValuePair<Node, Symbol>> All => _bindings;
+    public IEnumerable<KeyValuePair<Node, Symbol>> All =>
+        _base is null ? _bindings : _bindings.Concat(_base.All);
 
-    public int Count => _bindings.Count;
+    /// <summary>Bound nodes recorded in this compilation alone (excluding any cached base).</summary>
+    public IEnumerable<KeyValuePair<Node, Symbol>> LocalAll => _bindings;
+
+    public int Count => _bindings.Count + (_base?.Count ?? 0);
 
     private readonly List<(FileId File, Symbol Symbol)> _qualifiers = [];
 

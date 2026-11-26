@@ -80,7 +80,7 @@ public static class RenameProvider
         var edits = new List<ReferenceSite> { new(named.NameSpan.File, named.NameSpan) };
 
         var visited = new HashSet<Node>(ReferenceEqualityComparer.Instance);
-        foreach (var (use, bound) in model.Types.AllReferences.Concat(model.Binding.All))
+        foreach (var (use, bound) in model.Types.LocalReferences.Concat(model.Binding.LocalAll))
         {
             if (!ReferenceEquals(ReferenceProvider.Target(bound), symbol)) continue;
             if (ReferenceEquals(symbol.Declaration, use)) continue;
