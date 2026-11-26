@@ -61,7 +61,7 @@ public static class SemanticTokensProvider
 
         var tokens = new List<(int Line, int Character, int Length, int Type, int Modifiers)>();
 
-        foreach (var node in Tree(root))
+        foreach (var node in Tree(root, model.Compilation))
         {
             if (NameSpans.Of(node) is not { } span || span.File != file || span.IsEmpty) continue;
 
@@ -232,7 +232,7 @@ public static class SemanticTokensProvider
     }
 
     /// <summary>The whole tree, depth first. Order does not matter — the encoder sorts.</summary>
-    private static IEnumerable<Node> Tree(Node root)
+    private static IEnumerable<Node> Tree(Node root, Compilation compilation)
     {
         var stack = new Stack<Node>();
         stack.Push(root);
@@ -242,6 +242,9 @@ public static class SemanticTokensProvider
             var node = stack.Pop();
             yield return node;
             foreach (var child in AstChildren.Of(node)) stack.Push(child);
+            if (node is Decl decl)
+                foreach (var iface in compilation.SynthesizedInterfacesOf(decl))
+                    stack.Push(iface);
         }
     }
 }

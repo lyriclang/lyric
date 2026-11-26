@@ -193,9 +193,16 @@ public sealed class Resolver
         for (var k = 0; k < declarations.Length; k++)
         {
             var before = declarations[k];
-            declarations[k] = core ? Synthesize(module, before) : before;
+            TypeNode[] synthesized = [];
+            declarations[k] = core ? Synthesize(module, before, out synthesized) : before;
             if (!ReferenceEquals(declarations[k], before))
+            {
+                if (_comp.Documentation.Of(before) is { } doc)
+                    _comp.Documentation.Record(declarations[k], doc);
+                if (synthesized.Length > 0)
+                    _comp.RecordSynthesizedInterfaces(declarations[k], synthesized);
                 _comp.ReplaceAst(module, _comp.AstOf(module) with { Declarations = declarations });
+            }
             var decl = declarations[k];
             switch (decl)
             {
@@ -309,8 +316,9 @@ public sealed class Resolver
     /// leaves the type's own list (one conformance per type and interface). The
     /// declaration comes back without those nodes; the AST holds the result.
     /// </summary>
-    private Decl Synthesize(ModuleSymbol module, Decl decl)
+    private Decl Synthesize(ModuleSymbol module, Decl decl, out TypeNode[] synthesized)
     {
+        synthesized = [];
         string name; GenericParam[] generics; TypeNode[] interfaces; FieldDecl[] fields; EnumVariant[]? variants; IEnumerable<FunctionDecl> methods;
         switch (decl)
         {
@@ -343,11 +351,12 @@ public sealed class Resolver
             var id = _sm.AddSynthesized($"<synthesized {request.Interface} for {module.FullName}.{name}>", text,
                 request.Node?.Span ?? decl.Span, $"in the '{request.Interface}' synthesized for '{name}'");
             var parsed = new Parser(_sm, id, _de).ParseModule();
-            foreach (var synthesized in parsed.Declarations)
-                if (synthesized is ExtendDecl block) DeclareExtend(module, block, implicitly: request.Node is null);
+            foreach (var synthesizedDecl in parsed.Declarations)
+                if (synthesizedDecl is ExtendDecl block) DeclareExtend(module, block, implicitly: request.Node is null);
             if (request.Node is not null) taken.Add(request.Node);
         }
         if (taken.Count == 0) return decl;
+        synthesized = interfaces.Where(taken.Contains).ToArray();
         var kept = interfaces.Where(n => !taken.Contains(n)).ToArray();
         return decl switch
         {
@@ -771,12 +780,13 @@ public sealed class Resolver
         switch (decl)
         {
             case FunctionDecl fn: BindFunctionTypes(fn, scope); break;
-            case StructDecl s: { var ms = MemberScope(scope, s.Name); BindGenerics(s.Generics, ms); BindEach(s.Interfaces, ms); BindMembers(s.Members, ms); break; }
-            case ClassDecl c: { var ms = MemberScope(scope, c.Name); BindGenerics(c.Generics, ms); BindEach(c.Interfaces, ms); BindMembers(c.Members, ms); break; }
+            case StructDecl s: { var ms = MemberScope(scope, s.Name); BindGenerics(s.Generics, ms); BindEach(s.Interfaces, ms); BindEach(_comp.SynthesizedInterfacesOf(s), ms); BindMembers(s.Members, ms); break; }
+            case ClassDecl c: { var ms = MemberScope(scope, c.Name); BindGenerics(c.Generics, ms); BindEach(c.Interfaces, ms); BindEach(_comp.SynthesizedInterfacesOf(c), ms); BindMembers(c.Members, ms); break; }
             case EnumDecl e:
                 var es = MemberScope(scope, e.Name);
                 BindGenerics(e.Generics, es);
                 BindEach(e.Interfaces, es);
+                BindEach(_comp.SynthesizedInterfacesOf(e), es);
                 foreach (var v in e.Variants)
                 {
                     foreach (var t in v.TupleFields ?? []) BindType(t, es);
