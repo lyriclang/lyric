@@ -573,6 +573,12 @@ promise. This entry fills with the milestones.
   and in `obj.each { x => // … }` the comment was dropped, and the trailing block then fitted on
   one line; with a free function it stayed. A single method call was printed as a chain of calls
   first, which took the comments, then again without them.
+- **`lyric lsp` keeps the checked standard library across runs.** The server parses, resolves, and
+  type-checks `std` once and reuses that immutable snapshot across edits so each keystroke only
+  re-checks the user's package. A change to any `.lyr` file under `std/`, an open editor buffer
+  inside `std/`, a different toolchain version, build facts, overflow-check mode, or `--warn-deps`
+  invalidates or bypasses the cache automatically. Progress and timing log lines show `std cached`
+  when the snapshot is reused.
 
 ---
 

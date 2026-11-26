@@ -40,6 +40,9 @@ public static class ReferenceProvider
         // the same name in different scopes must not collapse into one answer.
         var found = new HashSet<Node>(ReferenceEqualityComparer.Instance);
         var sites = new List<ReferenceSite>();
+        var loadedFiles = new HashSet<FileId>();
+        foreach (var m in model.Compilation.Modules)
+            if (model.Compilation.AstOf(m).Span.File is { IsValid: true } f) loadedFiles.Add(f);
 
         foreach (var (node, bound) in model.Types.AllReferences.Concat(model.Binding.All))
         {
@@ -63,8 +66,8 @@ public static class ReferenceProvider
 
             // A use in code the compiler wrote — a synthesized Debug or Equatable — is no place in
             // a file: its text is made from the declaration again, and an edit there has no file
-            // to land in.
-            if (span.File.IsValid && !model.Compilation.IsSynthesized(span.File))
+            // to land in. Cached std modules that this compilation never imported are likewise out.
+            if (span.File.IsValid && loadedFiles.Contains(span.File) && !model.Compilation.IsSynthesized(span.File))
                 sites.Add(new ReferenceSite(span.File, span));
         }
 

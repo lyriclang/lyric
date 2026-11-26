@@ -55,8 +55,11 @@ internal sealed class FlowAnalyzer
     public void Run()
     {
         foreach (var module in _comp.Modules)
+        {
+            if (_comp.IsCached(module)) continue;
             foreach (var decl in _comp.AstOf(module).Declarations)
                 AnalyzeDecl(decl);
+        }
     }
 
     private void AnalyzeDecl(Decl decl)

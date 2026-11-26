@@ -10,6 +10,23 @@ namespace Lyric.Sema;
 /// </summary>
 public sealed class TypeResult
 {
+    private readonly TypeResult? _base;
+    private readonly int _baseComptimeSiteCount;
+
+    public TypeResult(TypeResult? baseResult = null)
+    {
+        _base = baseResult;
+        if (baseResult is not null)
+        {
+            foreach (var site in baseResult.ComptimeSites) ComptimeSites.Add(site);
+            _baseComptimeSiteCount = ComptimeSites.Count;
+            foreach (var quote in baseResult.Quotes) NoteQuote(quote, baseResult.QuoteModule(quote));
+        }
+    }
+
+    /// <summary>Whether this compilation added any <c>comptime</c> sites beyond the cached base.</summary>
+    public bool HasLocalComptimeSites => ComptimeSites.Count > _baseComptimeSiteCount;
+
     /// <summary>
     /// Whether the check gave up because a construct nested deeper than it walks (§12.4).
     ///
@@ -66,22 +83,30 @@ public sealed class TypeResult
     /// <summary>A Lyric 5 attribute's value: the struct it writes, as the
     /// <c>comptime</c> site the checker made of it — one of <see cref="ComptimeSites"/>, whose
     /// evaluated constant holds every field, written or defaulted.</summary>
-    public ComptimeExpr? AttributeValueOf(AttributeNode attribute) => _attributeValues.GetValueOrDefault(attribute);
+    public ComptimeExpr? AttributeValueOf(AttributeNode attribute) =>
+        _attributeValues.TryGetValue(attribute, out var v) ? v : _base?.AttributeValueOf(attribute);
 
     internal void SetAttributeValue(AttributeNode attribute, ComptimeExpr value) => _attributeValues[attribute] = value;
 
     /// <summary>Every typed expression with its type. The consumer is the test that checks the
     /// <see cref="ErrorType"/> invariant; without an enumeration it could only be checked where
     /// someone already looks.</summary>
-    public IEnumerable<KeyValuePair<Expr, LyrType>> AllTypes => _types;
-    public LyrType TypeOf(Expr expr) => _types.TryGetValue(expr, out var t) ? t : LyrType.Error;
+    public IEnumerable<KeyValuePair<Expr, LyrType>> AllTypes =>
+        _base is null ? _types : _types.Concat(_base.AllTypes);
+    public LyrType TypeOf(Expr expr) =>
+        _types.TryGetValue(expr, out var t) ? t : _base is not null ? _base.TypeOf(expr) : LyrType.Error;
 
     /// <summary>Did the checker give this expression the error type? Unlike <see cref="TypeOf"/>,
     /// not for a node it gives no type of its own, such as the range in <c>xs[1..]</c>.</summary>
-    public bool IsRefused(Expr expr) => _types.TryGetValue(expr, out var t) && t.IsError;
+    public bool IsRefused(Expr expr) =>
+        _types.TryGetValue(expr, out var t) ? t.IsError : _base is not null && _base.IsRefused(expr);
 
     /// <summary>Every type an expression of the program has: what a value of an interface can hold.</summary>
-    public IEnumerable<LyrType> ExpressionTypes => _types.Values;
+    public IEnumerable<LyrType> ExpressionTypes =>
+        _base is null ? _types.Values : _types.Values.Concat(_base.ExpressionTypes);
+
+    /// <summary>Expression types recorded in this compilation alone (excluding any cached base).</summary>
+    public IEnumerable<LyrType> LocalExpressionTypes => _types.Values;
 
     public void BindRef(Node node, Symbol symbol) => _refs[node] = symbol;
 
@@ -95,33 +120,38 @@ public sealed class TypeResult
 
     /// <summary>A <c>string</c> argument of a C function's <c>CStr</c> parameter: it crosses as
     /// its bytes, without a copy.</summary>
-    public bool IsCStrArgument(Expr argument) => _cstrArguments.Contains(argument);
+    public bool IsCStrArgument(Expr argument) =>
+        _cstrArguments.Contains(argument) || (_base is not null && _base.IsCStrArgument(argument));
     internal void MarkCStrArgument(Expr argument) => _cstrArguments.Add(argument);
 
     private readonly HashSet<Expr> _cCallbacks = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>A function — named, or a lambda that captures nothing — where a C function's
     /// pointer is expected: C calls it through a trampoline.</summary>
-    public bool IsCCallback(Expr source) => _cCallbacks.Contains(source);
+    public bool IsCCallback(Expr source) =>
+        _cCallbacks.Contains(source) || (_base is not null && _base.IsCCallback(source));
     internal void MarkCCallback(Expr source) => _cCallbacks.Add(source);
 
     private readonly Dictionary<CallExpr, int> _callbackUserdata = new(ReferenceEqualityComparer.Instance);
 
     /// <summary><c>Callback&lt;C&gt;.new(closure)</c>: which of <c>C</c>'s parameters is the
     /// userdata — its first or its last —, or <c>null</c> for any other call.</summary>
-    public int? CallbackUserdataOf(CallExpr call) => _callbackUserdata.TryGetValue(call, out var at) ? at : null;
+    public int? CallbackUserdataOf(CallExpr call) =>
+        _callbackUserdata.TryGetValue(call, out var at) ? at : _base?.CallbackUserdataOf(call);
     internal void SetCallbackUserdata(CallExpr call, int at) => _callbackUserdata[call] = at;
 
     /// <summary><c>std.ffi</c>'s <c>lib.symbol&lt;F&gt;(name)</c> with <c>F</c> a C function's type:
     /// the lowering reads the symbol's address, which a value of <c>F</c> is.</summary>
     private readonly HashSet<CallExpr> _librarySymbols = new(ReferenceEqualityComparer.Instance);
 
-    public bool IsLibrarySymbol(CallExpr call) => _librarySymbols.Contains(call);
+    public bool IsLibrarySymbol(CallExpr call) =>
+        _librarySymbols.Contains(call) || (_base is not null && _base.IsLibrarySymbol(call));
     internal void SetLibrarySymbol(CallExpr call) => _librarySymbols.Add(call);
 
     /// <summary>The parameter whose argument's text <paramref name="parameter"/> takes, or
     /// <c>null</c> where no <c>@callerExpr</c> sits on it.</summary>
-    public string? CallerExprOf(Param parameter) => _callerExpr.GetValueOrDefault(parameter);
+    public string? CallerExprOf(Param parameter) =>
+        _callerExpr.TryGetValue(parameter, out var target) ? target : _base?.CallerExprOf(parameter);
 
     /// <summary>The parameters <c>@callerLine</c> or <c>@callerFile</c> sits on, each with
     /// what of the call's place it takes.</summary>
@@ -132,7 +162,7 @@ public sealed class TypeResult
     /// <summary>What of the call's place <paramref name="parameter"/> takes, or <c>null</c> where
     /// neither <c>@callerLine</c> nor <c>@callerFile</c> sits on it.</summary>
     public CallerPlace? CallerPlaceOf(Param parameter) =>
-        _callerPlace.TryGetValue(parameter, out var place) ? place : null;
+        _callerPlace.TryGetValue(parameter, out var place) ? place : _base?.CallerPlaceOf(parameter);
 
     /// <summary>The source text of a span — what a call wrote —, for the lowering.</summary>
     public Func<Lyric.Core.Span, string>? SourceText { get; internal set; }
@@ -157,11 +187,13 @@ public sealed class TypeResult
     public void SetImplicitInstance(ImplicitMemberExpr member, GenericInstance instance) => _implicitInstances[member] = instance;
 
     /// <summary>The instance whose static an implicit member names: <c>.of(f)</c> at an expected <c>Result&lt;int, E&gt;</c>.</summary>
-    public GenericInstance? ImplicitInstanceOf(ImplicitMemberExpr member) => _implicitInstances.GetValueOrDefault(member);
+    public GenericInstance? ImplicitInstanceOf(ImplicitMemberExpr member) =>
+        _implicitInstances.TryGetValue(member, out var inst) ? inst : _base?.ImplicitInstanceOf(member);
 
     public void SetOpenBlockArguments(Node call, IReadOnlyDictionary<GenericParamSymbol, LyrType> bound) => _openBlockArguments[call] = bound;
 
-    public IReadOnlyDictionary<GenericParamSymbol, LyrType>? OpenBlockArgumentsOf(Node call) => _openBlockArguments.GetValueOrDefault(call);
+    public IReadOnlyDictionary<GenericParamSymbol, LyrType>? OpenBlockArgumentsOf(Node call) =>
+        _openBlockArguments.TryGetValue(call, out var b) ? b : _base?.OpenBlockArgumentsOf(call);
 
     /// <summary>The instance of a generic interface a member reached through a type parameter's
     /// constraint belongs to — <c>Into&lt;Centimeters&gt;</c> of <c>t.into()</c> under
@@ -175,9 +207,11 @@ public sealed class TypeResult
     /// <c>m</c>: they reach the interface's default, not the implementation they stand in.</summary>
     private readonly HashSet<MemberExpr> _defaultCalls = new(ReferenceEqualityComparer.Instance);
     public void MarkDefaultCall(MemberExpr member) => _defaultCalls.Add(member);
-    public bool IsDefaultCall(MemberExpr member) => _defaultCalls.Contains(member);
+    public bool IsDefaultCall(MemberExpr member) =>
+        _defaultCalls.Contains(member) || (_base is not null && _base.IsDefaultCall(member));
 
-    public LyrType? ConstraintInstanceOf(MemberExpr member) => _constraintInstances.GetValueOrDefault(member);
+    public LyrType? ConstraintInstanceOf(MemberExpr member) =>
+        _constraintInstances.TryGetValue(member, out var c) ? c : _base?.ConstraintInstanceOf(member);
 
     /// <summary>Whether a type conforms to an interface — the sema's answer at an instance the
     /// lowering reached, for a question the checked code could not settle: is the concrete
@@ -213,27 +247,31 @@ public sealed class TypeResult
     }
 
     public bool BlockConformanceRecorded(LyrType instance, TypeSymbol iface, ExtensionBlock block) =>
-        _blockConformances.Any(e => ReferenceEquals(e.Block, block) && ReferenceEquals(e.Iface, iface) && LyrType.Equal(e.Instance, instance));
+        _blockConformances.Any(e => ReferenceEquals(e.Block, block) && ReferenceEquals(e.Iface, iface) && LyrType.Equal(e.Instance, instance))
+        || (_base is not null && _base.BlockConformanceRecorded(instance, iface, block));
 
     /// <summary>The conformances a block on a shape or a blanket block gave a shape (05 §13 rules 6,
     /// 8), as the sema proved them: a value of the interface is made from the shape in a box.</summary>
     public IEnumerable<(LyrType Shape, TypeSymbol Iface, ExtensionBlock Block)> ShapeConformances =>
-        _blockConformances.Where(e => (e.Block.IsConstructorTarget || e.Block.IsBlanketTarget)
-            && e.Instance is ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType
-            && !TypeChecker.MentionsTypeParam(e.Instance));
+        (_base is null ? _blockConformances : _blockConformances.Concat(_base._blockConformances))
+            .Where(e => (e.Block.IsConstructorTarget || e.Block.IsBlanketTarget)
+                && e.Instance is ArrayOf or SliceOf or InlineArrayOf or Optional or TupleOf or FnType
+                && !TypeChecker.MentionsTypeParam(e.Instance));
 
     /// <summary>The blanket block that gives a built-in type the interface, and the type as the sema
     /// recorded it — what a box of the built-in's value is a value of.</summary>
     public (ExtensionBlock Block, LyrType Instance)? BlanketConformanceOfBuiltin(TypeSymbol builtin, TypeSymbol iface) =>
         _blockConformances.Where(e => e.Block.IsBlanketTarget && ReferenceEquals(e.Iface, iface)
                 && e.Instance is PrimitiveType or StringViewType && TypeFacts.Display(e.Instance) == builtin.Name)
-            .Select(e => ((ExtensionBlock, LyrType)?)(e.Block, e.Instance)).FirstOrDefault();
+            .Select(e => ((ExtensionBlock, LyrType)?)(e.Block, e.Instance)).FirstOrDefault()
+        ?? _base?.BlanketConformanceOfBuiltin(builtin, iface);
 
     /// <summary>The blanket block that gives <paramref name="instance"/> the interface, as the sema
     /// proved it (05 §13 rule 8): a value of the interface is made through it.</summary>
     public ExtensionBlock? BlanketConformanceOf(LyrType instance, TypeSymbol iface) =>
         _blockConformances.FirstOrDefault(e => e.Block.IsBlanketTarget && ReferenceEquals(e.Iface, iface)
-            && LyrType.Equal(e.Instance, instance)).Block;
+            && LyrType.Equal(e.Instance, instance)).Block
+        ?? _base?.BlanketConformanceOf(instance, iface);
 
     /// <summary>A generic member as the witness of a plain interface member: its
     /// own type arguments as the conformance to that interface instance bound them —
@@ -253,7 +291,7 @@ public sealed class TypeResult
         foreach (var w in _witnessArguments)
             if (ReferenceEquals(w.Witness, witness) && (instance is null || LyrType.Equal(w.Instance, instance)))
                 return w.Arguments;
-        return null;
+        return _base?.WitnessArgumentsOf(witness, instance);
     }
 
     public void RecordConformanceImpl(TypeSymbol implementer, TypeSymbol iface, string member,
@@ -274,25 +312,28 @@ public sealed class TypeResult
         _delegations[(implementer, iface)] = (field, symbol);
 
     public string? DelegationOf(TypeSymbol implementer, TypeSymbol iface) =>
-        _delegations.TryGetValue((implementer, iface), out var d) ? d.Field : null;
+        _delegations.TryGetValue((implementer, iface), out var d) ? d.Field : _base?.DelegationOf(implementer, iface);
 
-    public IEnumerable<(TypeSymbol Interface, string Field)> DelegationsOf(TypeSymbol implementer) =>
-        _delegations.Where(e => ReferenceEquals(e.Key.Item1, implementer)).Select(e => (e.Key.Item2, e.Value.Field));
+    public IEnumerable<(TypeSymbol Interface, string Field)> DelegationsOf(TypeSymbol implementer)
+    {
+        var local = _delegations.Where(e => ReferenceEquals(e.Key.Item1, implementer)).Select(e => (e.Key.Item2, e.Value.Field));
+        return _base is null ? local : local.Concat(_base.DelegationsOf(implementer));
+    }
 
     /// <summary>The implementation for one conformance, or <c>null</c> when the name was never
     /// ambiguous and the ordinary lookup answers just as well.</summary>
     public FunctionSymbol? ConformanceImpl(TypeSymbol implementer, TypeSymbol iface, string member,
         LyrType? instance)
     {
-        if (!_conformanceImpls.TryGetValue((implementer, iface, member), out var entries))
-            return null;
-        if (entries.Count == 1) return entries[0].Impl;
-        if (instance is null) return null;
-
-        foreach (var entry in entries)
-            if (LyrType.Equal(entry.Instance, instance))
-                return entry.Impl;
-        return null;
+        if (_conformanceImpls.TryGetValue((implementer, iface, member), out var entries))
+        {
+            if (entries.Count == 1) return entries[0].Impl;
+            if (instance is not null)
+                foreach (var entry in entries)
+                    if (LyrType.Equal(entry.Instance, instance))
+                        return entry.Impl;
+        }
+        return _base?.ConformanceImpl(implementer, iface, member, instance);
     }
 
     /// <summary>The pulls — a <c>resume</c> or a <c>next()</c> — whose coroutine may throw.
@@ -312,7 +353,8 @@ public sealed class TypeResult
 
     public void MarkBodyYield(YieldStmt yield) => _bodyYields.Add(yield);
 
-    public bool IsBodyYield(YieldStmt yield) => _bodyYields.Contains(yield);
+    public bool IsBodyYield(YieldStmt yield) =>
+        _bodyYields.Contains(yield) || (_base is not null && _base.IsBodyYield(yield));
 
     /// <summary>The generator lambdas: a lambda with a yield of its own, of type
     /// <c>fn(…) -> Coroutine&lt;Y, R&gt;</c>, lowered as a coroutine's factory and body.</summary>
@@ -327,12 +369,14 @@ public sealed class TypeResult
 
     public void MarkSpread(Expr argument) => _spreads.Add(argument);
 
-    public bool IsSpread(Expr argument) => _spreads.Contains(argument);
+    public bool IsSpread(Expr argument) =>
+        _spreads.Contains(argument) || (_base is not null && _base.IsSpread(argument));
 
-    public bool IsGeneratorLambda(LambdaExpr lambda) => _generatorLambdas.Contains(lambda);
+    public bool IsGeneratorLambda(LambdaExpr lambda) =>
+        _generatorLambdas.Contains(lambda) || (_base is not null && _base.IsGeneratorLambda(lambda));
 
     public LyrType[]? ThrownByPull(Node pull) =>
-        _throwingPulls.TryGetValue(pull, out var t) ? t : null;
+        _throwingPulls.TryGetValue(pull, out var t) ? t : _base?.ThrownByPull(pull);
 
     /// <summary>The members a clause's binding answers of its record, <c>e.suppressed()</c> and
     /// <c>e.backtrace()</c>: the member, and the binding whose record the
@@ -341,7 +385,8 @@ public sealed class TypeResult
 
     public void MarkRecordQuery(MemberExpr member, LocalSymbol binding) => _recordQueries[member] = binding;
 
-    public LocalSymbol? RecordQueryOf(MemberExpr member) => _recordQueries.GetValueOrDefault(member);
+    public LocalSymbol? RecordQueryOf(MemberExpr member) =>
+        _recordQueries.TryGetValue(member, out var b) ? b : _base?.RecordQueryOf(member);
 
     // --- errors ---------------------------------------------------------
 
@@ -356,7 +401,8 @@ public sealed class TypeResult
     /// function that is what its pulls throw, not its call.</summary>
     public void RecordDeclaredThrows(FunctionDecl fn, LyrType[] set) => _declaredThrows[fn] = set;
 
-    public LyrType[] DeclaredThrows(FunctionDecl fn) => _declaredThrows.GetValueOrDefault(fn) ?? [];
+    public LyrType[] DeclaredThrows(FunctionDecl fn) =>
+        _declaredThrows.TryGetValue(fn, out var set) ? set : _base?.DeclaredThrows(fn) ?? [];
 
     /// <summary>The program's <c>main</c> throws <paramref name="thrown"/> although it does not
     /// say so (<c>Cancelled</c>, which it covers itself): from here on its set holds
@@ -375,18 +421,21 @@ public sealed class TypeResult
     /// <summary>Whether a CALL of the function may throw: its set is non-empty and it is no
     /// coroutine function, whose clause belongs to its pulls. What a back end gives the caller's
     /// error slot.</summary>
-    public bool ThrowsAtCall(FunctionDecl fn) => _throwsAtCall.Contains(fn);
+    public bool ThrowsAtCall(FunctionDecl fn) =>
+        _throwsAtCall.Contains(fn) || (_base is not null && _base.ThrowsAtCall(fn));
 
     /// <summary>What a call may throw, in its instance's terms — the checker's settled callee,
     /// overloads and generic substitution done. Recorded for throwing calls only.</summary>
     public void RecordCallThrows(CallExpr call, LyrType[] set) => _callThrows[call] = set;
 
-    public LyrType[] CallThrows(CallExpr call) => _callThrows.GetValueOrDefault(call) ?? [];
+    public LyrType[] CallThrows(CallExpr call) =>
+        _callThrows.TryGetValue(call, out var set) ? set : _base?.CallThrows(call) ?? [];
 
     /// <summary>The type a typed <c>catch</c> clause names, resolved.</summary>
     public void RecordCatchType(CatchClause clause, LyrType type) => _catchTypes[clause] = type;
 
-    public LyrType? CatchType(CatchClause clause) => _catchTypes.GetValueOrDefault(clause);
+    public LyrType? CatchType(CatchClause clause) =>
+        _catchTypes.TryGetValue(clause, out var t) ? t : _base?.CatchType(clause);
 
     /// <summary>
     /// The set a catch binding carries: the types of a set clause, or
@@ -395,19 +444,22 @@ public sealed class TypeResult
     /// </summary>
     public void RecordCatchSet(CatchClause clause, LyrType[] set) => _catchSets[clause] = set;
 
-    public LyrType[]? CatchSet(CatchClause clause) => _catchSets.GetValueOrDefault(clause);
+    public LyrType[]? CatchSet(CatchClause clause) =>
+        _catchSets.TryGetValue(clause, out var set) ? set : _base?.CatchSet(clause);
 
     /// <summary>The type a type pattern tests, resolved — named or not.</summary>
     public void RecordTypeTested(TypePattern pattern, LyrType type) => _typesTested[pattern] = type;
 
-    public LyrType? TypeTested(TypePattern pattern) => _typesTested.GetValueOrDefault(pattern);
+    public LyrType? TypeTested(TypePattern pattern) =>
+        _typesTested.TryGetValue(pattern, out var t) ? t : _base?.TypeTested(pattern);
 
     private readonly Dictionary<TypeSetPattern, LyrType[]> _typeSets = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>The types a type-set pattern tests, resolved — the set its binding carries.</summary>
     public void RecordTypeSet(TypeSetPattern pattern, LyrType[] set) => _typeSets[pattern] = set;
 
-    public LyrType[]? TypeSet(TypeSetPattern pattern) => _typeSets.GetValueOrDefault(pattern);
+    public LyrType[]? TypeSet(TypeSetPattern pattern) =>
+        _typeSets.TryGetValue(pattern, out var set) ? set : _base?.TypeSet(pattern);
 
     private readonly Dictionary<CallExpr, StructInitExpr> _shorthands = new(ReferenceEqualityComparer.Instance);
 
@@ -415,9 +467,11 @@ public sealed class TypeResult
     /// the shorthand initializer: checked as that, and lowered as that.</summary>
     public void DesugarShorthand(CallExpr call, StructInitExpr init) => _shorthands[call] = init;
 
-    public StructInitExpr? ShorthandOf(CallExpr call) => _shorthands.GetValueOrDefault(call);
+    public StructInitExpr? ShorthandOf(CallExpr call) =>
+        _shorthands.TryGetValue(call, out var s) ? s : _base?.ShorthandOf(call);
 
-    public Symbol? RefOf(Node node) => _refs.TryGetValue(node, out var s) ? s : null;
+    public Symbol? RefOf(Node node) =>
+        _refs.TryGetValue(node, out var s) ? s : _base?.RefOf(node);
 
     /// <summary>
     /// Every node bound to a symbol, uses and declarations alike.
@@ -428,18 +482,23 @@ public sealed class TypeResult
     /// <c>ReferenceEquals(symbol.Declaration, node)</c> — no flag is needed, the symbol already
     /// knows where it was declared.</para>
     /// </summary>
-    public IEnumerable<KeyValuePair<Node, Symbol>> AllReferences => _refs;
+    public IEnumerable<KeyValuePair<Node, Symbol>> AllReferences =>
+        _base is null ? _refs : _refs.Concat(_base.AllReferences);
+
+    /// <summary>References recorded in this compilation alone (excluding any cached base).</summary>
+    public IEnumerable<KeyValuePair<Node, Symbol>> LocalReferences => _refs;
 
     /// <summary>The type of a module <c>let</c> or <c>static let</c>. Separate from
     /// <see cref="TypeOf"/>, because a global is not an expression: its type hangs on the symbol,
     /// not on a use site.</summary>
     public LyrType TypeOfGlobal(GlobalSymbol symbol) =>
-        _globals.TryGetValue(symbol, out var t) ? t : LyrType.Error;
+        _globals.TryGetValue(symbol, out var t) ? t : _base is not null ? _base.TypeOfGlobal(symbol) : LyrType.Error;
 
     // Exhaustiveness: matches proven by the TypeChecker. Flow and definite-assignment analysis read
     // this without needing type knowledge of their own.
     public void MarkMatchExhaustive(Node match) => _exhaustiveMatches.Add(match);
-    public bool IsMatchExhaustive(Node match) => _exhaustiveMatches.Contains(match);
+    public bool IsMatchExhaustive(Node match) =>
+        _exhaustiveMatches.Contains(match) || (_base is not null && _base.IsMatchExhaustive(match));
 
     // Captures: which outer locals, parameters and 'this' a lambda captures implicitly. The consumer
     // is closure lifting.
@@ -452,12 +511,57 @@ public sealed class TypeResult
     public void SetMethodValue(MemberExpr member, LambdaExpr lambda, LocalSymbol receiver) =>
         _methodValues[member] = (lambda, receiver);
     public (LambdaExpr Lambda, LocalSymbol Receiver)? MethodValueOf(MemberExpr member) =>
-        _methodValues.TryGetValue(member, out var value) ? value : null;
+        _methodValues.TryGetValue(member, out var value) ? value : _base?.MethodValueOf(member);
 
     public void SetCaptures(Node lambda, IReadOnlyList<Symbol> symbols, bool capturesThis) =>
         _captures[lambda] = (symbols, capturesThis);
     public (IReadOnlyList<Symbol> Symbols, bool CapturesThis) CapturesOf(Node lambda) =>
-        _captures.TryGetValue(lambda, out var c) ? c : (NoCaptures, false);
+        _captures.TryGetValue(lambda, out var c) ? c : _base is not null ? _base.CapturesOf(lambda) : (NoCaptures, false);
+
+    // --- associated-type answers (per compilation, chained onto any cached base) ---
+
+    private readonly Dictionary<AssociatedTypeSymbol, Dictionary<TypeSymbol, List<(LyrType Instance, LyrType Answer)>>> _assocAnswers =
+        new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>Records <paramref name="conformer"/>'s answer for <paramref name="member"/> on
+    /// <paramref name="instance"/> in this compilation without mutating the symbol.</summary>
+    public void BindAssociated(AssociatedTypeSymbol member, TypeSymbol conformer, LyrType instance, LyrType answer)
+    {
+        if (!_assocAnswers.TryGetValue(member, out var byConformer))
+            _assocAnswers[member] = byConformer = new(ReferenceEqualityComparer.Instance);
+        if (!byConformer.TryGetValue(conformer, out var list))
+            byConformer[conformer] = list = new();
+        list.Add((instance, answer));
+    }
+
+    /// <summary>The conformer's answer for <paramref name="member"/>, checking this compilation
+    /// first and then any cached base.</summary>
+    public LyrType? AssociatedAnswer(AssociatedTypeSymbol member, TypeSymbol conformer, LyrType? instance, bool exact = false)
+    {
+        if (_assocAnswers.TryGetValue(member, out var byConformer)
+            && byConformer.TryGetValue(conformer, out var list) && list.Count > 0)
+        {
+            if (instance is not null)
+                foreach (var (at, answer) in list)
+                    if (LyrType.Equal(at, instance)) return answer;
+            if (!exact) return list[0].Answer;
+        }
+        return _base?.AssociatedAnswer(member, conformer, instance, exact);
+    }
+
+    /// <summary>A built-in conformer's answer for <paramref name="member"/>, matched by the builtin's name.</summary>
+    public LyrType? BuiltinAssociatedAnswer(AssociatedTypeSymbol member, string name, LyrType? instance)
+    {
+        if (_assocAnswers.TryGetValue(member, out var byConformer))
+            foreach (var conformer in byConformer.Keys)
+                if (conformer.Kind == TypeSymbolKind.Builtin && conformer.Name == name)
+                    return AssociatedAnswer(member, conformer, instance);
+        return _base?.BuiltinAssociatedAnswer(member, name, instance);
+    }
+
+    /// <summary>The answer a blanket or shape block gives a type with none of its own, bound to
+    /// this compilation's checker.</summary>
+    public Func<AssociatedTypeSymbol, LyrType, LyrType?>? BlockAnswer { get; internal set; }
 
     /// <summary>
     /// Locals a closure SHARES with its enclosing function: they live in a heap cell rather than in a
@@ -521,22 +625,25 @@ public sealed class TypeResult
     public void RecordInterpolation(InterpolatedStringExpr text, InterpolationPlan plan) => _interpolations[text] = plan;
 
     public InterpolationPlan? InterpolationOf(InterpolatedStringExpr text) =>
-        _interpolations.TryGetValue(text, out var plan) ? plan : null;
+        _interpolations.TryGetValue(text, out var plan) ? plan : _base?.InterpolationOf(text);
 
     public void RecordForIn(ForInStmt loop, CallExpr iter, CallExpr next, LocalSymbol cursor, DeferStmt? close = null,
         bool closeIfCloseable = false) =>
         _forIns[loop] = new ForInProtocol(iter, next, cursor) { Close = close, CloseIfCloseable = closeIfCloseable };
 
-    public ForInProtocol? ForInOf(ForInStmt loop) => _forIns.TryGetValue(loop, out var p) ? p : null;
+    public ForInProtocol? ForInOf(ForInStmt loop) =>
+        _forIns.TryGetValue(loop, out var p) ? p : _base?.ForInOf(loop);
 
     /// <summary>A <c>for</c> over an array, a view or an inline array in Lyric 5: the index loop.</summary>
     private readonly HashSet<ForInStmt> _indexed = new(ReferenceEqualityComparer.Instance);
 
     public void MarkIndexed(ForInStmt loop) => _indexed.Add(loop);
 
-    public bool IsIndexed(ForInStmt loop) => _indexed.Contains(loop);
+    public bool IsIndexed(ForInStmt loop) =>
+        _indexed.Contains(loop) || (_base is not null && _base.IsIndexed(loop));
 
-    public CallExpr? OperatorCallOf(Node op) => _operatorCalls.GetValueOrDefault(op);
+    public CallExpr? OperatorCallOf(Node op) =>
+        _operatorCalls.TryGetValue(op, out var c) ? c : _base?.OperatorCallOf(op);
 
     /// <summary>A range on a type that gives a view of itself (std.core's <c>AsSlice&lt;T&gt;</c>):
     /// <c>list[a..b]</c> checked as <c>list.asSlice()[a..b]</c>, the index the lowering
@@ -545,7 +652,8 @@ public sealed class TypeResult
 
     public void DesugarRangeThroughView(IndexExpr range, IndexExpr throughView) => _rangesThroughViews[range] = throughView;
 
-    public IndexExpr? RangeThroughViewOf(IndexExpr range) => _rangesThroughViews.GetValueOrDefault(range);
+    public IndexExpr? RangeThroughViewOf(IndexExpr range) =>
+        _rangesThroughViews.TryGetValue(range, out var r) ? r : _base?.RangeThroughViewOf(range);
 
     /// <summary>An array literal that stands for a <c>FromArrayLiteral&lt;T&gt;</c>,
     /// with the element type its elements were checked against: the lowering builds the array of
@@ -554,7 +662,8 @@ public sealed class TypeResult
 
     public void RecordLiteralInto(ArrayLitExpr literal, LyrType element) => _literalsInto[literal] = element;
 
-    public LyrType? LiteralElementOf(ArrayLitExpr literal) => _literalsInto.GetValueOrDefault(literal);
+    public LyrType? LiteralElementOf(ArrayLitExpr literal) =>
+        _literalsInto.TryGetValue(literal, out var e) ? e : _base?.LiteralElementOf(literal);
 
     /// <summary>
     /// The type arguments of a call site, inferred or written.
@@ -581,16 +690,18 @@ public sealed class TypeResult
 
     public void SetArrangedArguments(Node call, Expr?[] arranged) => _arranged[call] = arranged;
 
-    public Expr?[]? ArrangedArgumentsOf(Node call) => _arranged.TryGetValue(call, out var a) ? a : null;
+    public Expr?[]? ArrangedArgumentsOf(Node call) =>
+        _arranged.TryGetValue(call, out var a) ? a : _base?.ArrangedArgumentsOf(call);
 
     /// <summary>The type arguments of a call; empty when the callee is not generic.</summary>
     public LyrType[] TypeArgumentsOf(Node call) =>
-        _typeArguments.TryGetValue(call, out var args) ? args : [];
+        _typeArguments.TryGetValue(call, out var args) ? args : _base?.TypeArgumentsOf(call) ?? [];
 
     /// <summary>Does this symbol live in a cell rather than in a frame slot? The lowering asks at
     /// EVERY access site, outside the closure too, because both sides have to see the same
     /// cell.</summary>
-    public bool IsBoxed(Symbol symbol) => _boxed.Contains(symbol);
+    public bool IsBoxed(Symbol symbol) =>
+        _boxed.Contains(symbol) || (_base is not null && _base.IsBoxed(symbol));
 
     /// <summary>The lambda literals an <c>inline fn</c>'s call sets in place:
     /// no closure, their <c>return</c> the enclosing function's, their loops its loops.</summary>
@@ -598,7 +709,8 @@ public sealed class TypeResult
 
     public void MarkInlineLambda(LambdaExpr lambda) => _inlineLambdas.Add(lambda);
 
-    public bool IsInlineLambda(LambdaExpr lambda) => _inlineLambdas.Contains(lambda);
+    public bool IsInlineLambda(LambdaExpr lambda) =>
+        _inlineLambdas.Contains(lambda) || (_base is not null && _base.IsInlineLambda(lambda));
 
     // ------------------------------------------------------------------ std.meta
 
@@ -683,42 +795,48 @@ public sealed class TypeResult
     private readonly Dictionary<(FunctionDecl Default, TypeSymbol Conformer), (FunctionDecl Expansion, LyrType Self)> _expansions = new();
 
     /// <summary>The module a question to <c>std.meta</c> is asked from: whose fields it may see.</summary>
-    public ModuleSymbol? MetaFromOf(CallExpr call) => _metaFrom.GetValueOrDefault(call);
+    public ModuleSymbol? MetaFromOf(CallExpr call) =>
+        _metaFrom.TryGetValue(call, out var m) ? m : _base?.MetaFromOf(call);
     internal void SetMetaFrom(CallExpr call, ModuleSymbol module) => _metaFrom[call] = module;
 
     private readonly HashSet<CallExpr> _metaFromConformer = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>A question about <c>Self</c> in a default of an interface marked
-    /// <c>@SeesConformer</c> (11 §4 rule 10; W10), checked once for every conformer: the lowering
+    /// <c>@SeesConformer</c>, checked once for every conformer: the lowering
     /// asks it with the module of the conformer it answers for, not the interface's.</summary>
-    public bool MetaFromConformer(CallExpr call) => _metaFromConformer.Contains(call);
+    public bool MetaFromConformer(CallExpr call) =>
+        _metaFromConformer.Contains(call) || (_base is not null && _base.MetaFromConformer(call));
     internal void MarkMetaFromConformer(CallExpr call) => _metaFromConformer.Add(call);
 
     /// <summary>A <c>comptime</c> expression that is a question to <c>std.meta</c>: answered per
     /// instance by the lowering, never a site of its own.</summary>
-    public bool IsMetaSite(ComptimeExpr site) => _metaSites.Contains(site);
+    public bool IsMetaSite(ComptimeExpr site) =>
+        _metaSites.Contains(site) || (_base is not null && _base.IsMetaSite(site));
     internal void MarkMetaSite(ComptimeExpr site) => _metaSites.Add(site);
 
     /// <summary>A <c>comptime for</c> over the fields of a known type, one body per field.</summary>
-    public MetaRound[]? MetaRoundsOf(ForInStmt loop) => _metaRounds.GetValueOrDefault(loop);
+    public MetaRound[]? MetaRoundsOf(ForInStmt loop) =>
+        _metaRounds.TryGetValue(loop, out var r) ? r : _base?.MetaRoundsOf(loop);
     internal void SetMetaRounds(ForInStmt loop, MetaRound[] rounds) => _metaRounds[loop] = rounds;
 
     /// <summary><c>e.[f]</c> as the member access it is in its round.</summary>
-    public MemberExpr? FieldMemberOf(FieldByInfoExpr access) => _fieldMembers.GetValueOrDefault(access);
+    public MemberExpr? FieldMemberOf(FieldByInfoExpr access) =>
+        _fieldMembers.TryGetValue(access, out var m) ? m : _base?.FieldMemberOf(access);
     internal void SetFieldMember(FieldByInfoExpr access, MemberExpr member) => _fieldMembers[access] = member;
 
     /// <summary>The field a round's variable holds the info of: a constant where it is read.</summary>
-    public MetaField? KnownFieldOf(LocalSymbol variable) => _knownFields.GetValueOrDefault(variable);
+    public MetaField? KnownFieldOf(LocalSymbol variable) =>
+        _knownFields.TryGetValue(variable, out var f) ? f : _base?.KnownFieldOf(variable);
     internal void SetKnownField(LocalSymbol variable, MetaField field) => _knownFields[variable] = field;
 
     /// <summary>A default whose body walks the fields of <c>Self</c>, set in place for one
     /// conformer: parsed again, checked with <c>Self</c> that conformer.</summary>
     public FunctionDecl? ExpansionOf(FunctionDecl @default, TypeSymbol conformer) =>
-        _expansions.TryGetValue((@default, conformer), out var found) ? found.Expansion : null;
+        _expansions.TryGetValue((@default, conformer), out var found) ? found.Expansion : _base?.ExpansionOf(@default, conformer);
     /// <summary>The <c>Self</c> an expansion was checked with: a generic conformer's instance over
     /// its conformance block's parameters, which the lowering binds to the instance's arguments.</summary>
     public LyrType? ExpansionSelfOf(FunctionDecl @default, TypeSymbol conformer) =>
-        _expansions.TryGetValue((@default, conformer), out var found) ? found.Self : null;
+        _expansions.TryGetValue((@default, conformer), out var found) ? found.Self : _base?.ExpansionSelfOf(@default, conformer);
     internal void SetExpansion(FunctionDecl @default, TypeSymbol conformer, FunctionDecl expansion, LyrType self) =>
         _expansions[(@default, conformer)] = (expansion, self);
 
@@ -734,58 +852,67 @@ public sealed class TypeResult
     private readonly Dictionary<VariantInitExpr, (EnumVariantSymbol Variant, LyrType Enum, Expr?[] Values)> _variantInits = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>The variant a round's variable holds the info of (a loop over <c>variants</c>).</summary>
-    public MetaVariant? KnownVariantOf(LocalSymbol variable) => _knownVariants.GetValueOrDefault(variable);
+    public MetaVariant? KnownVariantOf(LocalSymbol variable) =>
+        _knownVariants.TryGetValue(variable, out var v) ? v : _base?.KnownVariantOf(variable);
     internal void SetKnownVariant(LocalSymbol variable, MetaVariant variant) => _knownVariants[variable] = variant;
 
     /// <summary>The variant whose payload a round's variable walks (a loop over <c>v.payload</c>);
     /// the field itself is <see cref="KnownFieldOf"/>.</summary>
-    public MetaVariant? KnownPayloadOf(LocalSymbol variable) => _knownPayloads.GetValueOrDefault(variable);
+    public MetaVariant? KnownPayloadOf(LocalSymbol variable) =>
+        _knownPayloads.TryGetValue(variable, out var v) ? v : _base?.KnownPayloadOf(variable);
     internal void SetKnownPayload(LocalSymbol variable, MetaVariant variant) => _knownPayloads[variable] = variant;
 
     /// <summary>The member a round's variable holds the info of (a loop over <c>members</c>).</summary>
-    public MetaMember? KnownMemberOf(LocalSymbol variable) => _knownMembers.GetValueOrDefault(variable);
+    public MetaMember? KnownMemberOf(LocalSymbol variable) =>
+        _knownMembers.TryGetValue(variable, out var m) ? m : _base?.KnownMemberOf(variable);
     internal void SetKnownMember(LocalSymbol variable, MetaMember member) => _knownMembers[variable] = member;
 
-    /// <summary>The parameter a round's variable holds the info of (a loop over <c>m.parameters</c>; X4).</summary>
-    public MetaParam? KnownParamOf(LocalSymbol variable) => _knownParams.GetValueOrDefault(variable);
+    /// <summary>The parameter a round's variable holds the info of (a loop over <c>m.parameters</c>).</summary>
+    public MetaParam? KnownParamOf(LocalSymbol variable) =>
+        _knownParams.TryGetValue(variable, out var p) ? p : _base?.KnownParamOf(variable);
     internal void SetKnownParam(LocalSymbol variable, MetaParam parameter) => _knownParams[variable] = parameter;
 
     /// <summary><c>typeAttribute&lt;T, A&gt;()</c> whose <c>T</c> is written as an alias: the alias, whose
     /// own attributes are the answer — the type argument itself resolves through it.</summary>
-    public TypeAliasDecl? AliasAskedOf(CallExpr call) => _aliasAsked.GetValueOrDefault(call);
+    public TypeAliasDecl? AliasAskedOf(CallExpr call) =>
+        _aliasAsked.TryGetValue(call, out var a) ? a : _base?.AliasAskedOf(call);
     internal void SetAliasAsked(CallExpr call, TypeAliasDecl alias) => _aliasAsked[call] = alias;
 
     /// <summary><c>e is v</c> in a round: the variant tested, by its position.</summary>
-    public MetaVariant? VariantTestOf(TypeTestExpr test) => _variantTests.GetValueOrDefault(test);
+    public MetaVariant? VariantTestOf(TypeTestExpr test) =>
+        _variantTests.TryGetValue(test, out var v) ? v : _base?.VariantTestOf(test);
     internal void SetVariantTest(TypeTestExpr test, MetaVariant variant) => _variantTests[test] = variant;
 
     /// <summary><c>e.[v, p]</c> in a round: the variant and its payload field.</summary>
     public (MetaVariant Variant, MetaField Field)? PayloadAccessOf(PayloadByInfoExpr access) =>
-        _payloadAccesses.TryGetValue(access, out var found) ? found : null;
+        _payloadAccesses.TryGetValue(access, out var found) ? found : _base?.PayloadAccessOf(access);
     internal void SetPayloadAccess(PayloadByInfoExpr access, (MetaVariant Variant, MetaField Field) found) => _payloadAccesses[access] = found;
 
     private readonly Dictionary<IfStmt, bool> _decidedIfs = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<Node, FunctionDecl> _reparsedOwners = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>The function a round's loop was parsed again from: its 'mut' is the round's.</summary>
-    public FunctionDecl? ReparsedOwnerOf(Node root) => _reparsedOwners.GetValueOrDefault(root);
+    public FunctionDecl? ReparsedOwnerOf(Node root) =>
+        _reparsedOwners.TryGetValue(root, out var o) ? o : _base?.ReparsedOwnerOf(root);
     internal void SetReparsedOwner(Node root, FunctionDecl? owner) { if (owner is not null) _reparsedOwners[root] = owner; }
 
     /// <summary>A <c>comptime if</c> statement whose condition a round decided: the
     /// branch the checker checked, the one the lowering takes.</summary>
-    public bool? DecidedIf(IfStmt stmt) => _decidedIfs.TryGetValue(stmt, out var chosen) ? chosen : null;
+    public bool? DecidedIf(IfStmt stmt) =>
+        _decidedIfs.TryGetValue(stmt, out var chosen) ? chosen : _base?.DecidedIf(stmt);
     internal void SetDecidedIf(IfStmt stmt, bool chosen) => _decidedIfs[stmt] = chosen;
 
     /// <summary>What the lowering takes for an expression instead of itself: the chosen arm of a
     /// <c>comptime if</c> a round decided, an initializer over infos as the named one it stands
     /// for, <c>E.[v](…)</c> as the call of the variant.</summary>
-    public Expr? RewriteOf(Expr expr) => _rewrites.GetValueOrDefault(expr);
+    public Expr? RewriteOf(Expr expr) =>
+        _rewrites.TryGetValue(expr, out var r) ? r : _base?.RewriteOf(expr);
     internal void SetRewrite(Expr from, Expr to) => _rewrites[from] = to;
 
     /// <summary><c>E.[v] { … }</c>: the variant, the enum, and the payload's values in the
     /// payload's order.</summary>
     public (EnumVariantSymbol Variant, LyrType Enum, Expr?[] Values)? VariantInitOf(VariantInitExpr init) =>
-        _variantInits.TryGetValue(init, out var found) ? found : null;
+        _variantInits.TryGetValue(init, out var found) ? found : _base?.VariantInitOf(init);
     internal void SetVariantInit(VariantInitExpr init, (EnumVariantSymbol Variant, LyrType Enum, Expr?[] Values) found) => _variantInits[init] = found;
 
     /// <summary>What was parsed again — a round's body, a default set in place —: nodes of their

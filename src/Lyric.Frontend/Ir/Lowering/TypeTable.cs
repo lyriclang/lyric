@@ -45,6 +45,9 @@ internal sealed class TypeTable
     /// visible.</summary>
     public Compilation? Compilation { get; init; }
 
+    /// <summary>The type-checking side table, for resolving associated types.</summary>
+    public TypeResult? Types { get; init; }
+
     /// <summary>How <c>comptime</c> sites lower in this run; <c>null</c> for a check. Carried
     /// here because the table reaches every <see cref="FunctionLowerer"/> already — globals,
     /// instances and extensions included — and a site may stand in any of them.</summary>
@@ -893,7 +896,7 @@ internal sealed class TypeTable
         && Conformance.WithParents(symbol, _binding)
             .SelectMany(part => part.Members.Symbols.OfType<AssociatedTypeSymbol>())
             .FirstOrDefault(member => member.Name == name) is { } assoc
-        && Sema.TypeChecker.ResolveAssociated(fixedType, assoc) is NeverType;
+        && Sema.TypeChecker.ResolveAssociated(fixedType, assoc, Types) is NeverType;
 
     /// <summary>
     /// The slot list: every parent's slots in the order the parent list writes them, own members
@@ -1098,7 +1101,7 @@ internal sealed class TypeTable
     /// </remarks>
     private IrType LowerAnswer(AssocOf open, Core.Span span)
     {
-        var answer = TypeChecker.ResolveAssociated(open.Base, open.Member);
+        var answer = TypeChecker.ResolveAssociated(open.Base, open.Member, Types);
         if (answer is AssocOf { Base: not (TypeParamType or AssocOf) })
         {
             var asked = open.Member.Owner is { } owner ? $"{owner.Name}.{open.Member.Name}" : open.Member.Name;
@@ -1359,7 +1362,7 @@ internal sealed class TypeTable
         }
         var member = Declaring(interfaces, named.Path[1]);
         if (member is null) return null;
-        var reached = TypeChecker.ResolveAssociated(head, member);
+        var reached = TypeChecker.ResolveAssociated(head, member, Types);
         for (var i = 2; i < named.Path.Length; i++)
         {
             // Through the step before's bound, as the checker reads an open path; or what the
@@ -1372,7 +1375,7 @@ internal sealed class TypeTable
                 through = through.Concat(ConformedInterfaces(on));
             member = Declaring(through, named.Path[i]);
             if (member is null) return null;
-            reached = TypeChecker.ResolveAssociated(reached, member);
+            reached = TypeChecker.ResolveAssociated(reached, member, Types);
         }
         return reached;
     }

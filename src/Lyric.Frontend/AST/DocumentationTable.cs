@@ -14,7 +14,10 @@ namespace Lyric.AST;
 /// </summary>
 public sealed class DocumentationTable
 {
+    private readonly DocumentationTable? _base;
     private readonly Dictionary<Node, string> _docs = new(ReferenceEqualityComparer.Instance);
+
+    public DocumentationTable(DocumentationTable? baseTable = null) => _base = baseTable;
 
     /// <summary>A table nothing was recorded in. For a caller that has no documentation to pass and
     /// wants none — the REPL builds its compilation this way.</summary>
@@ -24,9 +27,9 @@ public sealed class DocumentationTable
 
     /// <summary>The block written above <paramref name="node"/>, or <c>null</c> when there is
     /// none.</summary>
-    public string? Of(Node node) => _docs.GetValueOrDefault(node);
+    public string? Of(Node node) => _docs.TryGetValue(node, out var text) ? text : _base?.Of(node);
 
-    public int Count => _docs.Count;
+    public int Count => _docs.Count + (_base?.Count ?? 0);
 
     /// <summary>
     /// Takes over everything <paramref name="other"/> holds.

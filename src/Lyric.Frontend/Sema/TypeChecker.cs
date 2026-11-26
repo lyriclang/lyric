@@ -21,7 +21,7 @@ public sealed class TypeChecker
     private readonly Compilation _comp;
     private readonly BindingResult _binding;
     private readonly DiagnosticEngine _de;
-    private readonly TypeResult _result = new();
+    private readonly TypeResult _result;
     private readonly Dictionary<GlobalSymbol, LyrType> _globals = new(ReferenceEqualityComparer.Instance);
 
     // The aliases currently being expanded, and the ones already reported as cyclic. An alias names a
@@ -139,6 +139,7 @@ public sealed class TypeChecker
         _comp = comp;
         _binding = binding;
         _de = de;
+        _result = new TypeResult(comp.CheckedStd?.Types);
         _result.SourceText = comp.TextOf;
         _result.ConformanceBlock = ConformanceBlockFor;
         _result.Satisfies = SatisfiesAt;
@@ -147,6 +148,17 @@ public sealed class TypeChecker
         _result.MetaVariants = MetaVariantsOf;
         _result.MetaConformances = MetaConformancesOf;
         _result.MetaMembers = MetaMembersOf;
+        _result.BlockAnswer = BlockAnswerFor;
+        if (comp.CheckedStd is { } std)
+        {
+            foreach (var (gs, t) in std.Globals) _globals[gs] = t;
+            foreach (var (gs, e) in std.FoldedConstants) _foldedConstants[gs] = e;
+            foreach (var fn in std.MetaDefaults) _metaDefaults.Add(fn);
+            foreach (var (fid, toks) in std.Tokens) _tokens[fid] = toks;
+            foreach (var entry in std.BlockAnswers)
+                if (comp.IsCachedExtension(entry.Block))
+                    _blockAnswers.Add(entry);
+        }
         _error = comp.FindModule(["std", "core"])?.Members.LookupLocal("Error") as TypeSymbol is { Kind: TypeSymbolKind.Interface } root ? root : null;
         _backtrace = comp.FindModule(["std", "core"])?.Members.LookupLocal("Backtrace") as TypeSymbol is { Kind: TypeSymbolKind.Struct } backtrace ? backtrace : null;
         _closeable = comp.FindModule(["std", "core"])?.Members.LookupLocal("Closeable") as TypeSymbol is { Kind: TypeSymbolKind.Interface } closeable ? closeable : null;
@@ -313,13 +325,36 @@ public sealed class TypeChecker
         }
     }
 
+    internal IReadOnlyDictionary<GlobalSymbol, LyrType> Globals => _globals;
+    internal IReadOnlyDictionary<GlobalSymbol, Expr> FoldedConstants => _foldedConstants;
+    internal IReadOnlyList<(AssociatedTypeSymbol Member, ExtensionBlock Block, LyrType Answer)> BlockAnswers => _blockAnswers;
+    internal IReadOnlySet<FunctionDecl> MetaDefaults => _metaDefaults;
+    internal IReadOnlyDictionary<FileId, List<Token>> Tokens => _tokens;
+
+    /// <summary>Populates all lazy metadata on extension blocks so they can be safely shared
+    /// read-only across compilations in a <see cref="Compiler.CheckedStdlib"/>.</summary>
+    internal void SealExtensions()
+    {
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            _currentModule = block.Module;
+            BlockTargetType(block);
+            FixationBindingsOf(block);
+            OpenParametersOf(block);
+            UnboundParametersOf(block);
+        }
+        _currentModule = null;
+    }
+
     private TypeResult CheckInner()
     {
         var errorsAtStart = _de.ErrorCount;
 
         // DEPENDENCY order, not discovery order: a module's globals are computed after those of
         // everything it imports, so an initializer may read across an import it declared itself.
-        foreach (var module in _comp.InitializationOrder()) ComputeGlobals(module);
+        foreach (var module in _comp.InitializationOrder())
+            if (!_comp.IsCached(module))
+                ComputeGlobals(module);
 
         // The associated types first: every conformance's answers are read before any
         // signature that names 'T.Item' is substituted — a body may be checked before the type
@@ -335,6 +370,7 @@ public sealed class TypeChecker
         // a module line while the same code in one file compiled.
         foreach (var module in _comp.InitializationOrder())
         {
+            if (_comp.IsCached(module)) continue;
             _currentModule = module;
             var ast = _comp.AstOf(module);
             CheckAttributes(ast.Attributes, AttributeSite.Module, targetIsGeneric: false,
@@ -1465,14 +1501,15 @@ public sealed class TypeChecker
         for (var i = 0; i < all.Count; i++)
         {
             if (all[i].Target is not { } target) continue;
+            var iCached = _comp.IsCachedExtension(all[i]);
             foreach (var sb in all[i].Decl.Statics)
             {
                 // The type's own member of the name, a method of another block, or a constant an
                 // earlier block declares: 'T.name' would have two answers.
                 var name = sb.Binding.Name;
-                Span? other = target.Members.LookupLocal(name) is { } member ? member.Declaration?.Span ?? default : null;
+                Span? other = !iCached && target.Members.LookupLocal(name) is { } member ? member.Declaration?.Span ?? default : null;
                 for (var j = 0; j < all.Count && other is null; j++)
-                    if (j != i && ReferenceEquals(all[j].Target, target)
+                    if (j != i && !(iCached && _comp.IsCachedExtension(all[j])) && ReferenceEquals(all[j].Target, target)
                         && all[j].MethodScope.LookupLocal(name) is { } clash && (clash is not GlobalSymbol || j < i))
                         other = clash.Declaration?.Span ?? default;
                 if (other is { } where)
@@ -1526,7 +1563,7 @@ public sealed class TypeChecker
         // A type that writes its Debug in a block has written one (05 §14 rule 7): the implicit
         // one stands back — std's containers write theirs under a constraint.
         if (_debug is { } debug)
-            foreach (var block in _comp.Extensions.Blocks.Where(b => b.IsImplicit && b.Target is not null).ToArray())
+            foreach (var block in _comp.Extensions.Blocks.Where(b => b.IsImplicit && !_comp.IsCachedExtension(b) && b.Target is not null).ToArray())
                 if (_comp.Extensions.Blocks.Any(other => !other.IsImplicit && ReferenceEquals(other.Target, block.Target)
                         && other.Decl.Interfaces.Any(node => ReferenceEquals(Conformance.InterfaceOf(node, _binding), debug))))
                     _comp.Extensions.Withdraw(block);
@@ -1535,7 +1572,7 @@ public sealed class TypeChecker
         do
         {
             withdrew = false;
-            foreach (var block in _comp.Extensions.Blocks.Where(b => b.IsImplicit && b.Target is not null).ToArray())
+            foreach (var block in _comp.Extensions.Blocks.Where(b => b.IsImplicit && !_comp.IsCachedExtension(b) && b.Target is not null).ToArray())
             {
                 _currentModule = block.Module;
                 int errors;
@@ -1577,6 +1614,7 @@ public sealed class TypeChecker
     {
         foreach (var block in _comp.Extensions.Blocks)
         {
+            if (_comp.IsCachedExtension(block)) continue;
             _currentModule = block.Module;
             CheckConformanceWords(block);
             CheckBlockParameters(block);
@@ -1697,31 +1735,32 @@ public sealed class TypeChecker
         // written out beside its child is one conformance (§1.3), and what a chain reaches is
         // not written twice by being reached twice. Across sites the same direct interface on
         // overlapping instances is the duplicate.
-        var seen = new List<(int Site, TypeSymbol Target, LyrType Instance, LyrType Iface, Span At)>();
+        var seen = new List<(int Site, TypeSymbol Target, LyrType Instance, LyrType Iface, Span At, bool Cached)>();
         var site = 0;
-        void Note(TypeSymbol target, LyrType instance, TypeNode node, LyrType self, SymbolTable scope)
+        void Note(TypeSymbol target, LyrType instance, TypeNode node, LyrType self, SymbolTable scope, bool cached)
         {
             if (Conformance.InterfaceOf(node, _binding) is not { } iface) return;
             var ifaceInstance = Substitute(ResolveType(node, scope), SelfMap(iface, self));
-            foreach (var (priorSite, priorTarget, priorInstance, priorIface, _) in seen)
-                if (priorSite != site && ReferenceEquals(priorTarget, target) && TypeFacts.Overlaps(priorInstance, instance)
-                    && TypeFacts.Overlaps(priorIface, ifaceInstance))
+            foreach (var (priorSite, priorTarget, priorInstance, priorIface, _, priorCached) in seen)
+                if (priorSite != site && !(priorCached && cached) && ReferenceEquals(priorTarget, target)
+                    && TypeFacts.Overlaps(priorInstance, instance) && TypeFacts.Overlaps(priorIface, ifaceInstance))
                 {
                     _de.Report("LYR-SEM0133", Severity.Error, NodeSpan(node),
                         $"'{TypeFacts.Display(instance)}' conforms to '{TypeFacts.Display(ifaceInstance)}' twice — one conformance per type and interface, whole-program; no specialization");
                     break;
                 }
-            seen.Add((site, target, instance, ifaceInstance, NodeSpan(node)));
+            seen.Add((site, target, instance, ifaceInstance, NodeSpan(node), cached));
         }
         foreach (var module in _comp.Modules)
         {
             _currentModule = module;
+            var cached = _comp.IsCached(module);
             foreach (var symbol in module.Members.Symbols)
                 if (symbol is TypeSymbol { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum } ts && DeclaredInModule(ts, module))
                 {
                     site++;
                     foreach (var node in DeclaredInterfaceNodes(ts))
-                        Note(ts, SelfType(ts), node, SelfType(ts), DeclarationScope(ts));
+                        Note(ts, SelfType(ts), node, SelfType(ts), DeclarationScope(ts), cached);
                 }
         }
         foreach (var block in _comp.Extensions.Blocks)
@@ -1729,10 +1768,11 @@ public sealed class TypeChecker
             // A view's block is a shape's, compared below with the others.
             if (block.Target is not { } target || block.Decl.Interfaces.Length == 0 || IsShapeBlock(block)) continue;
             _currentModule = block.Module;
+            var cached = _comp.IsCachedExtension(block);
             site++;
             var instance = block.Decl.Target is NamedType { TypeArguments.Length: > 0 } ? BlockTargetType(block) : SelfType(target);
             foreach (var node in block.Decl.Interfaces)
-                Note(target, instance, node, instance, block.MethodScope);
+                Note(target, instance, node, instance, block.MethodScope, cached);
         }
 
         // The blocks no target symbol stands for (05 §13 rules 6, 8) implement every interface of
@@ -1742,11 +1782,12 @@ public sealed class TypeChecker
         // conformance and a shape's block where it reaches the type or the shape, another
         // blanket block anywhere, even where no type could meet both; a shape's block, another
         // block on an overlapping shape.
-        var blockSites = new List<(ExtensionBlock Block, LyrType Target, List<TypeSymbol> Chain)>();
+        var blockSites = new List<(ExtensionBlock Block, LyrType Target, List<TypeSymbol> Chain, bool Cached)>();
         foreach (var block in _comp.Extensions.Blocks)
         {
             if (block.Decl.Interfaces.Length == 0 || !(block.IsBlanketTarget || IsShapeBlock(block))) continue;
             _currentModule = block.Module;
+            var blockCached = _comp.IsCachedExtension(block);
             var target = BlockTargetType(block);
             var chain = new List<TypeSymbol>();
             foreach (var node in block.Decl.Interfaces)
@@ -1761,8 +1802,9 @@ public sealed class TypeChecker
                 // blanket of the library cannot be changed where it stands, the program's can.
                 var excluded = false;
                 if (block.IsBlanketTarget)
-                    foreach (var (_, _, instance, priorIface, priorAt) in seen)
-                        if (TypeFacts.SymbolOf(priorIface) is { } written
+                    foreach (var (_, _, instance, priorIface, priorAt, priorCached) in seen)
+                        if (!(blockCached && priorCached)
+                            && TypeFacts.SymbolOf(priorIface) is { } written
                             && SharedWith(Conformance.WithParents(written, _binding)) is { } shared
                             && ReachesInTheProgram(block, instance, priorIface))
                         {
@@ -1777,15 +1819,15 @@ public sealed class TypeChecker
                 // share one, where whether they meet is a substitution of the one into the other —
                 // asked of every pair first, it was a tenth of every analysis.
                 if (clash is null && !excluded)
-                    foreach (var (prior, priorTarget, priorChain) in blockSites)
-                        if (SharedWith(priorChain) is { } shared && Meets(block, target, prior, priorTarget))
+                    foreach (var (prior, priorTarget, priorChain, priorCached) in blockSites)
+                        if (!(blockCached && priorCached) && SharedWith(priorChain) is { } shared && Meets(block, target, prior, priorTarget))
                         { clash = $"another block gives '{shared.Name}' to '{TypeFacts.Display(priorTarget)}'"; break; }
                 if (clash is not null)
                     _de.Report("LYR-SEM0133", Severity.Error, NodeSpan(node),
                         $"{clash} — one conformance per type and interface, whole-program; no specialization");
                 chain.AddRange(reached);
             }
-            blockSites.Add((block, target, chain));
+            blockSites.Add((block, target, chain, blockCached));
         }
         _currentModule = null;
     }
@@ -1903,7 +1945,7 @@ public sealed class TypeChecker
         var map = new Dictionary<GenericParamSymbol, LyrType>(ReferenceEqualityComparer.Instance);
         if (!TypeFacts.Match(BlockTargetType(block), receiver, map)) return null;
         FixationBindingsOf(block);
-        if (!ApplyFixations(block, map)) return null;
+        if (!ApplyFixations(block, map, _result)) return null;
         var openParameters = OpenParametersOf(block);
         if (wanted is GenericInstance asked && openParameters.Length > 0) BindOpenParameters(block, receiver, asked, map);
         foreach (var g in block.Generics)
@@ -1948,16 +1990,16 @@ public sealed class TypeChecker
     /// only a fixation names takes the receiver's answer — the answer matched against the fixed type
     /// where that is a structure, <c>(K, V)</c> of <c>Iterator&lt;Item = (K, V)&gt;</c>. False where
     /// the answer does not fit the structure. The checker and the lowering bind alike.</summary>
-    internal static bool ApplyFixations(ExtensionBlock block, Dictionary<GenericParamSymbol, LyrType> map)
+    internal static bool ApplyFixations(ExtensionBlock block, Dictionary<GenericParamSymbol, LyrType> map, TypeResult? types)
     {
         foreach (var (pattern, from, member, named) in block.FixationBindings ?? [])
         {
             if (!map.TryGetValue(from, out var source)) continue;
             if (pattern is TypeParamType { Param: var p })
             {
-                if (!map.ContainsKey(p)) map[p] = ResolveAssociated(source, member);
+                if (!map.ContainsKey(p)) map[p] = ResolveAssociated(source, member, types);
             }
-            else if (named.Any(n => !map.ContainsKey(n)) && !TypeFacts.Match(pattern, ResolveAssociated(source, member), map))
+            else if (named.Any(n => !map.ContainsKey(n)) && !TypeFacts.Match(pattern, ResolveAssociated(source, member, types), map))
                 return false;
         }
         return true;
@@ -2092,12 +2134,23 @@ public sealed class TypeChecker
     /// </summary>
     private void CheckMethodSets()
     {
+        var extendedTargets = new HashSet<TypeSymbol>(ReferenceEqualityComparer.Instance);
+        var hasNonCachedBlanket = false;
+        foreach (var block in _comp.Extensions.Blocks)
+        {
+            if (_comp.IsCachedExtension(block)) continue;
+            if (block.IsBlanketTarget) hasNonCachedBlanket = true;
+            else if (block.Target is { } t) extendedTargets.Add(t);
+        }
+
         foreach (var module in _comp.Modules)
         {
+            var cached = _comp.IsCached(module);
             _currentModule = module;
             foreach (var symbol in module.Members.Symbols)
                 if (symbol is TypeSymbol { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum } ts
-                    && DeclaredInModule(ts, module))
+                    && DeclaredInModule(ts, module)
+                    && (!cached || hasNonCachedBlanket || extendedTargets.Contains(ts)))
                     CheckMethodSet(ts);
         }
     }
@@ -6884,7 +6937,7 @@ public sealed class TypeChecker
         if (_askedInterfaces.Count == 0) return;
         var byName = new Dictionary<string, List<LyrType>>(StringComparer.Ordinal);
         var held = new List<LyrType>();
-        foreach (var type in _result.ExpressionTypes)
+        foreach (var type in _result.LocalExpressionTypes)
         {
             if (!(TypeFacts.SymbolOf(type) is { Kind: TypeSymbolKind.Struct or TypeSymbolKind.Class or TypeSymbolKind.Enum }
                   || BoxesAsBuiltin(type))
@@ -8877,7 +8930,7 @@ public sealed class TypeChecker
 
     /// <summary>The substitution with the interface's <c>Self</c> bound: to the conforming
     /// type at a conformance, to the type parameter at a constraint, to the type at a lookup.</summary>
-    private static Dictionary<GenericParamSymbol, LyrType> WithSelf(
+    private Dictionary<GenericParamSymbol, LyrType> WithSelf(
         Dictionary<GenericParamSymbol, LyrType> subst, TypeSymbol iface, LyrType self)
     {
         if (iface.SelfParam is not { } param) return subst;
@@ -8890,7 +8943,7 @@ public sealed class TypeChecker
     }
 
     /// <summary>The substitution of an interface's <c>Self</c> alone.</summary>
-    private static Dictionary<GenericParamSymbol, LyrType> SelfMap(TypeSymbol iface, LyrType self) =>
+    private Dictionary<GenericParamSymbol, LyrType> SelfMap(TypeSymbol iface, LyrType self) =>
         WithSelf(EmptySubst, iface, self);
 
     private static Dictionary<GenericParamSymbol, LyrType> SubstMap(GenericInstance gi)
@@ -8904,48 +8957,55 @@ public sealed class TypeChecker
     // T to its argument across a type: Stack<T>.items of type T[] becomes int[] for Stack<int>.
     // A set bound to a parameter stays one where a type argument or a thrown type stands, and
     // in a value's place is its root: sets are thrown, not held.
-    private static LyrType Substitute(LyrType type, Dictionary<GenericParamSymbol, LyrType> map) => Substitute(type, map, keepSet: false);
+    private LyrType Substitute(LyrType type, Dictionary<GenericParamSymbol, LyrType> map) =>
+        Substitute(type, map, keepSet: false, _result);
 
-    private static LyrType Substitute(LyrType type, Dictionary<GenericParamSymbol, LyrType> map, bool keepSet)
+    private LyrType Substitute(LyrType type, Dictionary<GenericParamSymbol, LyrType> map, bool keepSet) =>
+        Substitute(type, map, keepSet, _result);
+
+    private static LyrType Substitute(LyrType type, Dictionary<GenericParamSymbol, LyrType> map, bool keepSet, TypeResult? types)
     {
         if (map.Count == 0) return keepSet ? type : ThrownSet.AsValue(type);
         StackGuard.Check("substituting a type");
         var result = type switch
         {
             TypeParamType tp => map.TryGetValue(tp.Param, out var m) ? m : tp,
-            Optional o => new Optional(Substitute(o.Inner, map)),
-            ArrayOf a => new ArrayOf(Substitute(a.Element, map)),
-            SliceOf s => new SliceOf(Substitute(s.Element, map)),
-            InlineArrayOf ia => new InlineArrayOf(Substitute(ia.Element, map), ia.Length),
-            TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map)).ToArray()) { Labels = t.Labels },
-            FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map)).ToArray(), Substitute(f.Return, map))
-                { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map, keepSet: true))), Places = f.Places, IsC = f.IsC },
+            Optional o => new Optional(Substitute(o.Inner, map, keepSet: false, types)),
+            ArrayOf a => new ArrayOf(Substitute(a.Element, map, keepSet: false, types)),
+            SliceOf s => new SliceOf(Substitute(s.Element, map, keepSet: false, types)),
+            InlineArrayOf ia => new InlineArrayOf(Substitute(ia.Element, map, keepSet: false, types), ia.Length),
+            TupleOf t => new TupleOf(t.Elements.Select(e => Substitute(e, map, keepSet: false, types)).ToArray()) { Labels = t.Labels },
+            FnType f => new FnType(f.Parameters.Select(p => Substitute(p, map, keepSet: false, types)).ToArray(), Substitute(f.Return, map, keepSet: false, types))
+                { Throws = ThrownAfter(f.Throws.Select(t => Substitute(t, map, keepSet: true, types))), Places = f.Places, IsC = f.IsC },
             // A join reduces once both its parts are known.
-            GenericInstance gi => ReduceJoin(new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map, keepSet: true)).ToArray())
+            GenericInstance gi => ReduceJoin(new GenericInstance(gi.Definition, gi.Arguments.Select(a => Substitute(a, map, keepSet: true, types)).ToArray())
             {
-                Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map, keepSet: true))).ToArray(),
+                Fixations = gi.Fixations?.Select(f => (f.Member, Substitute(f.Type, map, keepSet: true, types))).ToArray(),
                 // 'Task<T> throws E' at 'E = never' throws nothing.
-                Throws = gi.Throws is { } thrown && Substitute(thrown, map, keepSet: true) is not NeverType and var bound ? bound : null,
+                Throws = gi.Throws is { } thrown && Substitute(thrown, map, keepSet: true, types) is not NeverType and var bound ? bound : null,
             }),
-            RangeOf r => new RangeOf(Substitute(r.Element, map)),
+            RangeOf r => new RangeOf(Substitute(r.Element, map, keepSet: false, types)),
             CoroutineOf co => co with
             {
-                Yield = Substitute(co.Yield, map), Result = Substitute(co.Result, map),
-                Throws = ThrownAfter(co.Throws.Select(t => Substitute(t, map, keepSet: true))),
+                Yield = Substitute(co.Yield, map, keepSet: false, types), Result = Substitute(co.Result, map, keepSet: false, types),
+                Throws = ThrownAfter(co.Throws.Select(t => Substitute(t, map, keepSet: true, types))),
             },
-            AssocOf a => ResolveAssociated(Substitute(a.Base, map), a.Member, InstanceFromMap(a.Member, map)),
-            ThrownSet set => ThrownSet.Of(set.Members.Select(m => Substitute(m, map, keepSet: true)), set.Root),
+            AssocOf a => ResolveAssociated(Substitute(a.Base, map, keepSet: false, types), a.Member, types, InstanceFromMap(a.Member, map)),
+            ThrownSet set => ThrownSet.Of(set.Members.Select(m => Substitute(m, map, keepSet: true, types)), set.Root),
             _ => type // primitive, NamedRef, error, null
         };
         return keepSet ? result : ThrownSet.AsValue(result);
     }
 
+    private LyrType ResolveAssociated(LyrType @base, AssociatedTypeSymbol member, LyrType? instance = null) =>
+        ResolveAssociated(@base, member, _result, instance);
+
     /// <summary>
     /// <c>T.Item</c> once <c>T</c> is known: the conformer's binding of the associated
-    /// type, read off the interface's declaration symbol, through the conformer's own type
+    /// type, read from <paramref name="types"/>, through the conformer's own type
     /// arguments; still a type parameter, the question stays open as it is.
     /// </summary>
-    internal static LyrType ResolveAssociated(LyrType @base, AssociatedTypeSymbol member, LyrType? instance = null)
+    internal static LyrType ResolveAssociated(LyrType @base, AssociatedTypeSymbol member, TypeResult? types, LyrType? instance = null)
     {
         StackGuard.Check("resolving an associated type");
         switch (@base)
@@ -8957,15 +9017,15 @@ public sealed class TypeChecker
                 when (face.Fixations?.FirstOrDefault(f => ReferenceEquals(f.Member, member)) is { Member: not null } written
                          ? written.Type : member.Default) is { } given:
                 return given;
-            case NamedRef nr when member.Answer(nr.Symbol, instance) is { } bound: return bound;
-            case GenericInstance gi when member.Answer(gi.Definition, instance) is { } bound:
-                return Substitute(bound, SubstMap(gi));
-            case PrimitiveType p when member.BuiltinAnswer(TypeFacts.Display(p), instance) is { } bound: return bound;
-            case StringViewType when member.BuiltinAnswer("StringView", instance) is { } bound: return bound;
+            case NamedRef nr when types?.AssociatedAnswer(member, nr.Symbol, instance) is { } bound: return bound;
+            case GenericInstance gi when types?.AssociatedAnswer(member, gi.Definition, instance) is { } bound:
+                return Substitute(bound, SubstMap(gi), keepSet: false, types);
+            case PrimitiveType p when types?.BuiltinAssociatedAnswer(member, TypeFacts.Display(p), instance) is { } bound: return bound;
+            case StringViewType when types?.BuiltinAssociatedAnswer(member, "StringView", instance) is { } bound: return bound;
             case CoroutineOf co when CoroutineAnswer(co, member) is { } answered: return answered;
             case ErrorType: return LyrType.Error;
             // A conformance a blanket or shape block gives (05 §13 rules 6, 8) answers there.
-            case var other when member.BlockAnswer?.Invoke(other) is { } fromBlock: return fromBlock;
+            case var other when types?.BlockAnswer?.Invoke(member, other) is { } fromBlock: return fromBlock;
             default: return new AssocOf(@base, member);
         }
     }
@@ -9124,6 +9184,7 @@ public sealed class TypeChecker
         BindAssociatedBounds();
         foreach (var module in _comp.Modules)
         {
+            if (_comp.IsCached(module)) continue;
             _currentModule = module;
             foreach (var symbol in module.Members.Symbols)
                 if (symbol is TypeSymbol { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum } ts
@@ -9132,6 +9193,7 @@ public sealed class TypeChecker
         }
         foreach (var block in _comp.Extensions.Blocks)
         {
+            if (_comp.IsCachedExtension(block)) continue;
             // A built-in conforms through its block alone ('extend int :: [Add]'): its answers
             // hang on the builtin's symbol, found by the type's name.
             if (block.Target is not { Kind: TypeSymbolKind.Class or TypeSymbolKind.Struct or TypeSymbolKind.Enum or TypeSymbolKind.Builtin } target
@@ -9166,6 +9228,7 @@ public sealed class TypeChecker
     {
         foreach (var module in _comp.Modules)
         {
+            if (_comp.IsCached(module)) continue;
             _currentModule = module;
             foreach (var symbol in module.Members.Symbols)
             {
@@ -9239,7 +9302,6 @@ public sealed class TypeChecker
                         continue;
                     }
                     _blockAnswers.Add((member, block, answer));
-                    member.BlockAnswer ??= concrete => BlockAnswerFor(member, concrete);
                     _boundChecks.Add((member, answer, target, NodeSpan(node), $"the block on '{TypeFacts.Display(target)}'"));
                 }
             }
@@ -9372,24 +9434,24 @@ public sealed class TypeChecker
                     // Answered already: this is a second block of the same conformance, which
                     // coherence refuses as a whole (LYR-SEM0133) — its answers are not
                     // asked again, so the one mistake gets one error.
-                    if (member.Answer(ts, instance, exact: true) is not null) continue;
+                    if (_result.AssociatedAnswer(member, ts, instance, exact: true) is not null) continue;
                     if (answer.bound is { } written)
                     {
                         var resolved = ResolveType(written, answers);
                         if (toTarget is not null) resolved = Substitute(resolved, toTarget);
-                        member.Bind(ts, instance, resolved);
+                        _result.BindAssociated(member, ts, instance, resolved);
                         _boundChecks.Add((member, resolved, SelfType(ts), answer.own.Declaration?.Span ?? NodeSpan(node), $"'{ts.Name}'"));
                         continue;
                     }
                     if (member.Declaration is AssociatedTypeDecl { Type: { } fallback })
                     {
-                        member.Bind(ts, instance, Substitute(ResolveType(fallback, DeclarationScope(iface)),
+                        _result.BindAssociated(member, ts, instance, Substitute(ResolveType(fallback, DeclarationScope(iface)),
                             WithSelf(subst, iface, SelfType(ts))));
                         continue;
                     }
                     _de.Report("LYR-SEM0128", Severity.Error, NodeSpan(node),
                         $"'{ts.Name}' does not say what '{iface.Name}'s associated type '{member.Name}' is — write 'type {member.Name} = …;'");
-                    member.Bind(ts, instance, LyrType.Error);
+                    _result.BindAssociated(member, ts, instance, LyrType.Error);
                 }
             }
         }
@@ -9899,7 +9961,7 @@ public sealed class TypeChecker
     /// <para>The type arguments still have to line up — <c>Src&lt;int&gt;</c> is not
     /// <c>Src&lt;string&gt;</c> — so the same <c>Matches</c> decides it as everywhere else.</para>
     /// </summary>
-    private static bool IsTheConstraint(LyrType arg, TypeSymbol ts, TypeSymbol iface, LyrType wanted) =>
+    private bool IsTheConstraint(LyrType arg, TypeSymbol ts, TypeSymbol iface, LyrType wanted) =>
         ReferenceEquals(ts, iface) && (Matches(arg, EmptySubst, wanted)
             // A value with its associated types fixed is a value of its interface: what a
             // constraint fixes as well, it answers alike — 'Iterator<Item = int>' is an 'Iterator',
@@ -10196,7 +10258,7 @@ public sealed class TypeChecker
     /// distinguish there, and <c>ResolveType</c> yields a <c>NamedRef</c>. Only for a generic instance
     /// do the arguments count.</para>
     /// </summary>
-    private static bool Matches(LyrType declared, Dictionary<GenericParamSymbol, LyrType> subst,
+    private bool Matches(LyrType declared, Dictionary<GenericParamSymbol, LyrType> subst,
         LyrType wanted)
     {
         var resolved = Substitute(declared, subst);
@@ -14214,13 +14276,15 @@ public sealed class TypeChecker
     /// </summary>
     private void CheckInlineFunctions()
     {
-        foreach (var (node, symbol) in _result.AllReferences)
+        foreach (var (node, symbol) in _result.LocalReferences)
             if (symbol is FunctionSymbol { Declaration: FunctionDecl { IsInline: true } } called && node is Expr used
                 && !_callees.Contains(used))
                 _de.Report("LYR-SEM0183", Severity.Error, used.Span,
                     $"'{called.Name}' is an inline function: it is called, and set in place there — it is no value");
         var inlines = new List<FunctionDecl>();
         foreach (var module in _comp.Modules)
+        {
+            if (_comp.IsCached(module)) continue;
             foreach (var decl in _comp.AstOf(module).Declarations)
             {
                 IEnumerable<FunctionDecl> fns = decl switch
@@ -14248,6 +14312,7 @@ public sealed class TypeChecker
                     else _de.Report("LYR-SEM0184", Severity.Error, fn.NameSpan, $"'{fn.Name}' cannot be inline — {why}");
                 }
             }
+        }
         if (inlines.Count == 0) return;
 
         static FunctionDecl? InlineOf(Symbol? symbol) =>

@@ -68,6 +68,7 @@ public static class LintFilter
             if (compilation.IsNative(module) || (root is not null && module.Path[0] != root)) foreign.Add(ast.Span.File);
             // a module the toolchain wrote from a C header is no one's to lint, --warn-deps or not
             if (written?.Invoke(ast.Span.File) == true) quiet.Add(ast.Span.File);
+            if (!warnDeps && compilation.IsCached(module)) continue;
             Collect(ast);
         }
 

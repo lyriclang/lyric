@@ -121,7 +121,7 @@ public static class ModuleLowerer
         var macroRoots = new List<FunctionId>(); // the macros of an expansion round
         var ids = new Dictionary<FunctionSymbol, FunctionId>(ReferenceEqualityComparer.Instance);
         var imports = new ImportTable();
-        var typeTable = new TypeTable(binding) { Compilation = compilation, Comptime = comptime };
+        var typeTable = new TypeTable(binding) { Compilation = compilation, Types = types, Comptime = comptime };
         var globals = new GlobalTable();
         var exportRoots = new List<FunctionId>();
         FunctionId? entry = null;
@@ -1252,7 +1252,7 @@ public static class ModuleLowerer
                                 || (ofInstance is not null && types.BlockConformanceRecorded(ofInstance, iface, b)))
                     .ToList();
                 if (!Conformance.Implements(type, iface, binding) && viaExtension.Count == 0) continue;
-                if (!AnswersAsTheValue(concrete, fixedType, binding)) continue;
+                if (!AnswersAsTheValue(concrete, fixedType, binding, types)) continue;
                 var slots = typeTable.MethodSlotsOf(fixedId);
                 var methods = new FunctionId[slots.Length];
                 var complete = true;
@@ -1280,11 +1280,11 @@ public static class ModuleLowerer
     /// value does: the fixed ones as written, the others as the interface's default —
     /// a throwing iterator is no value of an <c>Iterator&lt;Item = string&gt;</c>, whose
     /// <c>Error</c> is <c>never</c>.</summary>
-    private static bool AnswersAsTheValue(LyrType concrete, GenericInstance fixedType, BindingResult binding) =>
+    private static bool AnswersAsTheValue(LyrType concrete, GenericInstance fixedType, BindingResult binding, TypeResult types) =>
         Conformance.WithParents(fixedType.Definition, binding)
             .SelectMany(part => part.Members.Symbols.OfType<AssociatedTypeSymbol>())
-            .All(member => LyrType.Equal(TypeChecker.ResolveAssociated(concrete, member),
-                                         TypeChecker.ResolveAssociated(fixedType, member)));
+            .All(member => LyrType.Equal(TypeChecker.ResolveAssociated(concrete, member, types),
+                                         TypeChecker.ResolveAssociated(fixedType, member, types)));
 
     /// <summary>The interface's default of a slot for one conformer: an instance whose
     /// 'Self' is the conformer — what a fixed value's row holds where the type leaves it.</summary>

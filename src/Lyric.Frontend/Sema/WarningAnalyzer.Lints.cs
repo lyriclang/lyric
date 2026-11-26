@@ -20,7 +20,7 @@ internal sealed partial class WarningAnalyzer
     {
         foreach (var module in _comp.Modules)
             if (module.Path.Length > 0) _moduleOfFile[_comp.AstOf(module).Span.File] = module;
-        foreach (var (node, symbol) in _types.AllReferences)
+        foreach (var (node, symbol) in _comp.WarnNative ? _types.AllReferences : _types.LocalReferences)
             if (node is Param p && ReferenceEquals(symbol.Declaration, node)) _paramSymbols[p] = symbol;
 
         foreach (var module in _comp.Modules)
@@ -303,7 +303,7 @@ internal sealed partial class WarningAnalyzer
     private void WarnUnusedAssignments()
     {
         var uses = new Dictionary<Symbol, List<Node>>(ReferenceEqualityComparer.Instance);
-        foreach (var (node, symbol) in _types.AllReferences)
+        foreach (var (node, symbol) in _comp.WarnNative ? _types.AllReferences : _types.LocalReferences)
         {
             if (symbol is not LocalSymbol { IsMutable: true } || ReferenceEquals(symbol.Declaration, node)) continue;
             if (!uses.TryGetValue(symbol, out var list)) uses[symbol] = list = [];

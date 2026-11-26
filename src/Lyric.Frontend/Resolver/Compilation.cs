@@ -24,7 +24,7 @@ public sealed class Compilation
 {
     private readonly SourceManager _sm;
     private readonly DiagnosticEngine _de;
-    private readonly SymbolTable _builtins = BuiltinTypes.CreateScope();
+    private readonly SymbolTable _builtins;
     private readonly List<ModuleSymbol> _modules = new();
     private readonly Dictionary<ModuleSymbol, Module> _asts = new(ReferenceEqualityComparer.Instance);
 
@@ -35,11 +35,29 @@ public sealed class Compilation
     /// synthesize.</summary>
     private readonly Dictionary<ModuleSymbol, Module> _loaded = new(ReferenceEqualityComparer.Instance);
 
-    public Compilation(SourceManager sm, DiagnosticEngine de)
+    private readonly HashSet<ModuleSymbol> _cachedModules = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<ExtensionBlock> _cachedExtensions = new(ReferenceEqualityComparer.Instance);
+
+    public Compilation(SourceManager sm, DiagnosticEngine de, Compiler.CheckedStdlib? checkedStd = null)
     {
         _sm = sm;
         _de = de;
+        CheckedStd = checkedStd;
+        _builtins = checkedStd?.Builtins ?? BuiltinTypes.CreateScope();
+        Documentation = new DocumentationTable(checkedStd?.Documentation);
     }
+
+    /// <summary>The checked standard library snapshot this compilation builds on, or <c>null</c>
+    /// when compiling without one.</summary>
+    public Compiler.CheckedStdlib? CheckedStd { get; }
+
+    /// <summary>Whether <paramref name="module"/> came pre-resolved and pre-checked from
+    /// <see cref="CheckedStd"/>.</summary>
+    public bool IsCached(ModuleSymbol module) => _cachedModules.Contains(module);
+
+    /// <summary>Whether <paramref name="block"/> came pre-resolved and pre-checked from
+    /// <see cref="CheckedStd"/>.</summary>
+    public bool IsCachedExtension(ExtensionBlock block) => _cachedExtensions.Contains(block);
 
     private readonly HashSet<ModuleSymbol> _native = new(ReferenceEqualityComparer.Instance);
 
@@ -186,7 +204,7 @@ public sealed class Compilation
     /// for per program: hovering a standard library call has to reach a table the entry module knows
     /// nothing about.</para>
     /// </summary>
-    public DocumentationTable Documentation { get; } = new();
+    public DocumentationTable Documentation { get; }
 
     /// <summary>What the links of the documentation name, once the checker has run: the lint that
     /// reports the broken ones and <c>lyric doc</c>, which links the others, read the same.</summary>
@@ -353,34 +371,85 @@ public sealed class Compilation
     /// <para>A cycle terminates by itself: only what <see cref="FindModule"/> does not yet know is
     /// loaded, and registration happens before a module's own imports are examined.</para>
     /// </summary>
+    /// <summary>Registers a pre-resolved, pre-checked standard-library module from
+    /// <see cref="CheckedStd"/> along with its cached extension blocks.</summary>
+    public ModuleSymbol AddCachedModule(Compiler.CachedStdModule cached)
+    {
+        var symbol = cached.Symbol;
+        _modules.Add(symbol);
+        _asts[symbol] = cached.Ast;
+        _loaded[symbol] = cached.LoadedAst;
+        _native.Add(symbol);
+        _cachedModules.Add(symbol);
+        foreach (var block in cached.Extensions)
+        {
+            Extensions.Add(block);
+            _cachedExtensions.Add(block);
+        }
+        return symbol;
+    }
+
+    /// <summary>Registers pre-checked inline-array extension blocks for <paramref name="length"/>
+    /// from <see cref="CheckedStd"/>.</summary>
+    public bool TryAddCachedInlineArray(int length)
+    {
+        if (CheckedStd?.InlineArrayExtensionsOf(length) is not { } blocks) return false;
+        foreach (var block in blocks)
+        {
+            InlineArrayBlocks.Add(block.Decl);
+            Extensions.Add(block);
+            _cachedExtensions.Add(block);
+        }
+        return true;
+    }
+
     private void LoadImportedModules()
     {
-        if (ModuleLoader is null) return;
+        if (ModuleLoader is null && CheckedStd is null) return;
 
         foreach (var path in WellKnownModules)
         {
             if (FindModule(path) is not null) continue;
-            if (ModuleLoader(path) is not { } wellKnown) continue; // without a stdlib path this does not apply
-            AddModule(wellKnown.Ast, string.Join('.', path), wellKnown.IsNative,
+            var name = string.Join('.', path);
+            if (CheckedStd?.FindModule(name) is { } cached)
+            {
+                AddCachedModule(cached);
+                continue;
+            }
+            if (ModuleLoader?.Invoke(path) is not { } wellKnown) continue; // without a stdlib path this does not apply
+            AddModule(wellKnown.Ast, name, wellKnown.IsNative,
                 wellKnown.Documentation);
         }
 
         LoadImports(0);
 
-        if (FindModule(CancelledHome) is null && _modules.Any(m => UsesCoroutines(AstOf(m)))
-            && ModuleLoader(CancelledHome) is { } task)
+        if (FindModule(CancelledHome) is null && _modules.Any(ModuleNeedsCoroutines))
         {
+            var cancelledName = string.Join('.', CancelledHome);
             var from = _modules.Count;
-            AddModule(task.Ast, string.Join('.', CancelledHome), task.IsNative, task.Documentation);
-            LoadImports(from);
+            if (CheckedStd?.FindModule(cancelledName) is { } cachedTask)
+            {
+                AddCachedModule(cachedTask);
+                LoadImports(from);
+            }
+            else if (ModuleLoader?.Invoke(CancelledHome) is { } task)
+            {
+                AddModule(task.Ast, cancelledName, task.IsNative, task.Documentation);
+                LoadImports(from);
+            }
         }
     }
+
+    private bool ModuleNeedsCoroutines(ModuleSymbol m) =>
+        IsCached(m) && CheckedStd?.FindModule(m.FullName) is { } cached
+            ? cached.UsesCoroutines
+            : ModuleUsesCoroutines(AstOf(m));
 
     /// <summary>Whether a module holds a coroutine: a yield, or a generator that yields nowhere —
     /// a body that returns no value, or only throws. Without the check, such a generator would
     /// find no std.task, and its <c>using</c> and its <c>close()</c> would be refused. A function
     /// that only returns one, as <c>std.core</c>'s <c>sequence</c> does, makes none.</summary>
-    private static bool UsesCoroutines(Module ast)
+    internal static bool ModuleUsesCoroutines(Module ast)
     {
         var pending = new Stack<Node>();
         pending.Push(ast);
@@ -402,14 +471,13 @@ public sealed class Compilation
             {
                 if (decl is not ImportDecl import) continue;
                 if (FindModule(import.Path) is not null) continue;
-                if (ModuleLoader(import.Path) is not { } loaded) continue;
-
                 var name = string.Join('.', import.Path);
-
-                // A file found at a path must agree that it lives there. Without the check the
-                // module registers under the name its header claims, the import that pulled it in
-                // still finds nothing, and the message says "cannot find" about a file that was
-                // just read — and a second importer loads it a second time.
+                if (CheckedStd?.FindModule(name) is { } cached)
+                {
+                    AddCachedModule(cached);
+                    continue;
+                }
+                if (ModuleLoader?.Invoke(import.Path) is not { } loaded) continue;
 
                 AddModule(loaded.Ast, name, loaded.IsNative, loaded.Documentation);
             }
@@ -483,6 +551,6 @@ public sealed class Compilation
     public BindingResult Resolve()
     {
         LoadImportedModules();
-        return new Resolver(this, _sm, _de).Run();
+        return new Resolver(this, _sm, _de, CheckedStd?.Binding).Run();
     }
 }

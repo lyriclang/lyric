@@ -81,6 +81,10 @@ public sealed class AnalysisService : IDisposable
     /// analysis before it is ready parses the library itself.</summary>
     private readonly Task<StdlibSeed> _seed;
 
+    /// <summary>The standard library checked once in the background on startup so subsequent
+    /// analyses skip re-resolving and re-checking <c>std</c>.</summary>
+    private readonly Task<CheckedStdlib?> _checkedStd;
+
     /// <summary>The pending analysis per triggering path. Replacing an entry cancels the run it
     /// stands for. Keyed by the trigger rather than by the unit, because the unit is not known
     /// until a project file has been read, and the debounce must not wait on disk I/O.</summary>
@@ -182,7 +186,9 @@ public sealed class AnalysisService : IDisposable
         _log = log;
         _debounce = debounce;
         _stdlibRoot = stdlibRoot;
-        _seed = Task.Run(() => StdlibSeed.Shared(stdlibRoot ?? Lyric5.Build.Pipeline.StdlibRoot));
+        var effectiveStd = stdlibRoot ?? Lyric5.Build.Pipeline.StdlibRoot;
+        _seed = Task.Run(() => StdlibSeed.Shared(effectiveStd));
+        _checkedStd = Task.Run(() => CheckedStdlib.Shared(effectiveStd, toolchainVersion: toolVersion));
     }
 
     /// <summary>
@@ -311,9 +317,14 @@ public sealed class AnalysisService : IDisposable
     }
 
     /// <summary>One analysis's time, phase by phase, as a line of the log.</summary>
-    internal static string Timings(string unit, int modules, IReadOnlyList<(string Phase, TimeSpan Time)>? phases, TimeSpan total)
+    internal static string Timings(string unit, int modules, IReadOnlyList<(string Phase, TimeSpan Time)>? phases,
+        TimeSpan total, bool stdCached = false)
     {
-        var parts = phases is null ? "" : " (" + string.Join(", ", phases.Select(p => $"{p.Phase} {p.Time.TotalMilliseconds:F0} ms")) + ")";
+        var items = new List<string>();
+        if (stdCached) items.Add("std cached");
+        if (phases is not null)
+            items.AddRange(phases.Select(p => $"{p.Phase} {p.Time.TotalMilliseconds:F0} ms"));
+        var parts = items.Count == 0 ? "" : " (" + string.Join(", ", items) + ")";
         return $"analysed {unit}: {modules} {(modules == 1 ? "module" : "modules")} in {total.TotalMilliseconds:F0} ms{parts}";
     }
 
@@ -429,19 +440,43 @@ public sealed class AnalysisService : IDisposable
     /// <summary>What the editor compiles under: the unit's options, the library parsed once, no
     /// lowering — the editor shows what the checker and the evaluation say —, and the run's token,
     /// which stops a compilation whose text has changed between two of its phases.</summary>
-    private CompilerOptions Options(CompilerOptions unit, CancellationToken cancellationToken) => unit with
+    private CompilerOptions Options(CompilerOptions unit, CancellationToken cancellationToken)
     {
-        StdlibRoot = _stdlibRoot ?? unit.StdlibRoot,
-        StdlibSeed = _seed.IsCompletedSuccessfully ? _seed.Result : null,
-        Lower = false,
-        EditorBudget = EditorBudget,
-        Cancellation = cancellationToken,
+        var stdRoot = _stdlibRoot ?? unit.StdlibRoot ?? Lyric5.Build.Pipeline.StdlibRoot;
+        var overlay = _documents.Overlay();
+        var checkedStd = CheckedStdlibFor(stdRoot, unit, overlay);
+        return unit with
+        {
+            StdlibRoot = _stdlibRoot ?? unit.StdlibRoot,
+            ToolchainVersion = unit.ToolchainVersion ?? _toolVersion,
+            StdlibSeed = _seed.IsCompletedSuccessfully ? _seed.Result : null,
+            CheckedStdlib = checkedStd,
+            Lower = false,
+            EditorBudget = EditorBudget,
+            Cancellation = cancellationToken,
 
-        // Everything the editor holds, not only the files this run starts from. Without it a
-        // program is checked against the last SAVE of every module it imports, and the two
-        // disagree for as long as an edit is unsaved.
-        SourceOverlay = _documents.Overlay(),
-    };
+            // Everything the editor holds, not only the files this run starts from. Without it a
+            // program is checked against the last SAVE of every module it imports, and the two
+            // disagree for as long as an edit is unsaved.
+            SourceOverlay = overlay,
+        };
+    }
+
+    /// <summary>Returns a fresh checked standard library snapshot for <paramref name="stdRoot"/>
+    /// and <paramref name="unit"/>, or <c>null</c> when an open buffer overrides a library file or
+    /// dependency warnings are enabled.</summary>
+    private CheckedStdlib? CheckedStdlibFor(string stdRoot, CompilerOptions unit, IReadOnlyDictionary<string, string> overlay)
+    {
+        if (unit.WarnDeps) return null;
+        var fullRoot = Path.GetFullPath(stdRoot);
+        var prefix = Path.TrimEndingDirectorySeparator(fullRoot) + Path.DirectorySeparatorChar;
+        var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        foreach (var path in overlay.Keys)
+            if (Path.GetFullPath(path).StartsWith(prefix, comparison))
+                return null;
+        return CheckedStdlib.Shared(stdRoot, unit.Build, unit.ToolchainVersion ?? _toolVersion, unit.OverflowChecks);
+    }
 
     /// <summary>
     /// The completions at an offset in a document's CURRENT text.
@@ -565,7 +600,7 @@ public sealed class AnalysisService : IDisposable
         // What 'lyric check -v' says of a build, said of each analysis in the client's log: where
         // an editor that waits spends its time.
         await SafeLogAsync(Timings(Path.GetFileName(unit.Root), roots.Count, result.Times,
-            System.Diagnostics.Stopwatch.GetElapsedTime(started)), MessageType.Log).ConfigureAwait(false);
+            System.Diagnostics.Stopwatch.GetElapsedTime(started), result.UsedCheckedStdlib), MessageType.Log).ConfigureAwait(false);
 
         // Recorded even when the result is discarded below: what this unit reads does not depend
         // on whether its diagnostics are still wanted.

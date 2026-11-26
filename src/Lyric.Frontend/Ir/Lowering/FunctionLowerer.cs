@@ -6079,7 +6079,7 @@ internal sealed class FunctionLowerer
         if (block.TargetType is not { } pattern || !TypeFacts.Match(pattern, receiver, map))
             throw NotSupported($"'{member}': '{TypeFacts.Display(receiver)}' does not match the block's target", span);
         // A parameter only a fixation names is the receiver's answer (05 §13 rule 2).
-        if (!TypeChecker.ApplyFixations(block, map))
+        if (!TypeChecker.ApplyFixations(block, map, _types))
             throw NotSupported($"'{member}': '{TypeFacts.Display(receiver)}' does not fit a fixation of the block", span);
         return map;
     }
@@ -8638,7 +8638,7 @@ internal sealed class FunctionLowerer
         },
         GenericInstance g => TypeChecker.ReduceJoin(new GenericInstance(g.Definition,
             g.Arguments.Select(SubstituteKeepingSets).ToArray()) { Fixations = g.Fixations }),
-        AssocOf a => TypeChecker.ResolveAssociated(SubstituteType(a.Base), a.Member),
+        AssocOf a => TypeChecker.ResolveAssociated(SubstituteType(a.Base), a.Member, _types),
         ThrownSet set => ThrownSet.Of(set.Members.Select(SubstituteKeepingSets), set.Root),
         _ => type,
     };
