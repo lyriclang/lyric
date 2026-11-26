@@ -510,6 +510,43 @@ public class NativeTests
         Assert.Equal("1 2 3 5 8\n21 11\n12\n", BuildAndRun(dir, "app", "build", "-C", dir));
     }
 
+    /// <summary>A string argument crosses as CStr or ?CStr when calling a C function pointer value,
+    /// just as it does for a direct extern "C" declaration.</summary>
+    [Fact]
+    public void A_string_crosses_as_CStr_through_a_C_function_pointer()
+    {
+        var c = """
+            #include <stdint.h>
+            #include <string.h>
+
+            static int64_t len_cstr(const char *s) { return (int64_t)strlen(s); }
+            static int64_t len_opt(const char *s) { return s ? (int64_t)strlen(s) : -1; }
+
+            int64_t (*get_len_cstr(void))(const char *) { return len_cstr; }
+            int64_t (*get_len_opt(void))(const char *) { return len_opt; }
+            """;
+        var main = """
+            import std.io { println };
+            import std.ffi { CStr };
+
+            extern "C" {
+                fn get_len_cstr(): extern "C" fn(CStr) -> int;
+                fn get_len_opt(): extern "C" fn(?CStr) -> int;
+            }
+
+            fn main(): void {
+                let len = get_len_cstr();
+                let opt = get_len_opt();
+                println(f"{len("hello")} {opt("world!")} {opt(null)}");
+            }
+            """;
+        var dir = Package(
+            ("lyric.toml", AppManifest + "\n[native]\nsources = [\"native/*.c\"]\n"),
+            ("native/cstr_ptr.c", c),
+            ("src/main.lyr", main));
+        Assert.Equal("5 6 -1\n", BuildAndRun(dir, "app", "build", "-C", dir));
+    }
+
     /// <summary>A callback may park: C's frames lie on the task's stack while another task runs.</summary>
     [Fact]
     public void A_callback_parks_with_C_frames_below_it()

@@ -573,6 +573,10 @@ promise. This entry fills with the milestones.
   and in `obj.each { x => // … }` the comment was dropped, and the trailing block then fitted on
   one line; with a free function it stayed. A single method call was printed as a chain of calls
   first, which took the comments, then again without them.
+- **A `string` crosses as `CStr` or `?CStr` through a C function pointer value too.** Calling an
+  `extern "C" fn(…)` value (for example one loaded with `Library.symbol`) with a `string` argument
+  for a `CStr` or `?CStr` parameter now converts it without a copy, matching direct `extern "C"`
+  declarations (`LYR-SEM0001` refused it).
 
 ---
 
