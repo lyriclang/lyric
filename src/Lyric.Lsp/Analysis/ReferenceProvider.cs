@@ -98,7 +98,7 @@ public static class ReferenceProvider
     internal static (Symbol Symbol, Node Node)? SymbolNodeAt(
         SemanticModel model, Module root, FileId file, int offset)
     {
-        var path = NodeFinder.PathAt(root, file, offset);
+        var path = NodeFinder.PathAt(root, file, offset, model.Compilation);
 
         for (var i = path.Count - 1; i >= 0; i--)
             if ((model.Types.RefOf(path[i]) ?? model.Binding.Resolve(path[i])) is { } symbol)

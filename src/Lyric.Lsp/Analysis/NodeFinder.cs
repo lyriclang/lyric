@@ -157,9 +157,11 @@ public static class NodeFinder
 
     /// <summary>
     /// The chain from the module down to the innermost node covering <paramref name="offset"/>,
-    /// outermost first. Empty when the offset lies outside the module.
+    /// outermost first. Empty when the offset lies outside the module. When
+    /// <paramref name="compilation"/> is given, interface nodes removed from a declaration by
+    /// conformance synthesis are searched alongside its kept children.
     /// </summary>
-    public static IReadOnlyList<Node> PathAt(Node root, FileId file, int offset)
+    public static IReadOnlyList<Node> PathAt(Node root, FileId file, int offset, Compilation? compilation = null)
     {
         if (!Covers(root, file, offset)) return [];
 
@@ -174,6 +176,15 @@ public static class NodeFinder
                 if (!Covers(child, file, offset)) continue;
                 next = child;
                 break;
+            }
+            if (next is null && compilation is not null && current is Decl decl)
+            {
+                foreach (var iface in compilation.SynthesizedInterfacesOf(decl))
+                {
+                    if (!Covers(iface, file, offset)) continue;
+                    next = iface;
+                    break;
+                }
             }
 
             if (next is null) return path;

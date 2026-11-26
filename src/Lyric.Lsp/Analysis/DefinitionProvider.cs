@@ -33,7 +33,7 @@ public static class DefinitionProvider
     /// <see cref="HoverProvider.At"/> for why it is passed.</param>
     public static DefinitionTarget? At(SemanticModel model, Module root, FileId file, int offset)
     {
-        var path = NodeFinder.PathAt(root, file, offset);
+        var path = NodeFinder.PathAt(root, file, offset, model.Compilation);
 
         // '_' names nothing; the pattern around it is not what the cursor is on.
         if (path is [.., WildcardPattern]) return null;

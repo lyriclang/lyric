@@ -421,9 +421,21 @@ public sealed class Compilation
     /// <summary>The module's tree as it was loaded (see <c>_loaded</c>).</summary>
     public Module LoadedAstOf(ModuleSymbol module) => _loaded[module];
 
+    private readonly Dictionary<Decl, TypeNode[]> _synthesizedInterfaces = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>The resolver's view of the module's tree, with what the synthesis took off its
     /// declarations: this compilation's alone, the loaded tree stays as it was.</summary>
     public void ReplaceAst(ModuleSymbol module, Module ast) => _asts[module] = ast;
+
+    /// <summary>Records the interface type nodes that conformance synthesis removed from
+    /// <paramref name="declaration"/> so name binding and editor queries still find them.</summary>
+    public void RecordSynthesizedInterfaces(Decl declaration, TypeNode[] interfaces) =>
+        _synthesizedInterfaces[declaration] = interfaces;
+
+    /// <summary>The interface type nodes removed from <paramref name="declaration"/> by
+    /// conformance synthesis, in source order; empty when none were removed.</summary>
+    public TypeNode[] SynthesizedInterfacesOf(Decl declaration) =>
+        _synthesizedInterfaces.TryGetValue(declaration, out var found) ? found : [];
 
     public ModuleSymbol? FindModule(string[] path) =>
         _modules.FirstOrDefault(m => m.Path.Length == path.Length && m.Path.SequenceEqual(path));

@@ -178,6 +178,89 @@ public sealed class HoverTests
             fn main(): int { return 0; }
             """));
     }
+
+    [Fact]
+    public void Types_deriving_builtin_interfaces_keep_their_doc_comments_on_hover()
+    {
+        const string source = """
+            /// Doc for StructWithEq.
+            pub struct StructWithEq :: Equatable & Debug { pub x: int }
+
+            /// Doc for ClassWithEq.
+            pub class ClassWithEq :: Equatable { pub x: int = 0 }
+
+            /// Doc for EnumWithEq.
+            pub enum EnumWithEq :: Equatable & Debug { A, B }
+
+            pub fn useIt(a: StructWithEq, b: ClassWithEq, c: EnumWithEq): void {
+                let _ = (a, b, c);
+            }
+            """;
+
+        foreach (var (marker, doc) in new[]
+        {
+            ("a: Struct$WithEq", "Doc for StructWithEq."),
+            ("b: Class$WithEq", "Doc for ClassWithEq."),
+            ("c: Enum$WithEq", "Doc for EnumWithEq."),
+        })
+        {
+            var marked = source.Replace(marker.Replace("$", ""), marker);
+            Assert.Contains(doc, Text(marked));
+        }
+    }
+
+    [Fact]
+    public void Builtin_interfaces_in_conformance_clauses_answer_hover_definition_and_semantic_tokens()
+    {
+        const string source = """
+            pub struct S :: Equatable & Debug { pub x: int }
+            pub class C :: Equatable { pub x: int = 0 }
+            pub enum E :: Equatable & Debug { A, B }
+            """;
+
+        foreach (var (target, expected) in new[]
+        {
+            ("struct S :: Equat$able", "interface Equatable"),
+            ("struct S :: Equatable & Deb$ug", "interface Debug"),
+            ("class C :: Equat$able", "interface Equatable"),
+            ("enum E :: Equatable & Deb$ug", "interface Debug"),
+        })
+        {
+            var marked = source.Replace(target.Replace("$", ""), target);
+            var found = HoverAt(marked);
+            Assert.NotNull(found);
+            Assert.Contains(expected, found.Markdown);
+        }
+
+        // Go-to-definition and semantic tokens also see the synthesized conformance nodes.
+        var path = Path.Combine(AppContext.BaseDirectory, "derived_conformance.lyr");
+        var result = Single.Check(path, source);
+        var model = result.Model!;
+        var file = DiagnosticMapper.FindFile(result.Sources, path);
+        var eqOffset = source.IndexOf("Equatable", StringComparison.Ordinal) + 2;
+        var def = DefinitionProvider.At(model, model.Entry, file, eqOffset);
+        Assert.NotNull(def);
+
+        var tokens = SemanticTokensProvider.Of(model, model.Entry, file, result.Sources);
+        var interfaceType = SemanticTokensProvider.TokenTypes.ToList().IndexOf("interface");
+        var decoded = DecodeTokens(tokens);
+        Assert.Contains(decoded, t => t.Line == 0 && t.Length == "Equatable".Length && t.Type == interfaceType);
+        Assert.Contains(decoded, t => t.Line == 0 && t.Length == "Debug".Length && t.Type == interfaceType);
+    }
+
+    private static List<(int Line, int Character, int Length, int Type)> DecodeTokens(IReadOnlyList<int> data)
+    {
+        var list = new List<(int, int, int, int)>();
+        var line = 0;
+        var col = 0;
+        for (var i = 0; i + 4 < data.Count; i += 5)
+        {
+            line += data[i];
+            col = data[i] == 0 ? col + data[i + 1] : data[i + 1];
+            list.Add((line, col, data[i + 2], data[i + 3]));
+        }
+        return list;
+    }
 }
 
 /// <summary>Hover across the wire, including the case the whole retained-model design exists for.

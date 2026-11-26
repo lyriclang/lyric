@@ -27,7 +27,7 @@ public static class HoverProvider
     /// entry is the right walk root for exactly one of them.</param>
     public static HoverResult? At(SemanticModel model, Module root, FileId file, int offset)
     {
-        var path = NodeFinder.PathAt(root, file, offset);
+        var path = NodeFinder.PathAt(root, file, offset, model.Compilation);
 
         // A name of an import clause is no node; it stands for what it imports, as at a use.
         if (NodeFinder.ImportedAt(model, path, file, offset, out var name) is { } imported)

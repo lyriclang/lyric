@@ -573,6 +573,12 @@ promise. This entry fills with the milestones.
   and in `obj.each { x => // … }` the comment was dropped, and the trailing block then fitted on
   one line; with a free function it stayed. A single method call was printed as a chain of calls
   first, which took the comments, then again without them.
+- **`lyric lsp` keeps `///` documentation and resolves derived built-in interfaces in `::`
+  clauses.** Conformance synthesis cloned `struct`/`class`/`enum` declarations when stripping
+  synthesized interfaces such as `Equatable` and `Debug`, which orphaned the declaration's doc
+  comment in `DocumentationTable` and left the stripped interface nodes unbound. Hover,
+  go-to-definition and semantic tokens now see both the type's doc comment and the derived
+  interfaces.
 
 ---
 
