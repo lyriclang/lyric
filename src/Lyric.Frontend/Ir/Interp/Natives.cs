@@ -137,7 +137,9 @@ public sealed class Natives(Interpreter interpreter)
 
     private Value Say(string code, Lyric.Core.Severity severity, Value[] a)
     {
-        Said.Add((code, severity, Syntax.SpanOf(S(a[0]).ToString(), (int)I(a[1]), (int)I(a[2])), S(a[3]).ToString()));
+        Said.Add((code, severity,
+            Syntax.SpanOf(S(a[0]).ToString(), (int)I(a[1]), (int)I(a[2]), (int)I(a[3]), (int)I(a[4])),
+            S(a[5]).ToString()));
         return default;
     }
 
@@ -168,8 +170,9 @@ public sealed class Natives(Interpreter interpreter)
         ["std.syntax.sourceOfType"] = (a, t, _) => Str(Syntax.Source(Syntax.TypeOf(a[0], t[0]))),
         ["std.syntax.sourceOfPattern"] = (a, t, _) => Str(Syntax.Source(Syntax.PatternOf(a[0], t[0]))),
         ["std.syntax.freshName"] = (a, _, _) => Str(Syntax.FreshName(S(a[0]).ToString())),
-        // a struct parameter reaches a native flattened (ImportTable): the Span's file, line and column
-        ["std.syntax.error"] = (a, _, _) => throw Syntax.MacroError(S(a[0]).ToString(), (int)I(a[1]), (int)I(a[2]), S(a[3]).ToString()),
+        // a struct parameter reaches a native flattened (ImportTable): the Span's file, start and end
+        ["std.syntax.error"] = (a, _, _) => throw Syntax.MacroError(
+            S(a[0]).ToString(), (int)I(a[1]), (int)I(a[2]), (int)I(a[3]), (int)I(a[4]), S(a[5]).ToString()),
         ["std.syntax.warn"] = (a, _, _) => Say("LYR-MAC0002", Lyric.Core.Severity.Warning, a),
         ["std.syntax.note"] = (a, _, _) => Say("LYR-MAC0003", Lyric.Core.Severity.Hint, a),
         // --- strings (string.c)

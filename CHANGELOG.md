@@ -573,6 +573,11 @@ promise. This entry fills with the milestones.
   and in `obj.each { x => // … }` the comment was dropped, and the trailing block then fitted on
   one line; with a free function it stayed. A single method call was printed as a chain of calls
   first, which took the comments, then again without them.
+- **`std.syntax.Span` carries its end (`endLine`, `endColumn`, both defaulting to `0`).** Nodes
+  read from source keep their full start-to-end extent through macros and back, so diagnostics,
+  `error(at, msg)`/`warn`/`note` and auto-fix suggestions underline and edit the whole node instead
+  of a single character. Existing code constructing `Span { file, line, column }` keeps working as
+  a one-character point span.
 
 ---
 

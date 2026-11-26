@@ -14,7 +14,7 @@ public class ExpansionDiagnosticTests
     private const string Macros = """
         import std.io { println };
         import std.collections { List };
-        import std.syntax { Expr, Stmt, Decl, FnDecl, Block, Literal, Span };
+        import std.syntax { Expr, Stmt, Decl, FnDecl, Block, Literal, Span, error };
 
         /// `bad!(e)` adds a string to whatever it gets: wrong for an int, in the quote.
         pub macro bad(e: Expr): Expr {
@@ -55,6 +55,17 @@ public class ExpansionDiagnosticTests
             all.pushAll(pre);
             all.pushAll(target.body!.stmts);
             return Decl.Fn(target with { body = Block { stmts = all.toArray(), span = target.span } });
+        }
+
+        /// `refuse!(e)` reports an error at `e.span()`.
+        pub macro refuse(e: Expr): Expr {
+            error(e.span(), "refused by macro");
+        }
+
+        /// `pointError!(e)` constructs a `Span` with only file, line and column (default end).
+        pub macro pointError(e: Expr): Expr {
+            let s = e.span();
+            error(Span { file = s.file, line = s.line, column = s.column }, "point span error");
         }
 
         """;
@@ -215,5 +226,57 @@ public class ExpansionDiagnosticTests
         Assert.Contains(errors, l => l.EndsWith("main.lyr:6:18: error[LYR-SEM0001]: cannot assign 'string' to 'int'"));
         Assert.Contains(lines, l => l.Contains("note: synthesized as: let n__1: int = \"wrong\";"));
         Assert.Contains(lines, l => l.Contains("note: from the quote of 'Logged' here") && l.EndsWith("macros.lyr:39:31"));
+    }
+
+    /// <summary>A node read from the caller keeps its full extent through a macro and back: a
+    /// warning underlines the whole identifier and a suggestion replaces the whole token instead
+    /// of truncating to one character.</summary>
+    [Fact]
+    public void A_diagnostic_and_suggestion_in_a_macros_body_cover_the_whole_node()
+    {
+        var warnLines = Lines("""
+            import std.io { println };
+            import app.macros { retry };
+
+            fn main(): void {
+                retry!(3) {
+                    let unusedName = 1;
+                    println("ok");
+                }
+            }
+            """, 0);
+        Assert.Contains(warnLines, l => l.Contains("LYR-SEM0071"));
+        Assert.Contains(warnLines, l => l.Contains("^^^^^^^^^^"));
+
+        var errLines = Lines("""
+            import std.io { println };
+            import app.macros { retry };
+
+            fn main(): void {
+                let message = "hello";
+                retry!(3) {
+                    printl(message);
+                }
+            }
+            """, 1);
+        Assert.Contains(errLines, l => l.Contains("^^^^^^"));
+        Assert.Contains(errLines, l => l.Contains("println(message);"));
+        Assert.DoesNotContain(errLines, l => l.Contains("printlnrintl(message);"));
+    }
+
+    /// <summary><c>error(at, msg)</c> underlines the full span of the node when it has an end,
+    /// while a <c>Span</c> built with only file, line and column still compiles and underlines one
+    /// character.</summary>
+    [Fact]
+    public void Macro_error_underlines_the_full_span_and_default_end_stays_a_point()
+    {
+        var full = Lines("import std.io { println };\nimport app.macros { refuse };\n\nfn main(): void {\n    println(refuse!(12345));\n}\n", 1);
+        Assert.Contains(full, l => l.Contains("LYR-MAC0001") && l.Contains("refused by macro"));
+        Assert.Contains(full, l => l.Contains("^^^^^"));
+
+        var point = Lines("import std.io { println };\nimport app.macros { pointError };\n\nfn main(): void {\n    println(pointError!(12345));\n}\n", 1);
+        Assert.Contains(point, l => l.Contains("LYR-MAC0001") && l.Contains("point span error"));
+        Assert.DoesNotContain(point, l => l.Contains("^^^^^"));
+        Assert.Contains(point, l => l.TrimEnd().EndsWith("^"));
     }
 }

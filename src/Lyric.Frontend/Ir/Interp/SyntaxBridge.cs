@@ -182,31 +182,39 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
 
     private Make Sp(Span span) => t =>
     {
-        var (file, line, column) = Locate(span);
-        return Struct(t, ("file", S(file)), ("line", I(line)), ("column", I(column)));
+        var (file, line, column, endLine, endColumn) = Locate(span);
+        return Struct(t, ("file", S(file)), ("line", I(line)), ("column", I(column)),
+            ("endLine", I(endLine)), ("endColumn", I(endColumn)));
     };
 
     /// <summary>Where a span lies, as the diagnostics name it; nothing for a span of nothing, or
     /// of a file the bridge's sources do not hold.</summary>
-    private (string File, int Line, int Column) Locate(Span span)
+    private (string File, int Line, int Column, int EndLine, int EndColumn) Locate(Span span)
     {
-        if (span == default || span.File.Value < 1 || span.File.Value > _sources.FileCount) return ("", 0, 0); // ids count from 1
-        if (span.End > _sources.GetText(span.File).Length) return ("", 0, 0);
-        var at = _sources.Locate(span.File, span.Start);
-        return (_sources.GetPath(span.File), at.Line, at.Column);
+        if (span == default || span.File.Value < 1 || span.File.Value > _sources.FileCount) return ("", 0, 0, 0, 0); // ids count from 1
+        if (span.End > _sources.GetText(span.File).Length) return ("", 0, 0, 0, 0);
+        var start = _sources.Locate(span.File, span.Start);
+        var end = _sources.Locate(span.File, span.End);
+        return (_sources.GetPath(span.File), start.Line, start.Column, end.Line, end.Column);
     }
 
     /// <summary>The span a <c>Span</c> value names, as a span of the program: its file by the
-    /// name the diagnostics use, the place by line and column; none where the program holds no
-    /// such file.</summary>
-    public Span SpanAt(string file, int line, int column)
+    /// name the diagnostics use, the start and optional exclusive end by line and column (1-based);
+    /// a zero end yields a one-character point span; none where the program holds no such file.</summary>
+    public Span SpanAt(string file, int line, int column, int endLine = 0, int endColumn = 0)
     {
         // the files by their names, once each; a file added since (a synthesized one) is indexed at the next ask
         for (; _indexed < _sources.FileCount; _indexed++)
             _fileIds.TryAdd(_sources.GetPath(new FileId(_indexed + 1)), new FileId(_indexed + 1));
         if (!_fileIds.TryGetValue(file, out var id)) return default;
-        var offset = _sources.OffsetAt(id, line, column);
-        return offset < 0 ? default : new Span(id, offset, Math.Min(offset + 1, _sources.GetText(id).Length));
+        var start = _sources.OffsetAt(id, line, column);
+        if (start < 0) return default;
+        if (endLine > 0 && endColumn > 0)
+        {
+            var end = _sources.OffsetAt(id, endLine, endColumn);
+            if (end >= start) return new Span(id, start, end);
+        }
+        return new Span(id, start, Math.Min(start + 1, _sources.GetText(id).Length));
     }
 
     /// <summary>The span a <c>Span</c> value names, as <see cref="SpanAt"/> finds it; none for a
@@ -215,7 +223,8 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
     {
         var file = StrOf(FieldOf(v, t, "file"));
         if (file.Length == 0) return null;
-        var span = SpanAt(file, (int)FieldOf(v, t, "line").AsInt, (int)FieldOf(v, t, "column").AsInt);
+        var span = SpanAt(file, (int)FieldOf(v, t, "line").AsInt, (int)FieldOf(v, t, "column").AsInt,
+            (int)FieldOf(v, t, "endLine").AsInt, (int)FieldOf(v, t, "endColumn").AsInt);
         return span == default ? null : span;
     }
 
@@ -257,10 +266,12 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
     }
 
     /// <summary>The failure <c>error(at, msg)</c> raises.</summary>
-    public ComptimeFailure MacroError(string file, int line, int column, string message) => ComptimeFailure.Macro(SpanAt(file, line, column), message);
+    public ComptimeFailure MacroError(string file, int line, int column, int endLine, int endColumn, string message) =>
+        ComptimeFailure.Macro(SpanAt(file, line, column, endLine, endColumn), message);
 
     /// <summary>Where a <c>Span</c> value of a site points: what <c>warn</c> and <c>note</c> name.</summary>
-    public Span SpanOf(string file, int line, int column) => SpanAt(file, line, column);
+    public Span SpanOf(string file, int line, int column, int endLine = 0, int endColumn = 0) =>
+        SpanAt(file, line, column, endLine, endColumn);
 
     /// <summary>The name <paramref name="name"/> as an <c>Ident</c> value, for a macro's parameter.</summary>
     public Value IdentValue(string name, Span span, IrType t) => Ident(name, span, t);
@@ -820,11 +831,10 @@ public sealed class SyntaxBridge(IrModule module, SourceManager? sources = null)
     /// <summary>The span of the node being read, where its value names one.</summary>
     private Span? _current;
 
-    /// <summary>The keyword a node the caller wrote begins with, as its own span. A span of
-    /// std.syntax is a point — file, line, column —, so a node read back covers one character;
-    /// a diagnostic about the keyword and the edit that takes it out need the word, and the edit
-    /// left the rest of it behind ('ry fetch()'). Taken from the text where it is the keyword;
-    /// elsewhere the point, or the site.</summary>
+    /// <summary>The keyword a node the caller wrote begins with, as its own span. The node's own
+    /// span covers the whole expression (for example <c>try fetch()</c>), whereas diagnostics and
+    /// fixes about the leading keyword need only the keyword itself; taken from the source text
+    /// when it matches at the start, otherwise the node's span or the site.</summary>
     private Span KeywordAt(Span? own, string keyword)
     {
         if (own is not { } at) return NoSpan;
