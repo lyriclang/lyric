@@ -164,7 +164,9 @@ and an expression macro can take a little language of its own in a string.
 A macro speaks to its user through `std.syntax`: `error(at, message)` refuses the site, at the
 node `at` names; `warn(at, message)` says something worth a look and lets the expansion stand — a
 warning like the compiler's own, the lint `macro-warning`; `note(at, message)` adds a hint, such
-as which of two forms the macro took. Each points at the node and at the site's `!`.
+as which of two forms the macro took. Each `Span` carries the node's start (`line`, `column`) and
+exclusive end (`endLine`, `endColumn`, defaulting to `0` for a one-character point), so diagnostics
+and suggestions underline and edit the whole node while pointing back at the site's `!`.
 
 [`examples/macros`](../../examples/macros/src/main.lyr) has all three kinds at work, and the test
 suite builds it and compares what `lyric expand` prints.

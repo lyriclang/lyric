@@ -74,7 +74,7 @@ fn declNames(text: string): string {
 
 fn whereIs(): string {
     return match (parseExpr("  foo")) {
-        .Name(id) => f"{id.span.line}:{id.span.column}",
+        .Name(id) => f"{id.span.line}:{id.span.column}-{id.span.endLine}:{id.span.endColumn}",
         _ => "?",
     };
 }
@@ -118,8 +118,16 @@ fn aTreeIsWalked(): void {
 
 @Test
 fn aNodeKnowsWhereItStands(): void {
-    assertEq(comptime whereIs(), "1:3");
+    assertEq(comptime whereIs(), "1:3-1:6");
     assertEq(comptime Ident.of("y").span.line, 0);
+    assertEq(comptime Ident.of("y").span.endLine, 0);
+    assertEq(comptime Ident.of("y").span.endColumn, 0);
+    let point = Span { file = "a.lyr", line = 1, column = 3 };
+    assertEq(point.endLine, 0);
+    assertEq(point.endColumn, 0);
+    let a = Span { file = "a.lyr", line = 1, column = 3, endLine = 1, endColumn = 6 };
+    let b = Span { file = "a.lyr", line = 1, column = 3, endLine = 1, endColumn = 7 };
+    assertTrue(a != b);
 }
 
 @Test

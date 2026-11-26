@@ -8,7 +8,7 @@
 //! `_`, and a form the compiler has that this module has not - the rounds of a `comptime for`
 //! over fields and variants among them - is refused where it is read (`LYR-CT0005`).
 //!
-//! A node built here, not read, has a `Span` of nothing: file `""`, line and column `0`.
+//! A node built here, not read, has a `Span` of nothing: file `""`, lines and columns `0`.
 //!
 //! # Examples
 //!
@@ -27,18 +27,21 @@
 
 import std.collections { List };
 
-/// Where a node stands: a file as the diagnostics name it, a line and a column from 1; `""` and
-/// `0` where the node was built, not read.
+/// Where a node stands: a file as the diagnostics name it, its start and exclusive end by line
+/// and column from 1; `""` and `0` where the node was built, not read, and `0` for `endLine` and
+/// `endColumn` for a point span of one character.
 pub struct Span :: Equatable & Debug {
     pub file: string,
     pub line: int,
     pub column: int,
+    pub endLine: int = 0,
+    pub endColumn: int = 0,
 }
 
 extend Span {
-    /// Returns the span of what was built, not read: file `""`, line and column `0`.
+    /// Returns the span of what was built, not read: file `""`, lines and columns `0`.
     pub static fn none(): Span {
-        return Span { file = "", line = 0, column = 0 };
+        return Span { file = "", line = 0, column = 0, endLine = 0, endColumn = 0 };
     }
 }
 
