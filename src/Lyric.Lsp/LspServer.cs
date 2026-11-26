@@ -69,6 +69,8 @@ public sealed class LspServer : IDisposable
     /// <c>initialize</c>, because a client's capabilities do not change while it runs.</summary>
     private bool _definitionLinkSupport;
 
+    private bool _completionSnippetSupport;
+
     /// <summary>Whether the client reads nested document symbols. The flat alternative is not
     /// produced, so a client without this gets no outline rather than a wrong one.</summary>
     private bool _hierarchicalSymbols;
@@ -217,6 +219,7 @@ public sealed class LspServer : IDisposable
                 var client = capabilities?.TextDocument;
 
                 _definitionLinkSupport = client?.Definition?.LinkSupport ?? false;
+                _completionSnippetSupport = client?.Completion?.CompletionItem?.SnippetSupport ?? false;
                 _hierarchicalSymbols =
                     client?.DocumentSymbol?.HierarchicalDocumentSymbolSupport ?? false;
                 _watchedFilesSupport =
@@ -890,7 +893,8 @@ public sealed class LspServer : IDisposable
         }
 
         var offset = TextOffsets.ToOffset(document.Text, parameters.Position);
-        var items = await _analysis.CompleteAsync(document, offset, cancellationToken)
+        var items = await _analysis.CompleteAsync(
+                document, offset, _completionSnippetSupport, cancellationToken)
             .ConfigureAwait(false);
 
         if (items is null)
@@ -1257,7 +1261,7 @@ public sealed class LspServer : IDisposable
             DefinitionProvider = true,
             DocumentSymbolProvider = true,
             ReferencesProvider = true,
-            CompletionProvider = new CompletionOptions { TriggerCharacters = ["."] },
+            CompletionProvider = new CompletionOptions { TriggerCharacters = [".", ":", "@", "<", "/"] },
             RenameProvider = new RenameOptions { PrepareProvider = true },
             WorkspaceSymbolProvider = true,
             SemanticTokensProvider = new SemanticTokensOptions
@@ -1269,7 +1273,11 @@ public sealed class LspServer : IDisposable
                 },
                 Full = true,
             },
-            SignatureHelpProvider = new SignatureHelpOptions { TriggerCharacters = ["(", ","] },
+            SignatureHelpProvider = new SignatureHelpOptions
+            {
+                TriggerCharacters = ["(", ","],
+                RetriggerCharacters = [","],
+            },
             FoldingRangeProvider = true,
             InlayHintProvider = true,
             DocumentFormattingProvider = true,

@@ -48,6 +48,19 @@ public static class DefinitionProvider
             return NodeFinder.ModuleNamed(model, prefix) is { } module && Declaration(module) is { } target
                 && !model.Compilation.IsSynthesized(target.File) ? target : null;
 
+        // A conformance node stripped during synthesis (':: Equatable & Debug') jumps straight to
+        // its interface declaration.
+        if (NodeFinder.SynthesizedConformancePathAt(model, file, offset) is { } synthPath)
+        {
+            for (var i = synthPath.Count - 1; i >= 0; i--)
+            {
+                var synthSym = model.Types.RefOf(synthPath[i]) ?? model.Binding.Resolve(synthPath[i]);
+                if (synthSym is not null && Declaration(synthSym) is { } synthTarget
+                    && !model.Compilation.IsSynthesized(synthTarget.File))
+                    return synthTarget;
+            }
+        }
+
         // From the inside out, like hover: the innermost node is the most specific, and the nodes
         // above it are the fallback when it binds to nothing.
         for (var i = path.Count - 1; i >= 0; i--)

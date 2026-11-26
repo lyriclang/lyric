@@ -450,13 +450,17 @@ public sealed class AnalysisService : IDisposable
     /// keystroke that triggered this, and its spans are indices into that text. A compile of its own
     /// is what makes the answer about what the user is looking at.</para>
     /// </summary>
+    public Task<IReadOnlyList<CompletionItem>?> CompleteAsync(
+        OpenDocument document, int offset, CancellationToken cancellationToken) =>
+        CompleteAsync(document, offset, snippetSupport: false, cancellationToken);
+
     public async Task<IReadOnlyList<CompletionItem>?> CompleteAsync(
-        OpenDocument document, int offset, CancellationToken cancellationToken)
+        OpenDocument document, int offset, bool snippetSupport, CancellationToken cancellationToken)
     {
         var (options, module) = await OptionsForAsync(document, cancellationToken).ConfigureAwait(false);
 
         return await Task.Run(
-            () => CompletionProvider.At(document.Path, document.Text, offset, options, module),
+            () => CompletionProvider.At(document.Path, document.Text, offset, options, module, snippetSupport),
             cancellationToken).ConfigureAwait(false);
     }
 

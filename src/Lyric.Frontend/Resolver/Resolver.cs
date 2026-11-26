@@ -236,6 +236,8 @@ public sealed class Resolver
     /// </summary>
     private readonly HashSet<(ModuleSymbol Module, string Type, string Interface)> _synthesized = new();
 
+    private readonly List<(ModuleSymbol Module, string OwnerName, TypeNode Node)> _synthesizedConformanceNodes = new();
+
     /// <summary>Whether the type's module gives it the interface in a block of its own — written,
     /// or synthesized in pass 1 for the listed node, which then left the list.</summary>
     private bool GivenByABlock(ModuleSymbol module, string type, string iface) =>
@@ -348,14 +350,19 @@ public sealed class Resolver
             if (request.Node is not null) taken.Add(request.Node);
         }
         if (taken.Count == 0) return decl;
+        foreach (var origNode in taken)
+            _synthesizedConformanceNodes.Add((module, name, origNode));
         var kept = interfaces.Where(n => !taken.Contains(n)).ToArray();
-        return decl switch
+        Decl replaced = decl switch
         {
             StructDecl s => s with { Interfaces = kept },
             ClassDecl c => c with { Interfaces = kept },
             EnumDecl e => e with { Interfaces = kept },
             _ => decl,
         };
+        if (!ReferenceEquals(replaced, decl) && _comp.Documentation.Of(decl) is { } doc)
+            _comp.Documentation.Record(replaced, doc);
+        return replaced;
     }
 
     // An extend block: its methods get their own FunctionSymbol in a block scope
@@ -764,6 +771,21 @@ public sealed class Resolver
         _module = module;
         var scope = module.Members;
         foreach (var decl in _comp.AstOf(module).Declarations) BindDeclTypes(decl, scope);
+        foreach (var item in _synthesizedConformanceNodes)
+        {
+            if (!ReferenceEquals(item.Module, module)) continue;
+            var ownerScope = MemberScope(scope, item.OwnerName);
+            BindSynthesizedInterfaceNode(item.Node, ownerScope);
+            _binding.RecordSynthesizedInterface(item.Node.Span.File, item.Node);
+        }
+    }
+
+    private void BindSynthesizedInterfaceNode(TypeNode type, SymbolTable scope)
+    {
+        if (type is not NamedType n) return;
+        if (ResolveTypePath(n, scope) is { } sym)
+            _binding.Bind(n, sym);
+        foreach (var a in n.TypeArguments) BindSynthesizedInterfaceNode(a, scope);
     }
 
     private void BindDeclTypes(Decl decl, SymbolTable scope)

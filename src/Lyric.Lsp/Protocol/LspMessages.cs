@@ -213,6 +213,9 @@ public sealed record SignatureHelpOptions
     /// <summary>Opening a call and moving to the next argument — the two moments the question
     /// changes its answer.</summary>
     public required IReadOnlyList<string> TriggerCharacters { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? RetriggerCharacters { get; init; }
 }
 
 public sealed record SignatureHelp
@@ -481,9 +484,21 @@ public enum CompletionItemKind
     EnumMember = 20,
 }
 
+public sealed record CompletionItemLabelDetails
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Detail { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+}
+
 public sealed record CompletionItem
 {
     public required string Label { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompletionItemLabelDetails? LabelDetails { get; init; }
 
     public required CompletionItemKind Kind { get; init; }
 
@@ -495,12 +510,45 @@ public sealed record CompletionItem
     /// <summary>What was written above the declaration, if anything.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public MarkupContent? Documentation { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SortText { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FilterText { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? InsertText { get; init; }
+
+    /// <summary><c>1</c> plain text, <c>2</c> snippet (<c>$1</c>/<c>$0</c>).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? InsertTextFormat { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Preselect { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? CommitCharacters { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<int>? Tags { get; init; }
+}
+
+public sealed record CompletionContext
+{
+    public int TriggerKind { get; init; } = 1;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TriggerCharacter { get; init; }
 }
 
 public sealed record CompletionParams
 {
     public required TextDocumentIdentifier TextDocument { get; init; }
     public required Position Position { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompletionContext? Context { get; init; }
 }
 
 /// <summary>Whether the declaration itself counts as one of the places a name occurs. The client
@@ -656,6 +704,20 @@ public sealed record TextDocumentClientCapabilities
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DocumentSymbolClientCapabilities? DocumentSymbol { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompletionClientCapabilities? Completion { get; init; }
+}
+
+public sealed record CompletionClientCapabilities
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompletionItemClientCapabilities? CompletionItem { get; init; }
+}
+
+public sealed record CompletionItemClientCapabilities
+{
+    public bool SnippetSupport { get; init; }
 }
 
 public sealed record DocumentSymbolClientCapabilities
