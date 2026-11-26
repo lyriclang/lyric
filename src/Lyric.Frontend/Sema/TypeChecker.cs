@@ -8052,8 +8052,9 @@ public sealed class TypeChecker
             // refused where it was checked.
             if (!fn.PlaceAt(i))
             {
-                // a C function's 'CStr' — or '?CStr' — takes a 'string' as its bytes, for the call
-                if (decl?.Extern is { Abi: "C" } && argTypes[i] is PrimitiveType { Kind: PrimitiveKind.String }
+                // a C function's 'CStr' — or '?CStr' — takes a 'string' as its bytes, for the call,
+                // whether called by its extern "C" declaration or through a C function pointer value
+                if ((decl?.Extern is { Abi: "C" } || fn.IsC) && argTypes[i] is PrimitiveType { Kind: PrimitiveKind.String }
                     && (fn.Parameters[i] is Optional { Inner: var inner } ? inner : fn.Parameters[i]) is NamedRef cstr
                     && IsFfiType(cstr.Symbol, "CStr"))
                 {

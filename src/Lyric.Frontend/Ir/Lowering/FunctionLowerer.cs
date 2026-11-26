@@ -8378,7 +8378,17 @@ internal sealed class FunctionLowerer
         var returned = LowerType(cFunction.Return, expr.Span);
         var args = new TempId[expr.Arguments.Length];
         for (var i = 0; i < args.Length; i++)
+        {
+            if (_types.IsCStrArgument(expr.Arguments[i]))
+            {
+                var parameter = parameters[i];
+                var cstrType = parameter is IrOptionalType optional ? optional.Inner : parameter;
+                var cstr = StringAsCStr(expr.Arguments[i], cstrType, expr.Span);
+                args[i] = parameter is IrOptionalType ? Coerce(cstr, cstrType, parameter, expr.Span) : cstr;
+                continue;
+            }
             args[i] = LowerExprAs(expr.Arguments[i], parameters[i]);
+        }
         var forms = parameters.Select(p => ModuleLowerer.CFormOf(p, _typeTable, compilation)).ToArray();
         var form = ModuleLowerer.CFormOf(returned, _typeTable, compilation);
         var dest = IsVoid(returned) ? (TempId?)null : _slots.NewTemp(returned);
