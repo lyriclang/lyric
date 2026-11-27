@@ -18,6 +18,11 @@ public static class CompletionProvider
     public static IReadOnlyList<CompletionItem>? At(
         string path, string text, int offset, CompilerOptions options,
         string? moduleName = null, bool snippetSupport = false)
+        => Sanitize(AtCore(path, text, offset, options, moduleName, snippetSupport));
+
+    private static IReadOnlyList<CompletionItem>? AtCore(
+        string path, string text, int offset, CompilerOptions options,
+        string? moduleName, bool snippetSupport)
     {
         if (offset < 0 || offset > text.Length) return null;
 
@@ -31,13 +36,21 @@ public static class CompletionProvider
         var nodes = NodeFinder.PathAt(model.Entry, file, offset);
         var from = EnclosingModule(model, file);
 
-        // 1. Inside an import declaration (path segments or '{ ... }' selective items).
+        // 1. Inside an import declaration (path segments or '{ ... }' selective items), including
+        // partial import lines that parser recovery did not wrap in ImportDecl.
         if (ImportContext(nodes) is { } import)
             return ImportItems(model, import, nodes, from, options.StdlibRoot);
+        if (TryImportPathFallback(text, offset) is { } partialImport)
+            return ImportModuleItems(model, partialImport, options.StdlibRoot);
 
-        // 2. Inside a struct initializer's field-name position ('Point { $ }' or 'Point { x = 1, $ }').
+        // 2. Inside a struct initializer's field-name position ('Point { $ }' or 'Point { x = 1, $ }'),
+        // including 1-identifier CallExpr+Lambda recovery and unclosed '{' before downstream statements.
         if (StructInitContext(nodes, offset) is { } init)
             return StructInitItems(model, init, from, snippetSupport);
+        if (CallInitializerTarget(model, nodes, offset) is { } callType)
+            return StructInitItemsForType(model, callType, new HashSet<string>(StringComparer.Ordinal), from, snippetSupport);
+        if (TryStructInitFallback(model, text, offset, from) is { } fallbackInit)
+            return StructInitItemsForType(model, fallbackInit.Type, fallbackInit.Used, from, snippetSupport);
 
         // 3. After a dot ('.'), offer members of receiver type/module/value.
         if (MemberContext(nodes, offset) is { } member)
@@ -56,8 +69,56 @@ public static class CompletionProvider
             };
         }
 
-        // 4. Everything else: scope + prelude + builtins, filtered when in a type position.
+        // 4. Suppress scope suggestions on new declaration names ('fn ma|', 'struct Foo|', 'fn f(x|: int)').
+        if (IsDeclarationNameSite(nodes, offset))
+            return Array.Empty<CompletionItem>();
+
+        // 5. Everything else: scope + prelude + builtins, filtered when in a type position.
         return ScopeCompletion.At(model, nodes, offset, from, snippetSupport);
+    }
+
+    private static IReadOnlyList<CompletionItem>? Sanitize(IReadOnlyList<CompletionItem>? items)
+    {
+        if (items is null || items.Count == 0) return items;
+        List<CompletionItem>? cleaned = null;
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            if (ContainsMarker(item.Label) || ContainsMarker(item.InsertText) || ContainsMarker(item.FilterText))
+            {
+                if (cleaned is null)
+                {
+                    cleaned = new List<CompletionItem>(items.Count - 1);
+                    for (var j = 0; j < i; j++) cleaned.Add(items[j]);
+                }
+                continue;
+            }
+            cleaned?.Add(item);
+        }
+        return cleaned ?? items;
+    }
+
+    private static bool ContainsMarker(string? s) =>
+        !string.IsNullOrEmpty(s) && s.Contains(Marker, StringComparison.Ordinal);
+
+    private static bool IsDeclarationNameSite(IReadOnlyList<Node> nodes, int offset)
+    {
+        for (var i = nodes.Count - 1; i >= 0; i--)
+        {
+            switch (nodes[i])
+            {
+                case Expr:
+                case TypeNode:
+                case Block:
+                case ImportDecl:
+                case StructInitField:
+                    return false;
+                case INamedDecl decl:
+                    return ContainsMarker(decl.Name)
+                        || (decl.NameSpan.File.IsValid && offset >= decl.NameSpan.Start && offset <= decl.NameSpan.End);
+            }
+        }
+        return false;
     }
 
     private static MemberExpr? MemberContext(IReadOnlyList<Node> nodes, int offset)
@@ -123,7 +184,52 @@ public static class CompletionProvider
         var cleanCount = rawPath.Length > 0 && rawPath[^1].Contains(Marker, StringComparison.Ordinal)
             ? rawPath.Length - 1
             : rawPath.Length;
-        var cleanSegs = rawPath[..cleanCount];
+        return ImportModuleItems(model, rawPath[..cleanCount], stdlibRoot);
+    }
+
+    private static string[]? TryImportPathFallback(string text, int offset)
+    {
+        var lineStart = offset;
+        while (lineStart > 0 && text[lineStart - 1] != '\n' && text[lineStart - 1] != ';' && text[lineStart - 1] != '{' && text[lineStart - 1] != '}')
+            lineStart--;
+
+        var seg = text[lineStart..offset].TrimStart();
+        if (seg.StartsWith("pub ", StringComparison.Ordinal))
+            seg = seg[4..].TrimStart();
+        if (!seg.StartsWith("import", StringComparison.Ordinal))
+            return null;
+        if (seg.Length > 6 && char.IsLetterOrDigit(seg[6]))
+            return null;
+
+        var rest = seg[6..].TrimStart();
+        if (rest.Length == 0)
+            return [];
+
+        // If selective '{ ... }' opened, let ImportContext or selective fallback handle exports; for paths, take segments before trailing dot/ident.
+        if (rest.Contains('{'))
+            return null;
+
+        var parts = rest.Split('.');
+        if (parts.Length == 0) return [];
+        var last = parts[^1].Trim();
+        var segCount = rest.EndsWith('.') ? parts.Length - 1 : parts.Length - 1;
+        var outSegs = new List<string>(segCount);
+        for (var i = 0; i < segCount; i++)
+        {
+            var p = parts[i].Trim();
+            if (p.Length == 0) return null;
+            outSegs.Add(p);
+        }
+        _ = last;
+        return outSegs.ToArray();
+    }
+
+    private static IReadOnlyList<CompletionItem> ImportModuleItems(
+        SemanticModel model, string[] cleanSegs, string? stdlibRoot)
+    {
+        var items = new List<CompletionItem>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var cleanCount = cleanSegs.Length;
         var prefix = cleanCount > 0 ? string.Join('.', cleanSegs) + "." : "";
 
         foreach (var mod in model.Compilation.Modules)
@@ -218,7 +324,7 @@ public static class CompletionProvider
         {
             NamedRef n => n.Symbol,
             GenericInstance g => g.Definition,
-            _ => ResolveInitTypeFallback(model, init, from),
+            _ => ResolveInitTypeFallback(model, init.Path, from),
         };
         if (typeSym is null) return null;
 
@@ -227,10 +333,17 @@ public static class CompletionProvider
             if (!f.Name.Contains(Marker, StringComparison.Ordinal))
                 used.Add(f.Name);
 
+        return StructInitItemsForType(model, typeSym, used, from, snippetSupport);
+    }
+
+    private static IReadOnlyList<CompletionItem> StructInitItemsForType(
+        SemanticModel model, TypeSymbol typeSym, HashSet<string> used, ModuleSymbol? from, bool snippetSupport)
+    {
         var items = new List<CompletionItem>();
         foreach (var sym in typeSym.Members.Symbols)
         {
             if (sym is not FieldSymbol field || used.Contains(field.Name)) continue;
+            if (from is not null && !model.Compilation.Visible(field, from)) continue;
             var sig = SignatureDetail(model, field);
             var insertText = snippetSupport ? $"{field.Name} = $1" : $"{field.Name} = ";
             items.Add(new CompletionItem
@@ -249,15 +362,140 @@ public static class CompletionProvider
         return items;
     }
 
-    private static TypeSymbol? ResolveInitTypeFallback(SemanticModel model, StructInitExpr init, ModuleSymbol? from)
+    private static TypeSymbol? CallInitializerTarget(SemanticModel model, IReadOnlyList<Node> nodes, int offset)
     {
-        if (init.Path.Length == 0) return null;
-        var sym = from?.Members.Lookup(init.Path[0])
-            ?? model.Compilation.PreludeMember(init.Path[0]);
-        for (var i = 1; i < init.Path.Length && sym is not null; i++)
+        for (var i = nodes.Count - 1; i >= 1; i--)
+        {
+            if (nodes[i] is LambdaExpr && nodes[i - 1] is CallExpr call && offset > call.Callee.Span.End)
+            {
+                var calleeType = model.Types.TypeOf(call.Callee);
+                if (calleeType is NonValueType { Symbol: TypeSymbol t })
+                    return t;
+                if (call.Callee is IdentifierExpr id)
+                    return ResolveInitTypeFallback(model, [id.Name], null);
+            }
+        }
+        return null;
+    }
+
+    private static (TypeSymbol Type, HashSet<string> Used)? TryStructInitFallback(
+        SemanticModel model, string text, int offset, ModuleSymbol? from)
+    {
+        var i = Math.Min(offset, text.Length);
+        var paren = 0;
+        var brace = 0;
+        var crossedComma = false;
+        var sawEqInCurrentSegment = false;
+        var openBrace = -1;
+
+        while (i > 0)
+        {
+            i--;
+            var ch = text[i];
+            if (ch == ')') paren++;
+            else if (ch == '(')
+            {
+                if (paren == 0) return null;
+                paren--;
+            }
+            else if (ch == '}') brace++;
+            else if (ch == '{')
+            {
+                if (brace > 0)
+                {
+                    brace--;
+                    continue;
+                }
+                openBrace = i;
+                break;
+            }
+            else if (paren == 0 && brace == 0 && !crossedComma)
+            {
+                if (ch == '=' || ch == ';' || ch == ':')
+                    sawEqInCurrentSegment = true;
+                else if (ch == ',')
+                    crossedComma = true;
+            }
+        }
+
+        if (openBrace < 0 || sawEqInCurrentSegment) return null;
+
+        // Parse '<mod>.<Type>' (skipping whitespace & optional '<...>' type args) directly before '{'.
+        var end = openBrace;
+        while (end > 0 && char.IsWhiteSpace(text[end - 1])) end--;
+        if (end > 0 && text[end - 1] == '>')
+        {
+            var depth = 0;
+            while (end > 0)
+            {
+                end--;
+                if (text[end] == '>') depth++;
+                else if (text[end] == '<')
+                {
+                    depth--;
+                    if (depth == 0) break;
+                }
+            }
+            while (end > 0 && char.IsWhiteSpace(text[end - 1])) end--;
+        }
+
+        var pathStart = end;
+        while (pathStart > 0 && (char.IsLetterOrDigit(text[pathStart - 1]) || text[pathStart - 1] == '_' || text[pathStart - 1] == '.'))
+            pathStart--;
+        if (pathStart >= end) return null;
+
+        var rawPath = text[pathStart..end];
+        if (rawPath is "if" or "else" or "while" or "for" or "match" or "fn" or "struct" or "class" or "enum" or "interface" or "extend" or "comptime")
+            return null;
+
+        var segs = rawPath.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        var typeSym = ResolveInitTypeFallback(model, segs, from);
+        if (typeSym is null || (typeSym.Kind != TypeSymbolKind.Struct && typeSym.Kind != TypeSymbolKind.Class))
+            return null;
+
+        // Collect already-assigned field identifiers inside '{ ...offset }'.
+        var used = new HashSet<string>(StringComparer.Ordinal);
+        var inside = text[(openBrace + 1)..Math.Min(offset, text.Length)];
+        var depthB = 0;
+        var depthP = 0;
+        var segStart = 0;
+        for (var k = 0; k <= inside.Length; k++)
+        {
+            var atEnd = k == inside.Length;
+            var c = atEnd ? ',' : inside[k];
+            if (!atEnd)
+            {
+                if (c == '(') depthP++;
+                else if (c == ')' && depthP > 0) depthP--;
+                else if (c == '{') depthB++;
+                else if (c == '}' && depthB > 0) depthB--;
+            }
+            if ((atEnd || (c == ',' && depthB == 0 && depthP == 0)))
+            {
+                var part = inside[segStart..k];
+                var eq = part.IndexOf('=');
+                if (eq > 0)
+                {
+                    var fname = part[..eq].Trim();
+                    if (fname.Length > 0 && fname.All(ch => char.IsLetterOrDigit(ch) || ch == '_'))
+                        used.Add(fname);
+                }
+                segStart = k + 1;
+            }
+        }
+
+        return (typeSym, used);
+    }
+
+    private static TypeSymbol? ResolveInitTypeFallback(SemanticModel model, string[] path, ModuleSymbol? from)
+    {
+        if (path.Length == 0) return null;
+        var sym = from?.Members.Lookup(path[0])
+            ?? model.Compilation.PreludeMember(path[0]);
+        for (var i = 1; i < path.Length && sym is not null; i++)
         {
             sym = Unwrap(sym);
-            sym = sym is ModuleSymbol m ? m.Members.LookupLocal(init.Path[i]) : null;
+            sym = sym is ModuleSymbol m ? m.Members.LookupLocal(path[i]) : null;
         }
         sym = sym is null ? null : Unwrap(sym);
         return sym as TypeSymbol;

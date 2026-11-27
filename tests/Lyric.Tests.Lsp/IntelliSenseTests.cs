@@ -184,4 +184,33 @@ public sealed class IntelliSenseTests
         Assert.NotNull(help);
         Assert.Equal(1, help.ActiveParameter);
     }
+
+    [Fact]
+    public void Completion_never_leaks_marker_across_declarations_and_incomplete_imports()
+    {
+        var declItems = Complete("fn ma$(): void {}\n");
+        Assert.DoesNotContain(declItems, i => i.Label.Contains("__lyric_completion__", StringComparison.Ordinal));
+        Assert.Empty(declItems);
+
+        var impItems = Complete("import std.u$\nstruct MyTest { id: int, }\n");
+        Assert.DoesNotContain(impItems, i => i.Label.Contains("__lyric_completion__", StringComparison.Ordinal));
+        Assert.Contains(impItems, i => i.Label == "uri" && i.Kind == CompletionItemKind.Module);
+        Assert.DoesNotContain(impItems, i => i.Label == "uint" || i.Label == "Coroutine");
+    }
+
+    [Fact]
+    public void Struct_initializer_offers_fields_on_empty_brace_and_unclosed_second_field()
+    {
+        var emptyBrace = Complete(
+            "struct MyTest { pub id: int, pub name: string, }\n"
+            + "fn main(): void {\n    let t: MyTest = MyTest { $ };\n}\n");
+        Assert.Contains(emptyBrace, i => i.Label == "id" && i.Kind == CompletionItemKind.Field);
+        Assert.Contains(emptyBrace, i => i.Label == "name" && i.Kind == CompletionItemKind.Field);
+
+        var unclosedSecond = Complete(
+            "struct MyTest { pub id: int, pub name: string, }\n"
+            + "fn main(): void {\n    let t: MyTest = MyTest { id = 0, $\n}\n");
+        Assert.DoesNotContain(unclosedSecond, i => i.Label == "id");
+        Assert.Contains(unclosedSecond, i => i.Label == "name" && i.Kind == CompletionItemKind.Field);
+    }
 }

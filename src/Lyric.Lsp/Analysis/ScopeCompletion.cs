@@ -216,8 +216,9 @@ public static class ScopeCompletion
         string detail, string band, bool allowSnippet, bool typesOnly)
     {
         // A module's own error sentinels stand for names that did not resolve; offering them would
-        // put a failure into a list of things that exist.
+        // put a failure into a list of things that exist. Never surface the synthetic completion marker.
         if (symbol is ErrorSymbol) return;
+        if (string.IsNullOrWhiteSpace(symbol.Name) || symbol.Name.Contains(CompletionProvider.Marker, StringComparison.Ordinal)) return;
         if (typesOnly && !IsTypeCandidate(symbol)) return;
         if (!seen.Add(symbol.Name)) return;
 
