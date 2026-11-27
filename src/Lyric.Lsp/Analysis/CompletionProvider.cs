@@ -17,17 +17,33 @@ public static class CompletionProvider
 
     public static IReadOnlyList<CompletionItem>? At(
         string path, string text, int offset, CompilerOptions options,
-        string? moduleName = null, bool snippetSupport = false)
-        => Sanitize(AtCore(path, text, offset, options, moduleName, snippetSupport));
+        string? moduleName = null, bool snippetSupport = false, WorkspaceSymbolIndex? index = null)
+        => Sanitize(AtCore(path, text, offset, options, moduleName, snippetSupport, index));
+
+    public static CompletionItem Resolve(CompletionItem item, WorkspaceSymbolIndex? index = null)
+    {
+        if (item.Documentation is { Value.Length: > 0 } || index is null)
+            return item;
+
+        foreach (var exp in index.FindExportsByName(item.Label))
+        {
+            if (exp.ModuleName == item.Detail || exp.ModuleName == item.LabelDetails?.Description)
+            {
+                if (!string.IsNullOrWhiteSpace(exp.Documentation))
+                    return item with { Documentation = new MarkupContent { Value = HoverProvider.Sections(exp.Documentation) } };
+            }
+        }
+        return item;
+    }
 
     private static IReadOnlyList<CompletionItem>? AtCore(
         string path, string text, int offset, CompilerOptions options,
-        string? moduleName, bool snippetSupport)
+        string? moduleName, bool snippetSupport, WorkspaceSymbolIndex? index)
     {
         if (offset < 0 || offset > text.Length) return null;
 
         var marked = text.Insert(offset, Marker);
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, marked, moduleName), options);
+        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, marked, moduleName), options with { IdeQuery = true });
         if (result.Model is not { } model) return null;
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);
@@ -35,6 +51,20 @@ public static class CompletionProvider
 
         var nodes = NodeFinder.PathAt(model.Entry, file, offset);
         var from = EnclosingModule(model, file);
+
+        // 0. Implicit member shorthand ('.Red' / '.of(...)') driven by contextual expected type.
+        if (ImplicitMemberContext(nodes, offset) is { } implicitMember)
+        {
+            if (ResolveExpectedEnumOrStaticType(model, nodes, implicitMember, from) is { } expectedType)
+                return Items(model, MemberFacts.OfType(model.Compilation, expectedType, from), expectedType.Name, snippetSupport, isMember: true);
+            return Array.Empty<CompletionItem>();
+        }
+
+        // 0b. Attribute positions ('@Test', '@Allow', '@Deprecated { ... }').
+        if (AttributeContext(nodes, offset) is { } attr)
+            return AttributeItems(model, nodes, attr, from, text, offset, snippetSupport);
+        if (TryAttributeFallback(text, offset) is { } attrSite)
+            return AttributeTypeItems(model, attrSite, from);
 
         // 1. Inside an import declaration (path segments or '{ ... }' selective items), including
         // partial import lines that parser recovery did not wrap in ImportDecl.
@@ -74,7 +104,190 @@ public static class CompletionProvider
             return Array.Empty<CompletionItem>();
 
         // 5. Everything else: scope + prelude + builtins, filtered when in a type position.
-        return ScopeCompletion.At(model, nodes, offset, from, snippetSupport);
+        return ScopeCompletion.At(model, nodes, offset, from, snippetSupport, index);
+    }
+
+    private static ImplicitMemberExpr? ImplicitMemberContext(IReadOnlyList<Node> nodes, int offset)
+    {
+        for (var i = nodes.Count - 1; i >= 0; i--)
+        {
+            if (nodes[i] is ImplicitMemberExpr im && offset >= im.Span.Start)
+                return im;
+        }
+        return null;
+    }
+
+    private static TypeSymbol? ResolveExpectedEnumOrStaticType(
+        SemanticModel model, IReadOnlyList<Node> nodes, ImplicitMemberExpr im, ModuleSymbol? from)
+    {
+        var expected = model.Types.ImplicitExpectedOf(im);
+        while (expected is Optional opt) expected = opt.Inner;
+        var sym = expected switch
+        {
+            NamedRef nr => nr.Symbol,
+            GenericInstance gi => gi.Definition,
+            _ => null,
+        };
+        if (sym is not null) return sym;
+
+        for (var i = nodes.Count - 1; i >= 0; i--)
+        {
+            switch (nodes[i])
+            {
+                case BindingStmt { Type: { } typeNode }:
+                    if (ResolveTypeNodeSymbol(model, typeNode, from) is { } bs) return bs;
+                    break;
+                case BinaryExpr { Operator: BinaryOp.Eq or BinaryOp.Ne, Left: var lhs, Right: var rhs }:
+                    var other = ReferenceEquals(lhs, im) ? rhs : lhs;
+                    var ot = model.Types.TypeOf(other);
+                    while (ot is Optional oopt) ot = oopt.Inner;
+                    if (ot is NamedRef onr) return onr.Symbol;
+                    if (ot is GenericInstance ogi) return ogi.Definition;
+                    break;
+                case ReturnStmt:
+                    for (var j = i - 1; j >= 0; j--)
+                        if (nodes[j] is FunctionDecl { ReturnType: { } retNode })
+                            return ResolveTypeNodeSymbol(model, retNode, from);
+                    break;
+            }
+        }
+        return null;
+    }
+
+    private static TypeSymbol? ResolveTypeNodeSymbol(SemanticModel model, TypeNode typeNode, ModuleSymbol? from)
+    {
+        while (typeNode is NullableType nt) typeNode = nt.Inner;
+        if (model.Binding.Resolve(typeNode) is TypeSymbol bound) return bound;
+        if (typeNode is NamedType ntPath) return ResolveInitTypeFallback(model, ntPath.Path, from);
+        return null;
+    }
+
+    private static AttributeNode? AttributeContext(IReadOnlyList<Node> nodes, int offset)
+    {
+        for (var i = nodes.Count - 1; i >= 0; i--)
+            if (nodes[i] is AttributeNode attr && offset >= attr.Span.Start)
+                return attr;
+        return null;
+    }
+
+    private static IReadOnlyList<CompletionItem> AttributeItems(
+        SemanticModel model, IReadOnlyList<Node> nodes, AttributeNode attr, ModuleSymbol? from,
+        string text, int offset, bool snippetSupport)
+    {
+        if (nodes.Any(n => n is StructInitField) || offset > attr.PathSpan.End)
+        {
+            var typeSym = model.Types.RefOf(attr) as TypeSymbol
+                ?? ResolveInitTypeFallback(model, attr.Path, from);
+            if (typeSym is not null && typeSym.Kind == TypeSymbolKind.Struct)
+            {
+                var used = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var f in attr.Fields)
+                    if (!f.Name.Contains(Marker, StringComparison.Ordinal))
+                        used.Add(f.Name);
+                return StructInitItemsForType(model, typeSym, used, from, snippetSupport);
+            }
+        }
+
+        string[] markers = ["OnFunction", "OnCallable", "OnType", "OnTypeLike", "OnField", "OnMethod", "OnModule", "OnDecl", "OnTopLevel", "OnAny"];
+        for (var i = nodes.Count - 1; i >= 0; i--)
+        {
+            switch (nodes[i])
+            {
+                case FunctionDecl:
+                    markers = ["OnFunction", "OnCallable", "OnMethod", "OnMember", "OnTopLevel", "OnDecl", "OnAny"];
+                    goto done;
+                case FieldDecl:
+                    markers = ["OnField", "OnMember", "OnDecl", "OnAny"];
+                    goto done;
+                case StructDecl or ClassDecl or EnumDecl:
+                    markers = ["OnType", "OnTypeLike", "OnTopLevel", "OnDecl", "OnAny"];
+                    goto done;
+                case InterfaceDecl:
+                    markers = ["OnInterface", "OnTypeLike", "OnTopLevel", "OnDecl", "OnAny"];
+                    goto done;
+                case ExtendDecl:
+                    markers = ["OnExtend", "OnTopLevel", "OnAny"];
+                    goto done;
+                case Param:
+                    markers = ["OnParameter", "OnDecl", "OnAny"];
+                    goto done;
+                case Module:
+                    break;
+            }
+        }
+        done:
+        _ = text;
+        return AttributeTypeItems(model, markers, from);
+    }
+
+    private static string[]? TryAttributeFallback(string text, int offset)
+    {
+        var lineStart = offset;
+        while (lineStart > 0 && text[lineStart - 1] != '\n') lineStart--;
+        var before = text[lineStart..offset].TrimStart();
+        if (!before.StartsWith('@') || before.Contains('{') || before.Contains('(')) return null;
+        var rest = before[1..];
+        if (!rest.All(c => char.IsLetterOrDigit(c) || c == '_' || c == '.')) return null;
+        return ["OnFunction", "OnCallable", "OnType", "OnTypeLike", "OnField", "OnMethod", "OnModule", "OnTopLevel", "OnDecl", "OnAny"];
+    }
+
+    private static IReadOnlyList<CompletionItem> AttributeTypeItems(
+        SemanticModel model, string[] admittingMarkers, ModuleSymbol? from)
+    {
+        var markerSet = new HashSet<string>(admittingMarkers, StringComparer.Ordinal);
+        var core = model.Compilation.FindModule(["std", "core"]);
+        var items = new List<CompletionItem>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        IEnumerable<Symbol> Candidates()
+        {
+            if (from is not null)
+                foreach (var s in from.Members.Symbols) yield return s;
+            if (core is not null)
+                foreach (var s in core.Members.Symbols) yield return s;
+            if (model.Compilation.Prelude is { } prelude)
+                foreach (var s in prelude.Members.Symbols) yield return s;
+        }
+
+        foreach (var raw in Candidates())
+        {
+            var target = Unwrap(raw);
+            if (target is not TypeSymbol { Kind: TypeSymbolKind.Struct, Declaration: StructDecl sdecl } ts) continue;
+            if (from is not null && !model.Compilation.Visible(ts, from)) continue;
+            if (!MatchesAnyMarker(model, ts, sdecl, core, markerSet)) continue;
+            if (!seen.Add(ts.Name)) continue;
+
+            items.Add(new CompletionItem
+            {
+                Label = ts.Name,
+                Kind = CompletionItemKind.Struct,
+                Detail = "attribute",
+                LabelDetails = new CompletionItemLabelDetails { Detail = " attribute", Description = "std.core" },
+                Documentation = Documentation(model, ts),
+                SortText = $"0_{ts.Name}",
+                FilterText = ts.Name,
+            });
+        }
+        return items;
+    }
+
+    private static bool MatchesAnyMarker(
+        SemanticModel model, TypeSymbol ts, StructDecl sdecl, ModuleSymbol? core, HashSet<string> markerSet)
+    {
+        foreach (var ifaceNode in sdecl.Interfaces)
+        {
+            if (ifaceNode is NamedType nt && nt.Path.Length > 0 && markerSet.Contains(nt.Path[^1]))
+                return true;
+        }
+        if (core is not null && model.Types.Satisfies is { } satisfies)
+        {
+            foreach (var name in markerSet)
+            {
+                if (core.Members.LookupLocal(name) is TypeSymbol marker && satisfies(new NamedRef(ts), marker))
+                    return true;
+            }
+        }
+        return false;
     }
 
     private static IReadOnlyList<CompletionItem>? Sanitize(IReadOnlyList<CompletionItem>? items)

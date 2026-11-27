@@ -24,8 +24,12 @@ public static class WorkspaceSymbolProvider
     private const int Limit = 512;
 
     public static IReadOnlyList<SymbolInformation> Find(
-        IReadOnlyList<AnalysisSnapshot> compilations, string query)
+        IReadOnlyList<AnalysisSnapshot> compilations, string query,
+        WorkspaceSymbolIndex? index = null)
     {
+        if (index is not null && index.SymbolCount > 0)
+            return index.Query(query, Limit);
+
         var results = new List<SymbolInformation>();
 
         // Two compilations can hold the same file — a project and a lone script importing into

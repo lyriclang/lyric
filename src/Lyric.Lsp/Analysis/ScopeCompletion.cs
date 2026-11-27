@@ -31,11 +31,11 @@ public static class ScopeCompletion
     /// </summary>
     public static IReadOnlyList<CompletionItem> At(
         SemanticModel model, IReadOnlyList<Node> nodes, int offset, ModuleSymbol? from,
-        bool snippetSupport = false)
+        bool snippetSupport = false, WorkspaceSymbolIndex? index = null)
     {
         var items = new List<CompletionItem>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        var typesOnly = IsTypePosition(nodes);
+        var typesOnly = IsTypePosition(nodes, model);
 
         // Inner to outer, so a local shadows the parameter of the same name rather than appearing
         // beside it — which is what the resolver does with its scope chain.
@@ -63,12 +63,59 @@ public static class ScopeCompletion
         foreach (var symbol in model.Compilation.Builtins.Symbols)
             Add(model, items, seen, symbol, "builtin", "4", snippetSupport && !typesOnly, typesOnly);
 
+        if (index is not null)
+        {
+            var insertLine = 0;
+            foreach (var decl in model.Entry.Declarations)
+            {
+                if (decl is ImportDecl && decl.Span.File == model.Entry.Span.File)
+                    insertLine = Math.Max(insertLine, SpanMapper.ToRange(model.Compilation.Sources, decl.Span).End.Line + 1);
+            }
+            var insertPos = new Position { Line = insertLine, Character = 0 };
+            var insertRange = new Protocol.Range { Start = insertPos, End = insertPos };
+
+            foreach (var exp in index.AllPublicExports())
+            {
+                if (from is not null && string.Equals(exp.ModuleName, from.FullName, StringComparison.Ordinal))
+                    continue;
+                if (typesOnly && exp.CompletionKind is not (CompletionItemKind.Struct or CompletionItemKind.Enum
+                    or CompletionItemKind.Interface or CompletionItemKind.Class or CompletionItemKind.Module))
+                    continue;
+                if (!seen.Add(exp.Name)) continue;
+
+                items.Add(new CompletionItem
+                {
+                    Label = exp.Name,
+                    Kind = exp.CompletionKind,
+                    Detail = $"auto-import from {exp.ModuleName}",
+                    LabelDetails = new CompletionItemLabelDetails { Detail = exp.Detail, Description = exp.ModuleName },
+                    Documentation = string.IsNullOrWhiteSpace(exp.Documentation) ? null : new MarkupContent { Value = HoverProvider.Sections(exp.Documentation) },
+                    SortText = $"5_{exp.Name}",
+                    FilterText = exp.Name,
+                    AdditionalTextEdits = [new TextEdit { Range = insertRange, NewText = $"import {exp.ModuleName} {{ {exp.Name} }};\n" }],
+                });
+            }
+        }
+
         return items;
     }
 
-    private static bool IsTypePosition(IReadOnlyList<Node> nodes)
+    private static bool IsTypePosition(IReadOnlyList<Node> nodes, SemanticModel model)
     {
         if (nodes.Count == 0) return false;
+        // 'f<$>' parses as BinaryExpr(f, Lt, IdentifierExpr(__lyric_completion__)): offer types when 'f' has generics.
+        for (var i = nodes.Count - 1; i >= 0; i--)
+        {
+            if (nodes[i] is BinaryExpr { Operator: BinaryOp.Lt, Left: var callee, Right: IdentifierExpr { Name: var n } }
+                && n.Contains(CompletionProvider.Marker, StringComparison.Ordinal))
+            {
+                var target = model.Types.RefOf(callee) ?? model.Binding.Resolve(callee);
+                if (target is not null) target = CompletionProvider.Unwrap(target);
+                if (target is FunctionSymbol { Generics.Length: > 0 } or TypeSymbol { Generics.Length: > 0 })
+                    return true;
+            }
+        }
+
         // 'Pair<T>.of()' has NamedType as TypePathExpr argument; top-level identifier exprs are values.
         for (var i = nodes.Count - 1; i >= 0; i--)
         {

@@ -480,9 +480,11 @@ public sealed class Compilation
 
     /// <summary>Resolves every module and returns the binding side table. Errors go to the
     /// diagnostic engine as LYR-RES####.</summary>
-    public BindingResult Resolve()
+    public BindingResult Resolve(CancellationToken cancellation = default)
     {
+        cancellation.ThrowIfCancellationRequested();
         LoadImportedModules();
-        return new Resolver(this, _sm, _de).Run();
+        cancellation.ThrowIfCancellationRequested();
+        return new Resolver(this, _sm, _de, cancellation).Run();
     }
 }

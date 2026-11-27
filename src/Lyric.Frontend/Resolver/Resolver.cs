@@ -20,15 +20,17 @@ public sealed class Resolver
     private readonly BindingResult _binding = new();
 
     private readonly SourceManager _sm;
+    private readonly CancellationToken _cancellation;
 
     /// <summary>The module whose declarations pass 3 binds: where a type path is named FROM.</summary>
     private ModuleSymbol? _module;
 
-    public Resolver(Compilation comp, SourceManager sm, DiagnosticEngine de)
+    public Resolver(Compilation comp, SourceManager sm, DiagnosticEngine de, CancellationToken cancellation = default)
     {
         _comp = comp;
         _de = de;
         _sm = sm;
+        _cancellation = cancellation;
     }
 
     /// <summary>The "previous declaration" note for a duplicate, or none when the first claimant
@@ -40,13 +42,30 @@ public sealed class Resolver
 
     public BindingResult Run()
     {
-        foreach (var module in _comp.Modules) DeclareModule(module);
+        foreach (var module in _comp.Modules)
+        {
+            _cancellation.ThrowIfCancellationRequested();
+            DeclareModule(module);
+        }
+        _cancellation.ThrowIfCancellationRequested();
         SynthesizeInlineArrays();
-        foreach (var module in _comp.Modules) ResolveImports(module);
+        foreach (var module in _comp.Modules)
+        {
+            _cancellation.ThrowIfCancellationRequested();
+            ResolveImports(module);
+        }
         CheckOneNamespace();
         DetectImportCycles();
-        foreach (var module in _comp.Modules) SynthesizeImplied(module);
-        foreach (var module in _comp.Modules) BindTypeNames(module);
+        foreach (var module in _comp.Modules)
+        {
+            _cancellation.ThrowIfCancellationRequested();
+            SynthesizeImplied(module);
+        }
+        foreach (var module in _comp.Modules)
+        {
+            _cancellation.ThrowIfCancellationRequested();
+            BindTypeNames(module);
+        }
         ResolveExtensionTargets();
         _comp.Extensions.BuildIndex();
         return _binding;

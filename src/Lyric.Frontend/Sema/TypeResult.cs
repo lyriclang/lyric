@@ -153,11 +153,17 @@ public sealed class TypeResult
     /// lowering adds them to what the receiver binds.</summary>
     private readonly Dictionary<Node, IReadOnlyDictionary<GenericParamSymbol, LyrType>> _openBlockArguments = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<ImplicitMemberExpr, GenericInstance> _implicitInstances = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<ImplicitMemberExpr, LyrType> _implicitExpected = new(ReferenceEqualityComparer.Instance);
 
     public void SetImplicitInstance(ImplicitMemberExpr member, GenericInstance instance) => _implicitInstances[member] = instance;
 
     /// <summary>The instance whose static an implicit member names: <c>.of(f)</c> at an expected <c>Result&lt;int, E&gt;</c>.</summary>
     public GenericInstance? ImplicitInstanceOf(ImplicitMemberExpr member) => _implicitInstances.GetValueOrDefault(member);
+
+    public void SetImplicitExpected(ImplicitMemberExpr member, LyrType expected) => _implicitExpected[member] = expected;
+
+    /// <summary>The expected contextual type recorded at <paramref name="member"/> when the checker inspected an implicit member expression.</summary>
+    public LyrType? ImplicitExpectedOf(ImplicitMemberExpr member) => _implicitExpected.GetValueOrDefault(member);
 
     public void SetOpenBlockArguments(Node call, IReadOnlyDictionary<GenericParamSymbol, LyrType> bound) => _openBlockArguments[call] = bound;
 

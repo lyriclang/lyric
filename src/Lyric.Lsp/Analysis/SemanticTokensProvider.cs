@@ -54,7 +54,11 @@ public static class SemanticTokensProvider
     private const int Readonly = 1 << 2;
 
     public static IReadOnlyList<int> Of(
-        SemanticModel model, Module root, FileId file, SourceManager sources)
+        SemanticModel model, Module root, FileId file, SourceManager sources) =>
+        OfRange(model, root, file, sources, range: null);
+
+    public static IReadOnlyList<int> OfRange(
+        SemanticModel model, Module root, FileId file, SourceManager sources, Protocol.Range? range)
     {
         var methods = MethodSymbols(model);
         var declared = DeclaredInFile(model, root);
@@ -73,8 +77,9 @@ public static class SemanticTokensProvider
             symbol = ReferenceProvider.Target(symbol);
             if (Classify(symbol, methods) is not { } type) continue;
 
-            var modifiers = Modifiers(symbol, node);
             var start = SpanMapper.ToRange(sources, span).Start;
+            if (range is not null && (start.Line < range.Start.Line || start.Line > range.End.Line)) continue;
+            var modifiers = Modifiers(symbol, node);
             tokens.Add((start.Line, start.Character, span.Length, type, modifiers));
         }
 
@@ -99,12 +104,50 @@ public static class SemanticTokensProvider
                 if (span.File != file || span.IsEmpty) continue;
 
                 var start = SpanMapper.ToRange(sources, span).Start;
+                if (range is not null && (start.Line < range.Start.Line || start.Line > range.End.Line)) continue;
                 tokens.Add((start.Line, start.Character, span.Length, type,
                     Modifiers(target, node: null)));
             }
         }
 
         return Encode(tokens);
+    }
+
+    /// <summary>Computes minimal LSP <c>SemanticTokensEdit[]</c> turning <paramref name="previous"/> into <paramref name="current"/>.</summary>
+    public static IReadOnlyList<Protocol.SemanticTokensEdit> ComputeDelta(
+        IReadOnlyList<int> previous, IReadOnlyList<int> current)
+    {
+        var minLen = Math.Min(previous.Count, current.Count);
+        var prefix = 0;
+        while (prefix < minLen && previous[prefix] == current[prefix]) prefix++;
+
+        if (prefix == previous.Count && prefix == current.Count)
+            return [];
+
+        var suffix = 0;
+        while (prefix + suffix < minLen
+            && previous[previous.Count - 1 - suffix] == current[current.Count - 1 - suffix])
+            suffix++;
+
+        var deleteCount = previous.Count - prefix - suffix;
+        var insertCount = current.Count - prefix - suffix;
+        int[]? inserted = null;
+        if (insertCount > 0)
+        {
+            inserted = new int[insertCount];
+            for (var i = 0; i < insertCount; i++)
+                inserted[i] = current[prefix + i];
+        }
+
+        return
+        [
+            new Protocol.SemanticTokensEdit
+            {
+                Start = prefix,
+                DeleteCount = deleteCount,
+                Data = inserted,
+            },
+        ];
     }
 
     /// <summary>The relative quintuples of the protocol: line delta, character delta (absolute on

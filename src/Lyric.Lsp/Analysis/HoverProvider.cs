@@ -62,6 +62,20 @@ public static class HoverProvider
                 return new HoverResult(markdown, path[i].Span);
         }
 
+        // Declaration names ('fn foo', 'struct Bar', 'field x', 'enum E', 'interface I', 'type A'):
+        // these sit in module/type scopes rather than expression ref tables.
+        for (var i = path.Count - 1; i >= 0; i--)
+        {
+            if (path[i] is INamedDecl named
+                && named.NameSpan.File == file
+                && offset >= named.NameSpan.Start && offset <= named.NameSpan.End
+                && NodeFinder.DeclaredSymbol(model, path[i]) is { } declSym
+                && Describe(model, declSym, type: null) is { } declMarkdown)
+            {
+                return new HoverResult(declMarkdown, named.NameSpan);
+            }
+        }
+
         return null;
     }
 

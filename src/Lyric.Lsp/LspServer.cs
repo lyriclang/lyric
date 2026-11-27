@@ -95,19 +95,37 @@ public sealed class LspServer : IDisposable
     /// needs before it is used. Completed with whether the client accepted.</summary>
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, TaskCompletionSource<bool>> _awaitingAnswer = new();
 
-    /// <summary>The client's requests held for a first analysis (E20), by the raw text of their id:
-    /// what <c>$/cancelRequest</c> withdraws.</summary>
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CancellationTokenSource> _held =
+    /// <summary>All in-flight client requests dispatched off the read loop, by raw id text: what
+    /// <c>$/cancelRequest</c> withdraws.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CancellationTokenSource> _inFlight =
         new(StringComparer.Ordinal);
+
+    /// <summary>Latest interactive completion/signatureHelp request per method+URI so rapid typing
+    /// cancels superseded requests immediately.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CancellationTokenSource> _interactiveRequests =
+        new(StringComparer.Ordinal);
+
+    private readonly CancellationTokenSource _shutdownCts = new();
 
     /// <summary>Whether the client asks for an open document's diagnostics itself
     /// (<c>textDocument/diagnostic</c>), and whether it asks again when told to.</summary>
     private bool _pullDiagnostics;
     private bool _diagnosticRefresh;
+    private bool _semanticTokensRefresh;
+    private bool _inlayHintRefresh;
+    private bool _codeLensRefresh;
 
     /// <summary>The newest diagnostics of each file, by URI: what a pull answers.</summary>
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, PublishDiagnosticsParams> _lastDiagnostics =
         new(StringComparer.Ordinal);
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _diagnosticResultIds =
+        new(StringComparer.Ordinal);
+    private int _diagnosticVersion;
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string ResultId, IReadOnlyList<int> Data)> _lastSemanticTokens =
+        new(StringComparer.Ordinal);
+    private int _semanticTokenVersion;
 
     public LspServer(Stream input, Stream output, LspServerOptions? options = null)
     {
@@ -121,7 +139,8 @@ public sealed class LspServer : IDisposable
             _options.StdlibRoot,
             _options.Version,
             BeginProgress,
-            _options.ProgressDelay);
+            _options.ProgressDelay,
+            OnAnalysisCompleteAsync);
     }
 
     /// <summary>
@@ -226,6 +245,9 @@ public sealed class LspServer : IDisposable
                     capabilities?.Workspace?.DidChangeWatchedFiles?.DynamicRegistration ?? false;
                 _pullDiagnostics = client?.Diagnostic is { ValueKind: JsonValueKind.Object };
                 _diagnosticRefresh = capabilities?.Workspace?.Diagnostics?.RefreshSupport ?? false;
+                _semanticTokensRefresh = capabilities?.Workspace?.SemanticTokens?.RefreshSupport ?? false;
+                _inlayHintRefresh = capabilities?.Workspace?.InlayHint?.RefreshSupport ?? false;
+                _codeLensRefresh = capabilities?.Workspace?.CodeLens?.RefreshSupport ?? false;
                 _workDoneProgress = capabilities?.Window?.WorkDoneProgress ?? false;
 
                 await SendResultAsync(id, BuildInitializeResult(),
@@ -238,76 +260,149 @@ public sealed class LspServer : IDisposable
                 return;
 
             case LspMethods.Hover when _state == State.Running:
-                if (HoldUntilAnalysed(message, id)) return;
-                await SendHoverAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.Hover, ct => SendHoverAsync(message, id, ct));
                 return;
 
             case LspMethods.Definition when _state == State.Running:
-                await SendDefinitionAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.Definition, ct => SendDefinitionAsync(message, id, ct));
+                return;
+
+            case LspMethods.TypeDefinition when _state == State.Running:
+                DispatchRequest(id, LspMethods.TypeDefinition, ct => SendTypeDefinitionAsync(message, id, ct));
+                return;
+
+            case LspMethods.Implementation when _state == State.Running:
+                DispatchRequest(id, LspMethods.Implementation, ct => SendImplementationAsync(message, id, ct));
                 return;
 
             case LspMethods.DocumentSymbol when _state == State.Running:
-                await SendDocumentSymbolsAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.DocumentSymbol, ct => SendDocumentSymbolsAsync(message, id, ct));
                 return;
 
             case LspMethods.References when _state == State.Running:
-                await SendReferencesAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.References, ct => SendReferencesAsync(message, id, ct));
+                return;
+
+            case LspMethods.DocumentHighlight when _state == State.Running:
+                DispatchRequest(id, LspMethods.DocumentHighlight, ct => SendDocumentHighlightsAsync(message, id, ct));
+                return;
+
+            case LspMethods.SelectionRange when _state == State.Running:
+                DispatchRequest(id, LspMethods.SelectionRange, ct => SendSelectionRangesAsync(message, id, ct));
+                return;
+
+            case LspMethods.DocumentLink when _state == State.Running:
+                DispatchRequest(id, LspMethods.DocumentLink, ct => SendDocumentLinksAsync(message, id, ct));
+                return;
+
+            case LspMethods.PrepareCallHierarchy when _state == State.Running:
+                DispatchRequest(id, LspMethods.PrepareCallHierarchy, ct => SendPrepareCallHierarchyAsync(message, id, ct));
+                return;
+
+            case LspMethods.CallHierarchyIncoming when _state == State.Running:
+                DispatchRequest(id, LspMethods.CallHierarchyIncoming, ct => SendCallHierarchyIncomingAsync(message, id, ct));
+                return;
+
+            case LspMethods.CallHierarchyOutgoing when _state == State.Running:
+                DispatchRequest(id, LspMethods.CallHierarchyOutgoing, ct => SendCallHierarchyOutgoingAsync(message, id, ct));
+                return;
+
+            case LspMethods.PrepareTypeHierarchy when _state == State.Running:
+                DispatchRequest(id, LspMethods.PrepareTypeHierarchy, ct => SendPrepareTypeHierarchyAsync(message, id, ct));
+                return;
+
+            case LspMethods.TypeHierarchySupertypes when _state == State.Running:
+                DispatchRequest(id, LspMethods.TypeHierarchySupertypes, ct => SendTypeHierarchySupertypesAsync(message, id, ct));
+                return;
+
+            case LspMethods.TypeHierarchySubtypes when _state == State.Running:
+                DispatchRequest(id, LspMethods.TypeHierarchySubtypes, ct => SendTypeHierarchySubtypesAsync(message, id, ct));
                 return;
 
             case LspMethods.Completion when _state == State.Running:
-                await SendCompletionAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.Completion, ct => SendCompletionAsync(message, id, ct),
+                    ExtractPositionUri(message));
+                return;
+
+            case LspMethods.CompletionResolve when _state == State.Running:
+                DispatchRequest(id, LspMethods.CompletionResolve, ct => SendCompletionResolveAsync(message, id, ct));
                 return;
 
             case LspMethods.PrepareRename when _state == State.Running:
-                await SendPrepareRenameAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.PrepareRename, ct => SendPrepareRenameAsync(message, id, ct));
                 return;
 
             case LspMethods.Rename when _state == State.Running:
-                await SendRenameAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.Rename, ct => SendRenameAsync(message, id, ct));
                 return;
 
             case LspMethods.WorkspaceSymbol when _state == State.Running:
-                await SendWorkspaceSymbolsAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.WorkspaceSymbol, ct => SendWorkspaceSymbolsAsync(message, id, ct));
                 return;
 
             case LspMethods.SemanticTokensFull when _state == State.Running:
-                await SendSemanticTokensAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.SemanticTokensFull, ct => SendSemanticTokensAsync(message, id, ct));
+                return;
+
+            case LspMethods.SemanticTokensDelta when _state == State.Running:
+                DispatchRequest(id, LspMethods.SemanticTokensDelta, ct => SendSemanticTokensDeltaAsync(message, id, ct));
+                return;
+
+            case LspMethods.SemanticTokensRange when _state == State.Running:
+                DispatchRequest(id, LspMethods.SemanticTokensRange, ct => SendSemanticTokensRangeAsync(message, id, ct));
                 return;
 
             case LspMethods.SignatureHelp when _state == State.Running:
-                await SendSignatureHelpAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.SignatureHelp, ct => SendSignatureHelpAsync(message, id, ct),
+                    ExtractPositionUri(message));
                 return;
 
             case LspMethods.FoldingRange when _state == State.Running:
-                await SendFoldingRangesAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.FoldingRange, ct => SendFoldingRangesAsync(message, id, ct));
                 return;
 
             case LspMethods.InlayHint when _state == State.Running:
-                await SendInlayHintsAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.InlayHint, ct => SendInlayHintsAsync(message, id, ct));
                 return;
 
             case LspMethods.Formatting when _state == State.Running:
-                await SendFormattingAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.Formatting, ct => SendFormattingAsync(message, id, ct));
                 return;
 
             case LspMethods.CodeLens when _state == State.Running:
-                await SendCodeLensesAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.CodeLens, ct => SendCodeLensesAsync(message, id, ct));
                 return;
 
             case LspMethods.Tests when _state == State.Running:
-                await SendTestsAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.Tests, ct => SendTestsAsync(message, id, ct));
                 return;
 
             case LspMethods.ExecuteCommand when _state == State.Running:
-                await SendCommandAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.ExecuteCommand, ct => SendCommandAsync(message, id, ct));
+                return;
+
+            case LspMethods.ExpandMacro when _state == State.Running:
+                DispatchRequest(id, LspMethods.ExpandMacro, ct => SendExpandMacroAsync(message, id, ct));
                 return;
 
             case LspMethods.CodeAction when _state == State.Running:
-                await SendCodeActionsAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.CodeAction, ct => SendCodeActionsAsync(message, id, ct));
                 return;
 
             case LspMethods.Diagnostic when _state == State.Running:
-                await SendDocumentDiagnosticsAsync(message, id, cancellationToken).ConfigureAwait(false);
+                DispatchRequest(id, LspMethods.Diagnostic, ct => SendDocumentDiagnosticsAsync(message, id, ct));
+                return;
+
+            case LspMethods.WorkspaceDiagnostic when _state == State.Running:
+                DispatchRequest(id, LspMethods.WorkspaceDiagnostic, ct => SendWorkspaceDiagnosticsAsync(message, id, ct));
+                return;
+
+            case LspMethods.WillRenameFiles when _state == State.Running:
+                DispatchRequest(id, LspMethods.WillRenameFiles, ct => SendWillRenameFilesAsync(message, id, ct));
+                return;
+
+            case LspMethods.ServerStatus when _state == State.Running:
+                DispatchRequest(id, LspMethods.ServerStatus, ct => SendServerStatusAsync(id, ct));
                 return;
 
             case LspMethods.Shutdown when _state == State.Running:
@@ -316,6 +411,7 @@ public sealed class LspServer : IDisposable
                 // Everything pending is withdrawn here rather than at 'exit': after this answer
                 // the client is entitled to assume the server produces nothing further, and a
                 // diagnostic arriving afterwards would be exactly that.
+                _shutdownCts.Cancel();
                 _analysis.Dispose();
                 await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
                 return;
@@ -383,12 +479,10 @@ public sealed class LspServer : IDisposable
                 return;
 
             case LspMethods.CancelRequest:
-                // Only a request held for a first analysis is still unanswered when its withdrawal
-                // arrives; every other one was answered before the next message was read.
                 if (LspJson.ReadParams(message.Params, LspJson.Default.CancelParams) is { } cancel
-                    && _held.TryRemove(cancel.Id.GetRawText(), out var held))
+                    && _inFlight.TryRemove(cancel.Id.GetRawText(), out var active))
                 {
-                    try { held.Cancel(); }
+                    try { active.Cancel(); }
                     catch (ObjectDisposedException) { /* answered meanwhile */ }
                 }
                 return;
@@ -442,7 +536,78 @@ public sealed class LspServer : IDisposable
 
         var document = _documents.Set(parameters.TextDocument.Uri, parameters.TextDocument.Version, text!);
 
-        if (document is not null) _analysis.Schedule(document);
+        if (document is not null)
+        {
+            CancelInteractiveFor(document.Uri);
+            _analysis.Schedule(document);
+        }
+    }
+
+    private void CancelInteractiveFor(string uri)
+    {
+        foreach (var method in new[] { LspMethods.Completion, LspMethods.SignatureHelp })
+        {
+            if (_interactiveRequests.TryRemove($"{method}:{uri}", out var cts))
+            {
+                try { cts.Cancel(); }
+                catch (ObjectDisposedException) { }
+            }
+        }
+    }
+
+    private static string? ExtractPositionUri(JsonRpcMessage message) =>
+        message.Params is { ValueKind: JsonValueKind.Object } obj
+        && obj.TryGetProperty("textDocument", out var doc)
+        && doc.TryGetProperty("uri", out var uriProp)
+            ? uriProp.GetString()
+            : null;
+
+    private void DispatchRequest(
+        JsonElement id, string method, Func<CancellationToken, Task> handler, string? interactiveUri = null)
+    {
+        var idKey = id.GetRawText();
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_shutdownCts.Token);
+        _inFlight[idKey] = cts;
+
+        var interactiveKey = interactiveUri is not null ? $"{method}:{interactiveUri}" : null;
+        if (interactiveKey is not null)
+        {
+            if (_interactiveRequests.TryRemove(interactiveKey, out var previous))
+            {
+                try { previous.Cancel(); }
+                catch (ObjectDisposedException) { }
+            }
+            _interactiveRequests[interactiveKey] = cts;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await handler(cts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested && !_shutdownCts.IsCancellationRequested)
+            {
+                _analysis.Telemetry.RecordCancellation();
+                await SafeSendAsync(() => SendErrorAsync(id, JsonRpcErrorCodes.RequestCancelled,
+                    "the client withdrew the request", CancellationToken.None)).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Server is shutting down.
+            }
+            catch
+            {
+                // Connection closed.
+            }
+            finally
+            {
+                _inFlight.TryRemove(new KeyValuePair<string, CancellationTokenSource>(idKey, cts));
+                if (interactiveKey is not null)
+                    _interactiveRequests.TryRemove(new KeyValuePair<string, CancellationTokenSource>(interactiveKey, cts));
+                cts.Dispose();
+            }
+        });
     }
 
     private async Task HandleDidCloseAsync(
@@ -512,48 +677,14 @@ public sealed class LspServer : IDisposable
     }
 
     /// <summary>
-    /// Holds a hover on an open file that has no analysis yet until its first one (E20), and
-    /// answers it off the read loop, which must go on reading: the edit that makes the analysis
-    /// obsolete may be the next message. Answered at once, the hover would be null, which reads as
-    /// "nothing here" — and a client does not ask again.
+    /// Ensures the first analysis snapshot of an open file is ready before answering semantic requests,
+    /// honouring <paramref name="cancellationToken"/> if withdrawn or superseded.
     /// </summary>
-    private bool HoldUntilAnalysed(JsonRpcMessage message, JsonElement id)
+    private async Task<AnalysisSnapshot?> EnsureSnapshotAsync(string path, CancellationToken cancellationToken)
     {
-        if (LspJson.ReadParams(message.Params, LspJson.Default.TextDocumentPositionParams) is not { } parameters
-            || !DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
-            || _documents.ByPath(path) is null
-            || _analysis.LastGood(path) is not null)
-            return false;
-
-        var key = id.GetRawText();
-        var cancel = new CancellationTokenSource();
-        _held[key] = cancel;
-        _ = AnswerWhenAnalysedAsync(message, id, path, key, cancel);
-        return true;
-    }
-
-    private async Task AnswerWhenAnalysedAsync(
-        JsonRpcMessage message, JsonElement id, string path, string key, CancellationTokenSource cancel)
-    {
-        try
-        {
-            await _analysis.FirstAsync(path, cancel.Token).ConfigureAwait(false);
-            await SendHoverAsync(message, id, CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancel.IsCancellationRequested)
-        {
-            await SafeSendAsync(() => SendErrorAsync(id, JsonRpcErrorCodes.RequestCancelled,
-                "the client withdrew the request", CancellationToken.None)).ConfigureAwait(false);
-        }
-        catch
-        {
-            // The connection is gone; there is no one left to answer.
-        }
-        finally
-        {
-            _held.TryRemove(key, out _);
-            cancel.Dispose();
-        }
+        if (_analysis.LastGood(path) is { } known) return known;
+        if (_documents.ByPath(path) is null) return null;
+        return await _analysis.FirstAsync(path, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -676,7 +807,7 @@ public sealed class LspServer : IDisposable
         }
 
         if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
-            || _analysis.LastGood(path) is not { } snapshot)
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot)
         {
             await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
             return;
@@ -704,14 +835,6 @@ public sealed class LspServer : IDisposable
             .ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Answers where a name is declared, or answers with null.
-    ///
-    /// <para>The target may be in ANOTHER file, and usually is: every call into the standard
-    /// library lands there. Its URI is built from the path the source manager holds, except when
-    /// it is the requested document itself — then the client's own spelling goes back, so the
-    /// editor recognises the file it just asked about.</para>
-    /// </summary>
     private async Task SendDefinitionAsync(
         JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
     {
@@ -726,7 +849,7 @@ public sealed class LspServer : IDisposable
         }
 
         if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
-            || _analysis.LastGood(path) is not { } snapshot
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot
             || DefinitionProvider.At(snapshot.Model, snapshot.Root, snapshot.File,
                 TextOffsets.ToOffset(snapshot.Text, parameters.Position)) is not { } target)
         {
@@ -734,13 +857,45 @@ public sealed class LspServer : IDisposable
             return;
         }
 
+        await SendDefinitionTargetAsync(id, parameters.TextDocument.Uri, path, snapshot, target, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task SendTypeDefinitionAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(
+            message.Params, LspJson.Default.TextDocumentPositionParams);
+
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams,
+                "expected a text document and a position", cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot
+            || NavigationProviders.TypeDefinitionAt(snapshot.Model, snapshot.Root, snapshot.File,
+                TextOffsets.ToOffset(snapshot.Text, parameters.Position)) is not { } target)
+        {
+            await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        await SendDefinitionTargetAsync(id, parameters.TextDocument.Uri, path, snapshot, target, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task SendDefinitionTargetAsync(
+        JsonElement id, string requestUri, string path, AnalysisSnapshot snapshot,
+        DefinitionTarget target, CancellationToken cancellationToken)
+    {
         var targetPath = snapshot.Sources.GetPath(target.File);
         var uri = DocumentUri.PathComparer.Equals(targetPath, path)
-            ? parameters.TextDocument.Uri
+            ? requestUri
             : DocumentUri.FromFilePath(targetPath);
 
-        // Ranged against the snapshot's own source manager, which is where the span's offsets are
-        // valid — the same reason hover gives.
         var name = SpanMapper.ToRange(snapshot.Sources, target.NameSpan);
 
         if (_definitionLinkSupport)
@@ -760,22 +915,49 @@ public sealed class LspServer : IDisposable
             return;
         }
 
-        // The NAME rather than the whole declaration. A struct with twenty members is a twenty-line
-        // span, and selecting all of it on a jump is noise; a client without link support has one
-        // range for both questions, and the useful one is where the cursor should land.
         var location = new Location { Uri = uri, Range = name };
-
         await SendResultAsync(id, location, LspJson.Default.Location, cancellationToken)
             .ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Answers what the document declares, or answers with null.
-    ///
-    /// <para>Null for a client that does not read the nested form: the flat alternative is
-    /// deprecated and carries no children, and sending it would be a second answer shape rather than
-    /// the same one with a flag.</para>
-    /// </summary>
+    private async Task SendImplementationAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.TextDocumentPositionParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams,
+                "expected a text document and a position", cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot)
+        {
+            await SendResultAsync(id, new List<Location>(), LspJson.Default.ListLocation, cancellationToken)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        var offset = TextOffsets.ToOffset(snapshot.Text, parameters.Position);
+        var targets = NavigationProviders.ImplementationAt(snapshot.Model, snapshot.Root, snapshot.File, offset);
+        var locations = new List<Location>(targets.Count);
+        foreach (var t in targets)
+        {
+            var tp = snapshot.Sources.GetPath(t.File);
+            locations.Add(new Location
+            {
+                Uri = DocumentUri.PathComparer.Equals(tp, path)
+                    ? parameters.TextDocument.Uri
+                    : DocumentUri.FromFilePath(tp),
+                Range = SpanMapper.ToRange(snapshot.Sources, t.NameSpan),
+            });
+        }
+
+        await SendResultAsync(id, locations, LspJson.Default.ListLocation, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     private async Task SendDocumentSymbolsAsync(
         JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
     {
@@ -788,17 +970,28 @@ public sealed class LspServer : IDisposable
             return;
         }
 
-        if (!_hierarchicalSymbols
-            || !DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
-            || _analysis.LastGood(path) is not { } snapshot)
+        if (!_hierarchicalSymbols || !DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path))
         {
             await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        // Ranged against the snapshot's own source manager, where the spans are valid — the same
-        // reason hover and the jump give.
-        var symbols = DocumentSymbolProvider.Of(snapshot.Sources, snapshot.Root);
+        IReadOnlyList<DocumentSymbol>? symbols = null;
+        if (_analysis.LastGood(path) is { } snapshot)
+        {
+            symbols = DocumentSymbolProvider.Of(snapshot.Sources, snapshot.Root);
+        }
+        else if (_documents.ByPath(path) is { } openDoc)
+        {
+            var syntax = _analysis.ParseSyntax(openDoc);
+            symbols = DocumentSymbolProvider.Of(syntax.Sources, syntax.Root);
+        }
+
+        if (symbols is null)
+        {
+            await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
+            return;
+        }
 
         await SendResultAsync(id, symbols, LspJson.Default.IReadOnlyListDocumentSymbol,
             cancellationToken).ConfigureAwait(false);
@@ -827,7 +1020,7 @@ public sealed class LspServer : IDisposable
 
         var offset = 0;
         if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
-            || _analysis.LastGood(path) is not { } snapshot
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot
             || ReferenceProvider.At(snapshot.Model, snapshot.Root, snapshot.File,
                 offset = TextOffsets.ToOffset(snapshot.Text, parameters.Position),
                 parameters.Context.IncludeDeclaration) is not { } sites)
@@ -957,14 +1150,28 @@ public sealed class LspServer : IDisposable
             return;
         }
 
-        if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
-            || _analysis.LastGood(path) is not { } snapshot)
+        if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path))
         {
             await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        var ranges = FoldingProvider.Of(snapshot.Root, snapshot.File, snapshot.Sources);
+        IReadOnlyList<FoldingRange>? ranges = null;
+        if (_analysis.LastGood(path) is { } snapshot)
+        {
+            ranges = FoldingProvider.Of(snapshot.Root, snapshot.File, snapshot.Sources);
+        }
+        else if (_documents.ByPath(path) is { } openDoc)
+        {
+            var syntax = _analysis.ParseSyntax(openDoc);
+            ranges = FoldingProvider.Of(syntax.Root, syntax.File, syntax.Sources);
+        }
+
+        if (ranges is null)
+        {
+            await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
+            return;
+        }
 
         await SendResultAsync(id, ranges, LspJson.Default.IReadOnlyListFoldingRange,
             cancellationToken).ConfigureAwait(false);
@@ -985,7 +1192,7 @@ public sealed class LspServer : IDisposable
         }
 
         if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
-            || _analysis.LastGood(path) is not { } snapshot)
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot)
         {
             await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
             return;
@@ -1142,7 +1349,7 @@ public sealed class LspServer : IDisposable
         }
 
         if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
-            || _analysis.LastGood(path) is not { } snapshot)
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot)
         {
             await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
             return;
@@ -1150,12 +1357,75 @@ public sealed class LspServer : IDisposable
 
         var data = SemanticTokensProvider.Of(
             snapshot.Model, snapshot.Root, snapshot.File, snapshot.Sources);
+        var resultId = $"st{Interlocked.Increment(ref _semanticTokenVersion)}";
+        _lastSemanticTokens[parameters.TextDocument.Uri] = (resultId, data);
 
+        await SendResultAsync(id, new SemanticTokens { ResultId = resultId, Data = data },
+            LspJson.Default.SemanticTokens, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task SendSemanticTokensDeltaAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.SemanticTokensDeltaParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams,
+                "expected a text document and previousResultId", cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot)
+        {
+            await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var data = SemanticTokensProvider.Of(
+            snapshot.Model, snapshot.Root, snapshot.File, snapshot.Sources);
+        var resultId = $"st{Interlocked.Increment(ref _semanticTokenVersion)}";
+
+        if (_lastSemanticTokens.TryGetValue(parameters.TextDocument.Uri, out var previous)
+            && previous.ResultId == parameters.PreviousResultId)
+        {
+            _lastSemanticTokens[parameters.TextDocument.Uri] = (resultId, data);
+            var edits = SemanticTokensProvider.ComputeDelta(previous.Data, data);
+            await SendResultAsync(id, new SemanticTokensDelta { ResultId = resultId, Edits = edits },
+                LspJson.Default.SemanticTokensDelta, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        _lastSemanticTokens[parameters.TextDocument.Uri] = (resultId, data);
+        await SendResultAsync(id, new SemanticTokens { ResultId = resultId, Data = data },
+            LspJson.Default.SemanticTokens, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task SendSemanticTokensRangeAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.SemanticTokensRangeParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams,
+                "expected a text document and range", cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot)
+        {
+            await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var data = SemanticTokensProvider.OfRange(
+            snapshot.Model, snapshot.Root, snapshot.File, snapshot.Sources, parameters.Range);
         await SendResultAsync(id, new SemanticTokens { Data = data },
             LspJson.Default.SemanticTokens, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Answers the workspace symbol search over every live compilation.</summary>
+    /// <summary>Answers the workspace symbol search over the incremental index and live compilations.</summary>
     private async Task SendWorkspaceSymbolsAsync(
         JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
     {
@@ -1169,7 +1439,7 @@ public sealed class LspServer : IDisposable
         }
 
         var symbols = WorkspaceSymbolProvider.Find(
-            _analysis.CurrentCompilations(), parameters.Query);
+            _analysis.CurrentCompilations(), parameters.Query, _analysis.SymbolIndex);
 
         await SendResultAsync(id, symbols, LspJson.Default.IReadOnlyListSymbolInformation,
             cancellationToken).ConfigureAwait(false);
@@ -1261,7 +1531,7 @@ public sealed class LspServer : IDisposable
             DefinitionProvider = true,
             DocumentSymbolProvider = true,
             ReferencesProvider = true,
-            CompletionProvider = new CompletionOptions { TriggerCharacters = [".", ":", "@", "<", "/"] },
+            CompletionProvider = new CompletionOptions { TriggerCharacters = [".", ":", "@", "<", "/"], ResolveProvider = true },
             RenameProvider = new RenameOptions { PrepareProvider = true },
             WorkspaceSymbolProvider = true,
             SemanticTokensProvider = new SemanticTokensOptions
@@ -1272,6 +1542,7 @@ public sealed class LspServer : IDisposable
                     TokenModifiers = SemanticTokensProvider.TokenModifiers,
                 },
                 Full = true,
+                Range = true,
             },
             SignatureHelpProvider = new SignatureHelpOptions
             {
@@ -1285,39 +1556,63 @@ public sealed class LspServer : IDisposable
             CodeActionProvider = new CodeActionOptions { CodeActionKinds = ["quickfix"] },
             ExecuteCommandProvider = new ExecuteCommandOptions { Commands = [LspMethods.ExpandCommand] },
             CodeLensProvider = new CodeLensOptions(),
+            TypeDefinitionProvider = true,
+            ImplementationProvider = true,
+            DocumentHighlightProvider = true,
+            SelectionRangeProvider = true,
+            CallHierarchyProvider = true,
+            TypeHierarchyProvider = true,
+            DocumentLinkProvider = new DocumentLinkOptions(),
+            Workspace = new WorkspaceServerCapabilities
+            {
+                FileOperations = new FileOperationsServerCapabilities
+                {
+                    WillRename = new FileOperationRegistrationOptions
+                    {
+                        Filters = [new FileOperationFilter { Scheme = "file", Pattern = new FileOperationPattern { Glob = "**/*.lyr" } }],
+                    },
+                },
+            },
         },
         ServerInfo = new ServerInfo { Name = "lyric", Version = _options.Version },
     };
 
-    /// <summary>
-    /// What an analysis says of a file. Kept by URI, the newest only, for the client that asks
-    /// (<c>textDocument/diagnostic</c>); pushed — unless that client asks for the file itself
-    /// because it has it open. Then it is told to ask again where it can be
-    /// (<c>workspace/diagnostic/refresh</c>): an edit in one file changes what another open one
-    /// says.
-    /// </summary>
     private async Task PublishDiagnosticsAsync(
         PublishDiagnosticsParams parameters, CancellationToken cancellationToken)
     {
         _lastDiagnostics[parameters.Uri] = parameters;
+        _diagnosticResultIds[parameters.Uri] = $"d{Interlocked.Increment(ref _diagnosticVersion)}_{parameters.Version ?? 0}";
         if (!_pullDiagnostics || _documents.ByUri(parameters.Uri) is null)
         {
             await SendNotificationAsync(LspMethods.PublishDiagnostics,
                 LspJson.ToElement(parameters, LspJson.Default.PublishDiagnosticsParams),
                 cancellationToken).ConfigureAwait(false);
-            return;
         }
-        if (_diagnosticRefresh)
+    }
+
+    private async Task OnAnalysisCompleteAsync(CancellationToken cancellationToken)
+    {
+        if (_pullDiagnostics && _diagnosticRefresh)
             await SendAsync(new JsonRpcRequest { Id = Interlocked.Increment(ref _lastRequestId), Method = LspMethods.DiagnosticRefresh },
+                LspJson.Default.JsonRpcRequest, cancellationToken).ConfigureAwait(false);
+        if (_semanticTokensRefresh)
+            await SendAsync(new JsonRpcRequest { Id = Interlocked.Increment(ref _lastRequestId), Method = LspMethods.SemanticTokensRefresh },
+                LspJson.Default.JsonRpcRequest, cancellationToken).ConfigureAwait(false);
+        if (_inlayHintRefresh)
+            await SendAsync(new JsonRpcRequest { Id = Interlocked.Increment(ref _lastRequestId), Method = LspMethods.InlayHintRefresh },
+                LspJson.Default.JsonRpcRequest, cancellationToken).ConfigureAwait(false);
+        if (_codeLensRefresh)
+            await SendAsync(new JsonRpcRequest { Id = Interlocked.Increment(ref _lastRequestId), Method = LspMethods.CodeLensRefresh },
                 LspJson.Default.JsonRpcRequest, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>The tests of a document of a package, off its last good analysis; none for a file
     /// outside one.</summary>
-    private (string Root, IReadOnlyList<EditorTest> Tests)? TestsOf(string uri)
+    private async Task<(string Root, IReadOnlyList<EditorTest> Tests)?> TestsOfAsync(string uri, CancellationToken cancellationToken)
     {
-        if (!DocumentUri.TryToFilePath(uri, out var path) || _analysis.LastGood(path) is not { } snapshot
-            || PackageUnit.Find(path, out _) is not { } unit || unit.ModuleOf(path) is null)
+        if (!DocumentUri.TryToFilePath(uri, out var path)
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot
+            || _analysis.UnitForPath(path) is not { } unit || unit.ModuleOf(path) is null)
             return null;
         return (unit.Root, TestLensProvider.Of(snapshot, unit, path));
     }
@@ -1331,7 +1626,7 @@ public sealed class LspServer : IDisposable
     {
         var parameters = LspJson.ReadParams(message.Params, LspJson.Default.CodeLensParams);
         var lenses = new List<CodeLens>();
-        if (parameters is not null && TestsOf(parameters.TextDocument.Uri) is { } found)
+        if (parameters is not null && await TestsOfAsync(parameters.TextDocument.Uri, cancellationToken).ConfigureAwait(false) is { } found)
             foreach (var test in found.Tests)
             {
                 lenses.Add(new CodeLens { Range = LineRange(test.Line), Command = new LspCommand { Title = "Run test", Command = LspMethods.RunTest, Arguments = [found.Root, test.Name] } });
@@ -1344,7 +1639,7 @@ public sealed class LspServer : IDisposable
     private async Task SendTestsAsync(JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
     {
         var parameters = LspJson.ReadParams(message.Params, LspJson.Default.CodeLensParams);
-        var found = parameters is null ? null : TestsOf(parameters.TextDocument.Uri);
+        var found = parameters is null ? null : await TestsOfAsync(parameters.TextDocument.Uri, cancellationToken).ConfigureAwait(false);
         await SendResultAsync(id, new DocumentTests
         {
             Root = found?.Root,
@@ -1389,7 +1684,7 @@ public sealed class LspServer : IDisposable
         IReadOnlyList<CodeAction> actions = [];
         if (DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path) && _analysis.FindingsOf(path) is { } found)
             actions = CodeActionProvider.At(path, parameters.TextDocument.Uri, parameters.Range, found.Sources, found.Findings,
-                _analysis.LastGood(path), _options.Version);
+                _analysis.LastGood(path), _options.Version, _analysis.SymbolIndex);
         await SendResultAsync(id, actions, LspJson.Default.IReadOnlyListCodeAction, cancellationToken).ConfigureAwait(false);
     }
 
@@ -1437,9 +1732,326 @@ public sealed class LspServer : IDisposable
             }
         }
 
+        var resultId = _diagnosticResultIds.TryGetValue(uri, out var rid) ? rid : null;
+        if (parameters.PreviousResultId is not null && resultId is not null && parameters.PreviousResultId == resultId)
+        {
+            await SendResultAsync(id, new UnchangedDocumentDiagnosticReport { ResultId = resultId },
+                LspJson.Default.UnchangedDocumentDiagnosticReport, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         var items = _lastDiagnostics.TryGetValue(uri, out var known) ? known.Diagnostics : [];
-        await SendResultAsync(id, new FullDocumentDiagnosticReport { Items = items },
+        await SendResultAsync(id, new FullDocumentDiagnosticReport { ResultId = resultId, Items = items },
             LspJson.Default.FullDocumentDiagnosticReport, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task SendWorkspaceDiagnosticsAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.WorkspaceDiagnosticParams);
+        var prevMap = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (parameters?.PreviousResultIds is { } prevs)
+            foreach (var p in prevs)
+                prevMap[p.Uri] = p.Value;
+
+        var reports = new List<WorkspaceDocumentDiagnosticReport>();
+        foreach (var (uri, pub) in _lastDiagnostics)
+        {
+            var rid = _diagnosticResultIds.TryGetValue(uri, out var r) ? r : null;
+            if (rid is not null && prevMap.TryGetValue(uri, out var prevRid) && prevRid == rid)
+            {
+                reports.Add(new WorkspaceDocumentDiagnosticReport
+                {
+                    Kind = "unchanged",
+                    Uri = uri,
+                    Version = pub.Version,
+                    ResultId = rid,
+                });
+            }
+            else
+            {
+                reports.Add(new WorkspaceDocumentDiagnosticReport
+                {
+                    Kind = "full",
+                    Uri = uri,
+                    Version = pub.Version,
+                    ResultId = rid,
+                    Items = pub.Diagnostics,
+                });
+            }
+        }
+
+        await SendResultAsync(id, new WorkspaceDiagnosticReport { Items = reports },
+            LspJson.Default.WorkspaceDiagnosticReport, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task SendCompletionResolveAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var item = LspJson.ReadParams(message.Params, LspJson.Default.CompletionItem);
+        if (item is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected completion item", cancellationToken)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        var resolved = CompletionProvider.Resolve(item, _analysis.SymbolIndex);
+        await SendResultAsync(id, resolved, LspJson.Default.CompletionItem, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task SendDocumentHighlightsAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.TextDocumentPositionParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected a text document and a position",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot)
+        {
+            await SendResultAsync(id, Array.Empty<DocumentHighlight>(),
+                LspJson.Default.IReadOnlyListDocumentHighlight, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var offset = TextOffsets.ToOffset(snapshot.Text, parameters.Position);
+        var highlights = NavigationProviders.DocumentHighlightsAt(
+            snapshot.Model, snapshot.Root, snapshot.File, snapshot.Sources, offset);
+        await SendResultAsync(id, highlights, LspJson.Default.IReadOnlyListDocumentHighlight, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task SendSelectionRangesAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.SelectionRangeParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected a text document and positions",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path))
+        {
+            await SendResultAsync(id, Array.Empty<SelectionRange>(),
+                LspJson.Default.IReadOnlyListSelectionRange, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        IReadOnlyList<SelectionRange> ranges;
+        if (_analysis.LastGood(path) is { } snapshot)
+        {
+            ranges = NavigationProviders.SelectionRangesAt(snapshot.Root, snapshot.File, snapshot.Sources, parameters.Positions);
+        }
+        else if (_documents.ByPath(path) is { } openDoc)
+        {
+            var syntax = _analysis.ParseSyntax(openDoc);
+            ranges = NavigationProviders.SelectionRangesAt(syntax.Root, syntax.File, syntax.Sources, parameters.Positions);
+        }
+        else
+        {
+            ranges = [];
+        }
+
+        await SendResultAsync(id, ranges, LspJson.Default.IReadOnlyListSelectionRange, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task SendDocumentLinksAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.DocumentLinkParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected a text document",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot)
+        {
+            await SendResultAsync(id, Array.Empty<DocumentLink>(),
+                LspJson.Default.IReadOnlyListDocumentLink, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var links = NavigationProviders.DocumentLinksOf(snapshot.Model, snapshot.Root, snapshot.File, snapshot.Sources);
+        await SendResultAsync(id, links, LspJson.Default.IReadOnlyListDocumentLink, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task SendPrepareCallHierarchyAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.CallHierarchyPrepareParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected call hierarchy params",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot)
+        {
+            await SendResultAsync(id, Array.Empty<CallHierarchyItem>(),
+                LspJson.Default.IReadOnlyListCallHierarchyItem, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var offset = TextOffsets.ToOffset(snapshot.Text, parameters.Position);
+        var items = HierarchyProviders.PrepareCallHierarchy(snapshot.Model, snapshot.Root, snapshot.File, snapshot.Sources, offset);
+        await SendResultAsync(id, items, LspJson.Default.IReadOnlyListCallHierarchyItem, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task SendCallHierarchyIncomingAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.CallHierarchyIncomingCallsParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected call hierarchy item",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var calls = HierarchyProviders.IncomingCalls(_analysis.CurrentCompilations(), parameters.Item);
+        await SendResultAsync(id, calls, LspJson.Default.IReadOnlyListCallHierarchyIncomingCall, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task SendCallHierarchyOutgoingAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.CallHierarchyOutgoingCallsParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected call hierarchy item",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var calls = HierarchyProviders.OutgoingCalls(_analysis.CurrentCompilations(), parameters.Item);
+        await SendResultAsync(id, calls, LspJson.Default.IReadOnlyListCallHierarchyOutgoingCall, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task SendPrepareTypeHierarchyAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.TypeHierarchyPrepareParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected type hierarchy params",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!DocumentUri.TryToFilePath(parameters.TextDocument.Uri, out var path)
+            || await EnsureSnapshotAsync(path, cancellationToken).ConfigureAwait(false) is not { } snapshot)
+        {
+            await SendResultAsync(id, Array.Empty<TypeHierarchyItem>(),
+                LspJson.Default.IReadOnlyListTypeHierarchyItem, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var offset = TextOffsets.ToOffset(snapshot.Text, parameters.Position);
+        var items = HierarchyProviders.PrepareTypeHierarchy(snapshot.Model, snapshot.Root, snapshot.File, snapshot.Sources, offset);
+        await SendResultAsync(id, items, LspJson.Default.IReadOnlyListTypeHierarchyItem, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task SendTypeHierarchySupertypesAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.TypeHierarchySupertypesParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected type hierarchy item",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var items = HierarchyProviders.Supertypes(_analysis.CurrentCompilations(), parameters.Item);
+        await SendResultAsync(id, items, LspJson.Default.IReadOnlyListTypeHierarchyItem, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task SendTypeHierarchySubtypesAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.TypeHierarchySubtypesParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected type hierarchy item",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var items = HierarchyProviders.Subtypes(_analysis.CurrentCompilations(), parameters.Item);
+        await SendResultAsync(id, items, LspJson.Default.IReadOnlyListTypeHierarchyItem, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task SendWillRenameFilesAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.RenameFilesParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected files array",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var edit = HierarchyProviders.WillRenameFiles(_analysis.CurrentCompilations(), _analysis.UnitForPath, parameters);
+        if (edit is null)
+        {
+            await SendResultAsync(id, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        await SendResultAsync(id, edit, LspJson.Default.WorkspaceEdit, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task SendExpandMacroAsync(
+        JsonRpcMessage message, JsonElement id, CancellationToken cancellationToken)
+    {
+        var parameters = LspJson.ReadParams(message.Params, LspJson.Default.ExpandMacroParams);
+        if (parameters is null)
+        {
+            await SendErrorAsync(id, JsonRpcErrorCodes.InvalidParams, "expected textDocument and position",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (_documents.ByUri(parameters.TextDocument.Uri) is not { } document)
+        {
+            await SendResultAsync(id, new ExpandResult { Refused = "the document is not open" },
+                LspJson.Default.ExpandResult, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var (text, refused) = await _analysis.ExpandAsync(document, cancellationToken).ConfigureAwait(false);
+        await SendResultAsync(id, new ExpandResult { Text = text, Refused = refused },
+            LspJson.Default.ExpandResult, cancellationToken).ConfigureAwait(false);
+    }
+
+    private Task SendServerStatusAsync(JsonElement id, CancellationToken cancellationToken)
+    {
+        var status = _analysis.Telemetry.Snapshot(
+            _options.Version,
+            _documents.Count,
+            _analysis.AnalysedCount,
+            _analysis.SymbolIndex.SymbolCount);
+        return SendResultAsync(id, status, LspJson.Default.ServerStatusResult, cancellationToken);
     }
 
     private Task LogAsync(string message, MessageType type, CancellationToken cancellationToken) =>
@@ -1486,12 +2098,15 @@ public sealed class LspServer : IDisposable
 
     public void Dispose()
     {
-        _analysis.Dispose();
-        foreach (var held in _held.Values)
+        try { _shutdownCts.Cancel(); }
+        catch (ObjectDisposedException) { }
+        foreach (var active in _inFlight.Values)
         {
-            try { held.Cancel(); }
+            try { active.Cancel(); }
             catch (ObjectDisposedException) { /* answered meanwhile */ }
         }
+        _analysis.Dispose();
+        _shutdownCts.Dispose();
         _connection.Dispose();
     }
 }

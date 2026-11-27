@@ -27,7 +27,7 @@ public static class SignatureHelpProvider
     {
         if (offset < 0 || offset > text.Length) return null;
 
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, text, moduleName), options);
+        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, text, moduleName), options with { IdeQuery = true });
         if (result.Model is not { } model) return null;
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);
@@ -52,7 +52,7 @@ public static class SignatureHelpProvider
         if (symbol is not null) symbol = ReferenceProvider.Target(symbol);
 
         var signature = symbol is FunctionSymbol { Declaration: FunctionDecl declaration }
-            ? Declared(result.Sources, declaration)
+            ? Declared(result.Sources, declaration, model.Documentation.Of(declaration))
             : FromType(call, model);
         if (signature is null) return null;
 
@@ -88,7 +88,7 @@ public static class SignatureHelpProvider
 
     /// <summary>The declaration as written: name, generics, each parameter sliced from its own
     /// span, the return type from its.</summary>
-    private static SignatureInformation Declared(SourceManager sources, FunctionDecl declaration)
+    private static SignatureInformation Declared(SourceManager sources, FunctionDecl declaration, string? documentation = null)
     {
         var parameters = declaration.Parameters
             .Select(parameter => Flat(sources.Slice(parameter.Span).ToString()))
@@ -109,6 +109,9 @@ public static class SignatureHelpProvider
             Parameters = parameters
                 .Select(parameter => new ParameterInformation { Label = parameter })
                 .ToArray(),
+            Documentation = string.IsNullOrWhiteSpace(documentation)
+                ? null
+                : new MarkupContent { Value = HoverProvider.Sections(documentation) },
         };
     }
 
