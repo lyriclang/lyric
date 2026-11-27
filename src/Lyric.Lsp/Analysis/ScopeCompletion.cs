@@ -30,25 +30,110 @@ public static class ScopeCompletion
     /// builtins, and an empty answer would read as "this is not a place for names".</para>
     /// </summary>
     public static IReadOnlyList<CompletionItem> At(
-        SemanticModel model, IReadOnlyList<Node> nodes, int offset, ModuleSymbol? from)
+        SemanticModel model, IReadOnlyList<Node> nodes, int offset, ModuleSymbol? from,
+        bool snippetSupport = false, WorkspaceSymbolIndex? index = null)
     {
         var items = new List<CompletionItem>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        var typesOnly = IsTypePosition(nodes, model);
 
         // Inner to outer, so a local shadows the parameter of the same name rather than appearing
         // beside it — which is what the resolver does with its scope chain.
         for (var i = nodes.Count - 1; i >= 0; i--)
+        {
+            var detail = Detail(nodes[i]);
+            var band = nodes[i] switch
+            {
+                Block => "0",
+                ForInStmt or CatchClause or MatchArm or IfStmt or WhileStmt or LambdaExpr => "0",
+                _ => "1",
+            };
             foreach (var symbol in Declared(model, nodes[i], offset))
-                Add(model, items, seen, symbol, Detail(nodes[i]));
+                Add(model, items, seen, symbol, detail, band, snippetSupport && !typesOnly, typesOnly);
+        }
 
         if (from is not null)
             foreach (var symbol in from.Members.Symbols)
-                Add(model, items, seen, symbol, from.FullName);
+                Add(model, items, seen, symbol, from.FullName, "2", snippetSupport && !typesOnly, typesOnly);
+
+        if (model.Compilation.Prelude is { } prelude)
+            foreach (var symbol in prelude.Members.Symbols)
+                Add(model, items, seen, symbol, "std.prelude", "3", snippetSupport && !typesOnly, typesOnly);
 
         foreach (var symbol in model.Compilation.Builtins.Symbols)
-            Add(model, items, seen, symbol, "builtin");
+            Add(model, items, seen, symbol, "builtin", "4", snippetSupport && !typesOnly, typesOnly);
+
+        if (index is not null)
+        {
+            var insertLine = 0;
+            foreach (var decl in model.Entry.Declarations)
+            {
+                if (decl is ImportDecl && decl.Span.File == model.Entry.Span.File)
+                    insertLine = Math.Max(insertLine, SpanMapper.ToRange(model.Compilation.Sources, decl.Span).End.Line + 1);
+            }
+            var insertPos = new Position { Line = insertLine, Character = 0 };
+            var insertRange = new Protocol.Range { Start = insertPos, End = insertPos };
+
+            foreach (var exp in index.AllPublicExports())
+            {
+                if (from is not null && string.Equals(exp.ModuleName, from.FullName, StringComparison.Ordinal))
+                    continue;
+                if (typesOnly && exp.CompletionKind is not (CompletionItemKind.Struct or CompletionItemKind.Enum
+                    or CompletionItemKind.Interface or CompletionItemKind.Class or CompletionItemKind.Module))
+                    continue;
+                if (!seen.Add(exp.Name)) continue;
+
+                items.Add(new CompletionItem
+                {
+                    Label = exp.Name,
+                    Kind = exp.CompletionKind,
+                    Detail = $"auto-import from {exp.ModuleName}",
+                    LabelDetails = new CompletionItemLabelDetails { Detail = exp.Detail, Description = exp.ModuleName },
+                    Documentation = string.IsNullOrWhiteSpace(exp.Documentation) ? null : new MarkupContent { Value = HoverProvider.Sections(exp.Documentation) },
+                    SortText = $"5_{exp.Name}",
+                    FilterText = exp.Name,
+                    AdditionalTextEdits = [new TextEdit { Range = insertRange, NewText = $"import {exp.ModuleName} {{ {exp.Name} }};\n" }],
+                });
+            }
+        }
 
         return items;
+    }
+
+    private static bool IsTypePosition(IReadOnlyList<Node> nodes, SemanticModel model)
+    {
+        if (nodes.Count == 0) return false;
+        // 'f<$>' parses as BinaryExpr(f, Lt, IdentifierExpr(__lyric_completion__)): offer types when 'f' has generics.
+        for (var i = nodes.Count - 1; i >= 0; i--)
+        {
+            if (nodes[i] is BinaryExpr { Operator: BinaryOp.Lt, Left: var callee, Right: IdentifierExpr { Name: var n } }
+                && n.Contains(CompletionProvider.Marker, StringComparison.Ordinal))
+            {
+                var target = model.Types.RefOf(callee) ?? model.Binding.Resolve(callee);
+                if (target is not null) target = CompletionProvider.Unwrap(target);
+                if (target is FunctionSymbol { Generics.Length: > 0 } or TypeSymbol { Generics.Length: > 0 })
+                    return true;
+            }
+        }
+
+        // 'Pair<T>.of()' has NamedType as TypePathExpr argument; top-level identifier exprs are values.
+        for (var i = nodes.Count - 1; i >= 0; i--)
+        {
+            switch (nodes[i])
+            {
+                case NamedType:
+                case ArrayType:
+                case AST.TupleType:
+                case NullableType:
+                case ThrowingType:
+                case FunctionType:
+                case ThrowsClause:
+                    return true;
+                case Expr:
+                    return false;
+            }
+        }
+        return false;
     }
 
     /// <summary>What one level of the tree contributes.</summary>
@@ -174,49 +259,22 @@ public static class ScopeCompletion
     };
 
     private static void Add(
-        SemanticModel model, List<CompletionItem> items, HashSet<string> seen, Symbol symbol, string detail)
+        SemanticModel model, List<CompletionItem> items, HashSet<string> seen, Symbol symbol,
+        string detail, string band, bool allowSnippet, bool typesOnly)
     {
         // A module's own error sentinels stand for names that did not resolve; offering them would
-        // put a failure into a list of things that exist.
+        // put a failure into a list of things that exist. Never surface the synthetic completion marker.
         if (symbol is ErrorSymbol) return;
+        if (string.IsNullOrWhiteSpace(symbol.Name) || symbol.Name.Contains(CompletionProvider.Marker, StringComparison.Ordinal)) return;
+        if (typesOnly && !IsTypeCandidate(symbol)) return;
         if (!seen.Add(symbol.Name)) return;
 
-        items.Add(new CompletionItem
-        {
-            Label = symbol.Name,
-            Kind = KindOf(symbol),
-            Detail = detail,
-            Documentation = Documentation(model, symbol),
-        });
+        items.Add(CompletionProvider.BuildItem(model, symbol, symbol.Name, detail, band, allowSnippet));
     }
 
-    private static MarkupContent? Documentation(SemanticModel model, Symbol symbol)
+    private static bool IsTypeCandidate(Symbol symbol)
     {
-        var target = symbol is ImportBindingSymbol import ? import.Target : symbol;
-        if (target.Declaration is not { } declaration) return null;
-        if (model.Documentation.Of(declaration) is not { } text) return null;
-        return new MarkupContent { Value = text };
+        var t = CompletionProvider.Unwrap(symbol);
+        return t is TypeSymbol or GenericParamSymbol or ModuleSymbol or ExternalSymbol;
     }
-
-    private static CompletionItemKind KindOf(Symbol symbol) => symbol switch
-    {
-        ImportBindingSymbol import => KindOf(import.Target),
-
-        LocalSymbol or ParameterSymbol => CompletionItemKind.Variable,
-        FunctionSymbol => CompletionItemKind.Function,
-        GlobalSymbol => CompletionItemKind.Constant,
-        ModuleSymbol => CompletionItemKind.Module,
-        EnumVariantSymbol => CompletionItemKind.EnumMember,
-
-        // A type parameter is a type as far as the reader is concerned; the protocol's own
-        // TypeParameter kind exists but reads as a declaration site rather than a usable name.
-        GenericParamSymbol => CompletionItemKind.Interface,
-
-        TypeSymbol { Kind: TypeSymbolKind.Struct } => CompletionItemKind.Struct,
-        TypeSymbol { Kind: TypeSymbolKind.Enum } => CompletionItemKind.Enum,
-        TypeSymbol { Kind: TypeSymbolKind.Interface } => CompletionItemKind.Interface,
-        TypeSymbol => CompletionItemKind.Class,
-
-        _ => CompletionItemKind.Variable,
-    };
 }

@@ -182,6 +182,19 @@ public static class NodeFinder
         }
     }
 
+    /// <summary>Returns the node path through a conformance interface stripped by synthesis when
+    /// <paramref name="offset"/> lands on it inside <paramref name="file"/>.</summary>
+    public static IReadOnlyList<Node>? SynthesizedConformancePathAt(
+        SemanticModel model, FileId file, int offset)
+    {
+        foreach (var node in model.Binding.SynthesizedInterfacesIn(file))
+        {
+            if (Covers(node, file, offset))
+                return PathAt(node, file, offset);
+        }
+        return null;
+    }
+
     /// <summary>The innermost node covering the offset, or <c>null</c>.</summary>
     public static Node? At(Node root, FileId file, int offset)
     {

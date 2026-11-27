@@ -161,10 +161,63 @@ public sealed record ServerCapabilities
     public required ExecuteCommandOptions ExecuteCommandProvider { get; init; }
 
     public required CodeLensOptions CodeLensProvider { get; init; }
+
+    public bool TypeDefinitionProvider { get; init; }
+
+    public bool ImplementationProvider { get; init; }
+
+    public bool DocumentHighlightProvider { get; init; }
+
+    public bool SelectionRangeProvider { get; init; }
+
+    public bool CallHierarchyProvider { get; init; }
+
+    public bool TypeHierarchyProvider { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DocumentLinkOptions? DocumentLinkProvider { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkspaceServerCapabilities? Workspace { get; init; }
+}
+
+public sealed record DocumentLinkOptions
+{
+    public bool ResolveProvider => false;
+}
+
+public sealed record WorkspaceServerCapabilities
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public FileOperationsServerCapabilities? FileOperations { get; init; }
+}
+
+public sealed record FileOperationsServerCapabilities
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public FileOperationRegistrationOptions? WillRename { get; init; }
+}
+
+public sealed record FileOperationRegistrationOptions
+{
+    public required IReadOnlyList<FileOperationFilter> Filters { get; init; }
+}
+
+public sealed record FileOperationFilter
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Scheme { get; init; }
+
+    public required FileOperationPattern Pattern { get; init; }
+}
+
+public sealed record FileOperationPattern
+{
+    public required string Glob { get; init; }
 }
 
 /// <summary>Diagnostics a client asks for: a document's depend on other files (an import), and
-/// there is no workspace-wide question — the files nobody has open are pushed.</summary>
+/// workspace diagnostics cover the analysed project modules.</summary>
 public sealed record DiagnosticOptions
 {
     public required bool InterFileDependencies { get; init; }
@@ -174,6 +227,9 @@ public sealed record DiagnosticOptions
 public sealed record DocumentDiagnosticParams
 {
     public required TextDocumentIdentifier TextDocument { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PreviousResultId { get; init; }
 }
 
 /// <summary>The data of a <c>textDocument/diagnostic</c> the server gave up on: whether the client
@@ -188,7 +244,52 @@ public sealed record DiagnosticServerCancellationData
 public sealed record FullDocumentDiagnosticReport
 {
     public string Kind => "full";
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ResultId { get; init; }
+
     public required IReadOnlyList<LspDiagnostic> Items { get; init; }
+}
+
+public sealed record UnchangedDocumentDiagnosticReport
+{
+    public string Kind => "unchanged";
+    public required string ResultId { get; init; }
+}
+
+public sealed record WorkspaceDiagnosticParams
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Identifier { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<PreviousResultId>? PreviousResultIds { get; init; }
+}
+
+public sealed record PreviousResultId
+{
+    public required string Uri { get; init; }
+    public required string Value { get; init; }
+}
+
+public sealed record WorkspaceDiagnosticReport
+{
+    public required IReadOnlyList<WorkspaceDocumentDiagnosticReport> Items { get; init; }
+}
+
+public sealed record WorkspaceDocumentDiagnosticReport
+{
+    public required string Kind { get; init; }
+    public required string Uri { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Version { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ResultId { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<LspDiagnostic>? Items { get; init; }
 }
 
 public sealed record DocumentFormattingParams
@@ -213,6 +314,9 @@ public sealed record SignatureHelpOptions
     /// <summary>Opening a call and moving to the next argument — the two moments the question
     /// changes its answer.</summary>
     public required IReadOnlyList<string> TriggerCharacters { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? RetriggerCharacters { get; init; }
 }
 
 public sealed record SignatureHelp
@@ -235,6 +339,9 @@ public sealed record SignatureInformation
     /// client's highlight matches on. Empty when the callee is a function VALUE: the type knows
     /// no parameter names, and invented ones would read as fact.</summary>
     public required IReadOnlyList<ParameterInformation> Parameters { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public MarkupContent? Documentation { get; init; }
 }
 
 public sealed record ParameterInformation
@@ -272,14 +379,49 @@ public sealed record InlayHint
     public required Position Position { get; init; }
     public required string Label { get; init; }
     public required InlayHintKind Kind { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<TextEdit>? TextEdits { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? PaddingRight { get; init; }
 }
 
-/// <summary>Only the full form. A delta or a range form would be announced here the day a
-/// measurement asks for one.</summary>
+/// <summary>Full document plus range tokens; delta requests are also served on demand.</summary>
 public sealed record SemanticTokensOptions
 {
     public required SemanticTokensLegend Legend { get; init; }
     public required bool Full { get; init; }
+    public bool Range { get; init; }
+}
+
+public sealed record SemanticTokensDeltaParams
+{
+    public required TextDocumentIdentifier TextDocument { get; init; }
+    public required string PreviousResultId { get; init; }
+}
+
+public sealed record SemanticTokensRangeParams
+{
+    public required TextDocumentIdentifier TextDocument { get; init; }
+    public required Range Range { get; init; }
+}
+
+public sealed record SemanticTokensEdit
+{
+    public required int Start { get; init; }
+    public required int DeleteCount { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<int>? Data { get; init; }
+}
+
+public sealed record SemanticTokensDelta
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ResultId { get; init; }
+
+    public required IReadOnlyList<SemanticTokensEdit> Edits { get; init; }
 }
 
 /// <summary>The names behind the indices in <see cref="SemanticTokens.Data"/>. Announced once;
@@ -299,6 +441,9 @@ public sealed record SemanticTokensParams
 /// bits — the protocol's own encoding, produced ready to send.</summary>
 public sealed record SemanticTokens
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ResultId { get; init; }
+
     public required IReadOnlyList<int> Data { get; init; }
 }
 
@@ -457,9 +602,8 @@ public sealed record SymbolInformation
 /// <summary>What makes the editor ask for completions without being told to.</summary>
 public sealed record CompletionOptions
 {
-    /// <summary>Typing one of these opens the list. Only <c>.</c>: everything else this server can
-    /// answer is reached by typing a name, which the client asks about on its own.</summary>
     public required IReadOnlyList<string> TriggerCharacters { get; init; }
+    public bool ResolveProvider { get; init; }
 }
 
 /// <summary>
@@ -476,14 +620,28 @@ public enum CompletionItemKind
     Interface = 8,
     Module = 9,
     Enum = 13,
+    Keyword = 14,
+    Snippet = 15,
     Constant = 21,
     Struct = 22,
     EnumMember = 20,
 }
 
+public sealed record CompletionItemLabelDetails
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Detail { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+}
+
 public sealed record CompletionItem
 {
     public required string Label { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompletionItemLabelDetails? LabelDetails { get; init; }
 
     public required CompletionItemKind Kind { get; init; }
 
@@ -495,12 +653,51 @@ public sealed record CompletionItem
     /// <summary>What was written above the declaration, if anything.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public MarkupContent? Documentation { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SortText { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FilterText { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? InsertText { get; init; }
+
+    /// <summary><c>1</c> plain text, <c>2</c> snippet (<c>$1</c>/<c>$0</c>).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? InsertTextFormat { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Preselect { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? CommitCharacters { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<int>? Tags { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<TextEdit>? AdditionalTextEdits { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public System.Text.Json.JsonElement? Data { get; init; }
+}
+
+public sealed record CompletionContext
+{
+    public int TriggerKind { get; init; } = 1;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TriggerCharacter { get; init; }
 }
 
 public sealed record CompletionParams
 {
     public required TextDocumentIdentifier TextDocument { get; init; }
     public required Position Position { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompletionContext? Context { get; init; }
 }
 
 /// <summary>Whether the declaration itself counts as one of the places a name occurs. The client
@@ -627,6 +824,15 @@ public sealed record WorkspaceClientCapabilities
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DiagnosticWorkspaceClientCapabilities? Diagnostics { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DiagnosticWorkspaceClientCapabilities? SemanticTokens { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DiagnosticWorkspaceClientCapabilities? InlayHint { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DiagnosticWorkspaceClientCapabilities? CodeLens { get; init; }
 }
 
 public sealed record DiagnosticWorkspaceClientCapabilities
@@ -656,6 +862,20 @@ public sealed record TextDocumentClientCapabilities
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DocumentSymbolClientCapabilities? DocumentSymbol { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompletionClientCapabilities? Completion { get; init; }
+}
+
+public sealed record CompletionClientCapabilities
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompletionItemClientCapabilities? CompletionItem { get; init; }
+}
+
+public sealed record CompletionItemClientCapabilities
+{
+    public bool SnippetSupport { get; init; }
 }
 
 public sealed record DocumentSymbolClientCapabilities
@@ -874,6 +1094,156 @@ public sealed record WorkDoneProgressEnd
     public string Kind => "end";
 }
 
+public enum DocumentHighlightKind
+{
+    Text = 1,
+    Read = 2,
+    Write = 3,
+}
+
+public sealed record DocumentHighlight
+{
+    public required Range Range { get; init; }
+    public DocumentHighlightKind Kind { get; init; }
+}
+
+public sealed record SelectionRangeParams
+{
+    public required TextDocumentIdentifier TextDocument { get; init; }
+    public required IReadOnlyList<Position> Positions { get; init; }
+}
+
+public sealed record SelectionRange
+{
+    public required Range Range { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SelectionRange? Parent { get; init; }
+}
+
+public sealed record DocumentLinkParams
+{
+    public required TextDocumentIdentifier TextDocument { get; init; }
+}
+
+public sealed record DocumentLink
+{
+    public required Range Range { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Target { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Tooltip { get; init; }
+}
+
+public sealed record CallHierarchyPrepareParams
+{
+    public required TextDocumentIdentifier TextDocument { get; init; }
+    public required Position Position { get; init; }
+}
+
+public sealed record CallHierarchyItem
+{
+    public required string Name { get; init; }
+    public required SymbolKind Kind { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Detail { get; init; }
+
+    public required string Uri { get; init; }
+    public required Range Range { get; init; }
+    public required Range SelectionRange { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public System.Text.Json.JsonElement? Data { get; init; }
+}
+
+public sealed record CallHierarchyIncomingCallsParams
+{
+    public required CallHierarchyItem Item { get; init; }
+}
+
+public sealed record CallHierarchyIncomingCall
+{
+    public required CallHierarchyItem From { get; init; }
+    public required IReadOnlyList<Range> FromRanges { get; init; }
+}
+
+public sealed record CallHierarchyOutgoingCallsParams
+{
+    public required CallHierarchyItem Item { get; init; }
+}
+
+public sealed record CallHierarchyOutgoingCall
+{
+    public required CallHierarchyItem To { get; init; }
+    public required IReadOnlyList<Range> FromRanges { get; init; }
+}
+
+public sealed record TypeHierarchyPrepareParams
+{
+    public required TextDocumentIdentifier TextDocument { get; init; }
+    public required Position Position { get; init; }
+}
+
+public sealed record TypeHierarchyItem
+{
+    public required string Name { get; init; }
+    public required SymbolKind Kind { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Detail { get; init; }
+
+    public required string Uri { get; init; }
+    public required Range Range { get; init; }
+    public required Range SelectionRange { get; init; }
+}
+
+public sealed record TypeHierarchySupertypesParams
+{
+    public required TypeHierarchyItem Item { get; init; }
+}
+
+public sealed record TypeHierarchySubtypesParams
+{
+    public required TypeHierarchyItem Item { get; init; }
+}
+
+public sealed record RenameFilesParams
+{
+    public required IReadOnlyList<FileRename> Files { get; init; }
+}
+
+public sealed record FileRename
+{
+    public required string OldUri { get; init; }
+    public required string NewUri { get; init; }
+}
+
+public sealed record ExpandMacroParams
+{
+    public required TextDocumentIdentifier TextDocument { get; init; }
+    public required Position Position { get; init; }
+}
+
+public sealed record ServerStatusResult
+{
+    public required string Version { get; init; }
+    public required int OpenDocuments { get; init; }
+    public required int AnalysedFiles { get; init; }
+    public required int IndexedSymbols { get; init; }
+    public required int CancelledRequests { get; init; }
+    public required long PackageCacheHits { get; init; }
+    public required long PackageCacheMisses { get; init; }
+    public required long SyntaxCacheHits { get; init; }
+    public required double ManagedMemoryMb { get; init; }
+    public required double AnalysisP50Ms { get; init; }
+    public required double AnalysisP95Ms { get; init; }
+    public required double CompletionP50Ms { get; init; }
+    public required double CompletionP95Ms { get; init; }
+}
+
 /// <summary>The method names this server reacts to, so a typo is a compile error rather than a
 /// message that is silently never dispatched.</summary>
 public static class LspMethods
@@ -890,25 +1260,47 @@ public static class LspMethods
     public const string DidSave = "textDocument/didSave";
     public const string Hover = "textDocument/hover";
     public const string Definition = "textDocument/definition";
+    public const string TypeDefinition = "textDocument/typeDefinition";
+    public const string Implementation = "textDocument/implementation";
     public const string DocumentSymbol = "textDocument/documentSymbol";
     public const string References = "textDocument/references";
+    public const string DocumentHighlight = "textDocument/documentHighlight";
+    public const string SelectionRange = "textDocument/selectionRange";
+    public const string DocumentLink = "textDocument/documentLink";
+    public const string PrepareCallHierarchy = "textDocument/prepareCallHierarchy";
+    public const string CallHierarchyIncoming = "callHierarchy/incomingCalls";
+    public const string CallHierarchyOutgoing = "callHierarchy/outgoingCalls";
+    public const string PrepareTypeHierarchy = "textDocument/prepareTypeHierarchy";
+    public const string TypeHierarchySupertypes = "typeHierarchy/supertypes";
+    public const string TypeHierarchySubtypes = "typeHierarchy/subtypes";
     public const string Completion = "textDocument/completion";
+    public const string CompletionResolve = "completionItem/resolve";
 
     public const string PrepareRename = "textDocument/prepareRename";
     public const string Rename = "textDocument/rename";
     public const string WorkspaceSymbol = "workspace/symbol";
     public const string SemanticTokensFull = "textDocument/semanticTokens/full";
+    public const string SemanticTokensDelta = "textDocument/semanticTokens/full/delta";
+    public const string SemanticTokensRange = "textDocument/semanticTokens/range";
     public const string SignatureHelp = "textDocument/signatureHelp";
     public const string FoldingRange = "textDocument/foldingRange";
     public const string InlayHint = "textDocument/inlayHint";
     public const string Formatting = "textDocument/formatting";
     public const string Diagnostic = "textDocument/diagnostic";
+    public const string WorkspaceDiagnostic = "workspace/diagnostic";
     public const string CodeAction = "textDocument/codeAction";
     public const string ExecuteCommand = "workspace/executeCommand";
     public const string CodeLens = "textDocument/codeLens";
+    public const string WillRenameFiles = "workspace/willRenameFiles";
 
     /// <summary>The tests of a document — the server's own request beside the protocol's.</summary>
     public const string Tests = "lyric/tests";
+
+    /// <summary>Health, latency percentiles, and cache telemetry for diagnostics.</summary>
+    public const string ServerStatus = "lyric/serverStatus";
+
+    /// <summary>Expand the macro call/attribute at the given cursor position.</summary>
+    public const string ExpandMacro = "lyric/expandMacro";
 
     /// <summary>The commands a test's lens gives the client to run: <c>lyric test -f</c> in the
     /// package's directory, as it is or under the debugger.</summary>
@@ -918,6 +1310,9 @@ public static class LspMethods
     /// <summary>The one command: the module of a document with its macros expanded.</summary>
     public const string ExpandCommand = "lyric.expand";
     public const string DiagnosticRefresh = "workspace/diagnostic/refresh";
+    public const string SemanticTokensRefresh = "workspace/semanticTokens/refresh";
+    public const string InlayHintRefresh = "workspace/inlayHint/refresh";
+    public const string CodeLensRefresh = "workspace/codeLens/refresh";
 
     public const string DidChangeWatchedFiles = "workspace/didChangeWatchedFiles";
 

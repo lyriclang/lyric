@@ -38,15 +38,18 @@ public sealed class LspConnection : IDisposable
     /// bytes without a newline in it fails instead of growing until memory runs out.</summary>
     private const int MaxHeaderLineLength = 8 * 1024;
 
-    private readonly BufferedStream _input;
+    private readonly Stream _input;
     private readonly Stream _output;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private readonly byte[] _readBuffer = new byte[4096];
+    private int _readOffset;
+    private int _readCount;
 
     public LspConnection(Stream input, Stream output)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
-        _input = new BufferedStream(input);
+        _input = input;
         _output = output;
     }
 
@@ -94,14 +97,25 @@ public sealed class LspConnection : IDisposable
             throw new LspProtocolException($"header block without {ContentLengthHeader}");
 
         var body = new byte[contentLength];
-        try
+        var copied = Math.Min(_readCount, contentLength);
+        if (copied > 0)
         {
-            await _input.ReadExactlyAsync(body, cancellationToken).ConfigureAwait(false);
+            _readBuffer.AsSpan(_readOffset, copied).CopyTo(body);
+            _readOffset += copied;
+            _readCount -= copied;
         }
-        catch (EndOfStreamException)
+
+        if (copied < contentLength)
         {
-            throw new LspProtocolException(
-                $"stream ended after fewer than the announced {contentLength} bytes");
+            try
+            {
+                await _input.ReadExactlyAsync(body.AsMemory(copied), cancellationToken).ConfigureAwait(false);
+            }
+            catch (EndOfStreamException)
+            {
+                throw new LspProtocolException(
+                    $"stream ended after fewer than the announced {contentLength} bytes");
+            }
         }
 
         return body;
@@ -148,35 +162,52 @@ public sealed class LspConnection : IDisposable
     {
         var buffer = ArrayPool<byte>.Shared.Rent(256);
         var length = 0;
-        var single = new byte[1];
 
         try
         {
             while (true)
             {
-                if (await _input.ReadAsync(single, cancellationToken).ConfigureAwait(false) == 0)
-                    return length == 0 ? null : throw new LspProtocolException(
-                        "stream ended inside a header line");
-
-                var b = single[0];
-                if (b == (byte)'\n')
+                if (_readCount == 0)
                 {
+                    _readOffset = 0;
+                    _readCount = await _input.ReadAsync(_readBuffer, cancellationToken).ConfigureAwait(false);
+                    if (_readCount == 0)
+                        return length == 0 ? null : throw new LspProtocolException(
+                            "stream ended inside a header line");
+                }
+
+                var available = _readBuffer.AsSpan(_readOffset, _readCount);
+                var newline = available.IndexOf((byte)'\n');
+                var copyCount = newline >= 0 ? newline : available.Length;
+
+                if (length + copyCount > MaxHeaderLineLength)
+                    throw new LspProtocolException("header line without a terminator");
+
+                if (copyCount > 0)
+                {
+                    if (length + copyCount > buffer.Length)
+                    {
+                        var nextSize = Math.Max(buffer.Length * 2, length + copyCount);
+                        var grown = ArrayPool<byte>.Shared.Rent(nextSize);
+                        buffer.AsSpan(0, length).CopyTo(grown);
+                        ArrayPool<byte>.Shared.Return(buffer);
+                        buffer = grown;
+                    }
+
+                    available[..copyCount].CopyTo(buffer.AsSpan(length));
+                    length += copyCount;
+                }
+
+                if (newline >= 0)
+                {
+                    _readOffset += newline + 1;
+                    _readCount -= newline + 1;
                     if (length > 0 && buffer[length - 1] == (byte)'\r') length--;
                     return Encoding.ASCII.GetString(buffer, 0, length);
                 }
 
-                if (length == MaxHeaderLineLength)
-                    throw new LspProtocolException("header line without a terminator");
-
-                if (length == buffer.Length)
-                {
-                    var grown = ArrayPool<byte>.Shared.Rent(buffer.Length * 2);
-                    buffer.AsSpan(0, length).CopyTo(grown);
-                    ArrayPool<byte>.Shared.Return(buffer);
-                    buffer = grown;
-                }
-
-                buffer[length++] = b;
+                _readCount = 0;
+                _readOffset = 0;
             }
         }
         finally

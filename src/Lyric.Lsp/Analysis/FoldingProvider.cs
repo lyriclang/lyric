@@ -22,7 +22,58 @@ public static class FoldingProvider
         var startLines = new HashSet<int>();
 
         Walk(root);
+        AddImportGroupFold();
+        AddDocCommentFolds();
         return ranges;
+
+        void AddImportGroupFold()
+        {
+            var importStart = -1;
+            var importEnd = -1;
+            var count = 0;
+            foreach (var decl in root.Declarations)
+            {
+                if (decl is ImportDecl && decl.Span.File == file)
+                {
+                    var r = SpanMapper.ToRange(sources, decl.Span);
+                    if (importStart < 0) importStart = r.Start.Line;
+                    importEnd = Math.Max(importEnd, r.End.Line);
+                    count++;
+                }
+                else
+                {
+                    if (count >= 3 && importEnd > importStart && startLines.Add(importStart))
+                        ranges.Add(new FoldingRange { StartLine = importStart, EndLine = importEnd });
+                    importStart = -1;
+                    importEnd = -1;
+                    count = 0;
+                }
+            }
+            if (count >= 3 && importEnd > importStart && startLines.Add(importStart))
+                ranges.Add(new FoldingRange { StartLine = importStart, EndLine = importEnd });
+        }
+
+        void AddDocCommentFolds()
+        {
+            var text = sources.GetText(file);
+            var lines = text.Split('\n');
+            var docStart = -1;
+            for (var i = 0; i <= lines.Length; i++)
+            {
+                var isDoc = i < lines.Length && lines[i].TrimStart().StartsWith("///", StringComparison.Ordinal);
+                if (isDoc)
+                {
+                    if (docStart < 0) docStart = i;
+                }
+                else if (docStart >= 0)
+                {
+                    var docEnd = i - 1;
+                    if (docEnd - docStart >= 2 && startLines.Add(docStart))
+                        ranges.Add(new FoldingRange { StartLine = docStart, EndLine = docEnd });
+                    docStart = -1;
+                }
+            }
+        }
 
         void Walk(Node node)
         {

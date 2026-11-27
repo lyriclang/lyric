@@ -129,10 +129,11 @@ public static class SourceCompiler
             diagnostics.Report("LYR-RES0013", Severity.Error, new Span(id, 0, 0),
                 "'std' is the standard library's name — a single file named std.lyr would claim it; rename the file");
 
+        options.Cancellation.ThrowIfCancellationRequested();
         report?.BeginPhase(Phase.Load);
         var resolveStarted = Stopwatch.GetTimestamp();
         CompilerPosition.Begin(sources);
-        var binding = compilation.Resolve();
+        var binding = compilation.Resolve(options.Cancellation);
         var resolveTime = Stopwatch.GetElapsedTime(resolveStarted);
         report?.EndPhase(loaderTime);
         report?.ReportPhase(Phase.Resolve, ModuleCount(loaded), resolveTime - loaderTime);
@@ -148,7 +149,7 @@ public static class SourceCompiler
             {
                 var again = Build(trees);
                 CompilerPosition.Begin(sources);
-                return (again, again.Resolve());
+                return (again, again.Resolve(options.Cancellation));
             });
             report?.EndPhase();
             if (expanded is null) return new CompileResult(sources, diagnostics, null);
@@ -159,7 +160,7 @@ public static class SourceCompiler
 
         options.Cancellation.ThrowIfCancellationRequested();
         report?.BeginPhase(Phase.Check, ModuleCount(loaded));
-        var types = Semantics.Analyze(compilation, binding, diagnostics);
+        var types = Semantics.Analyze(compilation, binding, diagnostics, ideQuery: options.IdeQuery, cancellation: options.Cancellation);
         report?.EndPhase();
         options.Cancellation.ThrowIfCancellationRequested();
 
@@ -167,8 +168,8 @@ public static class SourceCompiler
         // the case an editor cares about most: the text under a cursor is usually mid-edit.
         var model = new SemanticModel(compilation, entry, binding, types);
 
-        // On a faulty AST any lowering result would be guesswork.
-        if (diagnostics.HasErrors)
+        // On a faulty AST or an interactive completion/signature query any evaluation/linting is unnecessary.
+        if (diagnostics.HasErrors || options.IdeQuery)
             return new CompileResult(sources, diagnostics, null, model);
 
         // 'comptime' sites: a lowering that hoists each into a function of its own
@@ -513,6 +514,7 @@ public static class SourceCompiler
         report?.BeginPhase(Phase.Parse, $"{roots.Count} modules");
         foreach (var root in roots)
         {
+            options.Cancellation.ThrowIfCancellationRequested();
             if (root.Open(sources, diagnostics) is not { } id) continue;
 
             var parsed = ParsedModule.Parse(sources, id, diagnostics);
@@ -533,22 +535,24 @@ public static class SourceCompiler
         report?.EndPhase();
         if (entry is null) return new CompileResult(sources, diagnostics, null);
         times.Mark(PhaseClock.Parse);
+        options.Cancellation.ThrowIfCancellationRequested();
 
         CompilerPosition.Begin(sources);
         report?.BeginPhase(Phase.Resolve);
-        var binding = compilation.Resolve();
+        var binding = compilation.Resolve(options.Cancellation);
         report?.EndPhase();
         times.Mark(PhaseClock.Resolve);
         options.Cancellation.ThrowIfCancellationRequested();
         report?.BeginPhase(Phase.Check, $"{compilation.Modules.Count} modules");
-        var types = Semantics.Analyze(compilation, binding, diagnostics, singleProgram: false);
+        var types = Semantics.Analyze(compilation, binding, diagnostics, singleProgram: false,
+            ideQuery: options.IdeQuery, cancellation: options.Cancellation);
         report?.EndPhase();
         times.Mark(PhaseClock.Check);
         options.Cancellation.ThrowIfCancellationRequested();
 
         var model = new SemanticModel(compilation, entry, binding, types);
 
-        if (diagnostics.HasErrors)
+        if (diagnostics.HasErrors || options.IdeQuery)
             return new CompileResult(sources, diagnostics, null, model) { Times = times.Phases };
 
         // Every build that lowers evaluates — a library by itself too; an
@@ -707,6 +711,10 @@ public sealed record CompilerOptions
     /// <summary>Stops the compilation between its phases — an editor's, when the text it reads has
     /// changed meanwhile — with an <see cref="OperationCanceledException"/>.</summary>
     public CancellationToken Cancellation { get; init; }
+
+    /// <summary>Fast interactive query mode (completion/signatureHelp): skips lints, warning passes,
+    /// doc-link checks, comptime site hoisting/evaluation, and lowering after type checking.</summary>
+    public bool IdeQuery { get; init; }
 
     /// <summary>Where phase reports go. <c>null</c> means nobody is listening, and the compiler
     /// then runs with no output dependency at all.</summary>

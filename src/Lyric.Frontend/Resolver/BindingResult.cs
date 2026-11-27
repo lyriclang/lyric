@@ -44,4 +44,18 @@ public sealed class BindingResult
     /// <summary>Every import stepped through by a qualified type path, with the file it was
     /// written in.</summary>
     public IEnumerable<(FileId File, Symbol Symbol)> Qualifiers => _qualifiers;
+
+    private readonly List<(FileId File, TypeNode Node)> _synthesizedInterfaces = [];
+
+    /// <summary>Records an interface type node stripped from a type declaration during conformance
+    /// synthesis so editor tooling (hover, go-to-definition) still reaches its bound symbol.</summary>
+    public void RecordSynthesizedInterface(FileId file, TypeNode node) =>
+        _synthesizedInterfaces.Add((file, node));
+
+    /// <summary>All synthesized conformance type nodes written in <paramref name="file"/>.</summary>
+    public IEnumerable<TypeNode> SynthesizedInterfacesIn(FileId file)
+    {
+        foreach (var (f, node) in _synthesizedInterfaces)
+            if (f == file) yield return node;
+    }
 }

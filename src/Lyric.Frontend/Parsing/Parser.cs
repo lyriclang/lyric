@@ -560,18 +560,16 @@ public sealed partial class Parser
                         _de.Report("LYR-PAR0003", Severity.Error, number.Span, $"expected member name after '.', got {text}");
                         break;
                     }
-                    var name = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0003",
-                        $"expected member name after '.', got {Shown(_buffer.Current)}");
-                    operand = new MemberExpr(operand, _sm.Slice(name.Span).ToString(), false,
+                    var name = ExpectMemberName("'.'");
+                    operand = new MemberExpr(operand, name.Text, false,
                         Span.Union(Whole(operand), name.Span)) { MemberSpan = name.Span };
                     break;
                 }
                 case TokenKind.QuestionDot:
                 {
                     _buffer.Advance();
-                    var name = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0003",
-                        $"expected member name after '?.', got {Shown(_buffer.Current)}");
-                    operand = new MemberExpr(operand, _sm.Slice(name.Span).ToString(), true,
+                    var name = ExpectMemberName("'?.'");
+                    operand = new MemberExpr(operand, name.Text, true,
                         Span.Union(Whole(operand), name.Span)) { MemberSpan = name.Span };
                     break;
                 }
@@ -2135,5 +2133,26 @@ public sealed partial class Parser
         closeSpan = _buffer.Expect(TokenKind.Greater, "LYR-PAR0009",
             $"expected '>' to close type arguments, got {Shown(_buffer.Current)}").Span;
         return args.ToArray();
+    }
+
+    private (string Text, Span Span) ExpectMemberName(string after)
+    {
+        var current = _buffer.Current;
+        if (current.TokenKind is TokenKind.Return or TokenKind.Let or TokenKind.Var or TokenKind.If
+            or TokenKind.Else or TokenKind.While or TokenKind.For or TokenKind.Match or TokenKind.Break
+            or TokenKind.Continue or TokenKind.Throw or TokenKind.Try or TokenKind.Catch or TokenKind.Fn
+            or TokenKind.Struct or TokenKind.Class or TokenKind.Enum or TokenKind.Interface
+            or TokenKind.Extend or TokenKind.Import or TokenKind.Pub
+            or TokenKind.RBrace or TokenKind.Semicolon or TokenKind.Eof)
+        {
+            var anchor = new Span(current.Span.File, current.Span.Start, current.Span.Start);
+            _de.Report("LYR-PAR0003", Severity.Error, anchor,
+                $"expected member name after {after}, got {Shown(current)}");
+            return ("", anchor);
+        }
+
+        var token = _buffer.Expect(TokenKind.Identifier, "LYR-PAR0003",
+            $"expected member name after {after}, got {Shown(current)}");
+        return (_sm.Slice(token.Span).ToString(), token.Span);
     }
 }

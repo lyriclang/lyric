@@ -61,11 +61,35 @@ public sealed class AnalysisService : IDisposable
     private readonly DocumentStore _documents;
     private readonly Func<PublishDiagnosticsParams, CancellationToken, Task> _publish;
     private readonly Func<string, MessageType, CancellationToken, Task> _log;
+    private readonly Func<CancellationToken, Task>? _onAnalysisComplete;
     private readonly TimeSpan _debounce;
     private readonly string? _stdlibRoot;
 
     /// <summary>The toolchain's version: which catalog pages a diagnostic links to.</summary>
     private readonly string? _toolVersion;
+
+    public LspTelemetry Telemetry { get; } = new();
+    public WorkspaceSymbolIndex SymbolIndex { get; } = new();
+
+    private sealed record CachedUnitEntry(
+        PackageUnit? Unit,
+        string? Refused,
+        DateTime ManifestWriteUtc,
+        DateTime LockWriteUtc);
+
+    public sealed record CachedSyntax(
+        int Version,
+        SourceManager Sources,
+        FileId File,
+        Module Root);
+
+    private readonly ConcurrentDictionary<string, CachedUnitEntry> _unitCache =
+        new(DocumentUri.PathComparer);
+
+    private readonly ConcurrentDictionary<string, CachedSyntax> _syntaxCache =
+        new(DocumentUri.PathComparer);
+
+    private readonly ConcurrentQueue<string> _singleFileLru = new();
 
     /// <summary>What the newest analysis of each file found, as the compiler said it — with the
     /// changes its notes suggest, which the code actions offer.</summary>
@@ -172,7 +196,8 @@ public sealed class AnalysisService : IDisposable
         string? stdlibRoot = null,
         string? toolVersion = null,
         Func<string, IAnalysisProgress?>? progress = null,
-        TimeSpan? progressDelay = null)
+        TimeSpan? progressDelay = null,
+        Func<CancellationToken, Task>? onAnalysisComplete = null)
     {
         _toolVersion = toolVersion;
         _progress = progress;
@@ -180,6 +205,7 @@ public sealed class AnalysisService : IDisposable
         _documents = documents;
         _publish = publish;
         _log = log;
+        _onAnalysisComplete = onAnalysisComplete;
         _debounce = debounce;
         _stdlibRoot = stdlibRoot;
         _seed = Task.Run(() => StdlibSeed.Shared(stdlibRoot ?? Lyric5.Build.Pipeline.StdlibRoot));
@@ -208,8 +234,48 @@ public sealed class AnalysisService : IDisposable
     public void ChangedOnDisk(string path)
     {
         if (_disposed) return;
+        InvalidateUnitCacheFor(path);
+        if (!File.Exists(path)) SymbolIndex.RemoveFile(path);
         _ = RunDiskAsync(path, Swap(path));
     }
+
+    private void InvalidateUnitCacheFor(string path)
+    {
+        if (PackageUnit.IsManifest(path))
+        {
+            _unitCache.Clear();
+            return;
+        }
+        var dir = Path.GetDirectoryName(Path.GetFullPath(path));
+        if (dir is null) return;
+        foreach (var key in _unitCache.Keys)
+        {
+            if (dir.StartsWith(key, StringComparison.OrdinalIgnoreCase)
+                || key.StartsWith(dir, StringComparison.OrdinalIgnoreCase))
+                _unitCache.TryRemove(key, out _);
+        }
+    }
+
+    /// <summary>Fast syntax-only parse cached per open document version for immediate outline and folding.</summary>
+    public CachedSyntax ParseSyntax(OpenDocument document)
+    {
+        if (_syntaxCache.TryGetValue(document.Path, out var cached) && cached.Version == document.Version)
+        {
+            Telemetry.RecordSyntaxCacheHit();
+            return cached;
+        }
+
+        var sm = new Core.SourceManager();
+        var de = new Core.DiagnosticEngine(sm);
+        var id = sm.AddVirtual(document.Path, document.Text);
+        var parsed = ParsedModule.Parse(sm, id, de);
+        var entry = new CachedSyntax(document.Version, sm, id, parsed.Ast);
+        _syntaxCache[document.Path] = entry;
+        return entry;
+    }
+
+    /// <summary>Looks up the cached or disk <see cref="PackageUnit"/> for <paramref name="path"/>.</summary>
+    public PackageUnit? UnitForPath(string path) => FindPackageUnitCached(path, out _);
 
     private CancellationTokenSource Swap(string key)
     {
@@ -341,9 +407,62 @@ public sealed class AnalysisService : IDisposable
         var directory = Path.GetDirectoryName(path);
         if (directory is null) return null;
 
-        var unit = PackageUnit.Find(path, out var refused);
+        var unit = FindPackageUnitCached(path, out var refused);
         await NoticeAsync(directory, refused ?? string.Empty, MessageType.Error).ConfigureAwait(false);
         return unit;
+    }
+
+    private PackageUnit? FindPackageUnitCached(string path, out string? refused)
+    {
+        var full = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(full);
+        if (directory is null)
+        {
+            refused = null;
+            return null;
+        }
+
+        var manifestPath = Lyric5.Build.Project.FindManifest(directory);
+        if (manifestPath is null)
+        {
+            refused = null;
+            return null;
+        }
+
+        var rootDir = Path.GetDirectoryName(Path.GetFullPath(manifestPath)) ?? directory;
+        var manifestWrite = SafeWriteUtc(manifestPath);
+        var lockPath = Path.Combine(rootDir, PackageUnit.LockName);
+        var lockWrite = SafeWriteUtc(lockPath);
+
+        if (_unitCache.TryGetValue(rootDir, out var cached)
+            && cached.ManifestWriteUtc == manifestWrite
+            && cached.LockWriteUtc == lockWrite
+            && (cached.Unit is null || cached.Unit.ModuleOf(full) is null || FileExistsInUnit(cached.Unit, full)))
+        {
+            Telemetry.RecordPackageCacheHit();
+            refused = cached.Refused;
+            return cached.Unit;
+        }
+
+        Telemetry.RecordPackageCacheMiss();
+        var unit = PackageUnit.Find(full, out refused);
+        _unitCache[rootDir] = new CachedUnitEntry(unit, refused, manifestWrite, lockWrite);
+        return unit;
+    }
+
+    private static DateTime SafeWriteUtc(string path)
+    {
+        try { return File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue; }
+        catch (IOException) { return DateTime.MinValue; }
+    }
+
+    private bool FileExistsInUnit(PackageUnit unit, string fullPath)
+    {
+        if (_documents.ByPath(fullPath) is not null) return true;
+        foreach (var (file, _) in unit.Files)
+            if (DocumentUri.PathComparer.Equals(file, fullPath))
+                return true;
+        return !File.Exists(fullPath);
     }
 
     /// <summary>
@@ -450,14 +569,21 @@ public sealed class AnalysisService : IDisposable
     /// keystroke that triggered this, and its spans are indices into that text. A compile of its own
     /// is what makes the answer about what the user is looking at.</para>
     /// </summary>
+    public Task<IReadOnlyList<CompletionItem>?> CompleteAsync(
+        OpenDocument document, int offset, CancellationToken cancellationToken) =>
+        CompleteAsync(document, offset, snippetSupport: false, cancellationToken);
+
     public async Task<IReadOnlyList<CompletionItem>?> CompleteAsync(
-        OpenDocument document, int offset, CancellationToken cancellationToken)
+        OpenDocument document, int offset, bool snippetSupport, CancellationToken cancellationToken)
     {
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
         var (options, module) = await OptionsForAsync(document, cancellationToken).ConfigureAwait(false);
 
-        return await Task.Run(
-            () => CompletionProvider.At(document.Path, document.Text, offset, options, module),
+        var items = await Task.Run(
+            () => CompletionProvider.At(document.Path, document.Text, offset, options, module, snippetSupport, SymbolIndex),
             cancellationToken).ConfigureAwait(false);
+        Telemetry.RecordCompletion(System.Diagnostics.Stopwatch.GetElapsedTime(started));
+        return items;
     }
 
     /// <summary>
@@ -536,18 +662,19 @@ public sealed class AnalysisService : IDisposable
 
         // The buffers that go into this compile, captured BEFORE it: the version guard below has
         // to ask about exactly what was compiled, not about whatever is open afterwards.
-        var opens = new List<OpenDocument>();
+        var captured = new Dictionary<string, OpenDocument?>(roots.Count, DocumentUri.PathComparer);
         var scripts = new List<ScriptSource>(roots.Count);
         foreach (var path in roots)
         {
             var name = unit.ModuleOf(path)!;
             if (_documents.ByPath(path) is { } open)
             {
-                opens.Add(open);
+                captured[path] = open;
                 scripts.Add(ScriptSource.FromBuffer(path, open.Text, name));
             }
             else
             {
+                captured[path] = null;
                 scripts.Add(ScriptSource.FromDisk(path, name));
             }
         }
@@ -562,10 +689,13 @@ public sealed class AnalysisService : IDisposable
 
         token.ThrowIfCancellationRequested();
 
+        var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(started);
+        Telemetry.RecordAnalysis(elapsed);
+
         // What 'lyric check -v' says of a build, said of each analysis in the client's log: where
         // an editor that waits spends its time.
-        await SafeLogAsync(Timings(Path.GetFileName(unit.Root), roots.Count, result.Times,
-            System.Diagnostics.Stopwatch.GetElapsedTime(started)), MessageType.Log).ConfigureAwait(false);
+        await SafeLogAsync(Timings(Path.GetFileName(unit.Root), roots.Count, result.Times, elapsed),
+            MessageType.Log).ConfigureAwait(false);
 
         // Recorded even when the result is discarded below: what this unit reads does not depend
         // on whether its diagnostics are still wanted.
@@ -575,27 +705,35 @@ public sealed class AnalysisService : IDisposable
         // Asked AFTER the compile as well as before it, for EVERY buffer that went in. The compile
         // takes long enough for a file to have changed while it ran, and that is precisely when
         // publishing does damage.
-        foreach (var open in opens)
-            if (!_documents.IsCurrent(open))
+        foreach (var open in captured.Values)
+            if (open is not null && !_documents.IsCurrent(open))
                 return;
         if (trigger is not null && !_documents.IsCurrent(trigger)) return;
 
         var diagnostics = result.Diagnostics.SortedSnapshot();
+        if (result.Model is { } compiledModel)
+            SymbolIndex.UpdateCompilation(compiledModel, result.Sources);
 
         var published = new List<string>(roots.Count);
         foreach (var path in roots)
         {
-            var file = DiagnosticMapper.FindFile(result.Sources, path);
-            var open = _documents.ByPath(path);
-            var uri = open?.Uri ?? DocumentUri.FromFilePath(path);
+            var capturedOpen = captured[path];
+            if (capturedOpen is not null ? !_documents.IsCurrent(capturedOpen) : _documents.ByPath(path) is not null)
+            {
+                Settle(path);
+                continue;
+            }
 
-            // Errors do not disqualify a model — a program with a type error still has resolved
-            // names and types for everything around it, which is the state an editor is in most of
-            // the time.
+            var file = DiagnosticMapper.FindFile(result.Sources, path);
+            var uri = capturedOpen?.Uri ?? DocumentUri.FromFilePath(path);
+
+            // Errors do not disqualify a model — unless severe parse recovery truncated the module
+            // while we already have a healthier snapshot.
             if (file.IsValid && result.Model is { } model && RootOf(model, file) is { } moduleAst)
             {
-                _lastGood[path] = new AnalysisSnapshot(model, result.Sources, file, moduleAst,
-                    result.Sources.GetText(file), open?.Version ?? 0, ProjectWide: true);
+                var nextSnap = new AnalysisSnapshot(model, result.Sources, file, moduleAst,
+                    result.Sources.GetText(file), capturedOpen?.Version ?? 0, ProjectWide: true);
+                StoreLastGood(path, nextSnap, result.Diagnostics, trackSingleFileLru: false);
             }
 
             published.Add(uri);
@@ -608,7 +746,7 @@ public sealed class AnalysisService : IDisposable
                 await _publish(new PublishDiagnosticsParams
                 {
                     Uri = uri,
-                    Version = open?.Version,
+                    Version = capturedOpen?.Version,
                     Diagnostics = file.IsValid
                         ? DiagnosticMapper.ForFile(result.Sources, diagnostics, file, _toolVersion)
                         : [],
@@ -630,6 +768,7 @@ public sealed class AnalysisService : IDisposable
                 if (!stillThere.Contains(PathOf(uri)))
                 {
                     _lastGood.TryRemove(PathOf(uri), out _);
+                    SymbolIndex.RemoveFile(PathOf(uri));
                     await _publish(new PublishDiagnosticsParams { Uri = uri, Diagnostics = [] },
                         token).ConfigureAwait(false);
                 }
@@ -641,6 +780,9 @@ public sealed class AnalysisService : IDisposable
         foreach (var diagnostic in diagnostics)
             if (!diagnostic.Span.File.IsValid)
                 await SafeLogAsync($"{diagnostic.Code}: {diagnostic.Message}").ConfigureAwait(false);
+
+        if (_onAnalysisComplete is not null)
+            await _onAnalysisComplete(token).ConfigureAwait(false);
     }
 
     /// <summary>A document outside every project: compiled from itself, exactly as before the
@@ -648,6 +790,7 @@ public sealed class AnalysisService : IDisposable
     private async Task AnalyzeSingleAsync(OpenDocument document, CancellationToken cancellationToken,
         ICompilerProgress? phases = null)
     {
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
         var (options, module) = await OptionsForAsync(document, cancellationToken).ConfigureAwait(false);
         options = options with { Progress = phases };
 
@@ -657,6 +800,7 @@ public sealed class AnalysisService : IDisposable
             cancellationToken).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
+        Telemetry.RecordAnalysis(System.Diagnostics.Stopwatch.GetElapsedTime(started));
 
         _dependencies[document.Path] = FilesRead(result.Sources);
         _unitOf[document.Path] = document.Path;
@@ -672,9 +816,10 @@ public sealed class AnalysisService : IDisposable
 
         if (file.IsValid && result.Model is { } model)
         {
-            _lastGood[document.Path] =
-                new AnalysisSnapshot(model, result.Sources, file, model.Entry, document.Text,
-                    document.Version, ProjectWide: false);
+            SymbolIndex.UpdateCompilation(model, result.Sources);
+            var nextSnap = new AnalysisSnapshot(model, result.Sources, file, model.Entry, document.Text,
+                document.Version, ProjectWide: false);
+            StoreLastGood(document.Path, nextSnap, result.Diagnostics, trackSingleFileLru: true);
         }
 
         // The entry file is missing from the source manager only when the run never opened it. The
@@ -699,7 +844,55 @@ public sealed class AnalysisService : IDisposable
             }, cancellationToken).ConfigureAwait(false);
         }
         finally { Settle(document.Path); }
+
+        if (_onAnalysisComplete is not null)
+            await _onAnalysisComplete(cancellationToken).ConfigureAwait(false);
     }
+
+    private void StoreLastGood(
+        string path, AnalysisSnapshot candidate, Core.DiagnosticEngine diagnostics, bool trackSingleFileLru)
+    {
+        if (_lastGood.TryGetValue(path, out var existing) && ShouldPreserveLastGood(existing, candidate.Root, candidate.File, diagnostics))
+            return;
+
+        _lastGood[path] = candidate;
+        if (trackSingleFileLru)
+        {
+            _singleFileLru.Enqueue(path);
+            while (_singleFileLru.Count > 64 && _singleFileLru.TryDequeue(out var oldest))
+            {
+                if (!DocumentUri.PathComparer.Equals(oldest, path) && _documents.ByPath(oldest) is null)
+                {
+                    _lastGood.TryRemove(oldest, out _);
+                    SymbolIndex.RemoveFile(oldest);
+                }
+            }
+        }
+    }
+
+    private static bool ShouldPreserveLastGood(
+        AnalysisSnapshot existing, Module nextRoot, Core.FileId file, Core.DiagnosticEngine diagnostics)
+    {
+        var hasSyntaxError = false;
+        foreach (var d in diagnostics.Diagnostics)
+        {
+            if (d.Span.File == file && d.Severity == Core.Severity.Error
+                && (d.Code.StartsWith("LYR-PAR", StringComparison.Ordinal)
+                    || d.Code.StartsWith("LYR-LEX", StringComparison.Ordinal)))
+            {
+                hasSyntaxError = true;
+                break;
+            }
+        }
+        if (!hasSyntaxError) return false;
+        if (nextRoot.Declarations.Length < existing.Root.Declarations.Length) return true;
+        foreach (var decl in nextRoot.Declarations)
+            if (diagnostics.IsUnparsed(decl.Span))
+                return true;
+        return false;
+    }
+
+    public int AnalysedCount => _lastGood.Count;
 
     /// <summary>
     /// What closing a document means depends on what the document was.
@@ -730,6 +923,7 @@ public sealed class AnalysisService : IDisposable
         // The model goes with the buffer. Keeping it would answer questions about a file the editor
         // has closed, from text it no longer holds.
         _lastGood.TryRemove(document.Path, out _);
+        _syntaxCache.TryRemove(document.Path, out _);
         _published.TryRemove(document.Path, out _);
         _unitOf.TryRemove(document.Path, out _);
         _dependencies.TryRemove(document.Path, out _);
@@ -820,7 +1014,21 @@ public sealed class AnalysisService : IDisposable
     private static string PathOf(string uri) =>
         DocumentUri.TryToFilePath(uri, out var path) ? path : uri;
 
-    private CancellationTokenSource BeginRun(string unitKey, CancellationToken outer)
+    private sealed class RunLease(
+        ConcurrentDictionary<string, CancellationTokenSource> running,
+        string unitKey,
+        CancellationTokenSource cts) : IDisposable
+    {
+        public CancellationToken Token => cts.Token;
+
+        public void Dispose()
+        {
+            running.TryRemove(new KeyValuePair<string, CancellationTokenSource>(unitKey, cts));
+            cts.Dispose();
+        }
+    }
+
+    private RunLease BeginRun(string unitKey, CancellationToken outer)
     {
         var run = CancellationTokenSource.CreateLinkedTokenSource(outer);
 
@@ -831,7 +1039,7 @@ public sealed class AnalysisService : IDisposable
         }
 
         _running[unitKey] = run;
-        return run;
+        return new RunLease(_running, unitKey, run);
     }
 
     /// <summary>Logging must not itself throw on a connection that is already going down.</summary>

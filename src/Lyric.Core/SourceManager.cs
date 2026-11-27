@@ -105,14 +105,10 @@ public sealed class SourceManager
         if (id.Value > _files.Count) throw new ArgumentException($"no file with id:{id.Value}", nameof(id));
         var fileEntry = _files[id.Value - 1];
         if (offset < 0 || offset > fileEntry.Text.Length) throw new ArgumentOutOfRangeException(nameof(offset));
-        int line = 0;
-        do
-        {
-            var currentLineStart = fileEntry.LineStarts[line];
-            if (currentLineStart > offset) break;
-            line++;
-        } while (line < fileEntry.LineStarts.Length);
-        return new LinePosition(line, offset - fileEntry.LineStarts[line - 1] + 1);
+        var lineStarts = fileEntry.LineStarts;
+        var index = Array.BinarySearch(lineStarts, offset);
+        var lineIndex = index >= 0 ? index : Math.Clamp(~index - 1, 0, lineStarts.Length - 1);
+        return new LinePosition(lineIndex + 1, offset - lineStarts[lineIndex] + 1);
     }
 
     public LinePosition LocateStart(Span span)

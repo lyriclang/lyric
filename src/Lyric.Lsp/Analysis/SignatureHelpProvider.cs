@@ -27,7 +27,7 @@ public static class SignatureHelpProvider
     {
         if (offset < 0 || offset > text.Length) return null;
 
-        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, text, moduleName), options);
+        var result = SourceCompiler.Check(ScriptSource.FromBuffer(path, text, moduleName), options with { IdeQuery = true });
         if (result.Model is not { } model) return null;
 
         var file = DiagnosticMapper.FindFile(result.Sources, path);
@@ -52,7 +52,7 @@ public static class SignatureHelpProvider
         if (symbol is not null) symbol = ReferenceProvider.Target(symbol);
 
         var signature = symbol is FunctionSymbol { Declaration: FunctionDecl declaration }
-            ? Declared(result.Sources, declaration)
+            ? Declared(result.Sources, declaration, model.Documentation.Of(declaration))
             : FromType(call, model);
         if (signature is null) return null;
 
@@ -60,26 +60,35 @@ public static class SignatureHelpProvider
         {
             Signatures = [signature],
             ActiveSignature = 0,
-            ActiveParameter = ActiveParameter(call, offset),
+            ActiveParameter = ActiveParameter(call, text, offset),
         };
     }
 
     /// <summary>The argument the cursor stands in — or the one it is about to start, which is why
-    /// a position past every parsed argument counts one further.</summary>
-    private static int ActiveParameter(CallExpr call, int offset)
+    /// a position past every parsed argument counts one further (including after a trailing
+    /// comma).</summary>
+    private static int ActiveParameter(CallExpr call, string text, int offset)
     {
         var active = 0;
         foreach (var argument in call.Arguments)
         {
-            if (offset <= argument.Span.End) break;
+            if (offset <= argument.Span.End) return active;
             active++;
+        }
+        // When recovery drops a trailing comma without starting a next argument, count commas after
+        // the last argument (or after '(' when empty) before offset so 'f(a, )' highlights param 1.
+        if (call.Arguments.Length > 0)
+        {
+            var afterLast = call.Arguments[^1].Span.End;
+            for (var i = Math.Max(afterLast, call.Callee.Span.End); i < offset && i < text.Length; i++)
+                if (text[i] == ',') return Math.Max(active, call.Arguments.Length);
         }
         return active;
     }
 
     /// <summary>The declaration as written: name, generics, each parameter sliced from its own
     /// span, the return type from its.</summary>
-    private static SignatureInformation Declared(SourceManager sources, FunctionDecl declaration)
+    private static SignatureInformation Declared(SourceManager sources, FunctionDecl declaration, string? documentation = null)
     {
         var parameters = declaration.Parameters
             .Select(parameter => Flat(sources.Slice(parameter.Span).ToString()))
@@ -100,6 +109,9 @@ public static class SignatureHelpProvider
             Parameters = parameters
                 .Select(parameter => new ParameterInformation { Label = parameter })
                 .ToArray(),
+            Documentation = string.IsNullOrWhiteSpace(documentation)
+                ? null
+                : new MarkupContent { Value = HoverProvider.Sections(documentation) },
         };
     }
 

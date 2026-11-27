@@ -133,9 +133,19 @@ public sealed class TypeChecker
     private LyrType? _currentThis;
     private ModuleSymbol? _currentModule; // for extension visibility
     private Dictionary<Symbol, LyrType> _narrowed = new(ReferenceEqualityComparer.Instance); // ?T narrowed to T inside a proven non-null region
+    private readonly CancellationToken _cancellation;
+    private int _cancelPoll;
 
-    public TypeChecker(Compilation comp, BindingResult binding, DiagnosticEngine de)
+    private void PollCancel()
     {
+        if ((++_cancelPoll & 0x7F) == 0)
+            _cancellation.ThrowIfCancellationRequested();
+    }
+
+    public TypeChecker(Compilation comp, BindingResult binding, DiagnosticEngine de,
+        CancellationToken cancellation = default)
+    {
+        _cancellation = cancellation;
         _comp = comp;
         _binding = binding;
         _de = de;
@@ -360,6 +370,7 @@ public sealed class TypeChecker
 
     private void ComputeGlobals(ModuleSymbol module)
     {
+        PollCancel();
         // This pass runs before the declaration walk, so the module context is set here as
         // well: an initializer's expression check reads it — extension visibility. Null would mean "bare snippet" for every
         // global of a real module.
@@ -538,6 +549,7 @@ public sealed class TypeChecker
 
     private void CheckDecl(Decl decl, ModuleSymbol module)
     {
+        PollCancel();
         switch (decl)
         {
             case FunctionDecl fn:
@@ -3422,6 +3434,7 @@ public sealed class TypeChecker
 
     private void CheckStmt(Stmt stmt, SymbolTable scope)
     {
+        PollCancel();
         switch (stmt)
         {
             case Block b: CheckBlock(b, scope); break;
@@ -4634,6 +4647,7 @@ public sealed class TypeChecker
 
     private LyrType CheckExpr(Expr expr, SymbolTable scope, LyrType? expected = null)
     {
+        PollCancel();
         // A compound assignment's target, met again as its operator's left side (CheckAssign).
         if (ReferenceEquals(expr, _typedTarget)) return _result.TypeOf(expr) ?? LyrType.Error;
         if (++_depth > MaxNesting) return Deeper(expr.Span);
@@ -5677,6 +5691,9 @@ public sealed class TypeChecker
     /// </summary>
     private LyrType CheckImplicitMember(ImplicitMemberExpr im, LyrType? expected)
     {
+        if (expected is not null && !expected.IsError)
+            _result.SetImplicitExpected(im, expected);
+
         if (EnumFromExpected(expected) is not { } target)
         {
             var hint = expected is null || expected.IsError
